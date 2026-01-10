@@ -130,8 +130,8 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       continue;
     }
 
-    // Check for double thick parts (contains 15)
-    if (sku.includes('15')) {
+    // Check for double thick parts (starts with 15)
+    if (sku.startsWith('15')) {
       hasDoubleThick = true;
     }
 
@@ -154,9 +154,30 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       weightLbs += areaSqFt * LBS_PER_SQFT;
     }
 
-    // Count other 34* parts as core parts
-    if (sku.startsWith('34') || sku.startsWith('DRWEURO') || sku.startsWith('JDRWEURO') ||
-        sku.startsWith('TK') || sku.startsWith('FILL')) {
+    // Count valid part SKUs as core parts
+    // 34* and 15* parts (panels, dividers, etc.)
+    if (sku.startsWith('34') || sku.startsWith('15')) {
+      coreParts += quantity;
+      continue;
+    }
+    
+    // Drawer fronts (DRWEURO, JDRWEURO, BDRWEURO, IDRWEURO variants)
+    if (sku.includes('DRWEURO')) {
+      coreParts += quantity;
+      continue;
+    }
+    
+    // Door parts (LIFTDR, BADR, HBADR, DDR, LDR, RDR, HDR, KLDR, KRDR, GLDR)
+    if (sku.startsWith('LIFTDR') || sku.startsWith('BADR') || sku.startsWith('HBADR') ||
+        sku.startsWith('DDR') || sku.startsWith('LDR') || sku.startsWith('RDR') ||
+        sku.startsWith('HDR') || sku.startsWith('KLDR') || sku.startsWith('KRDR') ||
+        sku.startsWith('GLDR') || sku.startsWith('GRDREURO') || sku.startsWith('GLDREURO')) {
+      coreParts += quantity;
+      continue;
+    }
+    
+    // Other known part prefixes
+    if (sku.startsWith('TK') || sku.startsWith('FILL')) {
       coreParts += quantity;
     }
   }
