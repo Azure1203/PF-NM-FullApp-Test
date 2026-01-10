@@ -53,6 +53,11 @@ function formatPONumber(po: string | undefined): string | undefined {
   return po.replace(/[#\-]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+// M&J door keywords to detect
+const MJ_DOOR_KEYWORDS = [
+  'DRSLIMLINE', 'DRVENICE', 'DRSUSSEX', 'DRLANCASTER', 'DRLANCASTER-VGROOVE', 'DRLANCASTER-GD'
+];
+
 // Glass part keywords to detect
 const GLASS_KEYWORDS = [
   'CLEAR', 'FROSTED', 'FLUTEX', 'CATHEDRAL', 'BAMBOO', 'MIRROR',
@@ -64,7 +69,7 @@ const GLASS_KEYWORDS = [
 ];
 
 // Count parts from actual CSV data rows
-function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; hasShakerDoors: boolean; hasGlassParts: boolean; maxLength: number; weightLbs: number } {
+function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; hasShakerDoors: boolean; hasGlassParts: boolean; hasMJDoors: boolean; maxLength: number; weightLbs: number } {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
@@ -72,6 +77,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
   let hasDoubleThick = false;
   let hasShakerDoors = false;
   let hasGlassParts = false;
+  let hasMJDoors = false;
   let maxLength = 0;
   let weightLbs = 0;
   
@@ -89,7 +95,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, hasGlassParts, maxLength, weightLbs };
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, hasGlassParts, hasMJDoors, maxLength, weightLbs };
 
   // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
@@ -140,6 +146,11 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       hasGlassParts = true;
     }
 
+    // Check for M&J doors
+    if (!hasMJDoors && MJ_DOOR_KEYWORDS.some(keyword => sku.includes(keyword))) {
+      hasMJDoors = true;
+    }
+
     // Track max part height (column 3 is Height)
     const height = parseFloat(row[3] || '0') || 0;
     if (height > maxLength) {
@@ -182,7 +193,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, hasGlassParts, maxLength, weightLbs };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, hasGlassParts, hasMJDoors, maxLength, weightLbs };
 }
 
 export async function registerRoutes(
@@ -362,6 +373,7 @@ export async function registerRoutes(
       let hasDoubleThick = false;
       let hasShakerDoors = false;
       let hasGlassParts = false;
+      let hasMJDoors = false;
       let overallMaxLength = 0;
 
       interface FileData {
@@ -386,6 +398,7 @@ export async function registerRoutes(
           if (counts.hasDoubleThick) hasDoubleThick = true;
           if (counts.hasShakerDoors) hasShakerDoors = true;
           if (counts.hasGlassParts) hasGlassParts = true;
+          if (counts.hasMJDoors) hasMJDoors = true;
           if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
 
           // Extract room/design name from PO (text in parentheses)
@@ -440,6 +453,7 @@ PALLET SIZE: ${palletSize}
 WAS THERE BUYOUT HARDWARE: 
 ARE THERE PARTS AT CUSTOM: ${customPartsAnswer}
 ARE THERE GLASS PARTS: ${hasGlassParts ? 'YES' : 'NO'}
+ARE THERE DOORS FROM M&J: ${hasMJDoors ? 'YES' : 'NO'}
 
 --- ORDER BREAKDOWN ---
 
