@@ -47,6 +47,12 @@ function formatPhoneNumber(phone: string | undefined): string | undefined {
   return phone;
 }
 
+// Format PO number - remove # and - but keep ( and )
+function formatPONumber(po: string | undefined): string | undefined {
+  if (!po) return undefined;
+  return po.replace(/[#\-]/g, '').replace(/\s+/g, ' ').trim();
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -92,7 +98,7 @@ export async function registerRoutes(
       for (const file of files) {
         const fileContent = file.buffer.toString('utf-8');
         const records = await parseCSV(fileContent);
-        const poNumber = findValue(records, 'PO:');
+        const poNumber = formatPONumber(findValue(records, 'PO:'));
         parsedFiles.push({
           filename: file.originalname,
           content: fileContent,
