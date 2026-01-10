@@ -44,4 +44,4 @@ integrations = ["asana:1.0.0"]
 [userenv]
 
 [userenv.shared]
-ASANA_PROJECT_GID = "145195141877944"
+ASANA_PROJECT_GID = "1208263802564738"
