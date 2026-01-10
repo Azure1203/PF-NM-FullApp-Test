@@ -187,26 +187,37 @@ export async function registerRoutes(
       let templateTaskGid: string | undefined;
       
       try {
-        const asanaProjects = await projectsApi.getProjectsForWorkspace(workspaceId, { archived: false });
-        const asanaProject = asanaProjects.data?.find((p: any) => p.name.trim() === 'Perfect Fit Production');
+        // Get all projects and log them for debugging
+        const asanaProjects = await projectsApi.getProjectsForWorkspace(workspaceId, { archived: false, opt_fields: 'name,gid' });
+        console.log("Available Asana projects:", asanaProjects.data?.map((p: any) => p.name));
+        
+        // Search for project with flexible matching
+        const asanaProject = asanaProjects.data?.find((p: any) => 
+          p.name.trim().toLowerCase().includes('perfect fit')
+        );
+        
         if (asanaProject) {
+          console.log("Found project:", asanaProject.name, asanaProject.gid);
           asanaProjectGid = asanaProject.gid;
           
           // Find template task in the project
           const projectTasks = await tasksApi.getTasksForProject(asanaProjectGid, { opt_fields: 'name,gid' });
+          console.log("Tasks in project:", projectTasks.data?.slice(0, 10).map((t: any) => t.name));
+          
           const templateTask = projectTasks.data?.find((t: any) => 
-            t.name.includes('(PERFECT FIT) ORDER TEMPLATE / DO NOT DELETE')
+            t.name.includes('ORDER TEMPLATE')
           );
           if (templateTask) {
+            console.log("Found template task:", templateTask.name);
             templateTaskGid = templateTask.gid;
           }
         }
-      } catch (e) {
-        console.error("Error finding project/template:", e);
+      } catch (e: any) {
+        console.error("Error finding project/template:", e.response?.body || e);
       }
 
       if (!asanaProjectGid) {
-        return res.status(400).json({ message: 'Could not find "Perfect Fit Production" project in Asana' });
+        return res.status(400).json({ message: 'Could not find a "Perfect Fit" project in Asana. Please check that you have access to this project.' });
       }
 
       // Build file list for task notes
