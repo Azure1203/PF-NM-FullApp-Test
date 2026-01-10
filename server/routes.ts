@@ -55,13 +55,8 @@ export async function registerRoutes(
 
         // Helper to find value by key
         const findValue = (keyStart: string): string | undefined => {
-          // Special case for Date in A2 (records[1][0] is A2 in 0-indexed rows)
-          if (keyStart.toLowerCase() === 'date' && records[1] && records[1][0]) {
-            return records[1][0];
-          }
-
           for (const row of records) {
-            if (row[0] && row[0].toLowerCase().startsWith(keyStart.toLowerCase())) {
+            if (row[0] && row[0].toLowerCase().includes(keyStart.toLowerCase())) {
               return row[1];
             }
           }
@@ -74,15 +69,15 @@ export async function registerRoutes(
         extractedData.phone = findValue('Phone');
         extractedData.taxId = findValue('Tax ID');
         extractedData.orderId = findValue('Order ID');
-        extractedData.poNumber = findValue('PO:'); // "PO:/Design Name..."
+        extractedData.poNumber = findValue('PO:'); 
 
         const powerTailgateVal = findValue('Power Tail Gate');
-        if (powerTailgateVal && powerTailgateVal.toLowerCase() === 'yes') {
+        if (powerTailgateVal && powerTailgateVal.toLowerCase().includes('yes')) {
           extractedData.powerTailgate = true;
         }
 
         const phoneApptVal = findValue('Phone Appointment');
-        if (phoneApptVal && phoneApptVal.toLowerCase() === 'yes') {
+        if (phoneApptVal && phoneApptVal.toLowerCase().includes('yes')) {
           extractedData.phoneAppointment = true;
         }
 
