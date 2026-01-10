@@ -182,27 +182,30 @@ export async function registerRoutes(
       const me = await usersApi.getUser('me');
       const workspaceId = me.data.workspaces[0].gid;
 
-      // Find "Perfect Fit Production" project
-      let asanaProjectGid: string | undefined;
+      // Use configured Asana project GID, or search for it
+      let asanaProjectGid = process.env.ASANA_PROJECT_GID;
       let templateTaskGid: string | undefined;
       
       try {
-        // Get all projects and log them for debugging
-        const asanaProjects = await projectsApi.getProjectsForWorkspace(workspaceId, { archived: false, opt_fields: 'name,gid' });
-        console.log("Available Asana projects:", asanaProjects.data?.map((p: any) => p.name));
-        
-        // Search for project with flexible matching
-        const asanaProject = asanaProjects.data?.find((p: any) => 
-          p.name.trim().toLowerCase().includes('perfect fit')
-        );
-        
-        if (asanaProject) {
-          console.log("Found project:", asanaProject.name, asanaProject.gid);
-          asanaProjectGid = asanaProject.gid;
+        // If no project GID configured, try to find it
+        if (!asanaProjectGid) {
+          const asanaProjects = await projectsApi.getProjectsForWorkspace(workspaceId, { archived: false, opt_fields: 'name,gid' });
+          console.log("Available Asana projects:", asanaProjects.data?.map((p: any) => ({ name: p.name, gid: p.gid })));
           
+          const asanaProject = asanaProjects.data?.find((p: any) => 
+            p.name.trim().toLowerCase().includes('perfect fit')
+          );
+          
+          if (asanaProject) {
+            console.log("Found project:", asanaProject.name, "GID:", asanaProject.gid);
+            console.log("TIP: Set ASANA_PROJECT_GID=" + asanaProject.gid + " to skip this search");
+            asanaProjectGid = asanaProject.gid;
+          }
+        }
+        
+        if (asanaProjectGid) {
           // Find template task in the project
           const projectTasks = await tasksApi.getTasksForProject(asanaProjectGid, { opt_fields: 'name,gid' });
-          console.log("Tasks in project:", projectTasks.data?.slice(0, 10).map((t: any) => t.name));
           
           const templateTask = projectTasks.data?.find((t: any) => 
             t.name.includes('ORDER TEMPLATE')
@@ -217,7 +220,7 @@ export async function registerRoutes(
       }
 
       if (!asanaProjectGid) {
-        return res.status(400).json({ message: 'Could not find a "Perfect Fit" project in Asana. Please check that you have access to this project.' });
+        return res.status(400).json({ message: 'Asana project not found. Please set the ASANA_PROJECT_GID environment variable with your Perfect Fit Production project ID.' });
       }
 
       // Build file list for task notes
