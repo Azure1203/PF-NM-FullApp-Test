@@ -412,12 +412,11 @@ export async function registerRoutes(
           if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
           if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
 
-          // Extract room/design name from PO (text in parentheses)
-          const match = (file.poNumber || file.originalFilename).match(/\(([^)]+)\)/);
-          const roomName = match ? match[1] : (file.poNumber || file.originalFilename);
+          // Use full PO name for the file listing
+          const fullPoName = file.poNumber || file.originalFilename;
           
           fileDataList.push({
-            name: roomName,
+            name: fullPoName,
             coreParts: counts.coreParts,
             dovetails: counts.dovetails,
             assembledDrawers: counts.assembledDrawers,
