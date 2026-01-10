@@ -225,7 +225,7 @@ export async function registerRoutes(
 
       // Build file list for task notes
       const fileList = projectFiles.map(f => `  - ${f.poNumber || f.originalFilename}`).join('\n');
-      const taskName = `${project.dealer || 'Project'} - ${project.name}`;
+      const taskName = `(PERFECT FIT) ${project.name}`;
       const taskNotes = `
 Dealer: ${project.dealer || ''}
 Date: ${project.date || ''}
@@ -250,14 +250,14 @@ ${fileList}
           {}
         );
 
-        // Wait for duplication job to complete
+        // Wait for duplication job to complete (up to 30 seconds)
         const jobGid = duplicateResult.data.gid;
         let jobComplete = false;
         let attempts = 0;
         let newTask: any;
 
-        while (!jobComplete && attempts < 10) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        while (!jobComplete && attempts < 30) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
           const jobStatus = await jobsApi.getJob(jobGid, {});
           if (jobStatus.data.status === 'succeeded') {
             jobComplete = true;
