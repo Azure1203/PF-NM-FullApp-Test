@@ -133,20 +133,6 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       continue;
     }
 
-    // 5-piece shaker doors with GD suffix (TFL90SHAGD)
-    if (sku.includes('TFL90SHAGD')) {
-      fivePiece += quantity;
-      hasShakerDoors = true;
-      continue;
-    }
-    
-    // Regular shaker doors (TFL90SHA without GD) count as core parts
-    if (sku.includes('TFL90SHA')) {
-      coreParts += quantity;
-      hasShakerDoors = true;
-      continue;
-    }
-
     // Check for double thick parts (starts with 15)
     if (sku.startsWith('15')) {
       hasDoubleThick = true;
@@ -188,38 +174,26 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       continue;
     }
     
-    // Drawer fronts - all DRW variants (DRWEURO, JDRWEURO, BDRWEURO, IDRWEURO, DRWTFL90SHA, DRWSLIMLINE, etc.)
-    // Match: DRW, JDRW, BDRW, IDRW (but not already caught by TFL90SHA check above)
-    if (sku.startsWith('DRW') || sku.startsWith('JDRW') || sku.startsWith('BDRW') || sku.startsWith('IDRW') ||
-        sku.startsWith('MTDRW') || sku.startsWith('HGDRW') || 
-        sku.startsWith('MTJDRW') || sku.startsWith('HGJDRW') ||
-        sku.startsWith('MTBDRW') || sku.startsWith('HGBDRW') ||
-        sku.startsWith('MTIDRW') || sku.startsWith('HGIDRW')) {
+    // Drawer fronts (DRWEURO, JDRWEURO, BDRWEURO, IDRWEURO variants)
+    if (sku.includes('DRWEURO')) {
       coreParts += quantity;
       continue;
     }
     
-    // Door parts (LIFTDR, BADR, HBADR, DDR, LDR, RDR, HDR, KLDR, KRDR, GLDR, GRDR and MT/HG variants)
-    if (sku.startsWith('LIFTDR') || sku.startsWith('MTLIFTDR') || sku.startsWith('HGLIFTDR') ||
-        sku.startsWith('BADR') || sku.startsWith('MTBADR') || sku.startsWith('HGBADR') ||
-        sku.startsWith('HBADR') || sku.startsWith('MTHBADR') || sku.startsWith('HGHBADR') ||
-        sku.startsWith('DDR') || sku.startsWith('MTDDR') || sku.startsWith('HGDDR') ||
-        sku.startsWith('LDR') || sku.startsWith('MTLDR') || sku.startsWith('HGLDR') ||
-        sku.startsWith('RDR') || sku.startsWith('MTRDR') || sku.startsWith('HGRDR') ||
-        sku.startsWith('HDR') || sku.startsWith('MTHDR') || sku.startsWith('HGHDR') ||
-        sku.startsWith('KLDR') || sku.startsWith('MTKLDR') || sku.startsWith('HGKLDR') ||
-        sku.startsWith('KRDR') || sku.startsWith('MTKRDR') || sku.startsWith('HGKRDR') ||
-        sku.startsWith('GLDR') || sku.startsWith('MTGLDR') || sku.startsWith('HGGLDR') ||
-        sku.startsWith('GRDR') || sku.startsWith('MTGRDR') || sku.startsWith('HGGRDR')) {
+    // Door parts - all EURO door variants (LIFTDREURO, BADREURO, etc.)
+    if (sku.includes('LIFTDREURO') || sku.includes('BADREURO') || sku.includes('HBADREURO') ||
+        sku.includes('DDREURO') || sku.includes('LDREURO') || sku.includes('RDREURO') ||
+        sku.includes('HDREURO') || sku.includes('KLDREURO') || sku.includes('KRDREURO') ||
+        sku.includes('GLDREURO') || sku.includes('GRDREURO')) {
       coreParts += quantity;
       continue;
     }
     
-    // Other known part prefixes (TK, FILL, CLEAT, VAL, SFLAT, SVAL2)
-    if (sku.startsWith('TK') || sku.startsWith('MTTK') || sku.startsWith('HGTK') ||
-        sku.startsWith('FILL') || sku.startsWith('MTFILL') || sku.startsWith('HGFILL') ||
+    // Other known part prefixes (VAL, CLEAT, FILL, TK, SFLAT, SVAL)
+    if (sku.startsWith('VAL') || sku.startsWith('MTVAL') || sku.startsWith('HGVAL') ||
         sku.startsWith('CLEAT') || sku.startsWith('MTCLEAT') || sku.startsWith('HGCLEAT') ||
-        sku.startsWith('VAL') || sku.startsWith('MTVAL') || sku.startsWith('HGVAL') ||
+        sku.startsWith('FILL') || sku.startsWith('MTFILL') || sku.startsWith('HGFILL') ||
+        sku.startsWith('TK') || sku.startsWith('MTTK') || sku.startsWith('HGTK') ||
         sku.startsWith('SFLAT') || sku.startsWith('MTSFLAT') || sku.startsWith('HGSFLAT') ||
         sku.startsWith('SVAL')) {
       coreParts += quantity;
