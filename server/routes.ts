@@ -576,6 +576,38 @@ TOTAL WEIGHT: ${Math.round(totalWeight)} lbs
             } else if (projectFiles.length > 1) {
               customFields[field.gid] = `${projectFiles.length} Orders, See below`;
             }
+          } else if ((name === 'PF 5016 FOR NEEDED' || name === 'PF 5016 FOR NEEDED?') && field.type === 'enum' && field.enum_options) {
+            // Detect if address is Canadian or US
+            // Canadian postal codes: A1A 1A1 pattern (letter-number-letter space number-letter-number)
+            // Canadian provinces: AB, BC, MB, NB, NL, NS, NT, NU, ON, PE, QC, SK, YT
+            const canadianPostalCodePattern = /[A-Z]\d[A-Z]\s?\d[A-Z]\d/i;
+            const canadianProvinces = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'];
+            
+            let isCanadian = false;
+            if (project.shippingAddress) {
+              const addr = project.shippingAddress.toUpperCase();
+              // Check for Canadian postal code pattern
+              if (canadianPostalCodePattern.test(addr)) {
+                isCanadian = true;
+              }
+              // Check for Canadian province codes (with word boundaries)
+              for (const prov of canadianProvinces) {
+                if (new RegExp(`\\b${prov}\\b`).test(addr)) {
+                  isCanadian = true;
+                  break;
+                }
+              }
+              // Check for "CANADA" in address
+              if (addr.includes('CANADA')) {
+                isCanadian = true;
+              }
+            }
+            
+            // US = YES, Canada = NO
+            const option = field.enum_options.find((o: any) => 
+              o.name.toLowerCase() === (isCanadian ? 'no' : 'yes')
+            );
+            if (option) customFields[field.gid] = option.gid;
           }
         }
         
