@@ -434,11 +434,11 @@ export async function registerRoutes(
       // Build per-file breakdown (values are bolded, not labels)
       const fileBreakdown = fileDataList.map(f => 
         `${f.name}
-Parts: <b>${f.coreParts}</b>
-Dovetails: <b>${f.dovetails}</b>
-Assembled Netley Drawers: <b>${f.assembledDrawers}</b>
-5 Piece Shaker Doors: <b>${f.fivePiece}</b>
-Expected Weight: <b>${Math.round(f.weightLbs)} lbs</b>`
+Parts: <strong>${f.coreParts}</strong>
+Dovetails: <strong>${f.dovetails}</strong>
+Assembled Netley Drawers: <strong>${f.assembledDrawers}</strong>
+5 Piece Shaker Doors: <strong>${f.fivePiece}</strong>
+Expected Weight: <strong>${Math.round(f.weightLbs)} lbs</strong>`
       ).join('\n\n');
       
       // Calculate total weight
@@ -465,22 +465,22 @@ Expected Weight: <b>${Math.round(f.weightLbs)} lbs</b>`
       const taskName = `(PERFECT FIT) ${project.name}`;
       
       // Build description in the user's preferred format (values are bolded, not labels)
-      let taskNotes = `PALLET 1:
+      // Using html_notes with <body> wrapper for Asana HTML formatting
+      let taskNotes = `<body>PALLET 1:
 ${project.dealer || project.name}
-${project.orderId || ''}
-# OF ORDER ON PALLET: <b>${projectFiles.length}</b>
-PALLET SIZE: <b>${palletSize}</b>
-Parts: <b>${totalCoreParts}</b>
-Dovetails: <b>${totalDovetails}</b>
-Assembled Netley Drawers: <b>${totalAssembledDrawers}</b>
-5 Piece Shaker Doors: <b>${totalFivePiece}</b>
-Expected Weight: <b>${Math.round(totalWeight)} lbs</b>
+# OF ORDER ON PALLET: <strong>${projectFiles.length}</strong>
+PALLET SIZE: <strong>${palletSize}</strong>
+Parts: <strong>${totalCoreParts}</strong>
+Dovetails: <strong>${totalDovetails}</strong>
+Assembled Netley Drawers: <strong>${totalAssembledDrawers}</strong>
+5 Piece Shaker Doors: <strong>${totalFivePiece}</strong>
+Expected Weight: <strong>${Math.round(totalWeight)} lbs</strong>
 
 WAS THERE BUYOUT HARDWARE: 
-ARE THERE PARTS AT CUSTOM: <b>${customPartsAnswer}</b>
-ARE THERE GLASS PARTS: <b>${hasGlassParts ? 'YES' : 'NO'}</b>
-ARE THERE DOORS FROM M&J: <b>${hasMJDoors ? 'YES' : 'NO'}</b>
-ARE THERE DOORS FROM RICHELIEU: <b>${hasRichelieuDoors ? 'YES' : 'NO'}</b>`;
+ARE THERE PARTS AT CUSTOM: <strong>${customPartsAnswer}</strong>
+ARE THERE GLASS PARTS: <strong>${hasGlassParts ? 'YES' : 'NO'}</strong>
+ARE THERE DOORS FROM M&J: <strong>${hasMJDoors ? 'YES' : 'NO'}</strong>
+ARE THERE DOORS FROM RICHELIEU: <strong>${hasRichelieuDoors ? 'YES' : 'NO'}</strong>`;
 
       // Add per-file breakdown if there are multiple files
       if (fileDataList.length > 1) {
@@ -491,6 +491,7 @@ ARE THERE DOORS FROM RICHELIEU: <b>${hasRichelieuDoors ? 'YES' : 'NO'}</b>`;
 ${fileBreakdown}`;
       }
       
+      taskNotes += '</body>';
       taskNotes = taskNotes.trim();
 
       let newTaskGid: string;
@@ -527,8 +528,8 @@ ${fileBreakdown}`;
 
         newTaskGid = newTask.gid;
 
-        // Update the duplicated task with project-specific notes
-        await tasksApi.updateTask({ data: { notes: taskNotes } }, newTaskGid, {});
+        // Update the duplicated task with project-specific notes (using html_notes for formatting)
+        await tasksApi.updateTask({ data: { html_notes: taskNotes } }, newTaskGid, {});
 
       } else {
         // Fallback: create task from scratch if template not found
@@ -536,7 +537,7 @@ ${fileBreakdown}`;
         
         const taskData: any = {
           name: taskName,
-          notes: taskNotes,
+          html_notes: taskNotes,
           projects: [asanaProjectGid],
         };
 
