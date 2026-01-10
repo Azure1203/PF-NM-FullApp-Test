@@ -309,6 +309,8 @@ ${fileList}
             if (project.dealer) customFields[field.gid] = project.dealer;
           } else if (name === 'ORDER DATE' && field.type === 'text') {
             if (project.date) customFields[field.gid] = project.date;
+          } else if (name === 'ORDER DATE' && field.type === 'date') {
+            if (project.date) customFields[field.gid] = project.date;
           } else if (name === 'PF ADDRESS' && field.type === 'text') {
             if (project.shippingAddress) customFields[field.gid] = project.shippingAddress;
           } else if (name === 'PF PHONE NUMBER' && field.type === 'text') {
