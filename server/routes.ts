@@ -64,8 +64,8 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
   let maxLength = 0;
   let weightLbs = 0;
   
-  // Weight constant: 3/4" melamine ~2.72 lbs per sq ft
-  const LBS_PER_SQFT = 2.72;
+  // Weight constant: 3/4" melamine ~3 lbs per sq ft
+  const LBS_PER_SQFT = 3;
   // Conversion: mm² to sq ft (1 sq ft = 92903.04 mm²)
   const SQMM_TO_SQFT = 92903.04;
 
