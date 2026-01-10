@@ -88,9 +88,9 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
 
     if (!sku || quantity === 0) continue;
 
-    // Skip hardware (starts with H., M., R-)
+    // Skip hardware (starts with H., M., R-, S.)
     if (sku.startsWith('H.') || sku.startsWith('M.') || sku.startsWith('M-') || 
-        sku.startsWith('R-') || sku.startsWith('R.')) {
+        sku.startsWith('R-') || sku.startsWith('R.') || sku.startsWith('S.')) {
       continue;
     }
 
