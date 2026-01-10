@@ -59,6 +59,14 @@ export const api = {
         400: z.object({ message: z.string() }),
         404: errorSchemas.notFound,
       },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/orders/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
     }
   }
 };

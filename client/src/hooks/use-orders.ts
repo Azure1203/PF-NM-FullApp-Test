@@ -146,3 +146,37 @@ export function useSyncOrder() {
     }
   });
 }
+
+// DELETE /api/orders/:id
+export function useDeleteOrder() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.orders.delete.path, { id });
+      const res = await fetch(url, {
+        method: api.orders.delete.method,
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to delete order");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.orders.list.path] });
+      toast({
+        title: "Order Deleted",
+        description: "The order has been removed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+}

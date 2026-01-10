@@ -1,17 +1,19 @@
 import { Link } from "wouter";
-import { useOrders } from "@/hooks/use-orders";
+import { useOrders, useDeleteOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FileText, Search } from "lucide-react";
+import { Plus, ArrowRight, FileText, Search, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function Dashboard() {
   const { data: orders, isLoading } = useOrders();
+  const { mutate: deleteOrder, isPending: isDeleting } = useDeleteOrder();
   const [search, setSearch] = useState("");
 
   const filteredOrders = orders?.filter(order => {
@@ -95,39 +97,67 @@ export default function Dashboard() {
             </div>
           ) : (
             filteredOrders.map((order) => (
-              <Link key={order.id} href={`/orders/${order.id}`} className="block group">
-                <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 relative overflow-hidden">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-primary transition-colors" />
-                  
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
-                        <FileText className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
-                      </div>
-                      
-                      <div>
-                        <h3 className="font-semibold text-lg text-slate-800 group-hover:text-primary transition-colors">
-                          {order.dealer || "Unknown Dealer"}
-                          <span className="text-muted-foreground font-normal text-sm ml-2">
-                            ({order.originalFilename})
-                          </span>
-                        </h3>
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-1 text-sm text-muted-foreground">
-                          <span>PO: <span className="font-medium text-slate-700">{order.poNumber || "N/A"}</span></span>
-                          <span>Date: {order.createdAt ? format(new Date(order.createdAt), 'PPP') : 'N/A'}</span>
-                        </div>
+              <div key={order.id} className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 relative overflow-hidden group">
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-primary transition-colors" />
+                
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <Link href={`/orders/${order.id}`} className="flex items-start gap-4 flex-1">
+                    <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+                      <FileText className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-semibold text-lg text-slate-800 group-hover:text-primary transition-colors">
+                        {order.dealer || "Unknown Dealer"}
+                        <span className="text-muted-foreground font-normal text-sm ml-2">
+                          ({order.originalFilename})
+                        </span>
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-1 text-sm text-muted-foreground">
+                        <span>PO: <span className="font-medium text-slate-700">{order.poNumber || "N/A"}</span></span>
+                        <span>Date: {order.createdAt ? format(new Date(order.createdAt), 'PPP') : 'N/A'}</span>
                       </div>
                     </div>
+                  </Link>
 
-                    <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
-                      <StatusBadge status={order.status as any} />
-                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:translate-x-1 group-hover:text-primary transition-all">
-                        <ArrowRight className="w-5 h-5" />
-                      </div>
+                  <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto">
+                    <StatusBadge status={order.status as any} />
+                    
+                    <div className="flex items-center gap-2">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove the order for {order.dealer}.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => deleteOrder(order.id)}
+                              className="bg-destructive text-destructive-foreground"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+
+                      <Link href={`/orders/${order.id}`}>
+                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:translate-x-1 group-hover:text-primary transition-all">
+                          <ArrowRight className="w-5 h-5" />
+                        </div>
+                      </Link>
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))
           )}
         </div>

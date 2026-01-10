@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertOrderSchema } from "@shared/schema";
 
-import { useOrder, useUpdateOrder, useSyncOrder } from "@/hooks/use-orders";
+import { useOrder, useUpdateOrder, useSyncOrder, useDeleteOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, RefreshCw, Save, Send, Download, FileText, Loader2, ExternalLink } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, Download, FileText, Loader2, ExternalLink, Trash2 } from "lucide-react";
 import { Link } from "wouter";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 // Schema for form validation
 const formSchema = insertOrderSchema.pick({
@@ -42,6 +43,7 @@ export default function OrderDetails() {
   const { data: order, isLoading } = useOrder(id);
   const { mutate: updateOrder, isPending: isUpdating } = useUpdateOrder();
   const { mutate: syncOrder, isPending: isSyncing } = useSyncOrder();
+  const { mutate: deleteOrder, isPending: isDeleting } = useDeleteOrder();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -79,6 +81,12 @@ export default function OrderDetails() {
         onSuccess: () => syncOrder(id)
       });
     })();
+  };
+
+  const handleDelete = () => {
+    deleteOrder(id, {
+      onSuccess: () => setLocation("/")
+    });
   };
 
   const downloadRawContent = () => {
@@ -126,6 +134,31 @@ export default function OrderDetails() {
           </Link>
           
           <div className="flex gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive hover:bg-destructive/10">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Order
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the order
+                    from the database.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Button 
               variant="outline" 
               onClick={downloadRawContent}

@@ -27,6 +27,14 @@ export async function registerRoutes(
     res.json(order);
   });
 
+  app.delete(api.orders.delete.path, async (req, res) => {
+    const success = await storage.deleteOrder(Number(req.params.id));
+    if (!success) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    res.status(204).send();
+  });
+
   app.post(api.orders.upload.path, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -106,14 +114,14 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Order not found' });
       }
       res.json(order);
-    } catch (err) {
+    } catch (err: any) {
        if (err instanceof z.ZodError) {
           return res.status(400).json({
             message: err.errors[0].message,
             field: err.errors[0].path.join('.'),
           });
         }
-        throw err;
+        res.status(500).json({ message: err.message });
     }
   });
 
