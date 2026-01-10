@@ -55,10 +55,13 @@ export async function registerRoutes(
 
         // Helper to find value by key
         const findValue = (keyStart: string): string | undefined => {
+          // Special case for Date in A2 (records[1][0] is A2 in 0-indexed rows)
+          if (keyStart.toLowerCase() === 'date' && records[1] && records[1][0]) {
+            return records[1][0];
+          }
+
           for (const row of records) {
             if (row[0] && row[0].toLowerCase().startsWith(keyStart.toLowerCase())) {
-              // Return the next non-empty cell? Or the second cell?
-              // Based on example: "Date (dd/mm/yyyy),31/12/2025" -> Row[0] is key, Row[1] is value
               return row[1];
             }
           }
