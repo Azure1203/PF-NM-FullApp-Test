@@ -133,9 +133,16 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       continue;
     }
 
-    // 5-piece shaker doors (contains TFL90SHA)
-    if (sku.includes('TFL90SHA')) {
+    // 5-piece shaker doors with GD suffix (TFL90SHAGD)
+    if (sku.includes('TFL90SHAGD')) {
       fivePiece += quantity;
+      hasShakerDoors = true;
+      continue;
+    }
+    
+    // Regular shaker doors (TFL90SHA without GD) count as core parts
+    if (sku.includes('TFL90SHA')) {
+      coreParts += quantity;
       hasShakerDoors = true;
       continue;
     }
@@ -197,7 +204,8 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
     
     // Other known part prefixes
-    if (sku.startsWith('TK') || sku.startsWith('FILL')) {
+    if (sku.startsWith('TK') || sku.startsWith('FILL') || 
+        sku.startsWith('CLEAT') || sku.startsWith('VAL')) {
       coreParts += quantity;
     }
   }
