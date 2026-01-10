@@ -34,6 +34,19 @@ function findValue(records: string[][], keyStart: string): string | undefined {
   return undefined;
 }
 
+// Format phone number to xxx-xxx-xxxx
+function formatPhoneNumber(phone: string | undefined): string | undefined {
+  if (!phone) return undefined;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return phone;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -102,7 +115,7 @@ export async function registerRoutes(
         date: new Date().toISOString().split('T')[0],
         dealer: findValue(firstRecords, 'Dealer'),
         shippingAddress: findValue(firstRecords, 'Shipping Address'),
-        phone: findValue(firstRecords, 'Phone'),
+        phone: formatPhoneNumber(findValue(firstRecords, 'Phone')),
         taxId: findValue(firstRecords, 'Tax ID'),
         orderId: findValue(firstRecords, 'Order ID'),
         powerTailgate: findValue(firstRecords, 'Power Tail Gate')?.toLowerCase().includes('yes') || false,
