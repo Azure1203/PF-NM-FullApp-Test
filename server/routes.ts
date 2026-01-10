@@ -426,9 +426,9 @@ export async function registerRoutes(
         }
       }
 
-      // Build per-file breakdown with bold labels
+      // Build per-file breakdown
       const fileBreakdown = fileDataList.map(f => 
-        `<b>${f.name}</b>
+        `${f.name}
 Parts: ${f.coreParts}
 Dovetails: ${f.dovetails}
 Assembled Netley Drawers: ${f.assembledDrawers}
@@ -460,28 +460,28 @@ Expected Weight: ${Math.round(f.weightLbs)} lbs`
       const taskName = `(PERFECT FIT) ${project.name}`;
       
       // Build description in the user's preferred format
-      let taskNotes = `<b>PALLET 1:</b>
+      let taskNotes = `PALLET 1:
 ${project.dealer || project.name}
 ${project.orderId || ''}
-<b># OF ORDER ON PALLET:</b> ${projectFiles.length}
-<b>PALLET SIZE:</b> ${palletSize}
-<b>Parts:</b> ${totalCoreParts}
-<b>Dovetails:</b> ${totalDovetails}
-<b>Assembled Netley Drawers:</b> ${totalAssembledDrawers}
-<b>5 Piece Shaker Doors:</b> ${totalFivePiece}
-<b>Expected Weight:</b> ${Math.round(totalWeight)} lbs
+# OF ORDER ON PALLET: ${projectFiles.length}
+PALLET SIZE: ${palletSize}
+Parts: ${totalCoreParts}
+Dovetails: ${totalDovetails}
+Assembled Netley Drawers: ${totalAssembledDrawers}
+5 Piece Shaker Doors: ${totalFivePiece}
+Expected Weight: ${Math.round(totalWeight)} lbs
 
-<b>WAS THERE BUYOUT HARDWARE:</b> 
-<b>ARE THERE PARTS AT CUSTOM:</b> ${customPartsAnswer}
-<b>ARE THERE GLASS PARTS:</b> ${hasGlassParts ? 'YES' : 'NO'}
-<b>ARE THERE DOORS FROM M&J:</b> ${hasMJDoors ? 'YES' : 'NO'}
-<b>ARE THERE DOORS FROM RICHELIEU:</b> ${hasRichelieuDoors ? 'YES' : 'NO'}`;
+WAS THERE BUYOUT HARDWARE: 
+ARE THERE PARTS AT CUSTOM: ${customPartsAnswer}
+ARE THERE GLASS PARTS: ${hasGlassParts ? 'YES' : 'NO'}
+ARE THERE DOORS FROM M&J: ${hasMJDoors ? 'YES' : 'NO'}
+ARE THERE DOORS FROM RICHELIEU: ${hasRichelieuDoors ? 'YES' : 'NO'}`;
 
       // Add per-file breakdown if there are multiple files
       if (fileDataList.length > 1) {
         taskNotes += `
 
-<b>--- ORDER BREAKDOWN ---</b>
+--- ORDER BREAKDOWN ---
 
 ${fileBreakdown}`;
       }
