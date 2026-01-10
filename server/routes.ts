@@ -179,6 +179,46 @@ Original File: ${order.originalFilename}
         workspace: workspaceId,
       };
 
+      // Try to handle custom fields if we can find them
+      try {
+        const project = await projectsApi.getProject(projectGid!);
+        const customFieldSettings = project.data.custom_field_settings || [];
+        
+        const customFields: Record<string, any> = {};
+        
+        for (const setting of customFieldSettings) {
+          const field = setting.custom_field;
+          const name = field.name.toLowerCase();
+          
+          if (name.includes('power tailgate')) {
+            // For enum fields, we need the option GID
+            if (field.type === 'enum') {
+              const option = field.enum_options.find((o: any) => 
+                o.name.toLowerCase() === (order.powerTailgate ? 'yes' : 'no')
+              );
+              if (option) customFields[field.gid] = option.gid;
+            } else {
+              customFields[field.gid] = order.powerTailgate ? 'Yes' : 'No';
+            }
+          } else if (name.includes('phone appointment')) {
+            if (field.type === 'enum') {
+              const option = field.enum_options.find((o: any) => 
+                o.name.toLowerCase() === (order.phoneAppointment ? 'yes' : 'no')
+              );
+              if (option) customFields[field.gid] = option.gid;
+            } else {
+              customFields[field.gid] = order.phoneAppointment ? 'Yes' : 'No';
+            }
+          }
+        }
+        
+        if (Object.keys(customFields).length > 0) {
+          taskData.custom_fields = customFields;
+        }
+      } catch (e) {
+        console.error("Error mapping custom fields:", e);
+      }
+
       if (projectGid) {
         taskData.projects = [projectGid];
       }
