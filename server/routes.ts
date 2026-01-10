@@ -331,6 +331,12 @@ ${fileList}
               o.name.toLowerCase() === (project.phoneAppointment ? 'yes' : 'no')
             );
             if (option) customFields[field.gid] = option.gid;
+          } else if ((name === 'PF PO' || name === 'PF PO:') && field.type === 'text') {
+            if (projectFiles.length === 1) {
+              customFields[field.gid] = projectFiles[0].poNumber || project.name;
+            } else if (projectFiles.length > 1) {
+              customFields[field.gid] = `${projectFiles.length} Orders, See below`;
+            }
           }
         }
         
