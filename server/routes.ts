@@ -636,7 +636,8 @@ ${fileBreakdown}`;
 
       // Update project status in our database
       const updatedProject = await storage.updateProject(project.id, {
-        asanaTaskId: newTaskGid
+        asanaTaskId: newTaskGid,
+        status: 'synced'
       });
 
       res.json(updatedProject);
