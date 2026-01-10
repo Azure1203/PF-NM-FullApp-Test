@@ -118,10 +118,10 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       hasDoubleThick = true;
     }
 
-    // Track max part length (column 5 is Length(L))
-    const length = parseFloat(row[5] || '0') || 0;
-    if (length > maxLength) {
-      maxLength = length;
+    // Track max part height (column 3 is Height)
+    const height = parseFloat(row[3] || '0') || 0;
+    if (height > maxLength) {
+      maxLength = height;
     }
 
     // Count other 34* parts as core parts
