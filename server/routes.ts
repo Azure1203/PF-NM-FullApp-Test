@@ -182,30 +182,46 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
 
     // Count valid part SKUs as core parts
-    // 34* and 15* parts (panels, dividers, etc.)
-    if (sku.startsWith('34') || sku.startsWith('15')) {
+    // 34*, 15*, 14*, 1G* parts (panels, dividers, backs, shelves, etc.)
+    if (sku.startsWith('34') || sku.startsWith('15') || sku.startsWith('14') || sku.startsWith('1G')) {
       coreParts += quantity;
       continue;
     }
     
-    // Drawer fronts (DRWEURO, JDRWEURO, BDRWEURO, IDRWEURO variants)
-    if (sku.includes('DRWEURO')) {
+    // Drawer fronts - all DRW variants (DRWEURO, JDRWEURO, BDRWEURO, IDRWEURO, DRWTFL90SHA, DRWSLIMLINE, etc.)
+    // Match: DRW, JDRW, BDRW, IDRW (but not already caught by TFL90SHA check above)
+    if (sku.startsWith('DRW') || sku.startsWith('JDRW') || sku.startsWith('BDRW') || sku.startsWith('IDRW') ||
+        sku.startsWith('MTDRW') || sku.startsWith('HGDRW') || 
+        sku.startsWith('MTJDRW') || sku.startsWith('HGJDRW') ||
+        sku.startsWith('MTBDRW') || sku.startsWith('HGBDRW') ||
+        sku.startsWith('MTIDRW') || sku.startsWith('HGIDRW')) {
       coreParts += quantity;
       continue;
     }
     
-    // Door parts (LIFTDR, BADR, HBADR, DDR, LDR, RDR, HDR, KLDR, KRDR, GLDR)
-    if (sku.startsWith('LIFTDR') || sku.startsWith('BADR') || sku.startsWith('HBADR') ||
-        sku.startsWith('DDR') || sku.startsWith('LDR') || sku.startsWith('RDR') ||
-        sku.startsWith('HDR') || sku.startsWith('KLDR') || sku.startsWith('KRDR') ||
-        sku.startsWith('GLDR') || sku.startsWith('GRDREURO') || sku.startsWith('GLDREURO')) {
+    // Door parts (LIFTDR, BADR, HBADR, DDR, LDR, RDR, HDR, KLDR, KRDR, GLDR, GRDR and MT/HG variants)
+    if (sku.startsWith('LIFTDR') || sku.startsWith('MTLIFTDR') || sku.startsWith('HGLIFTDR') ||
+        sku.startsWith('BADR') || sku.startsWith('MTBADR') || sku.startsWith('HGBADR') ||
+        sku.startsWith('HBADR') || sku.startsWith('MTHBADR') || sku.startsWith('HGHBADR') ||
+        sku.startsWith('DDR') || sku.startsWith('MTDDR') || sku.startsWith('HGDDR') ||
+        sku.startsWith('LDR') || sku.startsWith('MTLDR') || sku.startsWith('HGLDR') ||
+        sku.startsWith('RDR') || sku.startsWith('MTRDR') || sku.startsWith('HGRDR') ||
+        sku.startsWith('HDR') || sku.startsWith('MTHDR') || sku.startsWith('HGHDR') ||
+        sku.startsWith('KLDR') || sku.startsWith('MTKLDR') || sku.startsWith('HGKLDR') ||
+        sku.startsWith('KRDR') || sku.startsWith('MTKRDR') || sku.startsWith('HGKRDR') ||
+        sku.startsWith('GLDR') || sku.startsWith('MTGLDR') || sku.startsWith('HGGLDR') ||
+        sku.startsWith('GRDR') || sku.startsWith('MTGRDR') || sku.startsWith('HGGRDR')) {
       coreParts += quantity;
       continue;
     }
     
-    // Other known part prefixes
-    if (sku.startsWith('TK') || sku.startsWith('FILL') || 
-        sku.startsWith('CLEAT') || sku.startsWith('VAL')) {
+    // Other known part prefixes (TK, FILL, CLEAT, VAL, SFLAT, SVAL2)
+    if (sku.startsWith('TK') || sku.startsWith('MTTK') || sku.startsWith('HGTK') ||
+        sku.startsWith('FILL') || sku.startsWith('MTFILL') || sku.startsWith('HGFILL') ||
+        sku.startsWith('CLEAT') || sku.startsWith('MTCLEAT') || sku.startsWith('HGCLEAT') ||
+        sku.startsWith('VAL') || sku.startsWith('MTVAL') || sku.startsWith('HGVAL') ||
+        sku.startsWith('SFLAT') || sku.startsWith('MTSFLAT') || sku.startsWith('HGSFLAT') ||
+        sku.startsWith('SVAL')) {
       coreParts += quantity;
     }
   }
