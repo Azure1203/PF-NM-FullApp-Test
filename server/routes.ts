@@ -223,20 +223,40 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'Asana project not found. Please set the ASANA_PROJECT_GID environment variable with your Perfect Fit Production project ID.' });
       }
 
+      // Parse counts from each CSV file and sum them
+      let totalCoreParts = 0;
+      let totalDovetails = 0;
+      let totalAssembledDrawers = 0;
+      let totalFivePiece = 0;
+
+      for (const file of projectFiles) {
+        if (file.rawContent) {
+          const records = await parseCSV(file.rawContent);
+          const coreParts = parseInt(findValue(records, '# of Core Parts') || '0') || 0;
+          const dovetails = parseInt(findValue(records, '# of Dovetails') || '0') || 0;
+          const assembledDrawers = parseInt(findValue(records, '# of Assembled Drawers') || '0') || 0;
+          const fivePiece = parseInt(findValue(records, '# of 5-Piece') || '0') || 0;
+          
+          totalCoreParts += coreParts;
+          totalDovetails += dovetails;
+          totalAssembledDrawers += assembledDrawers;
+          totalFivePiece += fivePiece;
+        }
+      }
+
       // Build file list for task notes
       const fileList = projectFiles.map(f => `  - ${f.poNumber || f.originalFilename}`).join('\n');
       const taskName = `(PERFECT FIT) ${project.name}`;
-      const taskNotes = `
-Dealer: ${project.dealer || ''}
-Date: ${project.date || ''}
-Shipping Address: ${project.shippingAddress || ''}
-Phone: ${project.phone || ''}
-Tax ID: ${project.taxId || ''}
-Power Tailgate: ${project.powerTailgate ? 'YES' : 'NO'}
-Phone Appointment: ${project.phoneAppointment ? 'YES' : 'NO'}
-Order ID: ${project.orderId || ''}
+      const taskNotes = `# OF ORDER ON PALLET: ${projectFiles.length}
+PALLET SIZE: 
+NUMBER OF PARTS: ${totalCoreParts}
+NUMBER OF DOVETAIL DRAWERS: ${totalDovetails}
+NUMBER OF ASSEMBLED NETLEY DRAWERS: ${totalAssembledDrawers}
+NUMBER OF 5 PIECE SHAKER DOORS BY NETLEY: ${totalFivePiece}
+WAS THERE BUYOUT HARDWARE: 
+ARE THERE PARTS AT CUSTOM: 
 
-Files in this project (${projectFiles.length}):
+Files in this project:
 ${fileList}
       `.trim();
 
