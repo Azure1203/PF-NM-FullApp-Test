@@ -14,7 +14,7 @@ export interface IStorage {
   getProjects(): Promise<Project[]>;
   getProject(id: number): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
-  updateProject(id: number, updates: Partial<InsertProject>): Promise<Project>;
+  updateProject(id: number, updates: Partial<Project>): Promise<Project>;
   deleteProject(id: number): Promise<boolean>;
   
   // Order file methods
@@ -38,7 +38,7 @@ export class DatabaseStorage implements IStorage {
     return project;
   }
 
-  async updateProject(id: number, updates: Partial<InsertProject>): Promise<Project> {
+  async updateProject(id: number, updates: Partial<Project>): Promise<Project> {
     const [updated] = await db.update(projects)
       .set(updates)
       .where(eq(projects.id, id))

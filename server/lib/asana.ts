@@ -59,10 +59,11 @@ export async function getAsanaApiInstances() {
   token.accessToken = accessToken;
 
   return {
-    client, // return the client itself too if needed
+    client,
     tasksApi: new Asana.TasksApi(),
     projectsApi: new Asana.ProjectsApi(),
     usersApi: new Asana.UsersApi(),
-    workspacesApi: new Asana.WorkspacesApi()
+    workspacesApi: new Asana.WorkspacesApi(),
+    jobsApi: new Asana.JobsApi()
   };
 }

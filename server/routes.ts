@@ -167,106 +167,154 @@ export async function registerRoutes(
     }
   });
 
-  // Sync project to Asana (creates ONE task for the entire project)
+  // Sync project to Asana (duplicates template task and updates it)
   app.post(api.orders.sync.path, async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Get all files in this project
     const projectFiles = await storage.getProjectFiles(project.id);
 
     try {
-      const { tasksApi, projectsApi } = await getAsanaApiInstances();
+      const { tasksApi, projectsApi, jobsApi, usersApi } = await getAsanaApiInstances();
       
-      const me = await (await getAsanaApiInstances()).usersApi.getUser('me');
-      const workspaceId = me.workspaces[0].gid;
+      const me = await usersApi.getUser('me');
+      const workspaceId = me.data.workspaces[0].gid;
 
-      // Find Asana project
+      // Find "Perfect Fit Production" project
       let asanaProjectGid: string | undefined;
+      let templateTaskGid: string | undefined;
       
       try {
         const asanaProjects = await projectsApi.getProjectsForWorkspace(workspaceId, { archived: false });
         const asanaProject = asanaProjects.data?.find((p: any) => p.name.trim() === 'Perfect Fit Production');
         if (asanaProject) {
           asanaProjectGid = asanaProject.gid;
+          
+          // Find template task in the project
+          const projectTasks = await tasksApi.getTasksForProject(asanaProjectGid, { opt_fields: 'name,gid' });
+          const templateTask = projectTasks.data?.find((t: any) => 
+            t.name.includes('(PERFECT FIT) ORDER TEMPLATE') || t.name.includes('ORDER TEMPLATE')
+          );
+          if (templateTask) {
+            templateTaskGid = templateTask.gid;
+          }
         }
       } catch (e) {
-        console.error("Error finding project:", e);
+        console.error("Error finding project/template:", e);
+      }
+
+      if (!asanaProjectGid) {
+        return res.status(400).json({ message: 'Could not find "Perfect Fit Production" project in Asana' });
       }
 
       // Build file list for task notes
       const fileList = projectFiles.map(f => `  - ${f.poNumber || f.originalFilename}`).join('\n');
-
-      // Create Task
-      const taskData: any = {
-        name: `${project.dealer || 'Project'} - ${project.name}`,
-        notes: `
-Dealer: ${project.dealer}
-Date: ${project.date}
-Shipping Address: ${project.shippingAddress}
-Phone: ${project.phone}
-Tax ID: ${project.taxId}
+      const taskName = `${project.dealer || 'Project'} - ${project.name}`;
+      const taskNotes = `
+Dealer: ${project.dealer || ''}
+Date: ${project.date || ''}
+Shipping Address: ${project.shippingAddress || ''}
+Phone: ${project.phone || ''}
+Tax ID: ${project.taxId || ''}
 Power Tailgate: ${project.powerTailgate ? 'YES' : 'NO'}
 Phone Appointment: ${project.phoneAppointment ? 'YES' : 'NO'}
-Order ID: ${project.orderId}
+Order ID: ${project.orderId || ''}
 
 Files in this project (${projectFiles.length}):
 ${fileList}
-        `,
-        workspace: workspaceId,
-      };
+      `.trim();
 
-      // Try to handle custom fields
-      if (asanaProjectGid) {
-        try {
-          const asanaProjectDetails = await projectsApi.getProject(asanaProjectGid);
-          const customFieldSettings = asanaProjectDetails.data.custom_field_settings || [];
-          
-          const customFields: Record<string, any> = {};
-          
-          for (const setting of customFieldSettings) {
-            const field = setting.custom_field;
-            const name = field.name.toLowerCase();
-            
-            if (name.includes('power tailgate')) {
-              if (field.type === 'enum') {
-                const option = field.enum_options.find((o: any) => 
-                  o.name.toLowerCase() === (project.powerTailgate ? 'yes' : 'no')
-                );
-                if (option) customFields[field.gid] = option.gid;
-              } else {
-                customFields[field.gid] = project.powerTailgate ? 'Yes' : 'No';
-              }
-            } else if (name.includes('phone appointment')) {
-              if (field.type === 'enum') {
-                const option = field.enum_options.find((o: any) => 
-                  o.name.toLowerCase() === (project.phoneAppointment ? 'yes' : 'no')
-                );
-                if (option) customFields[field.gid] = option.gid;
-              } else {
-                customFields[field.gid] = project.phoneAppointment ? 'Yes' : 'No';
-              }
-            }
+      let newTaskGid: string;
+
+      if (templateTaskGid) {
+        // Duplicate the template task
+        const duplicateResult = await tasksApi.duplicateTask(
+          { data: { name: taskName, include: ['notes', 'subtasks', 'projects', 'tags'] } },
+          templateTaskGid,
+          {}
+        );
+
+        // Wait for duplication job to complete
+        const jobGid = duplicateResult.data.gid;
+        let jobComplete = false;
+        let attempts = 0;
+        let newTask: any;
+
+        while (!jobComplete && attempts < 10) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const jobStatus = await jobsApi.getJob(jobGid, {});
+          if (jobStatus.data.status === 'succeeded') {
+            jobComplete = true;
+            newTask = jobStatus.data.new_task;
+          } else if (jobStatus.data.status === 'failed') {
+            throw new Error('Task duplication failed');
           }
-          
-          if (Object.keys(customFields).length > 0) {
-            taskData.custom_fields = customFields;
-          }
-        } catch (e) {
-          console.error("Error mapping custom fields:", e);
+          attempts++;
         }
+
+        if (!newTask) {
+          throw new Error('Task duplication timed out');
+        }
+
+        newTaskGid = newTask.gid;
+
+        // Update the duplicated task with project-specific notes
+        await tasksApi.updateTask({ data: { notes: taskNotes } }, newTaskGid, {});
+
+      } else {
+        // Fallback: create task from scratch if template not found
+        console.log('Template task not found, creating task from scratch');
         
-        taskData.projects = [asanaProjectGid];
+        const taskData: any = {
+          name: taskName,
+          notes: taskNotes,
+          projects: [asanaProjectGid],
+        };
+
+        const task = await tasksApi.createTask({ data: taskData });
+        newTaskGid = task.data.gid;
       }
 
-      const task = await tasksApi.createTask({ data: taskData });
+      // Update custom fields if available
+      try {
+        const asanaProjectDetails = await projectsApi.getProject(asanaProjectGid);
+        const customFieldSettings = asanaProjectDetails.data.custom_field_settings || [];
+        
+        const customFields: Record<string, any> = {};
+        
+        for (const setting of customFieldSettings) {
+          const field = setting.custom_field;
+          const name = field.name.toLowerCase();
+          
+          if (name.includes('power tailgate')) {
+            if (field.type === 'enum') {
+              const option = field.enum_options.find((o: any) => 
+                o.name.toLowerCase() === (project.powerTailgate ? 'yes' : 'no')
+              );
+              if (option) customFields[field.gid] = option.gid;
+            }
+          } else if (name.includes('phone appointment')) {
+            if (field.type === 'enum') {
+              const option = field.enum_options.find((o: any) => 
+                o.name.toLowerCase() === (project.phoneAppointment ? 'yes' : 'no')
+              );
+              if (option) customFields[field.gid] = option.gid;
+            }
+          }
+        }
+        
+        if (Object.keys(customFields).length > 0) {
+          await tasksApi.updateTask({ data: { custom_fields: customFields } }, newTaskGid, {});
+        }
+      } catch (e) {
+        console.error("Error updating custom fields:", e);
+      }
 
-      // Update Project Status
+      // Update project status in our database
       const updatedProject = await storage.updateProject(project.id, {
-        status: 'synced',
-        asanaTaskId: task.data.gid
+        asanaTaskId: newTaskGid
       });
 
       res.json(updatedProject);
