@@ -302,7 +302,7 @@ ${fileList}
         
         for (const setting of customFieldSettings) {
           const field = setting.custom_field;
-          const name = field.name.toUpperCase();
+          const name = field.name.toUpperCase().trim();
           
           // Match exact Asana custom field names
           if (name === 'PERFECT FIT DEALER' && field.type === 'text') {
@@ -310,23 +310,23 @@ ${fileList}
           } else if (name === 'ORDER DATE' && field.type === 'text') {
             if (project.date) customFields[field.gid] = project.date;
           } else if (name === 'ORDER DATE' && field.type === 'date') {
-            if (project.date) customFields[field.gid] = project.date;
+            if (project.date) customFields[field.gid] = { date: project.date };
           } else if (name === 'PF ADDRESS' && field.type === 'text') {
             if (project.shippingAddress) customFields[field.gid] = project.shippingAddress;
           } else if (name === 'PF PHONE NUMBER' && field.type === 'text') {
             if (project.phone) customFields[field.gid] = project.phone;
-          } else if (name === 'PF TAX ID' && field.type === 'text') {
+          } else if ((name === 'PF TAX ID' || name === 'PF TAX ID:') && field.type === 'text') {
             if (project.taxId) customFields[field.gid] = project.taxId;
           } else if (name === 'ORDER ID' && field.type === 'text') {
             if (project.orderId) customFields[field.gid] = project.orderId;
           } else if (name === 'ORDER ID' && field.type === 'number') {
             if (project.orderId) customFields[field.gid] = parseInt(project.orderId) || 0;
-          } else if (name === 'PF POWER TAILGATE NEEDED' && field.type === 'enum' && field.enum_options) {
+          } else if ((name === 'PF POWER TAILGATE NEEDED' || name === 'PF POWER TAILGATE NEEDED?') && field.type === 'enum' && field.enum_options) {
             const option = field.enum_options.find((o: any) => 
               o.name.toLowerCase() === (project.powerTailgate ? 'yes' : 'no')
             );
             if (option) customFields[field.gid] = option.gid;
-          } else if (name === 'PF PHONE APPT NEEDED' && field.type === 'enum' && field.enum_options) {
+          } else if ((name === 'PF PHONE APPT NEEDED' || name === 'PF PHONE APPT NEEDED?') && field.type === 'enum' && field.enum_options) {
             const option = field.enum_options.find((o: any) => 
               o.name.toLowerCase() === (project.phoneAppointment ? 'yes' : 'no')
             );
