@@ -54,7 +54,7 @@ function formatPONumber(po: string | undefined): string | undefined {
 }
 
 // Count parts from actual CSV data rows
-function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; hasShakerDoors: boolean; maxLength: number } {
+function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; hasShakerDoors: boolean; maxLength: number; weightLbs: number } {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
@@ -62,6 +62,12 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
   let hasDoubleThick = false;
   let hasShakerDoors = false;
   let maxLength = 0;
+  let weightLbs = 0;
+  
+  // Weight constant: 3/4" melamine ~2.72 lbs per sq ft
+  const LBS_PER_SQFT = 2.72;
+  // Conversion: mm² to sq ft (1 sq ft = 92903.04 mm²)
+  const SQMM_TO_SQFT = 92903.04;
 
   // Find the data section (starts after "Manuf code" header row)
   let dataStartIndex = -1;
@@ -72,7 +78,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, maxLength };
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, maxLength, weightLbs };
 
   // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
@@ -124,6 +130,14 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       maxLength = height;
     }
 
+    // Calculate weight for this part (Height × Width in mm², then convert to sq ft)
+    const width = parseFloat(row[4] || '0') || 0;
+    if (height > 0 && width > 0) {
+      const areaSqMm = height * width * quantity;
+      const areaSqFt = areaSqMm / SQMM_TO_SQFT;
+      weightLbs += areaSqFt * LBS_PER_SQFT;
+    }
+
     // Count other 34* parts as core parts
     if (sku.startsWith('34') || sku.startsWith('DRWEURO') || sku.startsWith('JDRWEURO') ||
         sku.startsWith('TK') || sku.startsWith('FILL')) {
@@ -131,7 +145,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, maxLength };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, maxLength, weightLbs };
 }
 
 export async function registerRoutes(
@@ -318,6 +332,7 @@ export async function registerRoutes(
         dovetails: number;
         assembledDrawers: number;
         fivePiece: number;
+        weightLbs: number;
       }
       const fileDataList: FileData[] = [];
 
@@ -343,7 +358,8 @@ export async function registerRoutes(
             coreParts: counts.coreParts,
             dovetails: counts.dovetails,
             assembledDrawers: counts.assembledDrawers,
-            fivePiece: counts.fivePiece
+            fivePiece: counts.fivePiece,
+            weightLbs: counts.weightLbs
           });
         }
       }
@@ -354,8 +370,12 @@ export async function registerRoutes(
   Parts: ${f.coreParts}
   Dovetails: ${f.dovetails}
   Assembled Netley Drawers: ${f.assembledDrawers}
-  5 Piece Shaker Doors: ${f.fivePiece}`
+  5 Piece Shaker Doors: ${f.fivePiece}
+  Weight: ${Math.round(f.weightLbs)} lbs`
       ).join('\n\n');
+      
+      // Calculate total weight
+      const totalWeight = fileDataList.reduce((sum, f) => sum + f.weightLbs, 0);
 
       // Build custom parts answer
       const customPartsList: string[] = [];
@@ -390,6 +410,7 @@ TOTAL PARTS: ${totalCoreParts}
 TOTAL DOVETAIL DRAWERS: ${totalDovetails}
 TOTAL ASSEMBLED NETLEY DRAWERS: ${totalAssembledDrawers}
 TOTAL 5 PIECE SHAKER DOORS: ${totalFivePiece}
+TOTAL WEIGHT: ${Math.round(totalWeight)} lbs
       `.trim();
 
       let newTaskGid: string;
