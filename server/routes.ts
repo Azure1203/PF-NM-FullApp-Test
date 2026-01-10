@@ -73,11 +73,8 @@ export async function registerRoutes(
           return undefined;
         };
 
-        // Date extraction: First check B1 (records[0][1]), then fallback to label search
-        const b1Value = records[0]?.[1]?.trim();
-        const labelDateValue = findValue('Date');
-        
-        extractedData.date = b1Value || labelDateValue;
+        // Date extraction: Use current date as the order date
+        extractedData.date = new Date().toISOString().split('T')[0];
 
         extractedData.dealer = findValue('Dealer');
         extractedData.shippingAddress = findValue('Shipping Address');
