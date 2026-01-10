@@ -9,24 +9,19 @@ import { ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 
 export default function UploadOrder() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const { mutate: uploadOrder, isPending } = useUploadOrder();
   const [, setLocation] = useLocation();
 
   const handleUpload = () => {
-    if (!file) return;
+    if (files.length === 0) return;
     
     const formData = new FormData();
-    formData.append("file", file);
-    
-    uploadOrder(formData, {
-      onSuccess: (data) => {
-        // Short delay to show success state
-        setTimeout(() => {
-          setLocation(`/orders/${data.id}`);
-        }, 500);
-      }
+    files.forEach(file => {
+      formData.append("files", file);
     });
+    
+    uploadOrder(formData);
   };
 
   return (
@@ -41,16 +36,17 @@ export default function UploadOrder() {
         </Link>
 
         <PageHeader 
-          title="Upload New Order" 
-          description="Upload a CSV file to extract order details automatically."
+          title="Upload New Orders" 
+          description="Upload multiple CSV files to extract order details automatically."
         />
 
         <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden">
           <CardContent className="p-8">
             <div className="space-y-8">
               <FileUpload 
-                onFileSelect={setFile} 
+                onFilesSelect={setFiles} 
                 isUploading={isPending} 
+                multiple={true}
               />
 
               <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 text-sm text-blue-800">
@@ -67,7 +63,7 @@ export default function UploadOrder() {
                 <Button 
                   size="lg" 
                   onClick={handleUpload}
-                  disabled={!file || isPending}
+                  disabled={files.length === 0 || isPending}
                   className="btn-primary w-full sm:w-auto min-w-[150px]"
                 >
                   {isPending ? (
@@ -76,7 +72,7 @@ export default function UploadOrder() {
                       Processing...
                     </>
                   ) : (
-                    "Process Order"
+                    "Process Orders"
                   )}
                 </Button>
               </div>

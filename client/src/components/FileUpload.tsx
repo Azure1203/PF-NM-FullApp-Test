@@ -4,20 +4,21 @@ import { UploadCloud, FileType, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FileUploadProps {
-  onFileSelect: (file: File) => void;
+  onFilesSelect: (files: File[]) => void;
   isUploading?: boolean;
+  multiple?: boolean;
 }
 
-export function FileUpload({ onFileSelect, isUploading = false }: FileUploadProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+export function FileUpload({ onFilesSelect, isUploading = false, multiple = false }: FileUploadProps) {
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      const file = acceptedFiles[0];
-      setSelectedFile(file);
-      onFileSelect(file);
+      const newFiles = multiple ? [...selectedFiles, ...acceptedFiles] : [acceptedFiles[0]];
+      setSelectedFiles(newFiles);
+      onFilesSelect(newFiles);
     }
-  }, [onFileSelect]);
+  }, [onFilesSelect, selectedFiles, multiple]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -25,13 +26,15 @@ export function FileUpload({ onFileSelect, isUploading = false }: FileUploadProp
       'text/csv': ['.csv'],
       'application/vnd.ms-excel': ['.csv']
     },
-    maxFiles: 1,
+    multiple,
     disabled: isUploading
   });
 
-  const removeFile = (e: React.MouseEvent) => {
+  const removeFile = (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedFile(null);
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    onFilesSelect(newFiles);
   };
 
   return (
@@ -39,32 +42,47 @@ export function FileUpload({ onFileSelect, isUploading = false }: FileUploadProp
       <div
         {...getRootProps()}
         className={cn(
-          "relative group cursor-pointer flex flex-col items-center justify-center w-full h-64 rounded-2xl border-2 border-dashed transition-all duration-300 ease-out bg-slate-50/50 hover:bg-slate-50",
+          "relative group cursor-pointer flex flex-col items-center justify-center w-full min-h-64 rounded-2xl border-2 border-dashed transition-all duration-300 ease-out bg-slate-50/50 hover:bg-slate-50 p-6",
           isDragActive ? "border-primary bg-primary/5 scale-[1.01]" : "border-slate-200 hover:border-primary/50",
           isUploading && "opacity-50 cursor-not-allowed",
-          selectedFile ? "border-solid border-primary/20 bg-primary/5" : ""
+          selectedFiles.length > 0 ? "border-solid border-primary/20 bg-primary/5" : ""
         )}
       >
         <input {...getInputProps()} />
         
-        {selectedFile ? (
-          <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary shadow-sm">
-              <FileType className="w-8 h-8" />
+        {selectedFiles.length > 0 ? (
+          <div className="w-full space-y-4 animate-in fade-in zoom-in duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {selectedFiles.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <FileType className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+                  {!isUploading && (
+                    <button 
+                      onClick={(e) => removeFile(index, e)}
+                      className="p-1.5 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-colors"
+                      title="Remove file"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-            <p className="text-lg font-semibold text-foreground">{selectedFile.name}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {(selectedFile.size / 1024).toFixed(2)} KB
-            </p>
-            
-            {!isUploading && (
-              <button 
-                onClick={removeFile}
-                className="mt-4 p-2 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-colors"
-                title="Remove file"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            {!multiple && selectedFiles.length > 0 && (
+              <p className="text-center text-xs text-muted-foreground italic">Click or drag to replace</p>
+            )}
+            {multiple && !isUploading && (
+              <div className="flex justify-center pt-2">
+                <p className="text-sm text-primary font-medium">+ Add more files</p>
+              </div>
             )}
           </div>
         ) : (
@@ -78,10 +96,10 @@ export function FileUpload({ onFileSelect, isUploading = false }: FileUploadProp
             
             <div className="space-y-1">
               <p className="text-xl font-medium text-foreground">
-                {isDragActive ? "Drop CSV here" : "Drag & drop your CSV"}
+                {isDragActive ? "Drop CSVs here" : "Drag & drop your CSVs"}
               </p>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                Upload order files to process automatically. Supports .csv format.
+                {multiple ? "Upload multiple order files to process them all at once." : "Upload an order file to process automatically."} Supports .csv format.
               </p>
             </div>
           </div>

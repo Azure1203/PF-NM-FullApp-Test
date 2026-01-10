@@ -35,68 +35,73 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.post(api.orders.upload.path, upload.single('file'), async (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+  app.post(api.orders.upload.path, upload.array('files'), async (req, res) => {
+    if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
+      return res.status(400).json({ message: 'No files uploaded' });
     }
 
     try {
-      const fileContent = req.file.buffer.toString('utf-8');
-      
-      // Parse CSV
-      parse(fileContent, {
-        relax_column_count: true,
-        skip_empty_lines: true,
-        trim: true
-      }, async (err, records: string[][]) => {
-        if (err) {
-          return res.status(400).json({ message: 'Failed to parse CSV: ' + err.message });
-        }
+      const files = req.files as Express.Multer.File[];
+      const createdOrders = [];
 
-        // Extract Data
-        const extractedData: any = {
-          originalFilename: req.file!.originalname,
-          rawContent: fileContent,
-          powerTailgate: false,
-          phoneAppointment: false,
-        };
+      for (const file of files) {
+        const fileContent = file.buffer.toString('utf-8');
+        
+        // Use a Promise to handle the async parsing for each file
+        const order = await new Promise((resolve, reject) => {
+          parse(fileContent, {
+            relax_column_count: true,
+            skip_empty_lines: true,
+            trim: true
+          }, async (err, records: string[][]) => {
+            if (err) return reject(err);
 
-        // Helper to find value by key
-        const findValue = (keyStart: string): string | undefined => {
-          // Check records for the key label in column A
-          for (let i = 0; i < Math.min(records.length, 20); i++) {
-            const row = records[i];
-            if (row[0] && row[0].toLowerCase().trim().includes(keyStart.toLowerCase().trim())) {
-              return row[1]?.trim();
+            // Extract Data
+            const extractedData: any = {
+              originalFilename: file.originalname,
+              rawContent: fileContent,
+              powerTailgate: false,
+              phoneAppointment: false,
+            };
+
+            const findValue = (keyStart: string): string | undefined => {
+              for (let i = 0; i < Math.min(records.length, 20); i++) {
+                const row = records[i];
+                if (row[0] && row[0].toLowerCase().trim().includes(keyStart.toLowerCase().trim())) {
+                  return row[1]?.trim();
+                }
+              }
+              return undefined;
+            };
+
+            extractedData.date = new Date().toISOString().split('T')[0];
+            extractedData.dealer = findValue('Dealer');
+            extractedData.shippingAddress = findValue('Shipping Address');
+            extractedData.phone = findValue('Phone');
+            extractedData.taxId = findValue('Tax ID');
+            extractedData.orderId = findValue('Order ID');
+            extractedData.poNumber = findValue('PO:'); 
+
+            const powerTailgateVal = findValue('Power Tail Gate');
+            if (powerTailgateVal && powerTailgateVal.toLowerCase().includes('yes')) {
+              extractedData.powerTailgate = true;
             }
-          }
-          return undefined;
-        };
 
-        // Date extraction: Use current date as the order date
-        extractedData.date = new Date().toISOString().split('T')[0];
+            const phoneApptVal = findValue('Phone Appointment');
+            if (phoneApptVal && phoneApptVal.toLowerCase().includes('yes')) {
+              extractedData.phoneAppointment = true;
+            }
 
-        extractedData.dealer = findValue('Dealer');
-        extractedData.shippingAddress = findValue('Shipping Address');
-        extractedData.phone = findValue('Phone');
-        extractedData.taxId = findValue('Tax ID');
-        extractedData.orderId = findValue('Order ID');
-        extractedData.poNumber = findValue('PO:'); 
+            const created = await storage.createOrder(extractedData);
+            resolve(created);
+          });
+        });
+        
+        createdOrders.push(order);
+      }
 
-        const powerTailgateVal = findValue('Power Tail Gate');
-        if (powerTailgateVal && powerTailgateVal.toLowerCase().includes('yes')) {
-          extractedData.powerTailgate = true;
-        }
-
-        const phoneApptVal = findValue('Phone Appointment');
-        if (phoneApptVal && phoneApptVal.toLowerCase().includes('yes')) {
-          extractedData.phoneAppointment = true;
-        }
-
-        // Create Order
-        const order = await storage.createOrder(extractedData);
-        res.status(201).json(order);
-      });
+      // Return the last created order or a summary (frontend expects a single order for redirect, but we can change that or just return the first)
+      res.status(201).json(createdOrders[0]);
 
     } catch (e: any) {
       res.status(500).json({ message: e.message });

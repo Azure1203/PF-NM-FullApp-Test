@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type Order, type InsertOrder } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 // ============================================
 // HOOKS FOR ORDER MANAGEMENT
@@ -37,6 +38,7 @@ export function useOrder(id: number) {
 export function useUploadOrder() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   return useMutation({
     mutationFn: async (formData: FormData) => {
@@ -47,20 +49,17 @@ export function useUploadOrder() {
       });
       
       if (!res.ok) {
-        if (res.status === 400) {
-          const error = api.orders.upload.responses[400].parse(await res.json());
-          throw new Error(error.message);
-        }
-        throw new Error("Failed to upload order");
+        throw new Error("Failed to upload orders");
       }
       return api.orders.upload.responses[201].parse(await res.json());
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.orders.list.path] });
       toast({
-        title: "Order Uploaded",
-        description: "The CSV file was successfully parsed and saved.",
+        title: "Orders Uploaded",
+        description: "Multiple files were successfully processed.",
       });
+      setLocation("/"); // Redirect to dashboard to see all new orders
     },
     onError: (error) => {
       toast({
