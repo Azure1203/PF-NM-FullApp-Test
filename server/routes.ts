@@ -426,9 +426,9 @@ export async function registerRoutes(
         }
       }
 
-      // Build per-file breakdown
+      // Build per-file breakdown with bold labels
       const fileBreakdown = fileDataList.map(f => 
-        `${f.name}:
+        `<b>${f.name}:</b>
   Parts: ${f.coreParts}
   Dovetails: ${f.dovetails}
   Assembled Netley Drawers: ${f.assembledDrawers}
@@ -458,24 +458,24 @@ export async function registerRoutes(
       }
 
       const taskName = `(PERFECT FIT) ${project.name}`;
-      const taskNotes = `# OF ORDERS ON PALLET: ${projectFiles.length}
-PALLET SIZE: ${palletSize}
-WAS THERE BUYOUT HARDWARE: 
-ARE THERE PARTS AT CUSTOM: ${customPartsAnswer}
-ARE THERE GLASS PARTS: ${hasGlassParts ? 'YES' : 'NO'}
-ARE THERE DOORS FROM M&J: ${hasMJDoors ? 'YES' : 'NO'}
-ARE THERE DOORS FROM RICHELIEU: ${hasRichelieuDoors ? 'YES' : 'NO'}
+      const taskNotes = `<b># OF ORDERS ON PALLET:</b> ${projectFiles.length}
+<b>PALLET SIZE:</b> ${palletSize}
+<b>WAS THERE BUYOUT HARDWARE:</b> 
+<b>ARE THERE PARTS AT CUSTOM:</b> ${customPartsAnswer}
+<b>ARE THERE GLASS PARTS:</b> ${hasGlassParts ? 'YES' : 'NO'}
+<b>ARE THERE DOORS FROM M&J:</b> ${hasMJDoors ? 'YES' : 'NO'}
+<b>ARE THERE DOORS FROM RICHELIEU:</b> ${hasRichelieuDoors ? 'YES' : 'NO'}
 
---- ORDER BREAKDOWN ---
+<b>--- ORDER BREAKDOWN ---</b>
 
 ${fileBreakdown}
 
---- TOTALS ---
-TOTAL PARTS: ${totalCoreParts}
-TOTAL DOVETAIL DRAWERS: ${totalDovetails}
-TOTAL ASSEMBLED NETLEY DRAWERS: ${totalAssembledDrawers}
-TOTAL 5 PIECE SHAKER DOORS: ${totalFivePiece}
-TOTAL WEIGHT: ${Math.round(totalWeight)} lbs
+<b>--- TOTALS ---</b>
+<b>TOTAL PARTS:</b> ${totalCoreParts}
+<b>TOTAL DOVETAIL DRAWERS:</b> ${totalDovetails}
+<b>TOTAL ASSEMBLED NETLEY DRAWERS:</b> ${totalAssembledDrawers}
+<b>TOTAL 5 PIECE SHAKER DOORS:</b> ${totalFivePiece}
+<b>TOTAL WEIGHT:</b> ${Math.round(totalWeight)} lbs
       `.trim();
 
       let newTaskGid: string;
