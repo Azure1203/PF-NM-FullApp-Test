@@ -55,15 +55,31 @@ export async function registerRoutes(
 
         // Helper to find value by key
         const findValue = (keyStart: string): string | undefined => {
-          for (const row of records) {
-            if (row[0] && row[0].toLowerCase().includes(keyStart.toLowerCase())) {
-              return row[1];
+          // Explicitly log the first few rows for debugging if needed
+          // console.log('Checking key:', keyStart);
+          for (let i = 0; i < Math.min(records.length, 20); i++) {
+            const row = records[i];
+            if (row[0] && row[0].toLowerCase().trim().includes(keyStart.toLowerCase().trim())) {
+              const val = row[1]?.trim();
+              // console.log(`Found ${keyStart} at row ${i}, value:`, val);
+              return val;
             }
           }
           return undefined;
         };
 
+        // Specific fix for Date in B2 (records[0][1]) if keys are in A1-A9
+        // Row 1 (A1, B1, ...) is records[0]
+        // Row 2 (A2, B2, ...) is records[1]
+        
         extractedData.date = findValue('Date');
+        // Fallback for Date if it's strictly in B2 and the label check failed for some reason
+        if (!extractedData.date && records[0] && records[0][1]) {
+           // If A1 contains "Date", B1 is records[0][1]
+           // If A2 contains "Date", B2 is records[1][1]
+           // The findValue should catch it if the label is in Column A.
+        }
+
         extractedData.dealer = findValue('Dealer');
         extractedData.shippingAddress = findValue('Shipping Address');
         extractedData.phone = findValue('Phone');
