@@ -223,11 +223,20 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'Asana project not found. Please set the ASANA_PROJECT_GID environment variable with your Perfect Fit Production project ID.' });
       }
 
-      // Parse counts from each CSV file and sum them
+      // Parse counts from each CSV file
       let totalCoreParts = 0;
       let totalDovetails = 0;
       let totalAssembledDrawers = 0;
       let totalFivePiece = 0;
+
+      interface FileData {
+        name: string;
+        coreParts: number;
+        dovetails: number;
+        assembledDrawers: number;
+        fivePiece: number;
+      }
+      const fileDataList: FileData[] = [];
 
       for (const file of projectFiles) {
         if (file.rawContent) {
@@ -241,23 +250,45 @@ export async function registerRoutes(
           totalDovetails += dovetails;
           totalAssembledDrawers += assembledDrawers;
           totalFivePiece += fivePiece;
+
+          // Extract room/design name from PO (text in parentheses)
+          const match = (file.poNumber || file.originalFilename).match(/\(([^)]+)\)/);
+          const roomName = match ? match[1] : (file.poNumber || file.originalFilename);
+          
+          fileDataList.push({
+            name: roomName,
+            coreParts,
+            dovetails,
+            assembledDrawers,
+            fivePiece
+          });
         }
       }
 
-      // Build file list for task notes
-      const fileList = projectFiles.map(f => `  - ${f.poNumber || f.originalFilename}`).join('\n');
+      // Build per-file breakdown
+      const fileBreakdown = fileDataList.map(f => 
+        `${f.name}:
+  Parts: ${f.coreParts}
+  Dovetails: ${f.dovetails}
+  Assembled Netley Drawers: ${f.assembledDrawers}
+  5 Piece Shaker Doors: ${f.fivePiece}`
+      ).join('\n\n');
+
       const taskName = `(PERFECT FIT) ${project.name}`;
-      const taskNotes = `# OF ORDER ON PALLET: ${projectFiles.length}
+      const taskNotes = `# OF ORDERS ON PALLET: ${projectFiles.length}
 PALLET SIZE: 
-NUMBER OF PARTS: ${totalCoreParts}
-NUMBER OF DOVETAIL DRAWERS: ${totalDovetails}
-NUMBER OF ASSEMBLED NETLEY DRAWERS: ${totalAssembledDrawers}
-NUMBER OF 5 PIECE SHAKER DOORS BY NETLEY: ${totalFivePiece}
 WAS THERE BUYOUT HARDWARE: 
 ARE THERE PARTS AT CUSTOM: 
 
-Files in this project:
-${fileList}
+--- ORDER BREAKDOWN ---
+
+${fileBreakdown}
+
+--- TOTALS ---
+TOTAL PARTS: ${totalCoreParts}
+TOTAL DOVETAIL DRAWERS: ${totalDovetails}
+TOTAL ASSEMBLED NETLEY DRAWERS: ${totalAssembledDrawers}
+TOTAL 5 PIECE SHAKER DOORS: ${totalFivePiece}
       `.trim();
 
       let newTaskGid: string;
