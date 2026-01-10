@@ -54,13 +54,14 @@ function formatPONumber(po: string | undefined): string | undefined {
 }
 
 // Count parts from actual CSV data rows
-function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; hasShakerDoors: boolean } {
+function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; hasShakerDoors: boolean; maxLength: number } {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
   let fivePiece = 0;
   let hasDoubleThick = false;
   let hasShakerDoors = false;
+  let maxLength = 0;
 
   // Find the data section (starts after "Manuf code" header row)
   let dataStartIndex = -1;
@@ -71,7 +72,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors };
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, maxLength };
 
   // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
@@ -117,6 +118,12 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       hasDoubleThick = true;
     }
 
+    // Track max part length (column 5 is Length(L))
+    const length = parseFloat(row[5] || '0') || 0;
+    if (length > maxLength) {
+      maxLength = length;
+    }
+
     // Count other 34* parts as core parts
     if (sku.startsWith('34') || sku.startsWith('DRWEURO') || sku.startsWith('JDRWEURO') ||
         sku.startsWith('TK') || sku.startsWith('FILL')) {
@@ -124,7 +131,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors, maxLength };
 }
 
 export async function registerRoutes(
@@ -303,6 +310,7 @@ export async function registerRoutes(
       let totalFivePiece = 0;
       let hasDoubleThick = false;
       let hasShakerDoors = false;
+      let overallMaxLength = 0;
 
       interface FileData {
         name: string;
@@ -324,6 +332,7 @@ export async function registerRoutes(
           totalFivePiece += counts.fivePiece;
           if (counts.hasDoubleThick) hasDoubleThick = true;
           if (counts.hasShakerDoors) hasShakerDoors = true;
+          if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
 
           // Extract room/design name from PO (text in parentheses)
           const match = (file.poNumber || file.originalFilename).match(/\(([^)]+)\)/);
@@ -354,9 +363,21 @@ export async function registerRoutes(
       if (hasShakerDoors) customPartsList.push('SHAKER DOORS');
       const customPartsAnswer = customPartsList.length > 0 ? customPartsList.join(', ') : '';
 
+      // Determine pallet size based on part count and max length
+      let palletSize = '';
+      if (totalCoreParts < 100 && overallMaxLength <= 2550) {
+        palletSize = 'USE 34" WIDE PALLET CUT TO SIZE';
+      } else if (totalCoreParts >= 100 && overallMaxLength < 2400) {
+        palletSize = 'USE 96" LONG PALLET';
+      } else if (totalCoreParts >= 100 && overallMaxLength >= 2400 && overallMaxLength <= 2550) {
+        palletSize = 'USE 105" LONG PALLET';
+      } else if (totalCoreParts >= 100 && overallMaxLength > 2550) {
+        palletSize = 'USE 110" LONG PALLET';
+      }
+
       const taskName = `(PERFECT FIT) ${project.name}`;
       const taskNotes = `# OF ORDERS ON PALLET: ${projectFiles.length}
-PALLET SIZE: 
+PALLET SIZE: ${palletSize}
 WAS THERE BUYOUT HARDWARE: 
 ARE THERE PARTS AT CUSTOM: ${customPartsAnswer}
 
