@@ -426,14 +426,14 @@ export async function registerRoutes(
         }
       }
 
-      // Build per-file breakdown
+      // Build per-file breakdown (values are bolded, not labels)
       const fileBreakdown = fileDataList.map(f => 
         `${f.name}
-Parts: ${f.coreParts}
-Dovetails: ${f.dovetails}
-Assembled Netley Drawers: ${f.assembledDrawers}
-5 Piece Shaker Doors: ${f.fivePiece}
-Expected Weight: ${Math.round(f.weightLbs)} lbs`
+Parts: <b>${f.coreParts}</b>
+Dovetails: <b>${f.dovetails}</b>
+Assembled Netley Drawers: <b>${f.assembledDrawers}</b>
+5 Piece Shaker Doors: <b>${f.fivePiece}</b>
+Expected Weight: <b>${Math.round(f.weightLbs)} lbs</b>`
       ).join('\n\n');
       
       // Calculate total weight
@@ -459,23 +459,23 @@ Expected Weight: ${Math.round(f.weightLbs)} lbs`
 
       const taskName = `(PERFECT FIT) ${project.name}`;
       
-      // Build description in the user's preferred format
+      // Build description in the user's preferred format (values are bolded, not labels)
       let taskNotes = `PALLET 1:
 ${project.dealer || project.name}
 ${project.orderId || ''}
-# OF ORDER ON PALLET: ${projectFiles.length}
-PALLET SIZE: ${palletSize}
-Parts: ${totalCoreParts}
-Dovetails: ${totalDovetails}
-Assembled Netley Drawers: ${totalAssembledDrawers}
-5 Piece Shaker Doors: ${totalFivePiece}
-Expected Weight: ${Math.round(totalWeight)} lbs
+# OF ORDER ON PALLET: <b>${projectFiles.length}</b>
+PALLET SIZE: <b>${palletSize}</b>
+Parts: <b>${totalCoreParts}</b>
+Dovetails: <b>${totalDovetails}</b>
+Assembled Netley Drawers: <b>${totalAssembledDrawers}</b>
+5 Piece Shaker Doors: <b>${totalFivePiece}</b>
+Expected Weight: <b>${Math.round(totalWeight)} lbs</b>
 
 WAS THERE BUYOUT HARDWARE: 
-ARE THERE PARTS AT CUSTOM: ${customPartsAnswer}
-ARE THERE GLASS PARTS: ${hasGlassParts ? 'YES' : 'NO'}
-ARE THERE DOORS FROM M&J: ${hasMJDoors ? 'YES' : 'NO'}
-ARE THERE DOORS FROM RICHELIEU: ${hasRichelieuDoors ? 'YES' : 'NO'}`;
+ARE THERE PARTS AT CUSTOM: <b>${customPartsAnswer}</b>
+ARE THERE GLASS PARTS: <b>${hasGlassParts ? 'YES' : 'NO'}</b>
+ARE THERE DOORS FROM M&J: <b>${hasMJDoors ? 'YES' : 'NO'}</b>
+ARE THERE DOORS FROM RICHELIEU: <b>${hasRichelieuDoors ? 'YES' : 'NO'}</b>`;
 
       // Add per-file breakdown if there are multiple files
       if (fileDataList.length > 1) {
