@@ -293,8 +293,10 @@ ${fileList}
 
       // Update custom fields if available
       try {
-        const asanaProjectDetails = await projectsApi.getProject(asanaProjectGid);
+        const asanaProjectDetails = await projectsApi.getProject(asanaProjectGid, { opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options' });
         const customFieldSettings = asanaProjectDetails.data.custom_field_settings || [];
+        
+        console.log("Available custom fields:", customFieldSettings.map((s: any) => ({ name: s.custom_field.name, type: s.custom_field.type })));
         
         const customFields: Record<string, any> = {};
         
@@ -302,22 +304,43 @@ ${fileList}
           const field = setting.custom_field;
           const name = field.name.toLowerCase();
           
+          // Enum fields (Yes/No options)
           if (name.includes('power tailgate')) {
-            if (field.type === 'enum') {
+            if (field.type === 'enum' && field.enum_options) {
               const option = field.enum_options.find((o: any) => 
                 o.name.toLowerCase() === (project.powerTailgate ? 'yes' : 'no')
               );
               if (option) customFields[field.gid] = option.gid;
             }
           } else if (name.includes('phone appointment')) {
-            if (field.type === 'enum') {
+            if (field.type === 'enum' && field.enum_options) {
               const option = field.enum_options.find((o: any) => 
                 o.name.toLowerCase() === (project.phoneAppointment ? 'yes' : 'no')
               );
               if (option) customFields[field.gid] = option.gid;
             }
           }
+          // Text fields
+          else if (name.includes('dealer') && field.type === 'text') {
+            if (project.dealer) customFields[field.gid] = project.dealer;
+          } else if (name.includes('phone') && !name.includes('appointment') && field.type === 'text') {
+            if (project.phone) customFields[field.gid] = project.phone;
+          } else if ((name.includes('address') || name.includes('shipping')) && field.type === 'text') {
+            if (project.shippingAddress) customFields[field.gid] = project.shippingAddress;
+          } else if (name.includes('tax') && field.type === 'text') {
+            if (project.taxId) customFields[field.gid] = project.taxId;
+          } else if (name.includes('order id') && field.type === 'text') {
+            if (project.orderId) customFields[field.gid] = project.orderId;
+          } else if (name.includes('date') && field.type === 'text') {
+            if (project.date) customFields[field.gid] = project.date;
+          }
+          // Number fields
+          else if (name.includes('order id') && field.type === 'number') {
+            if (project.orderId) customFields[field.gid] = parseInt(project.orderId) || 0;
+          }
         }
+        
+        console.log("Setting custom fields:", customFields);
         
         if (Object.keys(customFields).length > 0) {
           await tasksApi.updateTask({ data: { custom_fields: customFields } }, newTaskGid, {});
