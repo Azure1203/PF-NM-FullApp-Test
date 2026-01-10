@@ -195,7 +195,7 @@ export async function registerRoutes(
           // Find template task in the project
           const projectTasks = await tasksApi.getTasksForProject(asanaProjectGid, { opt_fields: 'name,gid' });
           const templateTask = projectTasks.data?.find((t: any) => 
-            t.name.includes('(PERFECT FIT) ORDER TEMPLATE') || t.name.includes('ORDER TEMPLATE')
+            t.name.includes('(PERFECT FIT) ORDER TEMPLATE / DO NOT DELETE')
           );
           if (templateTask) {
             templateTaskGid = templateTask.gid;
