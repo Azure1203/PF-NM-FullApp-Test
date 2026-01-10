@@ -54,11 +54,13 @@ function formatPONumber(po: string | undefined): string | undefined {
 }
 
 // Count parts from actual CSV data rows
-function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number } {
+function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; hasShakerDoors: boolean } {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
   let fivePiece = 0;
+  let hasDoubleThick = false;
+  let hasShakerDoors = false;
 
   // Find the data section (starts after "Manuf code" header row)
   let dataStartIndex = -1;
@@ -69,7 +71,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece };
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors };
 
   // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
@@ -106,7 +108,13 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     // 5-piece shaker doors (contains TFL90SHA)
     if (sku.includes('TFL90SHA')) {
       fivePiece += quantity;
+      hasShakerDoors = true;
       continue;
+    }
+
+    // Check for double thick parts (contains 15)
+    if (sku.includes('15')) {
+      hasDoubleThick = true;
     }
 
     // Count other 34* parts as core parts
@@ -116,7 +124,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, hasShakerDoors };
 }
 
 export async function registerRoutes(
@@ -293,6 +301,8 @@ export async function registerRoutes(
       let totalDovetails = 0;
       let totalAssembledDrawers = 0;
       let totalFivePiece = 0;
+      let hasDoubleThick = false;
+      let hasShakerDoors = false;
 
       interface FileData {
         name: string;
@@ -312,6 +322,8 @@ export async function registerRoutes(
           totalDovetails += counts.dovetails;
           totalAssembledDrawers += counts.assembledDrawers;
           totalFivePiece += counts.fivePiece;
+          if (counts.hasDoubleThick) hasDoubleThick = true;
+          if (counts.hasShakerDoors) hasShakerDoors = true;
 
           // Extract room/design name from PO (text in parentheses)
           const match = (file.poNumber || file.originalFilename).match(/\(([^)]+)\)/);
@@ -336,11 +348,17 @@ export async function registerRoutes(
   5 Piece Shaker Doors: ${f.fivePiece}`
       ).join('\n\n');
 
+      // Build custom parts answer
+      const customPartsList: string[] = [];
+      if (hasDoubleThick) customPartsList.push('DOUBLE THICK PARTS');
+      if (hasShakerDoors) customPartsList.push('SHAKER DOORS');
+      const customPartsAnswer = customPartsList.length > 0 ? customPartsList.join(', ') : '';
+
       const taskName = `(PERFECT FIT) ${project.name}`;
       const taskNotes = `# OF ORDERS ON PALLET: ${projectFiles.length}
 PALLET SIZE: 
 WAS THERE BUYOUT HARDWARE: 
-ARE THERE PARTS AT CUSTOM: 
+ARE THERE PARTS AT CUSTOM: ${customPartsAnswer}
 
 --- ORDER BREAKDOWN ---
 
