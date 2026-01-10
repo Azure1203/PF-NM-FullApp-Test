@@ -103,8 +103,13 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       continue;
     }
 
-    // TODO: Add rules for 5-piece shaker doors
-    // For now, count other 34* parts as core parts
+    // 5-piece shaker doors (contains TFL90SHA)
+    if (sku.includes('TFL90SHA')) {
+      fivePiece += quantity;
+      continue;
+    }
+
+    // Count other 34* parts as core parts
     if (sku.startsWith('34') || sku.startsWith('DRWEURO') || sku.startsWith('JDRWEURO') ||
         sku.startsWith('TK') || sku.startsWith('FILL')) {
       coreParts += quantity;
