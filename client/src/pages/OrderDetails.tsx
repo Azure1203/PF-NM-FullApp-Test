@@ -411,27 +411,40 @@ export default function OrderDetails() {
                       : "Review the details carefully before syncing to create an accurate Asana task."
                     }
                   </div>
-                  {project.status !== 'synced' && (
-                    <div className="pt-4 border-t border-slate-700">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-slate-300 border-slate-600 hover:bg-slate-800"
-                        onClick={() => {
-                          updateProject({ status: 'synced' } as any, {
-                            onSuccess: () => {
-                              toast({ title: "Status updated", description: "Order marked as synced to Asana" });
-                            }
-                          });
-                        }}
-                        disabled={isUpdating}
-                        data-testid="button-mark-synced"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Mark as Synced
-                      </Button>
-                    </div>
-                  )}
+                  <div className="pt-4 border-t border-slate-700">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-slate-300 border-slate-600 hover:bg-slate-800"
+                      onClick={() => {
+                        const newStatus = project.status === 'synced' ? 'pending' : 'synced';
+                        updateProject({ status: newStatus } as any, {
+                          onSuccess: () => {
+                            toast({ 
+                              title: "Status updated", 
+                              description: newStatus === 'synced' 
+                                ? "Order marked as synced" 
+                                : "Order marked as pending" 
+                            });
+                          }
+                        });
+                      }}
+                      disabled={isUpdating}
+                      data-testid="button-change-status"
+                    >
+                      {project.status === 'synced' ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Mark as Pending
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Mark as Synced
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
