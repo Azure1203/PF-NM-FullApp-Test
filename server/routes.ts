@@ -428,12 +428,12 @@ export async function registerRoutes(
 
       // Build per-file breakdown with bold labels
       const fileBreakdown = fileDataList.map(f => 
-        `<b>${f.name}:</b>
-  Parts: ${f.coreParts}
-  Dovetails: ${f.dovetails}
-  Assembled Netley Drawers: ${f.assembledDrawers}
-  5 Piece Shaker Doors: ${f.fivePiece}
-  Weight: ${Math.round(f.weightLbs)} lbs`
+        `<b>${f.name}</b>
+Parts: ${f.coreParts}
+Dovetails: ${f.dovetails}
+Assembled Netley Drawers: ${f.assembledDrawers}
+5 Piece Shaker Doors: ${f.fivePiece}
+Expected Weight: ${Math.round(f.weightLbs)} lbs`
       ).join('\n\n');
       
       // Calculate total weight
@@ -458,25 +458,35 @@ export async function registerRoutes(
       }
 
       const taskName = `(PERFECT FIT) ${project.name}`;
-      const taskNotes = `<b># OF ORDERS ON PALLET:</b> ${projectFiles.length}
+      
+      // Build description in the user's preferred format
+      let taskNotes = `<b>PALLET 1:</b>
+${project.dealer || project.name}
+${project.orderId || ''}
+<b># OF ORDER ON PALLET:</b> ${projectFiles.length}
 <b>PALLET SIZE:</b> ${palletSize}
+<b>Parts:</b> ${totalCoreParts}
+<b>Dovetails:</b> ${totalDovetails}
+<b>Assembled Netley Drawers:</b> ${totalAssembledDrawers}
+<b>5 Piece Shaker Doors:</b> ${totalFivePiece}
+<b>Expected Weight:</b> ${Math.round(totalWeight)} lbs
+
 <b>WAS THERE BUYOUT HARDWARE:</b> 
 <b>ARE THERE PARTS AT CUSTOM:</b> ${customPartsAnswer}
 <b>ARE THERE GLASS PARTS:</b> ${hasGlassParts ? 'YES' : 'NO'}
 <b>ARE THERE DOORS FROM M&J:</b> ${hasMJDoors ? 'YES' : 'NO'}
-<b>ARE THERE DOORS FROM RICHELIEU:</b> ${hasRichelieuDoors ? 'YES' : 'NO'}
+<b>ARE THERE DOORS FROM RICHELIEU:</b> ${hasRichelieuDoors ? 'YES' : 'NO'}`;
+
+      // Add per-file breakdown if there are multiple files
+      if (fileDataList.length > 1) {
+        taskNotes += `
 
 <b>--- ORDER BREAKDOWN ---</b>
 
-${fileBreakdown}
-
-<b>--- TOTALS ---</b>
-<b>TOTAL PARTS:</b> ${totalCoreParts}
-<b>TOTAL DOVETAIL DRAWERS:</b> ${totalDovetails}
-<b>TOTAL ASSEMBLED NETLEY DRAWERS:</b> ${totalAssembledDrawers}
-<b>TOTAL 5 PIECE SHAKER DOORS:</b> ${totalFivePiece}
-<b>TOTAL WEIGHT:</b> ${Math.round(totalWeight)} lbs
-      `.trim();
+${fileBreakdown}`;
+      }
+      
+      taskNotes = taskNotes.trim();
 
       let newTaskGid: string;
 
