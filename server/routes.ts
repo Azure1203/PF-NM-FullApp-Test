@@ -133,16 +133,9 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       continue;
     }
 
-    // 5-piece shaker doors with GD suffix (TFL90SHAGD)
-    if (sku.includes('TFL90SHAGD')) {
-      fivePiece += quantity;
-      hasShakerDoors = true;
-      continue;
-    }
-    
-    // Regular shaker doors (TFL90SHA without GD) count as core parts
+    // 5-piece shaker doors (all TFL90SHA parts including SHAGD)
     if (sku.includes('TFL90SHA')) {
-      coreParts += quantity;
+      fivePiece += quantity;
       hasShakerDoors = true;
       continue;
     }
