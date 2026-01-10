@@ -97,7 +97,13 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       continue;
     }
 
-    // TODO: Add rules for dovetails and 5-piece shaker doors
+    // Dovetail drawers (starts with DBX or SDBX)
+    if (sku.startsWith('DBX') || sku.startsWith('SDBX')) {
+      dovetails += quantity;
+      continue;
+    }
+
+    // TODO: Add rules for 5-piece shaker doors
     // For now, count other 34* parts as core parts
     if (sku.startsWith('34') || sku.startsWith('DRWEURO') || sku.startsWith('JDRWEURO') ||
         sku.startsWith('TK') || sku.startsWith('FILL')) {
