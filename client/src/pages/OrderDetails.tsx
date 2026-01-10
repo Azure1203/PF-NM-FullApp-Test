@@ -14,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { ProjectWithFiles } from "@shared/routes";
@@ -37,6 +38,7 @@ export default function OrderDetails() {
   const [, params] = useRoute("/orders/:id");
   const id = parseInt(params?.id || "0");
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const { data: project, isLoading } = useOrder(id) as { data: ProjectWithFiles | undefined; isLoading: boolean };
   const { mutate: updateProject, isPending: isUpdating } = useUpdateOrder();
@@ -409,6 +411,27 @@ export default function OrderDetails() {
                       : "Review the details carefully before syncing to create an accurate Asana task."
                     }
                   </div>
+                  {project.status !== 'synced' && (
+                    <div className="pt-4 border-t border-slate-700">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full text-slate-300 border-slate-600 hover:bg-slate-800"
+                        onClick={() => {
+                          updateProject({ status: 'synced' } as any, {
+                            onSuccess: () => {
+                              toast({ title: "Status updated", description: "Order marked as synced to Asana" });
+                            }
+                          });
+                        }}
+                        disabled={isUpdating}
+                        data-testid="button-mark-synced"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Mark as Synced
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
