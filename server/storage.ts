@@ -1,45 +1,66 @@
 import { db } from "./db";
 import {
-  orders,
-  type Order,
-  type InsertOrder
+  projects,
+  orderFiles,
+  type Project,
+  type InsertProject,
+  type OrderFile,
+  type InsertOrderFile
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
-  getOrders(): Promise<Order[]>;
-  getOrder(id: number): Promise<Order | undefined>;
-  createOrder(order: InsertOrder): Promise<Order>;
-  updateOrder(id: number, updates: Partial<InsertOrder>): Promise<Order>;
-  deleteOrder(id: number): Promise<boolean>;
+  // Project methods
+  getProjects(): Promise<Project[]>;
+  getProject(id: number): Promise<Project | undefined>;
+  createProject(project: InsertProject): Promise<Project>;
+  updateProject(id: number, updates: Partial<InsertProject>): Promise<Project>;
+  deleteProject(id: number): Promise<boolean>;
+  
+  // Order file methods
+  getProjectFiles(projectId: number): Promise<OrderFile[]>;
+  createOrderFile(file: InsertOrderFile): Promise<OrderFile>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getOrders(): Promise<Order[]> {
-    return await db.select().from(orders).orderBy(desc(orders.createdAt));
+  // Project methods
+  async getProjects(): Promise<Project[]> {
+    return await db.select().from(projects).orderBy(desc(projects.createdAt));
   }
 
-  async getOrder(id: number): Promise<Order | undefined> {
-    const [order] = await db.select().from(orders).where(eq(orders.id, id));
-    return order;
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project;
   }
 
-  async createOrder(insertOrder: InsertOrder): Promise<Order> {
-    const [order] = await db.insert(orders).values(insertOrder).returning();
-    return order;
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const [project] = await db.insert(projects).values(insertProject).returning();
+    return project;
   }
 
-  async updateOrder(id: number, updates: Partial<InsertOrder>): Promise<Order> {
-    const [updated] = await db.update(orders)
+  async updateProject(id: number, updates: Partial<InsertProject>): Promise<Project> {
+    const [updated] = await db.update(projects)
       .set(updates)
-      .where(eq(orders.id, id))
+      .where(eq(projects.id, id))
       .returning();
     return updated;
   }
 
-  async deleteOrder(id: number): Promise<boolean> {
-    const [deleted] = await db.delete(orders).where(eq(orders.id, id)).returning();
+  async deleteProject(id: number): Promise<boolean> {
+    // Delete associated files first
+    await db.delete(orderFiles).where(eq(orderFiles.projectId, id));
+    const [deleted] = await db.delete(projects).where(eq(projects.id, id)).returning();
     return !!deleted;
+  }
+
+  // Order file methods
+  async getProjectFiles(projectId: number): Promise<OrderFile[]> {
+    return await db.select().from(orderFiles).where(eq(orderFiles.projectId, projectId));
+  }
+
+  async createOrderFile(file: InsertOrderFile): Promise<OrderFile> {
+    const [created] = await db.insert(orderFiles).values(file).returning();
+    return created;
   }
 }
 

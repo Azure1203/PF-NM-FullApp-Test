@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertOrderSchema, orders } from './schema';
+import { insertProjectSchema, projects, type Project, type OrderFile } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -14,20 +14,23 @@ export const errorSchemas = {
   }),
 };
 
+// Project with files for detailed views
+export type ProjectWithFiles = Project & { files: OrderFile[] };
+
 export const api = {
   orders: {
     list: {
       method: 'GET' as const,
       path: '/api/orders',
       responses: {
-        200: z.array(z.custom<typeof orders.$inferSelect>()),
+        200: z.array(z.custom<Project>()),
       },
     },
     get: {
       method: 'GET' as const,
       path: '/api/orders/:id',
       responses: {
-        200: z.custom<typeof orders.$inferSelect>(),
+        200: z.custom<ProjectWithFiles>(),
         404: errorSchemas.notFound,
       },
     },
@@ -37,7 +40,7 @@ export const api = {
       path: '/api/orders/upload',
       input: z.any(), // FormData
       responses: {
-        201: z.custom<typeof orders.$inferSelect>(),
+        201: z.custom<Project>(),
         400: errorSchemas.validation,
       },
     },
@@ -45,9 +48,9 @@ export const api = {
     update: {
       method: 'PUT' as const,
       path: '/api/orders/:id',
-      input: insertOrderSchema.partial(),
+      input: insertProjectSchema.partial(),
       responses: {
-        200: z.custom<typeof orders.$inferSelect>(),
+        200: z.custom<Project>(),
         404: errorSchemas.notFound,
       },
     },
@@ -55,7 +58,7 @@ export const api = {
       method: 'POST' as const,
       path: '/api/orders/:id/sync',
       responses: {
-        200: z.custom<typeof orders.$inferSelect>(),
+        200: z.custom<Project>(),
         400: z.object({ message: z.string() }),
         404: errorSchemas.notFound,
       },
@@ -70,6 +73,10 @@ export const api = {
     }
   }
 };
+
+// Backward compatibility exports
+export type Order = Project;
+export type InsertOrder = z.infer<typeof insertProjectSchema>;
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
   let url = path;

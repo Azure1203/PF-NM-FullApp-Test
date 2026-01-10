@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FileText, Search, Trash2, Loader2 } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,16 +12,15 @@ import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function Dashboard() {
-  const { data: orders, isLoading } = useOrders();
-  const { mutate: deleteOrder, isPending: isDeleting } = useDeleteOrder();
+  const { data: projects, isLoading } = useOrders();
+  const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
   const [search, setSearch] = useState("");
 
-  const filteredOrders = orders?.filter(order => {
+  const filteredProjects = projects?.filter(project => {
     const term = search.toLowerCase();
     return (
-      order.originalFilename.toLowerCase().includes(term) ||
-      order.dealer?.toLowerCase().includes(term) ||
-      order.poNumber?.toLowerCase().includes(term)
+      project.name?.toLowerCase().includes(term) ||
+      project.dealer?.toLowerCase().includes(term)
     );
   }) || [];
 
@@ -30,13 +29,13 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         
         <PageHeader 
-          title="Order Dashboard" 
-          description="Manage and sync your closet orders."
+          title="Project Dashboard" 
+          description="Manage and sync your closet order projects."
           actions={
             <Link href="/upload">
               <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6">
                 <Plus className="w-5 h-5" />
-                Upload New Order
+                Upload New Project
               </Button>
             </Link>
           }
@@ -45,9 +44,9 @@ export default function Dashboard() {
         {/* Stats Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {[
-            { label: "Total Orders", value: orders?.length || 0, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Pending Sync", value: orders?.filter(o => o.status === 'pending').length || 0, color: "text-amber-600", bg: "bg-amber-50" },
-            { label: "Synced to Asana", value: orders?.filter(o => o.status === 'synced').length || 0, color: "text-green-600", bg: "bg-green-50" },
+            { label: "Total Projects", value: projects?.length || 0, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "Pending Sync", value: projects?.filter(p => p.status === 'pending').length || 0, color: "text-amber-600", bg: "bg-amber-50" },
+            { label: "Synced to Asana", value: projects?.filter(p => p.status === 'synced').length || 0, color: "text-green-600", bg: "bg-green-50" },
           ].map((stat, i) => (
             <Card key={i} className="border-none shadow-sm shadow-slate-100 hover:shadow-md transition-shadow">
               <CardContent className="p-6 flex items-center justify-between">
@@ -56,7 +55,7 @@ export default function Dashboard() {
                   <p className="text-3xl font-bold mt-1 text-slate-800">{isLoading ? "-" : stat.value}</p>
                 </div>
                 <div className={`w-12 h-12 rounded-full ${stat.bg} ${stat.color} flex items-center justify-center`}>
-                  <FileText className="w-6 h-6 opacity-80" />
+                  <FolderOpen className="w-6 h-6 opacity-80" />
                 </div>
               </CardContent>
             </Card>
@@ -68,60 +67,57 @@ export default function Dashboard() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input 
             className="pl-10 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-base"
-            placeholder="Search by filename, dealer, or PO number..."
+            placeholder="Search by project name or dealer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        {/* Orders List */}
+        {/* Projects List */}
         <div className="space-y-4">
           {isLoading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-24 rounded-xl bg-white border border-slate-100 shadow-sm animate-pulse" />
             ))
-          ) : filteredOrders.length === 0 ? (
+          ) : filteredProjects.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-slate-400" />
+                <FolderOpen className="w-8 h-8 text-slate-400" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">No orders found</h3>
+              <h3 className="text-lg font-semibold text-slate-900">No projects found</h3>
               <p className="text-muted-foreground mt-1">
-                {search ? "Try adjusting your search terms" : "Upload your first CSV order to get started"}
+                {search ? "Try adjusting your search terms" : "Upload your first CSV files to create a project"}
               </p>
               {!search && (
                 <Link href="/upload">
-                  <Button variant="outline" className="mt-4">Upload Order</Button>
+                  <Button variant="outline" className="mt-4">Upload Project</Button>
                 </Link>
               )}
             </div>
           ) : (
-            filteredOrders.map((order) => (
-              <div key={order.id} className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 relative overflow-hidden group">
+            filteredProjects.map((project) => (
+              <div key={project.id} className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 relative overflow-hidden group">
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-primary transition-colors" />
                 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <Link href={`/orders/${order.id}`} className="flex items-start gap-4 flex-1">
+                  <Link href={`/orders/${project.id}`} className="flex items-start gap-4 flex-1">
                     <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
-                      <FileText className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
+                      <FolderOpen className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
                     </div>
                     
                     <div>
                       <h3 className="font-semibold text-lg text-slate-800 group-hover:text-primary transition-colors">
-                        {order.dealer || "Unknown Dealer"}
-                        <span className="text-muted-foreground font-normal text-sm ml-2">
-                          ({order.originalFilename})
-                        </span>
+                        {project.name}
                       </h3>
                       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-1 text-sm text-muted-foreground">
-                        <span>PO: <span className="font-medium text-slate-700">{order.poNumber || "N/A"}</span></span>
-                        <span>Date: {order.createdAt ? format(new Date(order.createdAt), 'PPP') : 'N/A'}</span>
+                        <span>Dealer: <span className="font-medium text-slate-700">{project.dealer || "N/A"}</span></span>
+                        <span>Date: {project.createdAt ? format(new Date(project.createdAt), 'PPP') : 'N/A'}</span>
                       </div>
                     </div>
                   </Link>
 
                   <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto">
-                    <StatusBadge status={order.status as any} />
+                    <StatusBadge status={project.status as any} />
                     
                     <div className="flex items-center gap-2">
                       <AlertDialog>
@@ -132,15 +128,15 @@ export default function Dashboard() {
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently remove the order for {order.dealer}.
+                              This will permanently remove the project "{project.name}" and all its files.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction 
-                              onClick={() => deleteOrder(order.id)}
+                              onClick={() => deleteProject(project.id)}
                               className="bg-destructive text-destructive-foreground"
                             >
                               Delete
@@ -149,7 +145,7 @@ export default function Dashboard() {
                         </AlertDialogContent>
                       </AlertDialog>
 
-                      <Link href={`/orders/${order.id}`}>
+                      <Link href={`/orders/${project.id}`}>
                         <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:translate-x-1 group-hover:text-primary transition-all">
                           <ArrowRight className="w-5 h-5" />
                         </div>

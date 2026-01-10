@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertOrderSchema } from "@shared/schema";
+import { insertProjectSchema } from "@shared/schema";
 
 import { useOrder, useUpdateOrder, useSyncOrder, useDeleteOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
@@ -11,17 +11,16 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, RefreshCw, Save, Send, Download, FileText, Loader2, ExternalLink, Trash2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download } from "lucide-react";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import type { ProjectWithFiles } from "@shared/routes";
 
-// Schema for form validation
-const formSchema = insertOrderSchema.pick({
+const formSchema = insertProjectSchema.pick({
+  name: true,
   date: true,
   dealer: true,
   shippingAddress: true,
@@ -30,7 +29,6 @@ const formSchema = insertOrderSchema.pick({
   powerTailgate: true,
   phoneAppointment: true,
   orderId: true,
-  poNumber: true,
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -40,10 +38,10 @@ export default function OrderDetails() {
   const id = parseInt(params?.id || "0");
   const [, setLocation] = useLocation();
 
-  const { data: order, isLoading } = useOrder(id);
-  const { mutate: updateOrder, isPending: isUpdating } = useUpdateOrder();
-  const { mutate: syncOrder, isPending: isSyncing } = useSyncOrder();
-  const { mutate: deleteOrder, isPending: isDeleting } = useDeleteOrder();
+  const { data: project, isLoading } = useOrder(id) as { data: ProjectWithFiles | undefined; isLoading: boolean };
+  const { mutate: updateProject, isPending: isUpdating } = useUpdateOrder();
+  const { mutate: syncProject, isPending: isSyncing } = useSyncOrder();
+  const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -53,49 +51,47 @@ export default function OrderDetails() {
     }
   });
 
-  // Reset form when order data loads
   useEffect(() => {
-    if (order) {
+    if (project) {
       form.reset({
-        date: order.date || "",
-        dealer: order.dealer || "",
-        shippingAddress: order.shippingAddress || "",
-        phone: order.phone || "",
-        taxId: order.taxId || "",
-        orderId: order.orderId || "",
-        poNumber: order.poNumber || "",
-        powerTailgate: order.powerTailgate || false,
-        phoneAppointment: order.phoneAppointment || false,
+        name: project.name || "",
+        date: project.date || "",
+        dealer: project.dealer || "",
+        shippingAddress: project.shippingAddress || "",
+        phone: project.phone || "",
+        taxId: project.taxId || "",
+        orderId: project.orderId || "",
+        powerTailgate: project.powerTailgate || false,
+        phoneAppointment: project.phoneAppointment || false,
       });
     }
-  }, [order, form]);
+  }, [project, form]);
 
   const onSubmit = (data: FormValues) => {
-    updateOrder({ id, ...data });
+    updateProject({ id, ...data });
   };
 
   const handleSync = () => {
-    // First save changes, then sync
     form.handleSubmit((data) => {
-      updateOrder({ id, ...data }, {
-        onSuccess: () => syncOrder(id)
+      updateProject({ id, ...data }, {
+        onSuccess: () => syncProject(id)
       });
     })();
   };
 
   const handleDelete = () => {
-    deleteOrder(id, {
+    deleteProject(id, {
       onSuccess: () => setLocation("/")
     });
   };
 
-  const downloadRawContent = () => {
-    if (!order?.rawContent) return;
-    const blob = new Blob([order.rawContent], { type: 'text/csv' });
+  const downloadFile = (file: { rawContent?: string | null; originalFilename: string }) => {
+    if (!file.rawContent) return;
+    const blob = new Blob([file.rawContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `raw-${order.originalFilename}`;
+    a.download = file.originalFilename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -109,11 +105,11 @@ export default function OrderDetails() {
     );
   }
 
-  if (!order) {
+  if (!project) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/50 p-4">
-        <h2 className="text-2xl font-bold mb-2">Order Not Found</h2>
-        <p className="text-muted-foreground mb-6">The order you are looking for doesn't exist.</p>
+        <h2 className="text-2xl font-bold mb-2">Project Not Found</h2>
+        <p className="text-muted-foreground mb-6">The project you are looking for doesn't exist.</p>
         <Link href="/">
           <Button variant="outline">Back to Dashboard</Button>
         </Link>
@@ -138,15 +134,15 @@ export default function OrderDetails() {
               <AlertDialogTrigger asChild>
                 <Button variant="outline" className="text-destructive hover:bg-destructive/10">
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Order
+                  Delete Project
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the order
-                    from the database.
+                    This action cannot be undone. This will permanently delete the project
+                    and all its files from the database.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -158,21 +154,12 @@ export default function OrderDetails() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-
-            <Button 
-              variant="outline" 
-              onClick={downloadRawContent}
-              className="hidden sm:flex"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Raw CSV
-            </Button>
             
-            {order.status === 'synced' && order.asanaTaskId && (
+            {project.status === 'synced' && project.asanaTaskId && (
               <Button 
                 variant="outline"
                 className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                onClick={() => window.open(`https://app.asana.com/0/0/${order.asanaTaskId}`, '_blank')}
+                onClick={() => window.open(`https://app.asana.com/0/0/${project.asanaTaskId}`, '_blank')}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 View in Asana
@@ -182,11 +169,11 @@ export default function OrderDetails() {
         </div>
 
         <PageHeader 
-          title={order.dealer || "Processing Order"} 
-          description={`Extracted from ${order.originalFilename}`}
+          title={project.name} 
+          description={`${project.files?.length || 0} file(s) in this project`}
           actions={
             <div className="flex items-center gap-4">
-              <StatusBadge status={order.status as any} />
+              <StatusBadge status={project.status as any} />
               <Button 
                 onClick={handleSync}
                 disabled={isSyncing || isUpdating}
@@ -200,7 +187,7 @@ export default function OrderDetails() {
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    {order.status === 'synced' ? 'Sync Again' : 'Sync to Asana'}
+                    {project.status === 'synced' ? 'Sync Again' : 'Sync to Asana'}
                   </>
                 )}
               </Button>
@@ -216,9 +203,9 @@ export default function OrderDetails() {
               <form onSubmit={form.handleSubmit(onSubmit)}>
                 <Card className="border-none shadow-md">
                   <CardHeader>
-                    <CardTitle>Order Details</CardTitle>
+                    <CardTitle>Project Details</CardTitle>
                     <CardDescription>
-                      Review and edit extracted information before syncing.
+                      Review and edit project information before syncing to Asana.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -226,12 +213,12 @@ export default function OrderDetails() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField
                         control={form.control}
-                        name="dealer"
+                        name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Dealer Name</FormLabel>
+                            <FormLabel>Project Name</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="e.g. Closet World" className="bg-slate-50/50" />
+                              <Input {...field} placeholder="e.g. Anderson PO25-391065" className="bg-slate-50/50" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -240,12 +227,12 @@ export default function OrderDetails() {
 
                       <FormField
                         control={form.control}
-                        name="poNumber"
+                        name="dealer"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>PO Number / Project Name</FormLabel>
+                            <FormLabel>Dealer Name</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="e.g. PO-12345" className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} placeholder="e.g. Closet World" className="bg-slate-50/50" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -261,7 +248,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Order Date</FormLabel>
                             <FormControl>
-                              <Input {...field} type="date" className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} type="date" className="bg-slate-50/50" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -275,7 +262,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Order ID</FormLabel>
                             <FormControl>
-                              <Input {...field} className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -291,7 +278,8 @@ export default function OrderDetails() {
                           <FormLabel>Shipping Address</FormLabel>
                           <FormControl>
                             <Textarea 
-                              {...field} 
+                              {...field}
+                              value={field.value ?? ""}
                               className="bg-slate-50/50 min-h-[80px]" 
                               placeholder="Full shipping address..."
                             />
@@ -309,7 +297,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Phone Number</FormLabel>
                             <FormControl>
-                              <Input {...field} className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -323,7 +311,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Tax ID</FormLabel>
                             <FormControl>
-                              <Input {...field} className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -407,55 +395,68 @@ export default function OrderDetails() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-slate-700">
                     <span className="text-slate-400">Status</span>
-                    <StatusBadge status={order.status as any} />
+                    <StatusBadge status={project.status as any} />
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-slate-700">
                     <span className="text-slate-400">Asana Task</span>
                     <span className="font-mono text-sm">
-                      {order.asanaTaskId ? `#${order.asanaTaskId.slice(-6)}` : "Not Created"}
+                      {project.asanaTaskId ? `#${project.asanaTaskId.slice(-6)}` : "Not Created"}
                     </span>
                   </div>
                   <div className="pt-4 text-sm text-slate-400">
-                    {order.status === 'synced' 
-                      ? "This order has been successfully pushed to Asana. Updates here will not automatically reflect in Asana unless you sync again."
-                      : "Review the details on the left carefully before syncing to ensure accurate task creation."
+                    {project.status === 'synced' 
+                      ? "This project has been synced to Asana. Updates here won't reflect in Asana unless you sync again."
+                      : "Review the details carefully before syncing to create an accurate Asana task."
                     }
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="raw" className="w-full">
-              <TabsList className="w-full grid grid-cols-2 bg-white border border-slate-200">
-                <TabsTrigger value="raw">Raw Data</TabsTrigger>
-                <TabsTrigger value="meta">Metadata</TabsTrigger>
-              </TabsList>
-              <TabsContent value="raw">
-                <Card className="border border-slate-200 shadow-none">
-                  <CardContent className="p-4">
-                    <div className="bg-slate-50 rounded-md p-3 text-xs font-mono text-slate-600 overflow-x-auto max-h-[300px] whitespace-pre">
-                      {order.rawContent || "No raw content available."}
+            {/* Files in Project */}
+            <Card className="border-none shadow-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="w-5 h-5 text-primary" />
+                  Files in Project
+                </CardTitle>
+                <CardDescription>
+                  {project.files?.length || 0} CSV file(s) uploaded
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {project.files?.map((file, index) => (
+                    <div key={file.id || index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FileText className="w-5 h-5 text-slate-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate" title={file.poNumber || file.originalFilename}>
+                            {file.poNumber || file.originalFilename}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {file.originalFilename}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => downloadFile(file)}
+                        className="shrink-0"
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              <TabsContent value="meta">
-                <Card className="border border-slate-200 shadow-none">
-                  <CardContent className="p-4 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Uploaded</span>
-                      <span>{new Date(order.createdAt!).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Filename</span>
-                      <span className="truncate max-w-[150px]" title={order.originalFilename}>
-                        {order.originalFilename}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                  ))}
+                  {(!project.files || project.files.length === 0) && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No files in this project
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
