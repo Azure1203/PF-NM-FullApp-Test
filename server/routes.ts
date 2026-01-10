@@ -53,6 +53,61 @@ function formatPONumber(po: string | undefined): string | undefined {
   return po.replace(/[#\-]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+// Count parts from actual CSV data rows
+function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number } {
+  let coreParts = 0;
+  let dovetails = 0;
+  let assembledDrawers = 0;
+  let fivePiece = 0;
+
+  // Find the data section (starts after "Manuf code" header row)
+  let dataStartIndex = -1;
+  for (let i = 0; i < records.length; i++) {
+    if (records[i][0]?.toLowerCase().includes('manuf')) {
+      dataStartIndex = i + 1;
+      break;
+    }
+  }
+
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece };
+
+  // Process each data row
+  for (let i = dataStartIndex; i < records.length; i++) {
+    const row = records[i];
+    const sku = (row[0] || '').trim().toUpperCase();
+    const quantity = parseInt(row[2] || '0') || 0;
+
+    if (!sku || quantity === 0) continue;
+
+    // Skip hardware (starts with H., M., R-)
+    if (sku.startsWith('H.') || sku.startsWith('M.') || sku.startsWith('M-') || 
+        sku.startsWith('R-') || sku.startsWith('R.')) {
+      continue;
+    }
+
+    // MDRW parts (drawer parts)
+    if (sku.includes('MDRW')) {
+      if (sku.endsWith('ASS')) {
+        // Assembled drawers - counted separately
+        assembledDrawers += quantity;
+      } else {
+        // Regular drawer parts - multiply by 5
+        coreParts += quantity * 5;
+      }
+      continue;
+    }
+
+    // TODO: Add rules for dovetails and 5-piece shaker doors
+    // For now, count other 34* parts as core parts
+    if (sku.startsWith('34') || sku.startsWith('DRWEURO') || sku.startsWith('JDRWEURO') ||
+        sku.startsWith('TK') || sku.startsWith('FILL')) {
+      coreParts += quantity;
+    }
+  }
+
+  return { coreParts, dovetails, assembledDrawers, fivePiece };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -223,7 +278,6 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'Asana project not found. Please set the ASANA_PROJECT_GID environment variable with your Perfect Fit Production project ID.' });
       }
 
-      // Parse counts from each CSV file
       let totalCoreParts = 0;
       let totalDovetails = 0;
       let totalAssembledDrawers = 0;
@@ -241,15 +295,12 @@ export async function registerRoutes(
       for (const file of projectFiles) {
         if (file.rawContent) {
           const records = await parseCSV(file.rawContent);
-          const coreParts = parseInt(findValue(records, '# of Core Parts') || '0') || 0;
-          const dovetails = parseInt(findValue(records, '# of Dovetails') || '0') || 0;
-          const assembledDrawers = parseInt(findValue(records, '# of Assembled Drawers') || '0') || 0;
-          const fivePiece = parseInt(findValue(records, '# of 5-Piece') || '0') || 0;
+          const counts = countPartsFromCSV(records);
           
-          totalCoreParts += coreParts;
-          totalDovetails += dovetails;
-          totalAssembledDrawers += assembledDrawers;
-          totalFivePiece += fivePiece;
+          totalCoreParts += counts.coreParts;
+          totalDovetails += counts.dovetails;
+          totalAssembledDrawers += counts.assembledDrawers;
+          totalFivePiece += counts.fivePiece;
 
           // Extract room/design name from PO (text in parentheses)
           const match = (file.poNumber || file.originalFilename).match(/\(([^)]+)\)/);
@@ -257,10 +308,10 @@ export async function registerRoutes(
           
           fileDataList.push({
             name: roomName,
-            coreParts,
-            dovetails,
-            assembledDrawers,
-            fivePiece
+            coreParts: counts.coreParts,
+            dovetails: counts.dovetails,
+            assembledDrawers: counts.assembledDrawers,
+            fivePiece: counts.fivePiece
           });
         }
       }
