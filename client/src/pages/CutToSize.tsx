@@ -175,7 +175,7 @@ export default function CutToSize() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`text-3xl font-bold ${part.isCut ? 'text-green-600' : 'text-primary'}`} data-testid="text-cut-length">{part.cutLength} mm</div>
+                        <div className={`text-3xl font-bold ${part.isCut ? 'text-green-600' : 'text-primary'}`} data-testid="text-cut-length">{Number(part.cutLength).toFixed(1)} mm</div>
                         <div className="text-sm text-muted-foreground">{part.isCut ? 'Cut Complete' : 'Cut Length'}</div>
                       </div>
                     </div>
@@ -185,7 +185,7 @@ export default function CutToSize() {
                       <div className="flex items-center gap-3">
                         <Package className="w-5 h-5 text-muted-foreground" />
                         <div>
-                          <p className="text-2xl font-bold" data-testid="text-quantity">{part.quantity} <span className="text-base font-normal text-muted-foreground">@ {part.cutLength} mm</span></p>
+                          <p className="text-2xl font-bold" data-testid="text-quantity">{part.quantity} <span className="text-base font-normal text-muted-foreground">@ {Number(part.cutLength).toFixed(1)} mm</span></p>
                           <p className="text-xs text-muted-foreground">Quantity @ Cut Length</p>
                         </div>
                       </div>
