@@ -245,6 +245,115 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // Get sync preview data (protected) - calculates all totals before syncing
+  app.get('/api/orders/:id/preview', isAuthenticated, async (req, res) => {
+    const project = await storage.getProject(Number(req.params.id));
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    const projectFiles = await storage.getProjectFiles(project.id);
+
+    let totalCoreParts = 0;
+    let totalDovetails = 0;
+    let totalAssembledDrawers = 0;
+    let totalFivePiece = 0;
+    let totalWeight = 0;
+    let hasDoubleThick = false;
+    let hasShakerDoors = false;
+    let hasGlassParts = false;
+    let hasMJDoors = false;
+    let hasRichelieuDoors = false;
+    let overallMaxLength = 0;
+
+    interface FileBreakdown {
+      name: string;
+      coreParts: number;
+      dovetails: number;
+      assembledDrawers: number;
+      fivePieceDoors: number;
+      weightLbs: number;
+      maxLength: number;
+      hasGlassParts: boolean;
+      hasMJDoors: boolean;
+      hasRichelieuDoors: boolean;
+      hasDoubleThick: boolean;
+    }
+    const fileBreakdowns: FileBreakdown[] = [];
+
+    for (const file of projectFiles) {
+      if (file.rawContent) {
+        const records = await parseCSV(file.rawContent);
+        const counts = countPartsFromCSV(records);
+        
+        totalCoreParts += counts.coreParts;
+        totalDovetails += counts.dovetails;
+        totalAssembledDrawers += counts.assembledDrawers;
+        totalFivePiece += counts.fivePiece;
+        totalWeight += counts.weightLbs;
+        if (counts.hasDoubleThick) hasDoubleThick = true;
+        if (counts.hasShakerDoors) hasShakerDoors = true;
+        if (counts.hasGlassParts) hasGlassParts = true;
+        if (counts.hasMJDoors) hasMJDoors = true;
+        if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
+        if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
+
+        fileBreakdowns.push({
+          name: file.poNumber || file.originalFilename,
+          coreParts: counts.coreParts,
+          dovetails: counts.dovetails,
+          assembledDrawers: counts.assembledDrawers,
+          fivePieceDoors: counts.fivePiece,
+          weightLbs: counts.weightLbs,
+          maxLength: counts.maxLength,
+          hasGlassParts: counts.hasGlassParts,
+          hasMJDoors: counts.hasMJDoors,
+          hasRichelieuDoors: counts.hasRichelieuDoors,
+          hasDoubleThick: counts.hasDoubleThick
+        });
+      }
+    }
+
+    // Determine pallet size
+    let palletSize = '';
+    if (totalCoreParts < 100 && overallMaxLength <= 2550) {
+      palletSize = 'USE 34" WIDE PALLET CUT TO SIZE';
+    } else if (totalCoreParts >= 100 && overallMaxLength < 2400) {
+      palletSize = 'USE 96" LONG PALLET';
+    } else if (totalCoreParts >= 100 && overallMaxLength >= 2400 && overallMaxLength <= 2550) {
+      palletSize = 'USE 105" LONG PALLET';
+    } else if (totalCoreParts >= 100 && overallMaxLength > 2550) {
+      palletSize = 'USE 110" LONG PALLET';
+    }
+
+    // Build custom parts list
+    const customParts: string[] = [];
+    if (hasDoubleThick) customParts.push('DOUBLE THICK PARTS');
+    if (hasShakerDoors) customParts.push('SHAKER DOORS');
+
+    res.json({
+      totals: {
+        parts: totalCoreParts,
+        dovetails: totalDovetails,
+        assembledDrawers: totalAssembledDrawers,
+        fivePieceDoors: totalFivePiece,
+        weightLbs: Math.round(totalWeight),
+        maxLength: overallMaxLength,
+        fileCount: projectFiles.length
+      },
+      palletSize,
+      customParts,
+      flags: {
+        hasGlassParts,
+        hasMJDoors,
+        hasRichelieuDoors,
+        hasDoubleThick,
+        hasShakerDoors
+      },
+      fileBreakdowns
+    });
+  });
+
   // Upload multiple files as a single project (protected)
   app.post(api.orders.upload.path, isAuthenticated, upload.array('files'), async (req, res) => {
     if (!req.files || (req.files as Express.Multer.File[]).length === 0) {

@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertProjectSchema } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
 
 import { useOrder, useUpdateOrder, useSyncOrder, useDeleteOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
@@ -14,11 +15,47 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, Package, Layers, Weight, Ruler } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, Package, Layers, Weight, Ruler, Truck, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { ProjectWithFiles } from "@shared/routes";
+import { Badge } from "@/components/ui/badge";
+
+// Sync preview data type
+interface SyncPreview {
+  totals: {
+    parts: number;
+    dovetails: number;
+    assembledDrawers: number;
+    fivePieceDoors: number;
+    weightLbs: number;
+    maxLength: number;
+    fileCount: number;
+  };
+  palletSize: string;
+  customParts: string[];
+  flags: {
+    hasGlassParts: boolean;
+    hasMJDoors: boolean;
+    hasRichelieuDoors: boolean;
+    hasDoubleThick: boolean;
+    hasShakerDoors: boolean;
+  };
+  fileBreakdowns: Array<{
+    name: string;
+    coreParts: number;
+    dovetails: number;
+    assembledDrawers: number;
+    fivePieceDoors: number;
+    weightLbs: number;
+    maxLength: number;
+    hasGlassParts: boolean;
+    hasMJDoors: boolean;
+    hasRichelieuDoors: boolean;
+    hasDoubleThick: boolean;
+  }>;
+}
 
 const formSchema = insertProjectSchema.pick({
   name: true,
@@ -57,6 +94,12 @@ export default function OrderDetails() {
   const { mutate: updateProject, isPending: isUpdating } = useUpdateOrder();
   const { mutate: syncProject, isPending: isSyncing } = useSyncOrder();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
+  
+  // Fetch sync preview data
+  const { data: preview, isLoading: isLoadingPreview } = useQuery<SyncPreview>({
+    queryKey: ['/api/orders', id, 'preview'],
+    enabled: !!id && id > 0,
+  });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -209,6 +252,126 @@ export default function OrderDetails() {
             </div>
           }
         />
+
+        {/* Sync Preview Summary - shows all calculated data before syncing */}
+        {preview && (
+          <Card className="mb-8 border-none shadow-md bg-gradient-to-r from-blue-50 to-indigo-50" data-testid="sync-preview-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Truck className="w-5 h-5 text-blue-600" />
+                Order Summary - Ready for Asana
+              </CardTitle>
+              <CardDescription>
+                This is what will be synced to Asana when you click "Sync to Asana"
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Totals Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Parts</p>
+                  <p className="text-2xl font-bold text-slate-900" data-testid="text-total-parts">{preview.totals.parts}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Dovetails</p>
+                  <p className="text-2xl font-bold text-slate-900" data-testid="text-total-dovetails">{preview.totals.dovetails}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Assembled</p>
+                  <p className="text-2xl font-bold text-slate-900" data-testid="text-total-assembled">{preview.totals.assembledDrawers}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">5-Piece Doors</p>
+                  <p className="text-2xl font-bold text-slate-900" data-testid="text-total-fivepiece">{preview.totals.fivePieceDoors}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Weight</p>
+                  <p className="text-2xl font-bold text-slate-900" data-testid="text-total-weight">{preview.totals.weightLbs} lbs</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Max Length</p>
+                  <p className="text-2xl font-bold text-slate-900" data-testid="text-max-length">{preview.totals.maxLength} mm</p>
+                </div>
+              </div>
+
+              {/* Pallet Size */}
+              {preview.palletSize && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-5 h-5 text-amber-600" />
+                    <span className="font-semibold text-amber-800" data-testid="text-pallet-size">{preview.palletSize}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Special Parts Flags */}
+              <div className="flex flex-wrap gap-2">
+                {preview.flags.hasGlassParts && (
+                  <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Glass Parts
+                  </Badge>
+                )}
+                {preview.flags.hasMJDoors && (
+                  <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    M&J Doors
+                  </Badge>
+                )}
+                {preview.flags.hasRichelieuDoors && (
+                  <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Richelieu Doors
+                  </Badge>
+                )}
+                {preview.flags.hasDoubleThick && (
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Double Thick Parts
+                  </Badge>
+                )}
+                {preview.flags.hasShakerDoors && (
+                  <Badge variant="outline" className="bg-indigo-100 text-indigo-700 border-indigo-200">
+                    Shaker Doors
+                  </Badge>
+                )}
+                {preview.customParts.length === 0 && !preview.flags.hasGlassParts && !preview.flags.hasMJDoors && !preview.flags.hasRichelieuDoors && (
+                  <span className="text-sm text-muted-foreground">No special parts detected</span>
+                )}
+              </div>
+
+              {/* Per-file breakdown */}
+              {preview.fileBreakdowns.length > 1 && (
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Order Breakdown by File</h4>
+                  <div className="space-y-2">
+                    {preview.fileBreakdowns.map((file, idx) => (
+                      <div key={idx} className="bg-white rounded-lg p-3 border border-slate-100">
+                        <p className="font-medium text-sm text-slate-800 mb-2">{file.name}</p>
+                        <div className="grid grid-cols-5 gap-2 text-xs text-muted-foreground">
+                          <div>Parts: <span className="font-semibold text-slate-700">{file.coreParts}</span></div>
+                          <div>Dovetails: <span className="font-semibold text-slate-700">{file.dovetails}</span></div>
+                          <div>Assembled: <span className="font-semibold text-slate-700">{file.assembledDrawers}</span></div>
+                          <div>5-Piece: <span className="font-semibold text-slate-700">{file.fivePieceDoors}</span></div>
+                          <div>Weight: <span className="font-semibold text-slate-700">{Math.round(file.weightLbs)} lbs</span></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isLoadingPreview && (
+          <Card className="mb-8 border-none shadow-md">
+            <CardContent className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mr-2" />
+              <span className="text-muted-foreground">Calculating order details...</span>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
