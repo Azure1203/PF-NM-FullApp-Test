@@ -17,6 +17,41 @@ export const errorSchemas = {
 // Project with files for detailed views
 export type ProjectWithFiles = Project & { files: OrderFile[] };
 
+// Sync preview data type
+export interface SyncPreview {
+  totals: {
+    parts: number;
+    dovetails: number;
+    assembledDrawers: number;
+    fivePieceDoors: number;
+    weightLbs: number;
+    maxLength: number;
+    fileCount: number;
+  };
+  palletSize: string;
+  customParts: string[];
+  flags: {
+    hasGlassParts: boolean;
+    hasMJDoors: boolean;
+    hasRichelieuDoors: boolean;
+    hasDoubleThick: boolean;
+    hasShakerDoors: boolean;
+  };
+  fileBreakdowns: Array<{
+    name: string;
+    coreParts: number;
+    dovetails: number;
+    assembledDrawers: number;
+    fivePieceDoors: number;
+    weightLbs: number;
+    maxLength: number;
+    hasGlassParts: boolean;
+    hasMJDoors: boolean;
+    hasRichelieuDoors: boolean;
+    hasDoubleThick: boolean;
+  }>;
+}
+
 export const api = {
   orders: {
     list: {
@@ -60,6 +95,14 @@ export const api = {
       responses: {
         200: z.custom<Project>(),
         400: z.object({ message: z.string() }),
+        404: errorSchemas.notFound,
+      },
+    },
+    preview: {
+      method: 'GET' as const,
+      path: '/api/orders/:id/preview',
+      responses: {
+        200: z.custom<SyncPreview>(),
         404: errorSchemas.notFound,
       },
     },
