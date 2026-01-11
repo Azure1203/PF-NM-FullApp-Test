@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, Package, Layers, Weight, Ruler } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -39,6 +39,19 @@ export default function OrderDetails() {
   const id = parseInt(params?.id || "0");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
+
+  const toggleFileExpanded = (fileId: number) => {
+    setExpandedFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(fileId)) {
+        next.delete(fileId);
+      } else {
+        next.add(fileId);
+      }
+      return next;
+    });
+  };
 
   const { data: project, isLoading } = useOrder(id) as { data: ProjectWithFiles | undefined; isLoading: boolean };
   const { mutate: updateProject, isPending: isUpdating } = useUpdateOrder();
@@ -462,29 +475,114 @@ export default function OrderDetails() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {project.files?.map((file, index) => (
-                    <div key={file.id || index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <FileText className="w-5 h-5 text-slate-400 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate" title={file.poNumber || file.originalFilename}>
-                            {file.poNumber || file.originalFilename}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {file.originalFilename}
-                          </p>
+                  {project.files?.map((file, index) => {
+                    const isExpanded = expandedFiles.has(file.id || index);
+                    const hasDetails = (file.coreParts ?? 0) > 0 || (file.dovetails ?? 0) > 0 || (file.assembledDrawers ?? 0) > 0;
+                    
+                    return (
+                      <div key={file.id || index} className="bg-slate-50 rounded-lg border border-slate-100 overflow-hidden">
+                        <div 
+                          className="flex items-center justify-between p-3 cursor-pointer hover-elevate"
+                          onClick={() => toggleFileExpanded(file.id || index)}
+                          data-testid={`file-row-${file.id}`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <FileText className="w-5 h-5 text-slate-400 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate" title={file.poNumber || file.originalFilename}>
+                                {file.poNumber || file.originalFilename}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {file.originalFilename}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); downloadFile(file); }}
+                              className="shrink-0"
+                              data-testid={`button-download-${file.id}`}
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            {hasDetails && (
+                              isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </div>
                         </div>
+                        
+                        {isExpanded && (
+                          <div className="px-3 pb-3 border-t border-slate-200 bg-white">
+                            <div className="grid grid-cols-2 gap-3 pt-3">
+                              <div className="flex items-center gap-2">
+                                <Package className="w-4 h-4 text-blue-500" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Parts</p>
+                                  <p className="text-sm font-semibold">{file.coreParts ?? 0}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-amber-500" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Dovetails</p>
+                                  <p className="text-sm font-semibold">{file.dovetails ?? 0}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Package className="w-4 h-4 text-green-500" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Assembled Drawers</p>
+                                  <p className="text-sm font-semibold">{file.assembledDrawers ?? 0}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-purple-500" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">5-Piece Doors</p>
+                                  <p className="text-sm font-semibold">{file.fivePieceDoors ?? 0}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Weight className="w-4 h-4 text-slate-500" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Weight</p>
+                                  <p className="text-sm font-semibold">{file.weightLbs ?? 0} lbs</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Ruler className="w-4 h-4 text-slate-500" />
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Max Length</p>
+                                  <p className="text-sm font-semibold">{file.maxLength ?? 0} mm</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Special flags */}
+                            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
+                              {file.hasGlassParts && (
+                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Glass Parts</span>
+                              )}
+                              {file.hasMJDoors && (
+                                <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full">M&J Doors</span>
+                              )}
+                              {file.hasRichelieuDoors && (
+                                <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full">Richelieu Doors</span>
+                              )}
+                              {file.hasDoubleThick && (
+                                <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">Double Thick</span>
+                              )}
+                              {!file.hasGlassParts && !file.hasMJDoors && !file.hasRichelieuDoors && !file.hasDoubleThick && (
+                                <span className="text-xs text-muted-foreground">No special parts</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => downloadFile(file)}
-                        className="shrink-0"
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {(!project.files || project.files.length === 0) && (
                     <p className="text-sm text-muted-foreground text-center py-4">
                       No files in this project
