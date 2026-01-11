@@ -27,6 +27,7 @@ export interface SyncPreview {
     glassPieces: number;
     mjDoors: number;
     richelieuDoors: number;
+    doubleThick: number;
     weightLbs: number;
     maxLength: number;
     fileCount: number;
@@ -55,6 +56,7 @@ export interface SyncPreview {
     mjDoorsCount: number;
     richelieuDoorsCount: number;
     hasDoubleThick: boolean;
+    doubleThickCount: number;
     customParts: string[];
   }>;
 }

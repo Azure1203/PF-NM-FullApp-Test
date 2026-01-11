@@ -243,7 +243,7 @@ export default function OrderDetails() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3">
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
                   <p className="text-xs text-muted-foreground">Parts</p>
@@ -271,6 +271,10 @@ export default function OrderDetails() {
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-richelieu">{preview.totals.richelieuDoors}</p>
                   <p className="text-xs text-muted-foreground">Richelieu</p>
+                </div>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-total-doublethick">{preview.totals.doubleThick}</p>
+                  <p className="text-xs text-muted-foreground">Double Thick</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
@@ -369,7 +373,7 @@ export default function OrderDetails() {
                         {preview.fileBreakdowns[selectedFileIndex].name}
                       </h4>
                       
-                      <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold text-primary" data-testid="text-file-parts">{preview.fileBreakdowns[selectedFileIndex].coreParts}</p>
                           <p className="text-sm text-muted-foreground">Parts</p>
@@ -389,6 +393,18 @@ export default function OrderDetails() {
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-glass">{preview.fileBreakdowns[selectedFileIndex].glassPieces}</p>
                           <p className="text-sm text-muted-foreground">Glass Pieces</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-mj">{preview.fileBreakdowns[selectedFileIndex].mjDoorsCount}</p>
+                          <p className="text-sm text-muted-foreground">M&J Doors</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-richelieu">{preview.fileBreakdowns[selectedFileIndex].richelieuDoorsCount}</p>
+                          <p className="text-sm text-muted-foreground">Richelieu Doors</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-doublethick">{preview.fileBreakdowns[selectedFileIndex].doubleThickCount}</p>
+                          <p className="text-sm text-muted-foreground">Double Thick</p>
                         </div>
                       </div>
 
