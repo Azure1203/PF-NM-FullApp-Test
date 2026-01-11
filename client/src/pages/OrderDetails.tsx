@@ -246,7 +246,7 @@ export default function OrderDetails() {
               <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3">
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
-                  <p className="text-xs text-muted-foreground">Parts</p>
+                  <p className="text-xs text-muted-foreground">Parts Overall</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-dovetails">{preview.totals.dovetails}</p>
@@ -254,15 +254,15 @@ export default function OrderDetails() {
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-assembled">{preview.totals.assembledDrawers}</p>
-                  <p className="text-xs text-muted-foreground">Assembled</p>
+                  <p className="text-xs text-muted-foreground">Assembled Drawers</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-fivepiece">{preview.totals.fivePieceDoors}</p>
-                  <p className="text-xs text-muted-foreground">5-Piece</p>
+                  <p className="text-xs text-muted-foreground">5 Piece Shaker</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-glass">{preview.totals.glassPieces}</p>
-                  <p className="text-xs text-muted-foreground">Glass</p>
+                  <p className="text-xs text-muted-foreground">Glass Parts</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-mj-doors">{preview.totals.mjDoors}</p>
@@ -270,11 +270,11 @@ export default function OrderDetails() {
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-richelieu">{preview.totals.richelieuDoors}</p>
-                  <p className="text-xs text-muted-foreground">Richelieu</p>
+                  <p className="text-xs text-muted-foreground">Richelieu Doors</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-doublethick">{preview.totals.doubleThick}</p>
-                  <p className="text-xs text-muted-foreground">Double Thick</p>
+                  <p className="text-xs text-muted-foreground">Double Thick Parts</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
@@ -376,7 +376,7 @@ export default function OrderDetails() {
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold text-primary" data-testid="text-file-parts">{preview.fileBreakdowns[selectedFileIndex].coreParts}</p>
-                          <p className="text-sm text-muted-foreground">Parts</p>
+                          <p className="text-sm text-muted-foreground">Parts Overall</p>
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-dovetails">{preview.fileBreakdowns[selectedFileIndex].dovetails}</p>
@@ -388,11 +388,11 @@ export default function OrderDetails() {
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-fivepiece">{preview.fileBreakdowns[selectedFileIndex].fivePieceDoors}</p>
-                          <p className="text-sm text-muted-foreground">5-Piece Doors</p>
+                          <p className="text-sm text-muted-foreground">5 Piece Shaker</p>
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-glass">{preview.fileBreakdowns[selectedFileIndex].glassPieces}</p>
-                          <p className="text-sm text-muted-foreground">Glass Pieces</p>
+                          <p className="text-sm text-muted-foreground">Glass Parts</p>
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-mj">{preview.fileBreakdowns[selectedFileIndex].mjDoorsCount}</p>
@@ -404,7 +404,7 @@ export default function OrderDetails() {
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-doublethick">{preview.fileBreakdowns[selectedFileIndex].doubleThickCount}</p>
-                          <p className="text-sm text-muted-foreground">Double Thick</p>
+                          <p className="text-sm text-muted-foreground">Double Thick Parts</p>
                         </div>
                       </div>
 
