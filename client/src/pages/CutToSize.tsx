@@ -62,6 +62,9 @@ export default function CutToSize() {
       );
       return { previousParts };
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-status'] });
+    },
     onError: (error: Error, _, context) => {
       if (context?.previousParts) {
         queryClient.setQueryData(['/api/files', fileId, 'cts-parts'], context.previousParts);
