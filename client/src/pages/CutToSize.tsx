@@ -185,8 +185,8 @@ export default function CutToSize() {
                       <div className="flex items-center gap-3">
                         <Package className="w-5 h-5 text-muted-foreground" />
                         <div>
-                          <p className="text-2xl font-bold" data-testid="text-quantity">{part.quantity}</p>
-                          <p className="text-xs text-muted-foreground">Quantity</p>
+                          <p className="text-2xl font-bold" data-testid="text-quantity">{part.quantity} <span className="text-base font-normal text-muted-foreground">@ {part.cutLength} mm</span></p>
+                          <p className="text-xs text-muted-foreground">Quantity @ Cut Length</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
