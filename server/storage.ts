@@ -104,7 +104,7 @@ export class DatabaseStorage implements IStorage {
 
   // CTS parts methods
   async getCtsPartsForFile(fileId: number): Promise<CtsPart[]> {
-    return await db.select().from(ctsParts).where(eq(ctsParts.fileId, fileId));
+    return await db.select().from(ctsParts).where(eq(ctsParts.fileId, fileId)).orderBy(ctsParts.id);
   }
 
   async getCtsPartsCountForFile(fileId: number): Promise<number> {
