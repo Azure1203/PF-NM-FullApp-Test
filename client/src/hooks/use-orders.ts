@@ -49,9 +49,12 @@ export function useUploadOrder() {
       });
       
       if (!res.ok) {
-        throw new Error("Failed to upload orders");
+        const errorData = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(errorData.message || "Failed to upload orders");
       }
-      return api.orders.upload.responses[201].parse(await res.json());
+      
+      const data = await res.json();
+      return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.orders.list.path] });
