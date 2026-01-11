@@ -629,33 +629,38 @@ export async function registerRoutes(
     }
   });
 
-  // Get presigned URL for CTS image upload
-  app.post('/api/cts-configs/:partNumber/upload-url', isAuthenticated, async (req, res) => {
+  // Upload image for CTS part config (server-side upload to object storage)
+  app.post('/api/cts-configs/:partNumber/image', isAuthenticated, upload.single('image'), async (req, res) => {
     try {
       const partNumber = decodeURIComponent(req.params.partNumber);
-      const { contentType } = req.body;
+      const file = req.file;
       
-      // Get upload URL from object storage
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      
-      res.json({ uploadURL, objectPath, partNumber });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
-  // Complete CTS image upload (after file has been uploaded to object storage)
-  app.post('/api/cts-configs/:partNumber/image-complete', isAuthenticated, async (req, res) => {
-    try {
-      const partNumber = decodeURIComponent(req.params.partNumber);
-      const { objectPath } = req.body;
-      
-      if (!objectPath) {
-        return res.status(400).json({ message: 'objectPath is required' });
+      if (!file) {
+        return res.status(400).json({ message: 'No image file provided' });
       }
       
-      // Set ACL policy for public access
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({ message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.' });
+      }
+      
+      // Get upload URL and upload to object storage
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      
+      // Upload file buffer to the presigned URL
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file.buffer,
+        headers: { 'Content-Type': file.mimetype },
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload to object storage');
+      }
+      
+      // Normalize path and set public ACL
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
       const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
         owner: 'system',
         visibility: 'public',
@@ -673,6 +678,7 @@ export async function registerRoutes(
       
       res.json(config);
     } catch (err: any) {
+      console.error('CTS image upload error:', err);
       res.status(500).json({ message: err.message });
     }
   });
