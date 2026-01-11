@@ -54,11 +54,22 @@ export default function CutToSize() {
     mutationFn: async ({ partId, isCut }: { partId: number; isCut: boolean }) => {
       return apiRequest('PATCH', `/api/cts-parts/${partId}/cut`, { isCut });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
+    onMutate: async ({ partId, isCut }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
+      const previousParts = queryClient.getQueryData<CtsPartWithConfig[]>(['/api/files', fileId, 'cts-parts']);
+      queryClient.setQueryData<CtsPartWithConfig[]>(['/api/files', fileId, 'cts-parts'], (old) => 
+        old?.map(part => part.id === partId ? { ...part, isCut } : part)
+      );
+      return { previousParts };
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _, context) => {
+      if (context?.previousParts) {
+        queryClient.setQueryData(['/api/files', fileId, 'cts-parts'], context.previousParts);
+      }
       toast({ title: "Failed to update", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
     }
   });
 
