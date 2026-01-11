@@ -2,6 +2,9 @@ import { pgTable, text, serial, boolean, timestamp, integer } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Export auth schema for Replit Auth
+export * from "./models/auth";
+
 // Projects table - groups multiple order files together
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),

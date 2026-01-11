@@ -6,6 +6,7 @@ import { z } from "zod";
 import multer from 'multer';
 import { parse } from 'csv-parse';
 import { getAsanaApiInstances } from "./lib/asana";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -215,14 +216,18 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  // List all projects
-  app.get(api.orders.list.path, async (req, res) => {
+  // Setup authentication (must be before other routes)
+  await setupAuth(app);
+  registerAuthRoutes(app);
+
+  // List all projects (protected)
+  app.get(api.orders.list.path, isAuthenticated, async (req, res) => {
     const projects = await storage.getProjects();
     res.json(projects);
   });
 
-  // Get a single project with its files
-  app.get(api.orders.get.path, async (req, res) => {
+  // Get a single project with its files (protected)
+  app.get(api.orders.get.path, isAuthenticated, async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
@@ -231,8 +236,8 @@ export async function registerRoutes(
     res.json({ ...project, files });
   });
 
-  // Delete a project
-  app.delete(api.orders.delete.path, async (req, res) => {
+  // Delete a project (protected)
+  app.delete(api.orders.delete.path, isAuthenticated, async (req, res) => {
     const success = await storage.deleteProject(Number(req.params.id));
     if (!success) {
       return res.status(404).json({ message: 'Project not found' });
@@ -240,8 +245,8 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  // Upload multiple files as a single project
-  app.post(api.orders.upload.path, upload.array('files'), async (req, res) => {
+  // Upload multiple files as a single project (protected)
+  app.post(api.orders.upload.path, isAuthenticated, upload.array('files'), async (req, res) => {
     if (!req.files || (req.files as Express.Multer.File[]).length === 0) {
       return res.status(400).json({ message: 'No files uploaded' });
     }
@@ -304,8 +309,8 @@ export async function registerRoutes(
     }
   });
 
-  // Update project data
-  app.put(api.orders.update.path, async (req, res) => {
+  // Update project data (protected)
+  app.put(api.orders.update.path, isAuthenticated, async (req, res) => {
     try {
       const input = api.orders.update.input.parse(req.body);
       const project = await storage.updateProject(Number(req.params.id), input);
@@ -324,8 +329,8 @@ export async function registerRoutes(
     }
   });
 
-  // Sync project to Asana (duplicates template task and updates it)
-  app.post(api.orders.sync.path, async (req, res) => {
+  // Sync project to Asana (duplicates template task and updates it) (protected)
+  app.post(api.orders.sync.path, isAuthenticated, async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });

@@ -4,16 +4,19 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2 } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useAuth } from "@/hooks/use-auth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Dashboard() {
   const { data: projects, isLoading } = useOrders();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
 
   const filteredProjects = projects?.filter(project => {
@@ -28,12 +31,36 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-50/50 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            {user && (
+              <>
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                    {user.firstName?.[0] || user.email?.[0] || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm text-muted-foreground">
+                  Welcome, <span className="font-medium text-slate-700">{user.firstName || user.email}</span>
+                </span>
+              </>
+            )}
+          </div>
+          <a href="/api/logout">
+            <Button variant="outline" size="sm" data-testid="button-logout" className="gap-2">
+              <LogOut className="w-4 h-4" />
+              Log Out
+            </Button>
+          </a>
+        </div>
+        
         <PageHeader 
           title="Project Dashboard" 
           description="Manage and sync your closet order projects."
           actions={
             <Link href="/upload">
-              <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6">
+              <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6" data-testid="button-upload-new">
                 <Plus className="w-5 h-5" />
                 Upload New Project
               </Button>
