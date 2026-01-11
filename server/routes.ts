@@ -451,7 +451,7 @@ export async function registerRoutes(
           assembledDrawers: partCounts.assembledDrawers,
           fivePieceDoors: partCounts.fivePiece,
           weightLbs: Math.round(partCounts.weightLbs),
-          maxLength: partCounts.maxLength,
+          maxLength: Math.round(partCounts.maxLength),
           hasGlassParts: partCounts.hasGlassParts,
           hasMJDoors: partCounts.hasMJDoors,
           hasRichelieuDoors: partCounts.hasRichelieuDoors,

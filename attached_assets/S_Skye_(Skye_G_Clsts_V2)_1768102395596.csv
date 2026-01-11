@@ -1,0 +1,109 @@
+Date (dd/mm/yyyy),22/12/2025,,,,,,,,,
+Dealer (Company),Valley Lumber Co co Samson Tug & Barge,,,,,,,,,
+Designer Name (First/Last),Joni Dahlstrom,,,,,,,,,
+PO:/Design Name (First/Last),S Skye (Skye G Clsts V2),,,,,,,,,
+Shipping Address,"9228 10th Avenue South,, Seattle, WA, US, 98108",,,,,,,,,
+Phone,907-789-7500,,,,,,,,,
+Tax ID,83-106189,,,,,,,,,
+Power Tail Gate,NO,,,,,,,,,
+Phone Appointment,YES,,,,,,,,,
+Order ID,1679,,,,,,,,,
+# of Core Parts,115,,,,,,,,,
+# of Dovetails,20,,,,,,,,,
+# of Assembled Drawers,0,,,,,,,,,
+# of 5-Piece and GD,0,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+Manuf code,Color,Quantity,Height,Width(R),Length(L),Thickness,Left,Right,Top,Bottom
+SDBX36_22_6,,3,152,840,556,,,,,
+SDBX24_22_6,,3,152,548.8,556,,,,,
+SDBX15_22_6,,6,152,345.6,556,,,,,
+SDBX24_22_8,,2,203,548.8,556,,,,,
+SDBX15_22_8,,4,203,345.6,556,,,,,
+SDBX36_22_8,,2,203,840,556,,,,,
+34SHFF,TFL2CH,4,113.4,355.6,,19,1,1,0,0
+34SHFA,TFL2CH,3,558.8,355.6,,19,1,1,1,1
+34SHFA,TFL2CH,6,355.6,355.6,,19,1,1,1,1
+34SHFA,TFL2CH,1,1778,503.5,,19,1,1,1,1
+34SHFA,TFL2CH,5,417.5,609.6,,19,1,1,1,1
+34SHFF,TFL2CH,2,558.8,609.6,,19,1,1,0,0
+34SHFF,TFL2CH,4,355.6,609.6,,19,1,1,0,0
+34SHFF,TFL2CH,2,417.5,609.6,,19,1,1,0,0
+34SHFA,TFL2CH,1,1036.6,355.6,,19,1,1,1,1
+34SHFA,TFL2CH,5,341.3,355.6,,19,1,1,1,1
+34SHFF,TFL2CH,2,1036.6,355.6,,19,1,1,0,0
+34SHFA,TFL2CH,1,1905,654,,19,1,1,1,1
+34SHFA,TFL2CH,1,958.8,457.2,,19,1,1,1,1
+34SHFF,TFL2CH,2,850,609.6,,19,1,1,0,0
+34SHFA,TFL2CH,3,850,355.6,,19,1,1,1,1
+34SHFF,TFL2CH,2,530.9,355.6,,19,1,1,0,0
+34SHFA,TFL2CH,4,530.9,355.6,,19,1,1,1,1
+34SHFA,TFL2CH,1,2438.4,533.4,,19,1,1,1,1
+34SHFF,TFL2CH,2,355.6,355.6,,19,1,1,0,0
+34SHFF,TFL2CH,1,558.8,355.6,,19,1,1,0,0
+34SHFF,TFL2CH,1,1027.8,355.6,,19,1,1,0,0
+34SHFF,TFL2CH,2,679,355.6,,19,1,1,0,0
+34SHFF,TFL2CH,1,850,355.6,,19,1,1,0,0
+34SHFF,TFL2CH,1,894.9,355.6,,19,1,1,0,0
+34SHFF,TFL2CH,2,908.7,355.6,,19,1,1,0,0
+34SHFF,TFL2CH,2,341.3,355.6,,19,1,1,0,0
+TK,TFL2CH,1,1036.6,96.5,,19,0,0,0,0
+TK,TFL2CH,1,341.3,96.5,,19,0,0,0,0
+TK,TFL2CH,1,530.9,96.5,,19,0,0,0,0
+TK,TFL2CH,1,113.4,96.5,,19,0,0,0,0
+34BACK,TFL2CH,1,2132,569.9,,19,1,1,1,1
+TK,TFL2CH,1,850,96.5,,19,0,0,0,0
+34BACK,TFL2CH,1,980,578.3,,19,1,1,1,1
+34BACK,TFL2CH,2,980,384.9,,19,1,1,1,1
+CLEAT,TFL2CH,1,417.5,76.2,,19,1,1,1,1
+34TOPS,TFL2CH,1,1373.4,654,,19,1,1,1,1
+34BACK,TFL2CH,1,1140,578.3,,19,1,1,1,1
+TK,TFL2CH,1,558.8,96.5,,19,0,0,0,0
+34BACK,TFL2CH,1,1140,889,,19,1,1,1,1
+34BACK,TFL2CH,2,1140,384.9,,19,1,1,1,1
+TK,TFL2CH,2,355.6,96.5,,19,0,0,0,0
+34BACK,TFL2CH,1,2132,456.5,,19,1,1,1,1
+TK,TFL2CH,1,417.5,96.5,,19,0,0,0,0
+CLEAT,TFL2CH,1,1036.6,76.2,,19,1,1,1,1
+CLEAT,TFL2CH,1,341.3,76.2,,19,1,1,1,1
+CLEAT,TFL2CH,1,530.9,76.2,,19,1,1,1,1
+34TOPS,TFL2CH,1,914.4,654,,19,1,1,1,1
+34BACK,TFL2CH,1,980,889,,19,1,1,1,1
+34WPNLL,TFL2CH,2,980,355.6,,19,1,1,1,1
+34WPNLF,TFL2CH,8,1204,355.6,,19,1,1,1,1
+34WPNLF,TFL2CH,2,980,355.6,,19,1,1,1,1
+34WPNLR,TFL2CH,2,980,355.6,,19,1,1,1,1
+34PNLF,TFL2CH,3,2132,355.6,,19,1,1,1,1
+34PNLL,TFL2CH,1,2132,609.6,,19,1,1,1,1
+34PNLR,TFL2CH,1,2132,609.6,,19,1,1,1,1
+34PNLL,TFL2CH,2,1140,609.6,,19,1,1,1,1
+34PNLR,TFL2CH,2,1140,609.6,,19,1,1,1,1
+34PNLF,TFL2CH,2,1140,609.6,,19,1,1,1,1
+34PNLR,TFL2CH,1,2132,355.6,,19,1,1,1,1
+34PNLF,TFL2CH,2,884,355.6,,19,1,1,1,1
+34PNLL,TFL2CH,1,2132,355.6,,19,1,1,1,1
+H.801.13.201.CTS,Oval Rod Chrome- Cut to size,2,,,669.5,,,,,
+H.801.13.201.CTS,Oval Rod Chrome- Cut to size,1,,,1018.3,,,,,
+M-04-5311,Oval Rod Holder Chrome,16,,,,,,,,
+H.801.13.201.CTS,Oval Rod Chrome- Cut to size,1,,,1027.1,,,,,
+H.801.13.201.CTS,Oval Rod Chrome 1 - Cut to size,1,,,103.9,,,,,
+H.801.13.201.CTS,Oval Rod Chrome- Cut to size,1,,,885.4,,,,,
+H.801.13.201.CTS,Oval Rod Chrome- Cut to size,2,,,899.2,,,,,
+M-105-DS10550H,"Undermount Softclose Slides 22""",20,,,,,,,,
+H.263.24.972,System 1 Bolt Double - Approx Qty,197,,,,,,,,
+M-R20-1564,Flat Screw #8 x 5/8   #2 Drive,150,,,,,,,,
+M-R20-1779,Flat Screw #8 x 2-1/2  #2 Drive,175,,,,,,,,
+M-R20-1765,Flat Screw #8 x 1-1/4  #2 Drive,70,,,,,,,,
+R-B1655BLK,Corner Bracket / Black,29,,,,,,,,
+H.263.20.985,System Bolt Single - Approx. Qty,197,,,,,,,,
+H.263.50.305,Fixed Shelf Cams Black,197,,,,,,,,
+M-06-7000,System screw Pozi (euro),132,,,,,,,,
+M-03-2415,Adjustable Shelf Pins,167,,,,,,,,
+H.290.06.042,Hanging Rail Hardware Cover Right Black,12,,,,,,,,
+H.290.02.715,Hanging Rail Hardware Left,12,,,,,,,,
+H.290.06.022,Hanging Rail Hardware Cover Left Black,12,,,,,,,,
+H.290.11.901,Wall Rail,3,,,,,,,,
+H.290.12.380,Wall Rail Cover Black,3,,,,,,,,
+R-5282G,Corner Bracket / Steel,29,,,,,,,,
+H.290.02.714,Hanging Rail Hardware Right,12,,,,,,,,
