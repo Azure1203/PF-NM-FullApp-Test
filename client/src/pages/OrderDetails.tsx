@@ -90,6 +90,7 @@ export default function OrderDetails() {
   const { data: ctsCutStatus } = useQuery<{ total: number; cut: number; allCut: boolean }>({
     queryKey: ['/api/files', selectedFileId, 'cts-status'],
     enabled: !!selectedFileId && selectedFileId > 0,
+    staleTime: 0,
   });
 
   // Auto-select first file when preview loads
