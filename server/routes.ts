@@ -74,6 +74,47 @@ const GLASS_INSERT_KEYWORDS = [
 // Glass Shelf keywords to detect
 const GLASS_SHELF_KEYWORDS = ['GLSHFA_6', 'GLSHFA_10'];
 
+// Extract CTS (Cut To Size) parts from CSV
+function extractCTSParts(records: string[][]): Array<{ partNumber: string; description: string; cutLength: number; quantity: number }> {
+  const ctsParts: Array<{ partNumber: string; description: string; cutLength: number; quantity: number }> = [];
+  
+  // Find the data section (starts after "Manuf code" header row)
+  let dataStartIndex = -1;
+  for (let i = 0; i < records.length; i++) {
+    if (records[i][0]?.toLowerCase().includes('manuf')) {
+      dataStartIndex = i + 1;
+      break;
+    }
+  }
+  
+  if (dataStartIndex === -1) return ctsParts;
+  
+  // Process each data row looking for .CTS parts
+  for (let i = dataStartIndex; i < records.length; i++) {
+    const row = records[i];
+    const sku = (row[0] || '').trim();
+    
+    // Check if this is a CTS part (ends with .CTS)
+    if (sku.toUpperCase().endsWith('.CTS')) {
+      const description = (row[1] || '').trim();
+      const quantity = parseInt(row[2] || '0') || 0;
+      // Length is in column 5 (index 5 = Length(L))
+      const cutLength = parseFloat(row[5] || '0') || 0;
+      
+      if (quantity > 0 && cutLength > 0) {
+        ctsParts.push({
+          partNumber: sku,
+          description,
+          cutLength: Math.round(cutLength),
+          quantity
+        });
+      }
+    }
+  }
+  
+  return ctsParts;
+}
+
 // Count parts from actual CSV data rows
 function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[] } {
   let coreParts = 0;
@@ -463,7 +504,7 @@ export async function registerRoutes(
         // Calculate part counts from CSV data
         const partCounts = countPartsFromCSV(pf.records);
         
-        await storage.createOrderFile({
+        const orderFile = await storage.createOrderFile({
           projectId: project.id,
           originalFilename: pf.filename,
           poNumber: pf.poNumber,
@@ -481,6 +522,18 @@ export async function registerRoutes(
           hasRichelieuDoors: partCounts.hasRichelieuDoors,
           hasDoubleThick: partCounts.hasDoubleThick,
         });
+        
+        // Extract and save CTS parts for this file
+        const ctsParts = extractCTSParts(pf.records);
+        for (const ctsPart of ctsParts) {
+          await storage.createCtsPart({
+            fileId: orderFile.id,
+            partNumber: ctsPart.partNumber,
+            description: ctsPart.description,
+            cutLength: ctsPart.cutLength,
+            quantity: ctsPart.quantity,
+          });
+        }
       }
 
       res.status(201).json(project);
@@ -507,6 +560,67 @@ export async function registerRoutes(
           });
         }
         res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get CTS parts for a file
+  app.get('/api/files/:fileId/cts-parts', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const ctsParts = await storage.getCtsPartsForFile(fileId);
+      
+      // Get configurations for each part
+      const configs = await storage.getAllCtsPartConfigs();
+      const configMap = new Map(configs.map(c => [c.partNumber, c]));
+      
+      // Combine parts with their configs
+      const partsWithConfigs = ctsParts.map(part => ({
+        ...part,
+        config: configMap.get(part.partNumber) || null
+      }));
+      
+      res.json(partsWithConfigs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get all CTS part configs
+  app.get('/api/cts-configs', isAuthenticated, async (req, res) => {
+    try {
+      const configs = await storage.getAllCtsPartConfigs();
+      res.json(configs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Update CTS part config (image URL and rack location)
+  const ctsConfigUpdateSchema = z.object({
+    imageUrl: z.string().nullable().optional(),
+    rackLocation: z.string().nullable().optional(),
+  });
+  
+  app.put('/api/cts-configs/:partNumber', isAuthenticated, async (req, res) => {
+    try {
+      const partNumber = decodeURIComponent(req.params.partNumber);
+      const input = ctsConfigUpdateSchema.parse(req.body);
+      
+      const config = await storage.upsertCtsPartConfig({
+        partNumber,
+        imageUrl: input.imageUrl || null,
+        rackLocation: input.rackLocation || null,
+      });
+      
+      res.json(config);
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(500).json({ message: err.message });
     }
   });
 

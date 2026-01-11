@@ -2,10 +2,16 @@ import { db } from "./db";
 import {
   projects,
   orderFiles,
+  ctsParts,
+  ctsPartConfigs,
   type Project,
   type InsertProject,
   type OrderFile,
-  type InsertOrderFile
+  type InsertOrderFile,
+  type CtsPart,
+  type InsertCtsPart,
+  type CtsPartConfig,
+  type InsertCtsPartConfig
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
@@ -21,6 +27,15 @@ export interface IStorage {
   getProjectFiles(projectId: number): Promise<OrderFile[]>;
   createOrderFile(file: InsertOrderFile): Promise<OrderFile>;
   updateOrderFile(id: number, updates: Partial<OrderFile>): Promise<OrderFile | undefined>;
+  
+  // CTS parts methods
+  getCtsPartsForFile(fileId: number): Promise<CtsPart[]>;
+  createCtsPart(part: InsertCtsPart): Promise<CtsPart>;
+  
+  // CTS part config methods
+  getCtsPartConfig(partNumber: string): Promise<CtsPartConfig | undefined>;
+  getAllCtsPartConfigs(): Promise<CtsPartConfig[]>;
+  upsertCtsPartConfig(config: InsertCtsPartConfig): Promise<CtsPartConfig>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -70,6 +85,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orderFiles.id, id))
       .returning();
     return updated;
+  }
+
+  // CTS parts methods
+  async getCtsPartsForFile(fileId: number): Promise<CtsPart[]> {
+    return await db.select().from(ctsParts).where(eq(ctsParts.fileId, fileId));
+  }
+
+  async createCtsPart(part: InsertCtsPart): Promise<CtsPart> {
+    const [created] = await db.insert(ctsParts).values(part).returning();
+    return created;
+  }
+
+  // CTS part config methods
+  async getCtsPartConfig(partNumber: string): Promise<CtsPartConfig | undefined> {
+    const [config] = await db.select().from(ctsPartConfigs).where(eq(ctsPartConfigs.partNumber, partNumber));
+    return config;
+  }
+
+  async getAllCtsPartConfigs(): Promise<CtsPartConfig[]> {
+    return await db.select().from(ctsPartConfigs);
+  }
+
+  async upsertCtsPartConfig(config: InsertCtsPartConfig): Promise<CtsPartConfig> {
+    const existing = await this.getCtsPartConfig(config.partNumber);
+    if (existing) {
+      const [updated] = await db.update(ctsPartConfigs)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(ctsPartConfigs.partNumber, config.partNumber))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(ctsPartConfigs).values(config).returning();
+      return created;
+    }
   }
 }
 

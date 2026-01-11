@@ -1,0 +1,218 @@
+import { useState } from "react";
+import { useRoute } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+
+import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
+import type { OrderFile, CtsPart, CtsPartConfig } from "@shared/schema";
+
+interface CtsPartWithConfig extends CtsPart {
+  config: CtsPartConfig | null;
+}
+
+export default function CutToSize() {
+  const [, params] = useRoute("/files/:fileId/cts");
+  const fileId = parseInt(params?.fileId || "0");
+  const { toast } = useToast();
+  
+  const [editingConfig, setEditingConfig] = useState<{ [partNumber: string]: { imageUrl: string; rackLocation: string } }>({});
+
+  const { data: ctsParts, isLoading } = useQuery<CtsPartWithConfig[]>({
+    queryKey: ['/api/files', fileId, 'cts-parts'],
+    enabled: !!fileId && fileId > 0,
+  });
+
+  const { mutate: saveConfig, isPending: isSaving } = useMutation({
+    mutationFn: async ({ partNumber, imageUrl, rackLocation }: { partNumber: string; imageUrl: string; rackLocation: string }) => {
+      return apiRequest('PUT', `/api/cts-configs/${encodeURIComponent(partNumber)}`, { imageUrl, rackLocation });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
+      toast({ title: "Configuration saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const handleSaveConfig = (partNumber: string) => {
+    const config = editingConfig[partNumber];
+    const existingPart = ctsParts?.find(p => p.partNumber === partNumber);
+    
+    saveConfig({
+      partNumber,
+      imageUrl: config?.imageUrl ?? existingPart?.config?.imageUrl ?? "",
+      rackLocation: config?.rackLocation ?? existingPart?.config?.rackLocation ?? ""
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        <Link href="/">
+          <Button variant="ghost" className="mb-6 pl-0 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </Link>
+
+        <PageHeader 
+          title="Cut To Size Parts" 
+          description="Parts that need to be cut to specific lengths for this order."
+        />
+
+        {!ctsParts || ctsParts.length === 0 ? (
+          <Card className="border-none shadow-md">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <Scissors className="w-16 h-16 text-muted-foreground/30 mb-4" />
+              <p className="text-lg font-medium text-muted-foreground">No Cut To Size Parts</p>
+              <p className="text-sm text-muted-foreground/70">This file doesn't contain any .CTS parts.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {ctsParts.map((part) => {
+              const editing = editingConfig[part.partNumber] ?? {
+                imageUrl: part.config?.imageUrl ?? "",
+                rackLocation: part.config?.rackLocation ?? ""
+              };
+              
+              return (
+                <Card key={part.id} className="border-none shadow-md" data-testid={`cts-part-${part.id}`}>
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/10 p-3 rounded-lg">
+                          <Scissors className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg" data-testid="text-part-number">{part.partNumber}</CardTitle>
+                          <CardDescription data-testid="text-part-description">{part.description || "No description"}</CardDescription>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-primary" data-testid="text-cut-length">{part.cutLength} mm</div>
+                        <div className="text-sm text-muted-foreground">Cut Length</div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-muted/30 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Package className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-2xl font-bold" data-testid="text-quantity">{part.quantity}</p>
+                          <p className="text-xs text-muted-foreground">Quantity</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-lg font-semibold" data-testid="text-rack-location">
+                            {part.config?.rackLocation || <span className="text-muted-foreground/50 italic">Not set</span>}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Rack Location</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Image className="w-5 h-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm" data-testid="text-image-status">
+                            {part.config?.imageUrl ? (
+                              <span className="text-green-600 font-medium">Image set</span>
+                            ) : (
+                              <span className="text-muted-foreground/50 italic">No image</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Reference Photo</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {part.config?.imageUrl && (
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <img 
+                          src={part.config.imageUrl} 
+                          alt={`Reference for ${part.partNumber}`}
+                          className="w-full max-h-64 object-contain"
+                          data-testid="img-part-reference"
+                        />
+                      </div>
+                    )}
+
+                    <div className="border-t pt-4">
+                      <h4 className="text-sm font-medium text-muted-foreground mb-4">Configure Part</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`rack-${part.partNumber}`} className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4" />
+                            Rack Location
+                          </Label>
+                          <Input
+                            id={`rack-${part.partNumber}`}
+                            placeholder="e.g. Rack A-12, Shelf 3"
+                            value={editing.rackLocation}
+                            onChange={(e) => setEditingConfig(prev => ({
+                              ...prev,
+                              [part.partNumber]: { ...editing, rackLocation: e.target.value }
+                            }))}
+                            data-testid="input-rack-location"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`image-${part.partNumber}`} className="flex items-center gap-2">
+                            <Image className="w-4 h-4" />
+                            Image URL
+                          </Label>
+                          <Input
+                            id={`image-${part.partNumber}`}
+                            placeholder="https://example.com/image.jpg"
+                            value={editing.imageUrl}
+                            onChange={(e) => setEditingConfig(prev => ({
+                              ...prev,
+                              [part.partNumber]: { ...editing, imageUrl: e.target.value }
+                            }))}
+                            data-testid="input-image-url"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        className="mt-4"
+                        onClick={() => handleSaveConfig(part.partNumber)}
+                        disabled={isSaving}
+                        data-testid="button-save-config"
+                      >
+                        {isSaving ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        Save Configuration
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, Package, Layers, Weight, Ruler, Truck, AlertTriangle } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -494,23 +494,35 @@ export default function OrderDetails() {
                             className="min-h-[80px] resize-none"
                             data-testid="textarea-file-notes"
                           />
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              const fileId = project.files![selectedFileIndex].id;
-                              const notes = editingNotes[fileId] ?? project.files![selectedFileIndex].notes ?? "";
-                              updateFileNotes({ fileId, notes });
-                            }}
-                            disabled={isSavingNotes}
-                            data-testid="button-save-file-notes"
-                          >
-                            {isSavingNotes ? (
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                              <Save className="w-4 h-4 mr-2" />
-                            )}
-                            Save Notes
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const fileId = project.files![selectedFileIndex].id;
+                                const notes = editingNotes[fileId] ?? project.files![selectedFileIndex].notes ?? "";
+                                updateFileNotes({ fileId, notes });
+                              }}
+                              disabled={isSavingNotes}
+                              data-testid="button-save-file-notes"
+                            >
+                              {isSavingNotes ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4 mr-2" />
+                              )}
+                              Save Notes
+                            </Button>
+                            <Link href={`/files/${project.files![selectedFileIndex].id}/cts`}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                data-testid="button-view-cts-parts"
+                              >
+                                <Scissors className="w-4 h-4 mr-2" />
+                                Cut To Size Parts
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
                       )}
                     </div>

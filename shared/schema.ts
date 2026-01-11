@@ -63,6 +63,42 @@ export const insertOrderFileSchema = createInsertSchema(orderFiles).omit({
   createdAt: true
 });
 
+// CTS Parts table - individual cut-to-size parts extracted from each file
+export const ctsParts = pgTable("cts_parts", {
+  id: serial("id").primaryKey(),
+  fileId: integer("file_id").references(() => orderFiles.id, { onDelete: 'cascade' }).notNull(),
+  partNumber: text("part_number").notNull(), // e.g. H.801.43.340.CTS
+  description: text("description"), // e.g. Round Rod Black - Cut to size
+  cutLength: integer("cut_length").notNull(), // Length in mm (rounded)
+  quantity: integer("quantity").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CTS Part Configurations - shared image and rack location per part type
+export const ctsPartConfigs = pgTable("cts_part_configs", {
+  id: serial("id").primaryKey(),
+  partNumber: text("part_number").notNull().unique(), // The base part number (without .CTS suffix or with it)
+  imageUrl: text("image_url"), // URL or path to uploaded image
+  rackLocation: text("rack_location"), // Where to find the full-length rod
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCtsPartSchema = createInsertSchema(ctsParts).omit({ 
+  id: true, 
+  createdAt: true
+});
+
+export const insertCtsPartConfigSchema = createInsertSchema(ctsPartConfigs).omit({ 
+  id: true, 
+  updatedAt: true
+});
+
+export type CtsPart = typeof ctsParts.$inferSelect;
+export type InsertCtsPart = z.infer<typeof insertCtsPartSchema>;
+
+export type CtsPartConfig = typeof ctsPartConfigs.$inferSelect;
+export type InsertCtsPartConfig = z.infer<typeof insertCtsPartConfigSchema>;
+
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 
