@@ -82,6 +82,15 @@ export default function OrderDetails() {
     queryKey: ['/api/orders', id, 'preview'],
     enabled: !!id && id > 0,
   });
+  
+  // Get the selected file's ID for CTS status query
+  const selectedFileId = project?.files?.[selectedFileIndex ?? -1]?.id;
+  
+  // Fetch CTS cut status for the selected file
+  const { data: ctsCutStatus } = useQuery<{ total: number; cut: number; allCut: boolean }>({
+    queryKey: ['/api/files', selectedFileId, 'cts-status'],
+    enabled: !!selectedFileId && selectedFileId > 0,
+  });
 
   // Auto-select first file when preview loads
   useEffect(() => {
@@ -400,19 +409,29 @@ export default function OrderDetails() {
                       {/* Prominent CTS Parts Link */}
                       {preview.fileBreakdowns[selectedFileIndex].ctsPartsCount > 0 && project.files?.[selectedFileIndex] && (
                         <Link href={`/files/${project.files[selectedFileIndex].id}/cts`}>
-                          <div className="flex items-center justify-between p-4 mb-4 bg-primary/10 border border-primary/20 rounded-lg hover-elevate cursor-pointer group" data-testid="button-cts-link">
+                          <div className={`flex items-center justify-between p-4 mb-4 border rounded-lg hover-elevate cursor-pointer group ${ctsCutStatus?.allCut ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800' : 'bg-primary/10 border-primary/20'}`} data-testid="button-cts-link">
                             <div className="flex items-center gap-3">
-                              <div className="bg-primary/20 p-2 rounded-lg">
-                                <Scissors className="w-5 h-5 text-primary" />
+                              <div className={`p-2 rounded-lg ${ctsCutStatus?.allCut ? 'bg-green-500' : 'bg-primary/20'}`}>
+                                {ctsCutStatus?.allCut ? (
+                                  <CheckCircle className="w-5 h-5 text-white" />
+                                ) : (
+                                  <Scissors className="w-5 h-5 text-primary" />
+                                )}
                               </div>
                               <div>
-                                <p className="font-semibold text-primary">View Cut To Size Parts</p>
-                                <p className="text-sm text-muted-foreground">Parts that need custom cutting for this file</p>
+                                <p className={`font-semibold ${ctsCutStatus?.allCut ? 'text-green-700 dark:text-green-400' : 'text-primary'}`}>
+                                  {ctsCutStatus?.allCut ? 'All CTS Parts Cut' : 'View Cut To Size Parts'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {ctsCutStatus?.allCut ? 'All parts have been cut for this file' : 'Parts that need custom cutting for this file'}
+                                </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="bg-primary text-primary-foreground">{preview.fileBreakdowns[selectedFileIndex].ctsPartsCount} parts</Badge>
-                              <ChevronRight className="w-5 h-5 text-primary group-hover:translate-x-1 transition-transform" />
+                              <Badge variant="secondary" className={ctsCutStatus?.allCut ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground'}>
+                                {ctsCutStatus?.allCut ? 'Complete' : `${preview.fileBreakdowns[selectedFileIndex].ctsPartsCount} parts`}
+                              </Badge>
+                              <ChevronRight className={`w-5 h-5 group-hover:translate-x-1 transition-transform ${ctsCutStatus?.allCut ? 'text-green-600' : 'text-primary'}`} />
                             </div>
                           </div>
                         </Link>

@@ -705,6 +705,37 @@ export async function registerRoutes(
     }
   });
 
+  // Toggle CTS part cut status
+  app.patch('/api/cts-parts/:partId/cut', isAuthenticated, async (req, res) => {
+    try {
+      const partId = Number(req.params.partId);
+      const { isCut } = req.body;
+      
+      if (typeof isCut !== 'boolean') {
+        return res.status(400).json({ message: 'isCut must be a boolean' });
+      }
+      
+      const updated = await storage.updateCtsPartCutStatus(partId, isCut);
+      if (!updated) {
+        return res.status(404).json({ message: 'CTS part not found' });
+      }
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get CTS parts cut status for a file
+  app.get('/api/files/:fileId/cts-status', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const status = await storage.getCtsPartsCutStatus(fileId);
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Update file notes (protected)
   app.patch('/api/files/:fileId/notes', isAuthenticated, async (req, res) => {
     try {

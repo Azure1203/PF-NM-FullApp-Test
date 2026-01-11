@@ -32,7 +32,9 @@ export interface IStorage {
   // CTS parts methods
   getCtsPartsForFile(fileId: number): Promise<CtsPart[]>;
   getCtsPartsCountForFile(fileId: number): Promise<number>;
+  getCtsPartsCutStatus(fileId: number): Promise<{ total: number; cut: number; allCut: boolean }>;
   createCtsPart(part: InsertCtsPart): Promise<CtsPart>;
+  updateCtsPartCutStatus(partId: number, isCut: boolean): Promise<CtsPart | undefined>;
   
   // CTS part config methods
   getCtsPartConfig(partNumber: string): Promise<CtsPartConfig | undefined>;
@@ -110,9 +112,24 @@ export class DatabaseStorage implements IStorage {
     return parts.reduce((sum, part) => sum + part.quantity, 0);
   }
 
+  async getCtsPartsCutStatus(fileId: number): Promise<{ total: number; cut: number; allCut: boolean }> {
+    const parts = await db.select().from(ctsParts).where(eq(ctsParts.fileId, fileId));
+    const total = parts.reduce((sum, part) => sum + part.quantity, 0);
+    const cut = parts.filter(p => p.isCut).reduce((sum, part) => sum + part.quantity, 0);
+    return { total, cut, allCut: total > 0 && cut === total };
+  }
+
   async createCtsPart(part: InsertCtsPart): Promise<CtsPart> {
     const [created] = await db.insert(ctsParts).values(part).returning();
     return created;
+  }
+
+  async updateCtsPartCutStatus(partId: number, isCut: boolean): Promise<CtsPart | undefined> {
+    const [updated] = await db.update(ctsParts)
+      .set({ isCut })
+      .where(eq(ctsParts.id, partId))
+      .returning();
+    return updated;
   }
 
   // CTS part config methods

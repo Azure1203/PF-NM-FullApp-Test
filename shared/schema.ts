@@ -71,6 +71,7 @@ export const ctsParts = pgTable("cts_parts", {
   description: text("description"), // e.g. Round Rod Black - Cut to size
   cutLength: integer("cut_length").notNull(), // Length in mm (rounded)
   quantity: integer("quantity").notNull().default(1),
+  isCut: boolean("is_cut").default(false).notNull(), // Whether this part has been cut
   createdAt: timestamp("created_at").defaultNow(),
 });
 

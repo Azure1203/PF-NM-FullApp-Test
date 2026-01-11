@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import type { OrderFile, CtsPart, CtsPartConfig } from "@shared/schema";
@@ -46,6 +47,18 @@ export default function CutToSize() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to save", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const { mutate: toggleCutStatus } = useMutation({
+    mutationFn: async ({ partId, isCut }: { partId: number; isCut: boolean }) => {
+      return apiRequest('PATCH', `/api/cts-parts/${partId}/cut`, { isCut });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
     }
   });
 
@@ -135,21 +148,29 @@ export default function CutToSize() {
               };
               
               return (
-                <Card key={part.id} className="border-none shadow-md" data-testid={`cts-part-${part.id}`}>
+                <Card key={part.id} className={`border-none shadow-md ${part.isCut ? 'bg-green-50 dark:bg-green-950/20' : ''}`} data-testid={`cts-part-${part.id}`}>
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 p-3 rounded-lg">
-                          <Scissors className="w-6 h-6 text-primary" />
+                        <div 
+                          className={`p-3 rounded-lg cursor-pointer transition-colors ${part.isCut ? 'bg-green-500' : 'bg-primary/10'}`}
+                          onClick={() => toggleCutStatus({ partId: part.id, isCut: !part.isCut })}
+                          data-testid="checkbox-cut-status"
+                        >
+                          {part.isCut ? (
+                            <Check className="w-6 h-6 text-white" />
+                          ) : (
+                            <Scissors className="w-6 h-6 text-primary" />
+                          )}
                         </div>
                         <div>
-                          <CardTitle className="text-lg" data-testid="text-part-number">{part.partNumber}</CardTitle>
+                          <CardTitle className={`text-lg ${part.isCut ? 'line-through text-muted-foreground' : ''}`} data-testid="text-part-number">{part.partNumber}</CardTitle>
                           <CardDescription data-testid="text-part-description">{part.description || "No description"}</CardDescription>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-3xl font-bold text-primary" data-testid="text-cut-length">{part.cutLength} mm</div>
-                        <div className="text-sm text-muted-foreground">Cut Length</div>
+                        <div className={`text-3xl font-bold ${part.isCut ? 'text-green-600' : 'text-primary'}`} data-testid="text-cut-length">{part.cutLength} mm</div>
+                        <div className="text-sm text-muted-foreground">{part.isCut ? 'Cut Complete' : 'Cut Length'}</div>
                       </div>
                     </div>
                   </CardHeader>
