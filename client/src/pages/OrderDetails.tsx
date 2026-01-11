@@ -243,7 +243,7 @@ export default function OrderDetails() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
                   <p className="text-xs text-muted-foreground">Parts</p>
@@ -263,6 +263,14 @@ export default function OrderDetails() {
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-glass">{preview.totals.glassPieces}</p>
                   <p className="text-xs text-muted-foreground">Glass</p>
+                </div>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-total-mj-doors">{preview.totals.mjDoors}</p>
+                  <p className="text-xs text-muted-foreground">M&J Doors</p>
+                </div>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-total-richelieu">{preview.totals.richelieuDoors}</p>
+                  <p className="text-xs text-muted-foreground">Richelieu</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>

@@ -25,6 +25,8 @@ export interface SyncPreview {
     assembledDrawers: number;
     fivePieceDoors: number;
     glassPieces: number;
+    mjDoors: number;
+    richelieuDoors: number;
     weightLbs: number;
     maxLength: number;
     fileCount: number;
@@ -50,6 +52,8 @@ export interface SyncPreview {
     glassPieces: number;
     hasMJDoors: boolean;
     hasRichelieuDoors: boolean;
+    mjDoorsCount: number;
+    richelieuDoorsCount: number;
     hasDoubleThick: boolean;
     customParts: string[];
   }>;
