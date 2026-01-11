@@ -148,21 +148,16 @@ export default function CutToSize() {
               };
               
               return (
-                <Card key={part.id} className={`border-none shadow-md ${part.isCut ? 'bg-green-50 dark:bg-green-950/20' : ''}`} data-testid={`cts-part-${part.id}`}>
+                <Card key={part.id} className={`border-none shadow-md transition-colors ${part.isCut ? 'bg-green-50 dark:bg-green-950/20 border-2 border-green-400' : ''}`} data-testid={`cts-part-${part.id}`}>
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className={`p-3 rounded-lg cursor-pointer transition-colors ${part.isCut ? 'bg-green-500' : 'bg-primary/10'}`}
-                          onClick={() => toggleCutStatus({ partId: part.id, isCut: !part.isCut })}
+                      <div className="flex items-center gap-4">
+                        <Checkbox
+                          checked={part.isCut}
+                          onCheckedChange={(checked) => toggleCutStatus({ partId: part.id, isCut: !!checked })}
+                          className="w-8 h-8 border-2 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                           data-testid="checkbox-cut-status"
-                        >
-                          {part.isCut ? (
-                            <Check className="w-6 h-6 text-white" />
-                          ) : (
-                            <Scissors className="w-6 h-6 text-primary" />
-                          )}
-                        </div>
+                        />
                         <div>
                           <CardTitle className={`text-lg ${part.isCut ? 'line-through text-muted-foreground' : ''}`} data-testid="text-part-number">{part.partNumber}</CardTitle>
                           <CardDescription data-testid="text-part-description">{part.description || "No description"}</CardDescription>
