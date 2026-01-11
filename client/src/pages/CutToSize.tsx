@@ -97,12 +97,22 @@ export default function CutToSize() {
     <div className="min-h-screen bg-slate-50/50 pb-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         
-        <Link href="/">
-          <Button variant="ghost" className="mb-6 pl-0 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </Link>
+        <div className="flex gap-4 mb-6">
+          <Link href="/">
+            <Button variant="ghost" className="pl-0 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+          {fileInfo && (
+            <Link href={`/orders/${fileInfo.file.projectId}`}>
+              <Button variant="ghost" className="pl-0 text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Order
+              </Button>
+            </Link>
+          )}
+        </div>
 
         <PageHeader 
           title="Cut To Size Parts" 
