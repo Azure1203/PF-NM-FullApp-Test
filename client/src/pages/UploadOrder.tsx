@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useUploadOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,13 +13,84 @@ import { Link } from "wouter";
 
 type UploadStatus = "idle" | "uploading" | "processing" | "success" | "error";
 
+// Format filename to project name - removes extension, # and -, normalizes whitespace
+function formatFilenameToProjectName(filename: string): string {
+  // Remove file extension
+  let name = filename.replace(/\.[^/.]+$/, "");
+  // Remove # and - characters, normalize whitespace
+  name = name.replace(/[#\-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return name;
+}
+
+// Find common prefix among multiple filenames
+function findCommonPrefix(names: string[]): string | null {
+  if (names.length === 0) return null;
+  if (names.length === 1) return names[0];
+  
+  // Try to find common prefix before parentheses (room suffix)
+  const basenames = names.map(n => {
+    const parenIndex = n.indexOf('(');
+    return parenIndex > 0 ? n.substring(0, parenIndex).trim() : n;
+  });
+  
+  // Check if all basenames start the same
+  const first = basenames[0];
+  let commonLength = first.length;
+  
+  for (let i = 1; i < basenames.length; i++) {
+    let j = 0;
+    while (j < commonLength && j < basenames[i].length && first[j] === basenames[i][j]) {
+      j++;
+    }
+    commonLength = j;
+  }
+  
+  if (commonLength > 5) {
+    return first.substring(0, commonLength).trim();
+  }
+  
+  return null;
+}
+
 export default function UploadOrder() {
   const [files, setFiles] = useState<File[]>([]);
   const [projectName, setProjectName] = useState("");
+  const [userEditedName, setUserEditedName] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const { mutate: uploadOrder, isPending } = useUploadOrder();
   const [, setLocation] = useLocation();
+
+  // Generate project name from files
+  const generateProjectName = useCallback((selectedFiles: File[]): string => {
+    if (selectedFiles.length === 0) return "";
+    
+    const formattedNames = selectedFiles.map(f => formatFilenameToProjectName(f.name));
+    
+    if (selectedFiles.length === 1) {
+      return formattedNames[0];
+    }
+    
+    // For multiple files, try to find common prefix
+    const commonPrefix = findCommonPrefix(formattedNames);
+    return commonPrefix || formattedNames[0];
+  }, []);
+
+  const handleFilesSelect = useCallback((newFiles: File[]) => {
+    setFiles(newFiles);
+    setUploadStatus("idle");
+    setStatusMessage("");
+    
+    // Only auto-populate if user hasn't manually edited
+    if (!userEditedName) {
+      setProjectName(generateProjectName(newFiles));
+    }
+  }, [userEditedName, generateProjectName]);
+
+  const handleProjectNameChange = (value: string) => {
+    setProjectName(value);
+    setUserEditedName(true);
+  };
 
   const handleUpload = () => {
     if (files.length === 0) return;
@@ -76,11 +147,7 @@ export default function UploadOrder() {
           <CardContent className="p-8">
             <div className="space-y-8">
               <FileUpload 
-                onFilesSelect={(newFiles) => {
-                  setFiles(newFiles);
-                  setUploadStatus("idle");
-                  setStatusMessage("");
-                }} 
+                onFilesSelect={handleFilesSelect} 
                 isUploading={isPending} 
                 multiple={true}
               />
@@ -94,14 +161,14 @@ export default function UploadOrder() {
                   </Label>
                   <Input
                     id="projectName"
-                    placeholder="Enter project name (optional - will use PO number if left blank)"
+                    placeholder="Enter project name"
                     value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
+                    onChange={(e) => handleProjectNameChange(e.target.value)}
                     className="h-12 text-base"
                     data-testid="input-project-name"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Give this order group a custom name, or leave blank to use the PO number from the first file.
+                    Auto-generated from filename. Edit to customize before processing.
                   </p>
                 </div>
               )}
