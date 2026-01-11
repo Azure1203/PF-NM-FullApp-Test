@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X, Check } from "lucide-react";
+import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X, Check, Home } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import type { OrderFile, CtsPart, CtsPartConfig } from "@shared/schema";
@@ -300,6 +300,24 @@ export default function CutToSize() {
             })}
           </div>
         )}
+
+        {/* Navigation buttons at bottom */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-8 border-t mt-8">
+          {fileInfo?.file?.projectId && (
+            <Link href={`/orders/${fileInfo.file.projectId}`}>
+              <Button variant="outline" className="w-full sm:w-auto" data-testid="button-back-to-order">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Order
+              </Button>
+            </Link>
+          )}
+          <Link href="/">
+            <Button variant="outline" className="w-full sm:w-auto" data-testid="button-back-to-dashboard">
+              <Home className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
       </div>
     </div>
   );
