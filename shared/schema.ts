@@ -1,4 +1,4 @@
-import { pgTable, text, serial, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp, integer, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -69,7 +69,7 @@ export const ctsParts = pgTable("cts_parts", {
   fileId: integer("file_id").references(() => orderFiles.id, { onDelete: 'cascade' }).notNull(),
   partNumber: text("part_number").notNull(), // e.g. H.801.43.340.CTS
   description: text("description"), // e.g. Round Rod Black - Cut to size
-  cutLength: integer("cut_length").notNull(), // Length in mm (rounded)
+  cutLength: real("cut_length").notNull(), // Length in mm (with 1 decimal)
   quantity: integer("quantity").notNull().default(1),
   isCut: boolean("is_cut").default(false).notNull(), // Whether this part has been cut
   createdAt: timestamp("created_at").defaultNow(),

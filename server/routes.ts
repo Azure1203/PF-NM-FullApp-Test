@@ -109,7 +109,7 @@ function extractCTSParts(records: string[][]): Array<{ partNumber: string; descr
         ctsParts.push({
           partNumber: sku,
           description,
-          cutLength: Math.round(cutLength),
+          cutLength: parseFloat(cutLength.toFixed(1)),
           quantity
         });
       }
