@@ -42,6 +42,7 @@ export default function OrderDetails() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
+  const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
 
   const toggleFileExpanded = (fileId: number) => {
     setExpandedFiles(prev => {
@@ -65,6 +66,13 @@ export default function OrderDetails() {
     queryKey: ['/api/orders', id, 'preview'],
     enabled: !!id && id > 0,
   });
+
+  // Auto-select first file when preview loads
+  useEffect(() => {
+    if (preview && preview.fileBreakdowns.length > 0 && selectedFileIndex === null) {
+      setSelectedFileIndex(0);
+    }
+  }, [preview, selectedFileIndex]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -218,111 +226,58 @@ export default function OrderDetails() {
           }
         />
 
-        {/* Sync Preview Summary - shows all calculated data before syncing */}
+        {/* Project Totals Summary - compact header */}
         {preview && (
-          <Card className="mb-8 border-none shadow-md" data-testid="sync-preview-card">
+          <Card className="mb-6 border-none shadow-md" data-testid="project-totals-card">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Truck className="w-5 h-5 text-primary" />
-                Order Summary - Ready for Asana
-              </CardTitle>
-              <CardDescription>
-                This is what will be synced to Asana when you click "Sync to Asana"
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Truck className="w-5 h-5 text-primary" />
+                  Project Totals
+                </CardTitle>
+                {preview.palletSize && (
+                  <Badge variant="outline" className="text-sm" data-testid="text-pallet-size">
+                    {preview.palletSize}
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {/* Totals Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-                <div className="bg-muted/50 rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Parts</p>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
+                  <p className="text-xs text-muted-foreground">Parts</p>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Dovetails</p>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-dovetails">{preview.totals.dovetails}</p>
+                  <p className="text-xs text-muted-foreground">Dovetails</p>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Assembled</p>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-assembled">{preview.totals.assembledDrawers}</p>
+                  <p className="text-xs text-muted-foreground">Assembled</p>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">5-Piece Doors</p>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-fivepiece">{preview.totals.fivePieceDoors}</p>
+                  <p className="text-xs text-muted-foreground">5-Piece</p>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Weight</p>
-                  <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs} lbs</p>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
+                  <p className="text-xs text-muted-foreground">lbs</p>
                 </div>
-                <div className="bg-muted/50 rounded-lg p-3 border">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Max Length</p>
-                  <p className="text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength} mm</p>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
+                  <p className="text-xs text-muted-foreground">mm max</p>
                 </div>
               </div>
-
-              {/* Pallet Size */}
-              {preview.palletSize && (
-                <div className="bg-accent rounded-lg p-4 mb-4 border border-accent-border">
-                  <div className="flex items-center gap-2">
-                    <Truck className="w-5 h-5 text-accent-foreground" />
-                    <span className="font-semibold text-accent-foreground" data-testid="text-pallet-size">{preview.palletSize}</span>
-                  </div>
-                </div>
-              )}
-
+              
               {/* Special Parts Flags */}
-              <div className="flex flex-wrap gap-2">
-                {preview.flags.hasGlassParts && (
-                  <Badge variant="secondary">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Glass Parts
-                  </Badge>
-                )}
-                {preview.flags.hasMJDoors && (
-                  <Badge variant="secondary">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    M&J Doors
-                  </Badge>
-                )}
-                {preview.flags.hasRichelieuDoors && (
-                  <Badge variant="secondary">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Richelieu Doors
-                  </Badge>
-                )}
-                {preview.flags.hasDoubleThick && (
-                  <Badge variant="secondary">
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    Double Thick Parts
-                  </Badge>
-                )}
-                {preview.flags.hasShakerDoors && (
-                  <Badge variant="secondary">
-                    Shaker Doors
-                  </Badge>
-                )}
-                {preview.customParts.length === 0 && !preview.flags.hasGlassParts && !preview.flags.hasMJDoors && !preview.flags.hasRichelieuDoors && (
-                  <span className="text-sm text-muted-foreground">No special parts detected</span>
-                )}
-              </div>
-
-              {/* Per-file breakdown */}
-              {preview.fileBreakdowns.length > 1 && (
-                <div className="mt-6 pt-4 border-t">
-                  <h4 className="text-sm font-semibold mb-3">Order Breakdown by File</h4>
-                  <div className="space-y-2">
-                    {preview.fileBreakdowns.map((file, idx) => (
-                      <div key={idx} className="bg-muted/30 rounded-lg p-3 border" data-testid={`file-breakdown-${idx}`}>
-                        <p className="font-medium text-sm mb-2">{file.name}</p>
-                        <div className="grid grid-cols-5 gap-2 text-xs text-muted-foreground">
-                          <div>Parts: <span className="font-semibold">{file.coreParts}</span></div>
-                          <div>Dovetails: <span className="font-semibold">{file.dovetails}</span></div>
-                          <div>Assembled: <span className="font-semibold">{file.assembledDrawers}</span></div>
-                          <div>5-Piece: <span className="font-semibold">{file.fivePieceDoors}</span></div>
-                          <div>Weight: <span className="font-semibold">{Math.round(file.weightLbs)} lbs</span></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {(preview.flags.hasGlassParts || preview.flags.hasMJDoors || preview.flags.hasRichelieuDoors || preview.flags.hasDoubleThick || preview.flags.hasShakerDoors) && (
+                <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t">
+                  {preview.flags.hasGlassParts && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Glass Parts</Badge>}
+                  {preview.flags.hasMJDoors && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />M&J Doors</Badge>}
+                  {preview.flags.hasRichelieuDoors && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Richelieu Doors</Badge>}
+                  {preview.flags.hasDoubleThick && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Double Thick</Badge>}
+                  {preview.flags.hasShakerDoors && <Badge variant="secondary">Shaker Doors</Badge>}
                 </div>
               )}
             </CardContent>
@@ -330,10 +285,145 @@ export default function OrderDetails() {
         )}
 
         {isLoadingPreview && (
-          <Card className="mb-8 border-none shadow-md">
+          <Card className="mb-6 border-none shadow-md">
             <CardContent className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mr-2" />
               <span className="text-muted-foreground">Calculating order details...</span>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* CSV Files Section - Selectable with Details */}
+        {preview && preview.fileBreakdowns.length > 0 && (
+          <Card className="mb-6 border-none shadow-md" data-testid="files-section-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FolderOpen className="w-5 h-5 text-primary" />
+                CSV Files ({preview.fileBreakdowns.length})
+              </CardTitle>
+              <CardDescription>
+                Click on a file to view its computed order details
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* File List */}
+                <div className="space-y-2">
+                  {preview.fileBreakdowns.map((file, idx) => {
+                    const isSelected = selectedFileIndex === idx;
+                    const projectFile = project.files?.[idx];
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => setSelectedFileIndex(isSelected ? null : idx)}
+                        className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                          isSelected 
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary' 
+                            : 'hover-elevate'
+                        }`}
+                        data-testid={`file-item-${idx}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className={`w-5 h-5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{file.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {file.coreParts} parts, {file.dovetails} dovetails, {Math.round(file.weightLbs)} lbs
+                              </p>
+                            </div>
+                          </div>
+                          {projectFile && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); downloadFile(projectFile); }}
+                              data-testid={`button-download-file-${idx}`}
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Selected File Details */}
+                <div className="lg:border-l lg:pl-4">
+                  {selectedFileIndex !== null && preview.fileBreakdowns[selectedFileIndex] ? (
+                    <div data-testid="selected-file-details">
+                      <h4 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-primary" />
+                        {preview.fileBreakdowns[selectedFileIndex].name}
+                      </h4>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold text-primary" data-testid="text-file-parts">{preview.fileBreakdowns[selectedFileIndex].coreParts}</p>
+                          <p className="text-sm text-muted-foreground">Parts</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-dovetails">{preview.fileBreakdowns[selectedFileIndex].dovetails}</p>
+                          <p className="text-sm text-muted-foreground">Dovetails</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-assembled">{preview.fileBreakdowns[selectedFileIndex].assembledDrawers}</p>
+                          <p className="text-sm text-muted-foreground">Assembled Drawers</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-fivepiece">{preview.fileBreakdowns[selectedFileIndex].fivePieceDoors}</p>
+                          <p className="text-sm text-muted-foreground">5-Piece Doors</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-lg">
+                          <Weight className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-semibold" data-testid="text-file-weight">{Math.round(preview.fileBreakdowns[selectedFileIndex].weightLbs)} lbs</p>
+                            <p className="text-xs text-muted-foreground">Estimated Weight</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-lg">
+                          <Ruler className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-semibold" data-testid="text-file-maxlength">{preview.fileBreakdowns[selectedFileIndex].maxLength} mm</p>
+                            <p className="text-xs text-muted-foreground">Max Length</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* File-specific flags */}
+                      <div className="flex flex-wrap gap-2">
+                        {preview.fileBreakdowns[selectedFileIndex].hasGlassParts && (
+                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Glass Parts</Badge>
+                        )}
+                        {preview.fileBreakdowns[selectedFileIndex].hasMJDoors && (
+                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />M&J Doors</Badge>
+                        )}
+                        {preview.fileBreakdowns[selectedFileIndex].hasRichelieuDoors && (
+                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Richelieu Doors</Badge>
+                        )}
+                        {preview.fileBreakdowns[selectedFileIndex].hasDoubleThick && (
+                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Double Thick</Badge>
+                        )}
+                        {!preview.fileBreakdowns[selectedFileIndex].hasGlassParts && 
+                         !preview.fileBreakdowns[selectedFileIndex].hasMJDoors && 
+                         !preview.fileBreakdowns[selectedFileIndex].hasRichelieuDoors &&
+                         !preview.fileBreakdowns[selectedFileIndex].hasDoubleThick && (
+                          <span className="text-sm text-muted-foreground">No special parts in this file</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground">
+                      <FileText className="w-12 h-12 mb-3 opacity-30" />
+                      <p className="text-sm">Select a file to view details</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -590,135 +680,6 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
 
-            {/* Files in Project */}
-            <Card className="border-none shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FolderOpen className="w-5 h-5 text-primary" />
-                  Files in Project
-                </CardTitle>
-                <CardDescription>
-                  {project.files?.length || 0} CSV file(s) uploaded
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {project.files?.map((file, index) => {
-                    const isExpanded = expandedFiles.has(file.id || index);
-                    const hasDetails = (file.coreParts ?? 0) > 0 || (file.dovetails ?? 0) > 0 || (file.assembledDrawers ?? 0) > 0;
-                    
-                    return (
-                      <div key={file.id || index} className="bg-slate-50 rounded-lg border border-slate-100 overflow-hidden">
-                        <div 
-                          className="flex items-center justify-between p-3 cursor-pointer hover-elevate"
-                          onClick={() => toggleFileExpanded(file.id || index)}
-                          data-testid={`file-row-${file.id}`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <FileText className="w-5 h-5 text-slate-400 shrink-0" />
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate" title={file.poNumber || file.originalFilename}>
-                                {file.poNumber || file.originalFilename}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {file.originalFilename}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={(e) => { e.stopPropagation(); downloadFile(file); }}
-                              className="shrink-0"
-                              data-testid={`button-download-${file.id}`}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            {hasDetails && (
-                              isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                        
-                        {isExpanded && (
-                          <div className="px-3 pb-3 border-t border-slate-200 bg-white">
-                            <div className="grid grid-cols-2 gap-3 pt-3">
-                              <div className="flex items-center gap-2">
-                                <Package className="w-4 h-4 text-blue-500" />
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Parts</p>
-                                  <p className="text-sm font-semibold">{file.coreParts ?? 0}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-amber-500" />
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Dovetails</p>
-                                  <p className="text-sm font-semibold">{file.dovetails ?? 0}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Package className="w-4 h-4 text-green-500" />
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Assembled Drawers</p>
-                                  <p className="text-sm font-semibold">{file.assembledDrawers ?? 0}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-purple-500" />
-                                <div>
-                                  <p className="text-xs text-muted-foreground">5-Piece Doors</p>
-                                  <p className="text-sm font-semibold">{file.fivePieceDoors ?? 0}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Weight className="w-4 h-4 text-slate-500" />
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Weight</p>
-                                  <p className="text-sm font-semibold">{file.weightLbs ?? 0} lbs</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Ruler className="w-4 h-4 text-slate-500" />
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Max Length</p>
-                                  <p className="text-sm font-semibold">{file.maxLength ?? 0} mm</p>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Special flags */}
-                            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-100">
-                              {file.hasGlassParts && (
-                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">Glass Parts</span>
-                              )}
-                              {file.hasMJDoors && (
-                                <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full">M&J Doors</span>
-                              )}
-                              {file.hasRichelieuDoors && (
-                                <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full">Richelieu Doors</span>
-                              )}
-                              {file.hasDoubleThick && (
-                                <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">Double Thick</span>
-                              )}
-                              {!file.hasGlassParts && !file.hasMJDoors && !file.hasRichelieuDoors && !file.hasDoubleThick && (
-                                <span className="text-xs text-muted-foreground">No special parts</span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {(!project.files || project.files.length === 0) && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No files in this project
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </div>
