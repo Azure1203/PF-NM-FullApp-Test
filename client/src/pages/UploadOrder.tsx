@@ -6,13 +6,16 @@ import { FileUpload } from "@/components/FileUpload";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Loader2, CheckCircle2, FileText, Upload, Cog } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Loader2, CheckCircle2, FileText, Upload, Cog, FolderOpen } from "lucide-react";
 import { Link } from "wouter";
 
 type UploadStatus = "idle" | "uploading" | "processing" | "success" | "error";
 
 export default function UploadOrder() {
   const [files, setFiles] = useState<File[]>([]);
+  const [projectName, setProjectName] = useState("");
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const { mutate: uploadOrder, isPending } = useUploadOrder();
@@ -28,6 +31,10 @@ export default function UploadOrder() {
     files.forEach(file => {
       formData.append("files", file);
     });
+    
+    if (projectName.trim()) {
+      formData.append("projectName", projectName.trim());
+    }
     
     // Short delay to show uploading state, then switch to processing
     setTimeout(() => {
@@ -77,6 +84,27 @@ export default function UploadOrder() {
                 isUploading={isPending} 
                 multiple={true}
               />
+
+              {/* Project Name Input - shown when files are selected */}
+              {files.length > 0 && uploadStatus === "idle" && (
+                <div className="space-y-2">
+                  <Label htmlFor="projectName" className="flex items-center gap-2 text-base font-medium">
+                    <FolderOpen className="w-4 h-4" />
+                    Project Name
+                  </Label>
+                  <Input
+                    id="projectName"
+                    placeholder="Enter project name (optional - will use PO number if left blank)"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className="h-12 text-base"
+                    data-testid="input-project-name"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Give this order group a custom name, or leave blank to use the PO number from the first file.
+                  </p>
+                </div>
+              )}
 
               {/* Upload Progress Section */}
               {uploadStatus !== "idle" && (

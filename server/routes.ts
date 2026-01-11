@@ -416,10 +416,18 @@ export async function registerRoutes(
       // Use first file for project-level metadata
       const firstRecords = parsedFiles[0].records;
       
-      // Extract project name from the base PO (without the room/design suffix)
-      // e.g., "Anderson PO25-391065 (GUEST CLOSETS V5)" -> "Anderson PO25-391065"
-      const firstPO = parsedFiles[0].poNumber || parsedFiles[0].filename;
-      const projectName = firstPO.replace(/\s*\([^)]*\)\s*$/, '').trim() || firstPO;
+      // Use custom project name if provided, otherwise extract from PO
+      const customProjectName = req.body?.projectName?.trim();
+      let projectName: string;
+      
+      if (customProjectName) {
+        projectName = customProjectName;
+      } else {
+        // Extract project name from the base PO (without the room/design suffix)
+        // e.g., "Anderson PO25-391065 (GUEST CLOSETS V5)" -> "Anderson PO25-391065"
+        const firstPO = parsedFiles[0].poNumber || parsedFiles[0].filename;
+        projectName = firstPO.replace(/\s*\([^)]*\)\s*$/, '').trim() || firstPO;
+      }
 
       // Create the project
       const projectData = {
