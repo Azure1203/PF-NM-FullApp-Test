@@ -26,6 +26,11 @@ export default function CutToSize() {
   const [uploadingPart, setUploadingPart] = useState<string | null>(null);
   const fileInputRefs = useRef<{ [partNumber: string]: HTMLInputElement | null }>({});
 
+  const { data: fileInfo } = useQuery<{ file: any; projectName: string }>({
+    queryKey: ['/api/files', fileId],
+    enabled: !!fileId && fileId > 0,
+  });
+
   const { data: ctsParts, isLoading } = useQuery<CtsPartWithConfig[]>({
     queryKey: ['/api/files', fileId, 'cts-parts'],
     enabled: !!fileId && fileId > 0,
@@ -101,7 +106,7 @@ export default function CutToSize() {
 
         <PageHeader 
           title="Cut To Size Parts" 
-          description="Parts that need to be cut to specific lengths for this order."
+          description={fileInfo ? `Order: ${fileInfo.projectName}` : "Parts that need to be cut to specific lengths for this order."}
         />
 
         {!ctsParts || ctsParts.length === 0 ? (

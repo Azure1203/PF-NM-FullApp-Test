@@ -576,6 +576,20 @@ export async function registerRoutes(
     }
   });
 
+  // Get file info with project name
+  app.get('/api/files/:fileId', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const file = await storage.getFileWithProject(fileId);
+      if (!file) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      res.json(file);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Get CTS parts for a file
   app.get('/api/files/:fileId/cts-parts', isAuthenticated, async (req, res) => {
     try {
