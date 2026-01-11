@@ -24,6 +24,7 @@ export interface SyncPreview {
     dovetails: number;
     assembledDrawers: number;
     fivePieceDoors: number;
+    glassPieces: number;
     weightLbs: number;
     maxLength: number;
     fileCount: number;
@@ -46,9 +47,11 @@ export interface SyncPreview {
     weightLbs: number;
     maxLength: number;
     hasGlassParts: boolean;
+    glassPieces: number;
     hasMJDoors: boolean;
     hasRichelieuDoors: boolean;
     hasDoubleThick: boolean;
+    customParts: string[];
   }>;
 }
 

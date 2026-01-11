@@ -243,7 +243,7 @@ export default function OrderDetails() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
                   <p className="text-xs text-muted-foreground">Parts</p>
@@ -261,6 +261,10 @@ export default function OrderDetails() {
                   <p className="text-xs text-muted-foreground">5-Piece</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-total-glass">{preview.totals.glassPieces}</p>
+                  <p className="text-xs text-muted-foreground">Glass</p>
+                </div>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
                   <p className="text-xs text-muted-foreground">lbs</p>
                 </div>
@@ -271,9 +275,8 @@ export default function OrderDetails() {
               </div>
               
               {/* Special Parts Flags */}
-              {(preview.flags.hasGlassParts || preview.flags.hasMJDoors || preview.flags.hasRichelieuDoors || preview.flags.hasDoubleThick || preview.flags.hasShakerDoors) && (
+              {(preview.flags.hasMJDoors || preview.flags.hasRichelieuDoors || preview.flags.hasDoubleThick || preview.flags.hasShakerDoors) && (
                 <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t">
-                  {preview.flags.hasGlassParts && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Glass Parts</Badge>}
                   {preview.flags.hasMJDoors && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />M&J Doors</Badge>}
                   {preview.flags.hasRichelieuDoors && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Richelieu Doors</Badge>}
                   {preview.flags.hasDoubleThick && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Double Thick</Badge>}
@@ -375,6 +378,10 @@ export default function OrderDetails() {
                           <p className="text-3xl font-bold" data-testid="text-file-fivepiece">{preview.fileBreakdowns[selectedFileIndex].fivePieceDoors}</p>
                           <p className="text-sm text-muted-foreground">5-Piece Doors</p>
                         </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-glass">{preview.fileBreakdowns[selectedFileIndex].glassPieces}</p>
+                          <p className="text-sm text-muted-foreground">Glass Pieces</p>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -394,25 +401,34 @@ export default function OrderDetails() {
                         </div>
                       </div>
 
-                      {/* File-specific flags */}
-                      <div className="flex flex-wrap gap-2">
-                        {preview.fileBreakdowns[selectedFileIndex].hasGlassParts && (
-                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Glass Parts</Badge>
-                        )}
-                        {preview.fileBreakdowns[selectedFileIndex].hasMJDoors && (
-                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />M&J Doors</Badge>
-                        )}
-                        {preview.fileBreakdowns[selectedFileIndex].hasRichelieuDoors && (
-                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Richelieu Doors</Badge>
-                        )}
-                        {preview.fileBreakdowns[selectedFileIndex].hasDoubleThick && (
-                          <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Double Thick</Badge>
-                        )}
-                        {!preview.fileBreakdowns[selectedFileIndex].hasGlassParts && 
-                         !preview.fileBreakdowns[selectedFileIndex].hasMJDoors && 
-                         !preview.fileBreakdowns[selectedFileIndex].hasRichelieuDoors &&
-                         !preview.fileBreakdowns[selectedFileIndex].hasDoubleThick && (
-                          <span className="text-sm text-muted-foreground">No special parts in this file</span>
+                      {/* Special Parts Flags */}
+                      <div className="space-y-3 mb-4">
+                        <h5 className="text-sm font-medium text-muted-foreground">Special Parts</h5>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center gap-2 p-2 rounded-md bg-muted/20">
+                            <span className={`w-2 h-2 rounded-full ${preview.fileBreakdowns[selectedFileIndex].hasMJDoors ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                            <span className="text-sm" data-testid="text-file-mjdoors">M&J Doors: {preview.fileBreakdowns[selectedFileIndex].hasMJDoors ? 'YES' : 'NO'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 p-2 rounded-md bg-muted/20">
+                            <span className={`w-2 h-2 rounded-full ${preview.fileBreakdowns[selectedFileIndex].hasRichelieuDoors ? 'bg-primary' : 'bg-muted-foreground/30'}`} />
+                            <span className="text-sm" data-testid="text-file-richelieu">Richelieu Doors: {preview.fileBreakdowns[selectedFileIndex].hasRichelieuDoors ? 'YES' : 'NO'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Custom Parts at Custom */}
+                      <div className="space-y-2">
+                        <h5 className="text-sm font-medium text-muted-foreground">Parts at Custom</h5>
+                        {preview.fileBreakdowns[selectedFileIndex].customParts.length > 0 ? (
+                          <div className="flex flex-wrap gap-2" data-testid="text-file-customparts">
+                            {preview.fileBreakdowns[selectedFileIndex].customParts.map((part, idx) => (
+                              <Badge key={idx} variant="outline" className="border-primary text-primary">
+                                {part}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">None</p>
                         )}
                       </div>
                     </div>
