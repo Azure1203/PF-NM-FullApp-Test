@@ -32,6 +32,19 @@ export const orderFiles = pgTable("order_files", {
   originalFilename: text("original_filename").notNull(),
   poNumber: text("po_number"), // Each file can have its own PO/design name
   rawContent: text("raw_content"),
+  
+  // Calculated order details from CSV
+  coreParts: integer("core_parts").default(0),
+  dovetails: integer("dovetails").default(0),
+  assembledDrawers: integer("assembled_drawers").default(0),
+  fivePieceDoors: integer("five_piece_doors").default(0),
+  weightLbs: integer("weight_lbs").default(0),
+  maxLength: integer("max_length").default(0),
+  hasGlassParts: boolean("has_glass_parts").default(false),
+  hasMJDoors: boolean("has_mj_doors").default(false),
+  hasRichelieuDoors: boolean("has_richelieu_doors").default(false),
+  hasDoubleThick: boolean("has_double_thick").default(false),
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 

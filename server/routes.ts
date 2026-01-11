@@ -292,13 +292,26 @@ export async function registerRoutes(
 
       const project = await storage.createProject(projectData);
 
-      // Create order files linked to the project
+      // Create order files linked to the project with calculated values
       for (const pf of parsedFiles) {
+        // Calculate part counts from CSV data
+        const partCounts = countPartsFromCSV(pf.records);
+        
         await storage.createOrderFile({
           projectId: project.id,
           originalFilename: pf.filename,
           poNumber: pf.poNumber,
           rawContent: pf.content,
+          coreParts: partCounts.coreParts,
+          dovetails: partCounts.dovetails,
+          assembledDrawers: partCounts.assembledDrawers,
+          fivePieceDoors: partCounts.fivePiece,
+          weightLbs: Math.round(partCounts.weightLbs),
+          maxLength: partCounts.maxLength,
+          hasGlassParts: partCounts.hasGlassParts,
+          hasMJDoors: partCounts.hasMJDoors,
+          hasRichelieuDoors: partCounts.hasRichelieuDoors,
+          hasDoubleThick: partCounts.hasDoubleThick,
         });
       }
 
