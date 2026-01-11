@@ -62,18 +62,20 @@ const MJ_DOOR_KEYWORDS = [
 // Richelieu door keywords to detect
 const RICHELIEU_DOOR_KEYWORDS = ['ALUMSHAKER-06', 'ALUMSLIMSHAKER-03'];
 
-// Glass part keywords to detect
-const GLASS_KEYWORDS = [
+// Glass Insert keywords to detect
+const GLASS_INSERT_KEYWORDS = [
   'CLEAR', 'FROSTED', 'FLUTEX', 'CATHEDRAL', 'BAMBOO', 'MIRROR',
   'CLEARSAFETY', 'FROSTEDSAFETY', 'FLUTEXSAFETY', 'CATHEDRALSAFETY', 'SAFETYBAMBOO', 'MIRRORSAFETY',
   'ACID', 'SMOKED-GREY', 'EXTRA-CANNES', 'EXTRA-LINEN', 'SMOKED-BRONZE',
   'PURE-WHITE', 'METALLIC-GREY', 'JET-BLACK', 'BEIGE', 'CHOCOLATE', 'BLUE-GREY', 'TURQUOISE-BLUE',
-  'ALBARIUM', 'NACRE', 'SIRIUS', 'BROMO',
-  'GLSHFA_6', 'GLSHFA_10'
+  'ALBARIUM', 'NACRE', 'SIRIUS', 'BROMO'
 ];
 
+// Glass Shelf keywords to detect
+const GLASS_SHELF_KEYWORDS = ['GLSHFA_6', 'GLSHFA_10'];
+
 // Count parts from actual CSV data rows
-function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassPieces: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[] } {
+function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[] } {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
@@ -82,7 +84,8 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
   let doubleThickCount = 0;
   let hasShakerDoors = false;
   let hasGlassParts = false;
-  let glassPieces = 0;
+  let glassInserts = 0;
+  let glassShelves = 0;
   let hasMJDoors = false;
   let hasRichelieuDoors = false;
   let mjDoorsCount = 0;
@@ -104,7 +107,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassPieces, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts: [] };
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts: [] };
 
   // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
@@ -151,10 +154,16 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
       doubleThickCount += quantity;
     }
 
-    // Check for glass parts and count them
-    if (GLASS_KEYWORDS.some(keyword => sku.includes(keyword))) {
+    // Check for glass inserts
+    if (GLASS_INSERT_KEYWORDS.some(keyword => sku.includes(keyword))) {
       hasGlassParts = true;
-      glassPieces += quantity;
+      glassInserts += quantity;
+    }
+    
+    // Check for glass shelves
+    if (GLASS_SHELF_KEYWORDS.some(keyword => sku.includes(keyword))) {
+      hasGlassParts = true;
+      glassShelves += quantity;
     }
 
     // Check for M&J doors and count them
@@ -221,7 +230,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
   if (hasDoubleThick) customParts.push('DOUBLE THICK PARTS');
   if (hasShakerDoors) customParts.push('SHAKER DOORS');
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassPieces, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts };
 }
 
 export async function registerRoutes(
@@ -271,7 +280,8 @@ export async function registerRoutes(
     let totalDovetails = 0;
     let totalAssembledDrawers = 0;
     let totalFivePiece = 0;
-    let totalGlassPieces = 0;
+    let totalGlassInserts = 0;
+    let totalGlassShelves = 0;
     let totalMJDoors = 0;
     let totalRichelieuDoors = 0;
     let totalDoubleThick = 0;
@@ -292,7 +302,8 @@ export async function registerRoutes(
       weightLbs: number;
       maxLength: number;
       hasGlassParts: boolean;
-      glassPieces: number;
+      glassInserts: number;
+      glassShelves: number;
       hasMJDoors: boolean;
       hasRichelieuDoors: boolean;
       mjDoorsCount: number;
@@ -312,7 +323,8 @@ export async function registerRoutes(
         totalDovetails += counts.dovetails;
         totalAssembledDrawers += counts.assembledDrawers;
         totalFivePiece += counts.fivePiece;
-        totalGlassPieces += counts.glassPieces;
+        totalGlassInserts += counts.glassInserts;
+        totalGlassShelves += counts.glassShelves;
         totalMJDoors += counts.mjDoorsCount;
         totalRichelieuDoors += counts.richelieuDoorsCount;
         totalDoubleThick += counts.doubleThickCount;
@@ -333,7 +345,8 @@ export async function registerRoutes(
           weightLbs: counts.weightLbs,
           maxLength: counts.maxLength,
           hasGlassParts: counts.hasGlassParts,
-          glassPieces: counts.glassPieces,
+          glassInserts: counts.glassInserts,
+          glassShelves: counts.glassShelves,
           hasMJDoors: counts.hasMJDoors,
           hasRichelieuDoors: counts.hasRichelieuDoors,
           mjDoorsCount: counts.mjDoorsCount,
@@ -368,7 +381,8 @@ export async function registerRoutes(
         dovetails: totalDovetails,
         assembledDrawers: totalAssembledDrawers,
         fivePieceDoors: totalFivePiece,
-        glassPieces: totalGlassPieces,
+        glassInserts: totalGlassInserts,
+        glassShelves: totalGlassShelves,
         mjDoors: totalMJDoors,
         richelieuDoors: totalRichelieuDoors,
         doubleThick: totalDoubleThick,
@@ -461,6 +475,8 @@ export async function registerRoutes(
           weightLbs: Math.round(partCounts.weightLbs),
           maxLength: Math.round(partCounts.maxLength),
           hasGlassParts: partCounts.hasGlassParts,
+          glassInserts: partCounts.glassInserts,
+          glassShelves: partCounts.glassShelves,
           hasMJDoors: partCounts.hasMJDoors,
           hasRichelieuDoors: partCounts.hasRichelieuDoors,
           hasDoubleThick: partCounts.hasDoubleThick,

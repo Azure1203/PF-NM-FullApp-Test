@@ -41,6 +41,8 @@ export const orderFiles = pgTable("order_files", {
   weightLbs: integer("weight_lbs").default(0),
   maxLength: integer("max_length").default(0),
   hasGlassParts: boolean("has_glass_parts").default(false),
+  glassInserts: integer("glass_inserts").default(0),
+  glassShelves: integer("glass_shelves").default(0),
   hasMJDoors: boolean("has_mj_doors").default(false),
   hasRichelieuDoors: boolean("has_richelieu_doors").default(false),
   hasDoubleThick: boolean("has_double_thick").default(false),

@@ -261,8 +261,12 @@ export default function OrderDetails() {
                   <p className="text-xs text-muted-foreground">5 Piece Shaker</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
-                  <p className="text-2xl font-bold" data-testid="text-total-glass">{preview.totals.glassPieces}</p>
-                  <p className="text-xs text-muted-foreground">Glass Parts</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-glass-inserts">{preview.totals.glassInserts}</p>
+                  <p className="text-xs text-muted-foreground">Glass Inserts</p>
+                </div>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-total-glass-shelves">{preview.totals.glassShelves}</p>
+                  <p className="text-xs text-muted-foreground">Glass Shelves</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-mj-doors">{preview.totals.mjDoors}</p>
@@ -391,8 +395,12 @@ export default function OrderDetails() {
                           <p className="text-sm text-muted-foreground">5 Piece Shaker</p>
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
-                          <p className="text-3xl font-bold" data-testid="text-file-glass">{preview.fileBreakdowns[selectedFileIndex].glassPieces}</p>
-                          <p className="text-sm text-muted-foreground">Glass Parts</p>
+                          <p className="text-3xl font-bold" data-testid="text-file-glass-inserts">{preview.fileBreakdowns[selectedFileIndex].glassInserts}</p>
+                          <p className="text-sm text-muted-foreground">Glass Inserts</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-glass-shelves">{preview.fileBreakdowns[selectedFileIndex].glassShelves}</p>
+                          <p className="text-sm text-muted-foreground">Glass Shelves</p>
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-mj">{preview.fileBreakdowns[selectedFileIndex].mjDoorsCount}</p>
