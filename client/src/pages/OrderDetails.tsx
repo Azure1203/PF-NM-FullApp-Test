@@ -307,7 +307,7 @@ export default function OrderDetails() {
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-cts">{preview.totals.ctsPartsCount}</p>
-                  <p className="text-xs text-muted-foreground">Cut To Size</p>
+                  <p className="text-xs text-muted-foreground">Cut to Size Parts</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
@@ -476,7 +476,7 @@ export default function OrderDetails() {
                         </div>
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-cts">{preview.fileBreakdowns[selectedFileIndex].ctsPartsCount}</p>
-                          <p className="text-sm text-muted-foreground">Cut To Size</p>
+                          <p className="text-sm text-muted-foreground">Cut to Size Parts</p>
                         </div>
                       </div>
 
