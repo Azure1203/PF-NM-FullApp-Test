@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -297,6 +297,10 @@ export default function OrderDetails() {
                   <p className="text-xs text-muted-foreground">Double Thick Parts</p>
                 </div>
                 <div className="text-center p-2 bg-muted/30 rounded-md">
+                  <p className="text-2xl font-bold" data-testid="text-total-cts">{preview.totals.ctsPartsCount}</p>
+                  <p className="text-xs text-muted-foreground">Cut To Size</p>
+                </div>
+                <div className="text-center p-2 bg-muted/30 rounded-md">
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
                   <p className="text-xs text-muted-foreground">lbs</p>
                 </div>
@@ -388,10 +392,31 @@ export default function OrderDetails() {
                 <div className="lg:border-l lg:pl-4">
                   {selectedFileIndex !== null && preview.fileBreakdowns[selectedFileIndex] ? (
                     <div data-testid="selected-file-details">
-                      <h4 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                      <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
                         <FileText className="w-5 h-5 text-primary" />
                         {preview.fileBreakdowns[selectedFileIndex].name}
                       </h4>
+                      
+                      {/* Prominent CTS Parts Link */}
+                      {preview.fileBreakdowns[selectedFileIndex].ctsPartsCount > 0 && project.files?.[selectedFileIndex] && (
+                        <Link href={`/files/${project.files[selectedFileIndex].id}/cts`}>
+                          <div className="flex items-center justify-between p-4 mb-4 bg-primary/10 border border-primary/20 rounded-lg hover-elevate cursor-pointer group" data-testid="button-cts-link">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-primary/20 p-2 rounded-lg">
+                                <Scissors className="w-5 h-5 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-primary">View Cut To Size Parts</p>
+                                <p className="text-sm text-muted-foreground">Parts that need custom cutting for this file</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="bg-primary text-primary-foreground">{preview.fileBreakdowns[selectedFileIndex].ctsPartsCount} parts</Badge>
+                              <ChevronRight className="w-5 h-5 text-primary group-hover:translate-x-1 transition-transform" />
+                            </div>
+                          </div>
+                        </Link>
+                      )}
                       
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
@@ -429,6 +454,10 @@ export default function OrderDetails() {
                         <div className="bg-muted/30 rounded-lg p-4 text-center">
                           <p className="text-3xl font-bold" data-testid="text-file-doublethick">{preview.fileBreakdowns[selectedFileIndex].doubleThickCount}</p>
                           <p className="text-sm text-muted-foreground">Double Thick Parts</p>
+                        </div>
+                        <div className="bg-muted/30 rounded-lg p-4 text-center">
+                          <p className="text-3xl font-bold" data-testid="text-file-cts">{preview.fileBreakdowns[selectedFileIndex].ctsPartsCount}</p>
+                          <p className="text-sm text-muted-foreground">Cut To Size</p>
                         </div>
                       </div>
 
@@ -494,35 +523,23 @@ export default function OrderDetails() {
                             className="min-h-[80px] resize-none"
                             data-testid="textarea-file-notes"
                           />
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                const fileId = project.files![selectedFileIndex].id;
-                                const notes = editingNotes[fileId] ?? project.files![selectedFileIndex].notes ?? "";
-                                updateFileNotes({ fileId, notes });
-                              }}
-                              disabled={isSavingNotes}
-                              data-testid="button-save-file-notes"
-                            >
-                              {isSavingNotes ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <Save className="w-4 h-4 mr-2" />
-                              )}
-                              Save Notes
-                            </Button>
-                            <Link href={`/files/${project.files![selectedFileIndex].id}/cts`}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                data-testid="button-view-cts-parts"
-                              >
-                                <Scissors className="w-4 h-4 mr-2" />
-                                Cut To Size Parts
-                              </Button>
-                            </Link>
-                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const fileId = project.files![selectedFileIndex].id;
+                              const notes = editingNotes[fileId] ?? project.files![selectedFileIndex].notes ?? "";
+                              updateFileNotes({ fileId, notes });
+                            }}
+                            disabled={isSavingNotes}
+                            data-testid="button-save-file-notes"
+                          >
+                            {isSavingNotes ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4 mr-2" />
+                            )}
+                            Save Notes
+                          </Button>
                         </div>
                       )}
                     </div>

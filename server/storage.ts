@@ -30,6 +30,7 @@ export interface IStorage {
   
   // CTS parts methods
   getCtsPartsForFile(fileId: number): Promise<CtsPart[]>;
+  getCtsPartsCountForFile(fileId: number): Promise<number>;
   createCtsPart(part: InsertCtsPart): Promise<CtsPart>;
   
   // CTS part config methods
@@ -90,6 +91,11 @@ export class DatabaseStorage implements IStorage {
   // CTS parts methods
   async getCtsPartsForFile(fileId: number): Promise<CtsPart[]> {
     return await db.select().from(ctsParts).where(eq(ctsParts.fileId, fileId));
+  }
+
+  async getCtsPartsCountForFile(fileId: number): Promise<number> {
+    const parts = await db.select().from(ctsParts).where(eq(ctsParts.fileId, fileId));
+    return parts.reduce((sum, part) => sum + part.quantity, 0);
   }
 
   async createCtsPart(part: InsertCtsPart): Promise<CtsPart> {

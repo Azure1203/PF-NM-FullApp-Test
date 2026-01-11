@@ -355,8 +355,11 @@ export async function registerRoutes(
       hasDoubleThick: boolean;
       doubleThickCount: number;
       customParts: string[];
+      ctsPartsCount: number;
+      fileId: number;
     }
     const fileBreakdowns: FileBreakdown[] = [];
+    let totalCtsPartsCount = 0;
 
     for (const file of projectFiles) {
       if (file.rawContent) {
@@ -380,6 +383,10 @@ export async function registerRoutes(
         if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
         if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
 
+        // Get CTS parts count for this file
+        const fileCtsPartsCount = await storage.getCtsPartsCountForFile(file.id);
+        totalCtsPartsCount += fileCtsPartsCount;
+
         fileBreakdowns.push({
           name: file.poNumber || file.originalFilename,
           coreParts: counts.coreParts,
@@ -397,7 +404,9 @@ export async function registerRoutes(
           richelieuDoorsCount: counts.richelieuDoorsCount,
           hasDoubleThick: counts.hasDoubleThick,
           doubleThickCount: counts.doubleThickCount,
-          customParts: counts.customParts
+          customParts: counts.customParts,
+          ctsPartsCount: fileCtsPartsCount,
+          fileId: file.id
         });
       }
     }
@@ -430,6 +439,7 @@ export async function registerRoutes(
         mjDoors: totalMJDoors,
         richelieuDoors: totalRichelieuDoors,
         doubleThick: totalDoubleThick,
+        ctsPartsCount: totalCtsPartsCount,
         weightLbs: Math.round(totalWeight),
         maxLength: overallMaxLength,
         fileCount: projectFiles.length

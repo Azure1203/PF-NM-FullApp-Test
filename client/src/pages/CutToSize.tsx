@@ -202,20 +202,40 @@ export default function CutToSize() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor={`image-${part.partNumber}`} className="flex items-center gap-2">
+                          <Label className="flex items-center gap-2">
                             <Image className="w-4 h-4" />
-                            Image URL
+                            Reference Image
                           </Label>
-                          <Input
-                            id={`image-${part.partNumber}`}
-                            placeholder="https://example.com/image.jpg"
-                            value={editing.imageUrl}
-                            onChange={(e) => setEditingConfig(prev => ({
-                              ...prev,
-                              [part.partNumber]: { ...editing, imageUrl: e.target.value }
-                            }))}
-                            data-testid="input-image-url"
-                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              ref={(el) => fileInputRefs.current[part.partNumber] = el}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(part.partNumber, file);
+                              }}
+                              data-testid="input-image-file"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => fileInputRefs.current[part.partNumber]?.click()}
+                              disabled={uploadingPart === part.partNumber}
+                              data-testid="button-upload-image"
+                            >
+                              {uploadingPart === part.partNumber ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Upload className="w-4 h-4 mr-2" />
+                              )}
+                              {part.config?.imageUrl ? 'Change Image' : 'Upload Image'}
+                            </Button>
+                            {part.config?.imageUrl && (
+                              <span className="text-sm text-green-600">Image uploaded</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <Button
@@ -229,7 +249,7 @@ export default function CutToSize() {
                         ) : (
                           <Save className="w-4 h-4 mr-2" />
                         )}
-                        Save Configuration
+                        Save Rack Location
                       </Button>
                     </div>
                   </CardContent>
