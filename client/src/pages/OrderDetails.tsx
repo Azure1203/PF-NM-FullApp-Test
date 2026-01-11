@@ -4,7 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { insertProjectSchema } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 import { useOrder, useUpdateOrder, useSyncOrder, useDeleteOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
@@ -43,6 +44,7 @@ export default function OrderDetails() {
   const { toast } = useToast();
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
+  const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
 
   const toggleFileExpanded = (fileId: number) => {
     setExpandedFiles(prev => {
@@ -60,6 +62,20 @@ export default function OrderDetails() {
   const { mutate: updateProject, isPending: isUpdating } = useUpdateOrder();
   const { mutate: syncProject, isPending: isSyncing } = useSyncOrder();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
+  
+  // Mutation for updating file notes
+  const { mutate: updateFileNotes, isPending: isSavingNotes } = useMutation({
+    mutationFn: async ({ fileId, notes }: { fileId: number; notes: string }) => {
+      return apiRequest('PATCH', `/api/files/${fileId}/notes`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', id] });
+      toast({ title: "Notes saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save notes", description: error.message, variant: "destructive" });
+    }
+  });
   
   // Fetch sync preview data
   const { data: preview, isLoading: isLoadingPreview } = useQuery<SyncPreview>({
@@ -463,6 +479,40 @@ export default function OrderDetails() {
                           <p className="text-sm text-muted-foreground">None</p>
                         )}
                       </div>
+
+                      {/* File Notes */}
+                      {project.files?.[selectedFileIndex] && (
+                        <div className="space-y-2 mt-4 pt-4 border-t">
+                          <h5 className="text-sm font-medium text-muted-foreground">Notes</h5>
+                          <Textarea
+                            placeholder="Add notes for this file..."
+                            value={editingNotes[project.files[selectedFileIndex].id] ?? project.files[selectedFileIndex].notes ?? ""}
+                            onChange={(e) => setEditingNotes(prev => ({
+                              ...prev,
+                              [project.files![selectedFileIndex].id]: e.target.value
+                            }))}
+                            className="min-h-[80px] resize-none"
+                            data-testid="textarea-file-notes"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const fileId = project.files![selectedFileIndex].id;
+                              const notes = editingNotes[fileId] ?? project.files![selectedFileIndex].notes ?? "";
+                              updateFileNotes({ fileId, notes });
+                            }}
+                            disabled={isSavingNotes}
+                            data-testid="button-save-file-notes"
+                          >
+                            {isSavingNotes ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4 mr-2" />
+                            )}
+                            Save Notes
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground">

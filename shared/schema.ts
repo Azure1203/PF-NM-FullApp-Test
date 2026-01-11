@@ -46,6 +46,7 @@ export const orderFiles = pgTable("order_files", {
   hasMJDoors: boolean("has_mj_doors").default(false),
   hasRichelieuDoors: boolean("has_richelieu_doors").default(false),
   hasDoubleThick: boolean("has_double_thick").default(false),
+  notes: text("notes"), // User notes for this file
   
   createdAt: timestamp("created_at").defaultNow(),
 });

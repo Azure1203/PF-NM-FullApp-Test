@@ -20,6 +20,7 @@ export interface IStorage {
   // Order file methods
   getProjectFiles(projectId: number): Promise<OrderFile[]>;
   createOrderFile(file: InsertOrderFile): Promise<OrderFile>;
+  updateOrderFile(id: number, updates: Partial<OrderFile>): Promise<OrderFile | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -61,6 +62,14 @@ export class DatabaseStorage implements IStorage {
   async createOrderFile(file: InsertOrderFile): Promise<OrderFile> {
     const [created] = await db.insert(orderFiles).values(file).returning();
     return created;
+  }
+
+  async updateOrderFile(id: number, updates: Partial<OrderFile>): Promise<OrderFile | undefined> {
+    const [updated] = await db.update(orderFiles)
+      .set(updates)
+      .where(eq(orderFiles.id, id))
+      .returning();
+    return updated;
   }
 }
 
