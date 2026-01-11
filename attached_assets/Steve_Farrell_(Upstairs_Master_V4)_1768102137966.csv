@@ -1,0 +1,124 @@
+Date (dd/mm/yyyy),23/12/2025,,,,,,,,,
+Dealer (Company),Foundation Flooring,,,,,,,,,
+Designer Name (First/Last),Zanah Paret,,,,,,,,,
+PO:/Design Name (First/Last),Steve Farrell (Upstairs Master V4),,,,,,,,,
+Shipping Address,"4100 N Powerline Rd suite b 3,, Pompano Beach, FL, US, 33073",,,,,,,,,
+Phone,954-357-2777,,,,,,,,,
+Tax ID,27-1177754,,,,,,,,,
+Power Tail Gate,NO,,,,,,,,,
+Phone Appointment,YES,,,,,,,,,
+Order ID,1682,,,,,,,,,
+# of Core Parts,181,,,,,,,,,
+# of Dovetails,13,,,,,,,,,
+# of Assembled Drawers,0,,,,,,,,,
+# of 5-Piece and GD,0,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+,,,,,,,,,,
+Manuf code,Color,Quantity,Height,Width(R),Length(L),Thickness,Left,Right,Top,Bottom
+DBX24_22_135,,1,135,599.6,540,,,,,
+DBX36_14_231,,2,231,858.4,340,,,,,
+DBX24_14_103,,4,103,599.6,340,,,,,
+DBX24_14_231,,6,231,599.6,340,,,,,
+DRWEURO,TFL3W-SMAT,2,285,884.4,,19,1,1,1,1
+JDRWEURO,TFL3W-SMAT,2,157,625.6,,19,1,1,1,1
+DRWEURO,TFL3W-SMAT,4,157,625.6,,19,1,1,1,1
+DRWEURO,TFL3W-SMAT,6,285,625.6,,19,1,1,1,1
+DRWEURO,TFL3W-SMAT,1,189,625.6,,19,1,1,1,1
+SFLAT4,TFL3W-SMAT,9,2438.4,101.6,,19,1,1,0,0
+34RCSHFFA,TFL3W-SMAT,3,653.6,653.6,355.6,19,0,1,0,0
+34SHFF,TFL3W-SMAT,3,609.6,609.6,,19,1,1,0,0
+34SHFF,TFL3W-SMAT,3,457.2,609.6,,19,1,1,0,0
+34SHFF,TFL3W-SMAT,3,1025.5,355.6,,19,1,1,0,0
+34SHFF,TFL3W-SMAT,1,850.4,762,,19,1,1,0,0
+34SHFA,TFL3W-SMAT,2,533.4,355.6,,19,1,1,1,1
+34SHFF,TFL3W-SMAT,20,717.5,355.6,,19,1,1,0,0
+34SHFF,TFL3W-SMAT,6,1041.4,355.6,,19,1,1,0,0
+34SHFF,TFL3W-SMAT,11,609.6,355.6,,19,1,1,0,0
+34SHFA,TFL3W-SMAT,6,609.6,355.6,,19,1,1,1,1
+34SHFF,TFL3W-SMAT,4,868.4,355.6,,19,1,1,0,0
+34SHFF,TFL3W-SMAT,3,762,355.6,,19,1,1,0,0
+34SHFF,TFL3W-SMAT,4,533.4,355.6,,19,1,1,0,0
+34BACK,TFL3W-SMAT,1,884,638.8,,19,1,1,1,1
+34BACK,TFL3W-SMAT,2,692,562.6,,19,1,1,1,1
+CLEAT,TFL3W-SMAT,1,762,76.2,,19,1,1,1,1
+TK,TFL3W-SMAT,1,495.4,96.5,,19,0,0,0,0
+34BACK,TFL3W-SMAT,1,2132,673.1,,19,1,1,1,1
+34BACK,TFL3W-SMAT,1,2132,692.1,,19,1,1,1,1
+TK,TFL3W-SMAT,4,609.6,96.5,,19,0,0,0,0
+34BACK,TFL3W-SMAT,1,2132,801,,19,1,1,1,1
+CLEAT,TFL3W-SMAT,1,850.4,76.2,,19,1,1,1,1
+TK,TFL3W-SMAT,1,762,96.5,,19,0,0,0,0
+34BACK,TFL3W-SMAT,3,2132,629.1,,19,1,1,1,1
+34BACK,TFL3W-SMAT,2,2132,1070.7,,19,1,1,1,1
+TK,TFL3W-SMAT,2,1041.4,96.5,,19,0,0,0,0
+FILL,TFL3W-SMAT,1,2132,106.6,,19,0,0,1,1
+CLEAT,TFL3W-SMAT,2,717.5,76.2,,19,1,1,1,1
+34BACK,TFL3W-SMAT,2,2132,746.8,,19,1,1,1,1
+TK,TFL3W-SMAT,2,717.5,96.5,,19,0,0,0,0
+FILL,TFL3W-SMAT,4,2132,76.2,,19,0,0,1,1
+CLEAT,TFL3W-SMAT,1,1025.5,76.2,,19,1,1,1,1
+TK,TFL3W-SMAT,1,457.2,96.5,,19,0,0,0,0
+CLEAT,TFL3W-SMAT,2,1041.4,76.2,,19,1,1,1,1
+34BACK,TFL3W-SMAT,2,404,897.6,,19,1,1,1,1
+TK,TFL3W-SMAT,2,868.4,96.5,,19,0,0,0,0
+34BACK,TFL3W-SMAT,1,884,486.5,,19,1,1,1,1
+TK,TFL3W-SMAT,1,801,96.5,,19,0,0,0,0
+CLEAT,TFL3W-SMAT,3,609.6,76.2,,19,1,1,1,1
+TK,TFL3W-SMAT,1,1025.5,96.5,,19,0,0,0,0
+FILL,TFL3W-SMAT,1,404,76.2,,19,0,0,1,1
+34BACK,TFL3W-SMAT,1,2132,1064.5,,19,1,1,1,1
+34WPNLF,TFL3W-SMAT,3,692,355.6,,19,1,1,1,1
+34PNLL,TFL3W-SMAT,1,404,355.6,,19,1,1,1,1
+34PNLL,TFL3W-SMAT,3,2132,355.6,,19,1,1,1,1
+34PNLF,TFL3W-SMAT,1,884,609.6,,19,1,1,1,1
+34PNLR,TFL3W-SMAT,1,884,609.6,,19,1,1,1,1
+34PNLR,TFL3W-SMAT,4,2132,355.6,,19,1,1,1,1
+34PNLL,TFL3W-SMAT,1,884,609.6,,19,1,1,1,1
+34PNLF,TFL3W-SMAT,9,2132,355.6,,19,1,1,1,1
+34PNLN,TFL3W-SMAT,2,2132,762,,19,1,1,1,1
+34PNLR,TFL3W-SMAT,1,404,355.6,,19,1,1,1,1
+34PNLF,TFL3W-SMAT,1,404,355.6,,19,1,1,1,1
+LDREURO,TFL3W-SMAT,3,1117,311.3,,19,1,1,1,1
+LDREURO,TFL3W-SMAT,1,573,311.3,,19,1,1,1,1
+RDREURO,TFL3W-SMAT,1,573,311.3,,19,1,1,1,1
+HDREURO,TFL3W-SMAT,1,701,473.2,,19,1,1,1,1
+LDREURO,TFL3W-SMAT,2,669,273.2,,19,1,1,1,1
+RDREURO,TFL3W-SMAT,2,669,273.2,,19,1,1,1,1
+RDREURO,TFL3W-SMAT,3,1117,311.3,,19,1,1,1,1
+H.547.52.524,Synergy Elite Shoe Fence Black ,16,,,,,,,,
+H.808.71.503,Valet Rod Black [LEFT],1,,,,,,,,
+H.547.42.485,Cloth Laundry Bag (Cream),1,,,,,,,,
+H.547.42.390,Hamper Mounting Rail (Black),1,,,,,,,,
+H.547.42.994,Flap Stay Hamper Kit Black,1,,,,,,,,
+H.547.42.331,Wire Basket Tilt-out Hamper Black ,1,,,,,,,,
+H.811.03.504,"Jewelry Tray (24"") (Uses Tilt-down 6"" ""D"" Front - Needs fixed shelf)",2,,,,,,,,
+H.801.43.340.CTS, Round Rod Black- Cut to size,2,,,625.1,,,,,
+H.803.64.410, Round Rod Holder Black,18,,,,,,,,
+H.801.43.340.CTS, Round Rod Black- Cut to size,4,,,1031.9,,,,,
+H.801.43.340.CTS, Round Rod Black- Cut to size,2,,,752.5,,,,,
+H.801.43.340.CTS, Round Rod Black- Cut to size,1,,,1016,,,,,
+M-105-C80B675F,Soft Close Hinge110' HalfOverlay Closets,57,,,,,,,,
+M-105-89T02TQ,Softclose Plate 0mm Closets,57,,,,,,,,
+M-105-DS10550H,"Undermount Softclose Slides 22""",1,,,,,,,,
+M-105-DS10350H,"Undermount Softclose Slides 14""",12,,,,,,,,
+M-372-NJ35D65-14,"Side Mount Softclose Slides 14""",2,,,,,,,,
+H.263.50.705,Fixed Shelf Cams White,370,,,,,,,,
+R-5282G,Corner Bracket / Steel,27,,,,,,,,
+M-R20-1564,Flat Screw #8 x 5/8   #2 Drive,288,,,,,,,,
+M-R20-1779,Flat Screw #8 x 2-1/2  #2 Drive,238,,,,,,,,
+M-R20-1765,Flat Screw #8 x 1-1/4  #2 Drive,54,,,,,,,,
+R-B1655WH,Corner Bracket / White,27,,,,,,,,
+H.263.20.985,System Bolt Single - Approx. Qty,338,,,,,,,,
+M-R20-1513,Flat Screw #6 x 1/2   #1 Drive,12,,,,,,,,
+H.263.24.972,System 1 Bolt Double - Approx Qty,338,,,,,,,,
+M-06-7000,System screw Pozi (euro),177,,,,,,,,
+M-R20-3102,Drawer Front Screw Recex #8 x 1-1/4,39,,,,,,,,
+M-R20-3950,8/32 Standard Screw Break-away  - Imperial,26,,,,,,,,
+M-03-2415,Adjustable Shelf Pins,88,,,,,,,,
+H.290.06.020,Hanging Rail Hardware Cover Left White,3,,,,,,,,
+H.290.02.714,Hanging Rail Hardware Right,3,,,,,,,,
+H.290.06.040,Hanging Rail Hardware Cover Right White,3,,,,,,,,
+H.290.11.901,Wall Rail,1,,,,,,,,
+H.290.12.781,Wall Rail Cover White,1,,,,,,,,
+H.290.02.715,Hanging Rail Hardware Left,3,,,,,,,,
