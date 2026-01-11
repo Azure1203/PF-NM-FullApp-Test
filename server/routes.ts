@@ -7,6 +7,9 @@ import multer from 'multer';
 import { parse } from 'csv-parse';
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import path from 'path';
+import fs from 'fs';
+import express from 'express';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -595,9 +598,59 @@ export async function registerRoutes(
     }
   });
 
-  // Update CTS part config (image URL and rack location)
+  // Serve static CTS images
+  const ctsImagesDir = path.join(process.cwd(), 'uploads', 'cts-images');
+  if (!fs.existsSync(ctsImagesDir)) {
+    fs.mkdirSync(ctsImagesDir, { recursive: true });
+  }
+  app.use('/uploads/cts-images', express.static(ctsImagesDir));
+
+  // Upload image for CTS part config
+  app.post('/api/cts-configs/:partNumber/image', isAuthenticated, upload.single('image'), async (req, res) => {
+    try {
+      const partNumber = decodeURIComponent(req.params.partNumber);
+      const file = req.file;
+      
+      if (!file) {
+        return res.status(400).json({ message: 'No image file provided' });
+      }
+      
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({ message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.' });
+      }
+      
+      // Generate unique filename
+      const ext = path.extname(file.originalname) || '.jpg';
+      const sanitizedPartNumber = partNumber.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filename = `${sanitizedPartNumber}_${Date.now()}${ext}`;
+      const filepath = path.join(ctsImagesDir, filename);
+      
+      // Save file to disk
+      fs.writeFileSync(filepath, file.buffer);
+      
+      // Update config with image URL
+      const imageUrl = `/uploads/cts-images/${filename}`;
+      
+      // Get existing config to preserve rack location
+      const existingConfigs = await storage.getAllCtsPartConfigs();
+      const existingConfig = existingConfigs.find(c => c.partNumber === partNumber);
+      
+      const config = await storage.upsertCtsPartConfig({
+        partNumber,
+        imageUrl,
+        rackLocation: existingConfig?.rackLocation || null,
+      });
+      
+      res.json(config);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Update CTS part config (rack location only now, image is uploaded separately)
   const ctsConfigUpdateSchema = z.object({
-    imageUrl: z.string().nullable().optional(),
     rackLocation: z.string().nullable().optional(),
   });
   
@@ -606,9 +659,13 @@ export async function registerRoutes(
       const partNumber = decodeURIComponent(req.params.partNumber);
       const input = ctsConfigUpdateSchema.parse(req.body);
       
+      // Get existing config to preserve image URL
+      const existingConfigs = await storage.getAllCtsPartConfigs();
+      const existingConfig = existingConfigs.find(c => c.partNumber === partNumber);
+      
       const config = await storage.upsertCtsPartConfig({
         partNumber,
-        imageUrl: input.imageUrl || null,
+        imageUrl: existingConfig?.imageUrl || null,
         rackLocation: input.rackLocation || null,
       });
       

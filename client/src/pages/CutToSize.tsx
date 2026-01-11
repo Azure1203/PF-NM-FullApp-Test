@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package } from "lucide-react";
+import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import type { OrderFile, CtsPart, CtsPartConfig } from "@shared/schema";
@@ -22,7 +22,9 @@ export default function CutToSize() {
   const fileId = parseInt(params?.fileId || "0");
   const { toast } = useToast();
   
-  const [editingConfig, setEditingConfig] = useState<{ [partNumber: string]: { imageUrl: string; rackLocation: string } }>({});
+  const [editingConfig, setEditingConfig] = useState<{ [partNumber: string]: { rackLocation: string } }>({});
+  const [uploadingPart, setUploadingPart] = useState<string | null>(null);
+  const fileInputRefs = useRef<{ [partNumber: string]: HTMLInputElement | null }>({});
 
   const { data: ctsParts, isLoading } = useQuery<CtsPartWithConfig[]>({
     queryKey: ['/api/files', fileId, 'cts-parts'],
@@ -30,8 +32,8 @@ export default function CutToSize() {
   });
 
   const { mutate: saveConfig, isPending: isSaving } = useMutation({
-    mutationFn: async ({ partNumber, imageUrl, rackLocation }: { partNumber: string; imageUrl: string; rackLocation: string }) => {
-      return apiRequest('PUT', `/api/cts-configs/${encodeURIComponent(partNumber)}`, { imageUrl, rackLocation });
+    mutationFn: async ({ partNumber, rackLocation }: { partNumber: string; rackLocation: string }) => {
+      return apiRequest('PUT', `/api/cts-configs/${encodeURIComponent(partNumber)}`, { rackLocation });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
@@ -42,13 +44,38 @@ export default function CutToSize() {
     }
   });
 
+  const handleImageUpload = async (partNumber: string, file: File) => {
+    setUploadingPart(partNumber);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch(`/api/cts-configs/${encodeURIComponent(partNumber)}/image`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
+      toast({ title: "Image uploaded successfully" });
+    } catch (error: any) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setUploadingPart(null);
+    }
+  };
+
   const handleSaveConfig = (partNumber: string) => {
     const config = editingConfig[partNumber];
     const existingPart = ctsParts?.find(p => p.partNumber === partNumber);
     
     saveConfig({
       partNumber,
-      imageUrl: config?.imageUrl ?? existingPart?.config?.imageUrl ?? "",
       rackLocation: config?.rackLocation ?? existingPart?.config?.rackLocation ?? ""
     });
   };
@@ -89,7 +116,6 @@ export default function CutToSize() {
           <div className="space-y-6">
             {ctsParts.map((part) => {
               const editing = editingConfig[part.partNumber] ?? {
-                imageUrl: part.config?.imageUrl ?? "",
                 rackLocation: part.config?.rackLocation ?? ""
               };
               
