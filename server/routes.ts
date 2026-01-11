@@ -10,6 +10,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import path from 'path';
 import fs from 'fs';
 import express from 'express';
+import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -285,6 +286,12 @@ export async function registerRoutes(
   // Setup authentication (must be before other routes)
   await setupAuth(app);
   registerAuthRoutes(app);
+  
+  // Register object storage routes
+  registerObjectStorageRoutes(app);
+  
+  // Create object storage service instance
+  const objectStorageService = new ObjectStorageService();
 
   // List all projects (protected)
   app.get(api.orders.list.path, isAuthenticated, async (req, res) => {
@@ -622,40 +629,37 @@ export async function registerRoutes(
     }
   });
 
-  // Serve static CTS images
-  const ctsImagesDir = path.join(process.cwd(), 'uploads', 'cts-images');
-  if (!fs.existsSync(ctsImagesDir)) {
-    fs.mkdirSync(ctsImagesDir, { recursive: true });
-  }
-  app.use('/uploads/cts-images', express.static(ctsImagesDir));
-
-  // Upload image for CTS part config
-  app.post('/api/cts-configs/:partNumber/image', isAuthenticated, upload.single('image'), async (req, res) => {
+  // Get presigned URL for CTS image upload
+  app.post('/api/cts-configs/:partNumber/upload-url', isAuthenticated, async (req, res) => {
     try {
       const partNumber = decodeURIComponent(req.params.partNumber);
-      const file = req.file;
+      const { contentType } = req.body;
       
-      if (!file) {
-        return res.status(400).json({ message: 'No image file provided' });
+      // Get upload URL from object storage
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      
+      res.json({ uploadURL, objectPath, partNumber });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Complete CTS image upload (after file has been uploaded to object storage)
+  app.post('/api/cts-configs/:partNumber/image-complete', isAuthenticated, async (req, res) => {
+    try {
+      const partNumber = decodeURIComponent(req.params.partNumber);
+      const { objectPath } = req.body;
+      
+      if (!objectPath) {
+        return res.status(400).json({ message: 'objectPath is required' });
       }
       
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.mimetype)) {
-        return res.status(400).json({ message: 'Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.' });
-      }
-      
-      // Generate unique filename
-      const ext = path.extname(file.originalname) || '.jpg';
-      const sanitizedPartNumber = partNumber.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filename = `${sanitizedPartNumber}_${Date.now()}${ext}`;
-      const filepath = path.join(ctsImagesDir, filename);
-      
-      // Save file to disk
-      fs.writeFileSync(filepath, file.buffer);
-      
-      // Update config with image URL
-      const imageUrl = `/uploads/cts-images/${filename}`;
+      // Set ACL policy for public access
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+        owner: 'system',
+        visibility: 'public',
+      });
       
       // Get existing config to preserve rack location
       const existingConfigs = await storage.getAllCtsPartConfigs();
@@ -663,7 +667,7 @@ export async function registerRoutes(
       
       const config = await storage.upsertCtsPartConfig({
         partNumber,
-        imageUrl,
+        imageUrl: normalizedPath,
         rackLocation: existingConfig?.rackLocation || null,
       });
       

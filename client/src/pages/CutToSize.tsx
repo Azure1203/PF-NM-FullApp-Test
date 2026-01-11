@@ -76,18 +76,43 @@ export default function CutToSize() {
   const handleImageUpload = async (partNumber: string, file: File) => {
     setUploadingPart(partNumber);
     try {
-      const formData = new FormData();
-      formData.append('image', file);
-      
-      const response = await fetch(`/api/cts-configs/${encodeURIComponent(partNumber)}/image`, {
+      // Step 1: Get presigned URL from backend
+      const urlResponse = await fetch(`/api/cts-configs/${encodeURIComponent(partNumber)}/upload-url`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentType: file.type }),
         credentials: 'include',
       });
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Upload failed');
+      if (!urlResponse.ok) {
+        const error = await urlResponse.json();
+        throw new Error(error.message || 'Failed to get upload URL');
+      }
+      
+      const { uploadURL, objectPath } = await urlResponse.json();
+      
+      // Step 2: Upload file directly to object storage
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload image to storage');
+      }
+      
+      // Step 3: Complete the upload and save config
+      const completeResponse = await fetch(`/api/cts-configs/${encodeURIComponent(partNumber)}/image-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objectPath }),
+        credentials: 'include',
+      });
+      
+      if (!completeResponse.ok) {
+        const error = await completeResponse.json();
+        throw new Error(error.message || 'Failed to complete upload');
       }
       
       queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
