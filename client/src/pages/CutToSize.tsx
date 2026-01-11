@@ -67,9 +67,6 @@ export default function CutToSize() {
         queryClient.setQueryData(['/api/files', fileId, 'cts-parts'], context.previousParts);
       }
       toast({ title: "Failed to update", description: error.message, variant: "destructive" });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-parts'] });
     }
   });
 
