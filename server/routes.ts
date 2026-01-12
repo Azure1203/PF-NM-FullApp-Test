@@ -1159,10 +1159,20 @@ ${fileBreakdown}`;
       let pfProductionStatus: string[] = [];
       let asanaSection: string | null = null;
       
-      // Find the PERFECT FIT PRODUCTION project
-      const perfectFitProject = taskProjects.find((p: any) => 
-        p.name?.toUpperCase().includes('PERFECT FIT')
-      );
+      // Find the PERFECT FIT PRODUCTION project (GID: 1208263802564738)
+      // First try to find by exact GID, then fall back to name matching
+      const PERFECT_FIT_PROJECT_GID = '1208263802564738';
+      let perfectFitProject = taskProjects.find((p: any) => p.gid === PERFECT_FIT_PROJECT_GID);
+      
+      // If not found by GID, try name matching for "PERFECT FIT PRODUCTION"
+      if (!perfectFitProject) {
+        perfectFitProject = taskProjects.find((p: any) => 
+          p.name?.toUpperCase().includes('PERFECT FIT PRODUCTION')
+        );
+      }
+      
+      console.log('[Asana] Looking for project GID:', PERFECT_FIT_PROJECT_GID);
+      console.log('[Asana] Task projects:', taskProjects.map((p: any) => ({ gid: p.gid, name: p.name })));
       
       if (perfectFitProject) {
         try {
@@ -1337,10 +1347,14 @@ ${fileBreakdown}`;
           let pfProductionStatus: string[] = [];
           let asanaSection: string | null = null;
           
-          // Find the PERFECT FIT PRODUCTION project
-          const perfectFitProject = taskProjects.find((p: any) => 
-            p.name?.toUpperCase().includes('PERFECT FIT')
-          );
+          // Find the PERFECT FIT PRODUCTION project (GID: 1208263802564738)
+          const PERFECT_FIT_PROJECT_GID = '1208263802564738';
+          let perfectFitProject = taskProjects.find((p: any) => p.gid === PERFECT_FIT_PROJECT_GID);
+          if (!perfectFitProject) {
+            perfectFitProject = taskProjects.find((p: any) => 
+              p.name?.toUpperCase().includes('PERFECT FIT PRODUCTION')
+            );
+          }
           
           if (perfectFitProject) {
             try {
