@@ -809,6 +809,144 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== PALLET MANAGEMENT ENDPOINTS ====================
+  
+  // Get all pallets for a project with their file assignments (protected)
+  app.get('/api/orders/:id/pallets', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const projectPallets = await storage.getPalletsForProject(projectId);
+      
+      // Get file assignments for each pallet
+      const palletsWithAssignments = await Promise.all(
+        projectPallets.map(async (pallet) => {
+          const assignments = await storage.getAssignmentsForPallet(pallet.id);
+          return {
+            ...pallet,
+            fileIds: assignments.map(a => a.fileId)
+          };
+        })
+      );
+      
+      res.json(palletsWithAssignments);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Create a new pallet with file assignments (protected)
+  app.post('/api/orders/:id/pallets', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const { size, customSize, notes, fileIds } = req.body;
+      
+      if (!size || typeof size !== 'string') {
+        return res.status(400).json({ message: 'size is required' });
+      }
+      
+      // Get next pallet number for this project
+      const palletNumber = await storage.getNextPalletNumber(projectId);
+      
+      // Create the pallet
+      const pallet = await storage.createPallet({
+        projectId,
+        palletNumber,
+        size,
+        customSize: customSize || null,
+        notes: notes || null
+      });
+      
+      // Create file assignments if provided
+      let assignedFileIds: number[] = [];
+      if (fileIds && Array.isArray(fileIds) && fileIds.length > 0) {
+        const assignments = await storage.setAssignmentsForPallet(pallet.id, fileIds);
+        assignedFileIds = assignments.map(a => a.fileId);
+      }
+      
+      res.json({
+        ...pallet,
+        fileIds: assignedFileIds
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Update a pallet (protected)
+  app.patch('/api/pallets/:palletId', isAuthenticated, async (req, res) => {
+    try {
+      const palletId = Number(req.params.palletId);
+      const { size, customSize, notes, fileIds } = req.body;
+      
+      // Update pallet fields
+      const updates: any = {};
+      if (size !== undefined) updates.size = size;
+      if (customSize !== undefined) updates.customSize = customSize;
+      if (notes !== undefined) updates.notes = notes;
+      
+      const pallet = await storage.updatePallet(palletId, updates);
+      if (!pallet) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      // Update file assignments if provided
+      let assignedFileIds: number[] = [];
+      if (fileIds !== undefined && Array.isArray(fileIds)) {
+        const assignments = await storage.setAssignmentsForPallet(palletId, fileIds);
+        assignedFileIds = assignments.map(a => a.fileId);
+      } else {
+        const assignments = await storage.getAssignmentsForPallet(palletId);
+        assignedFileIds = assignments.map(a => a.fileId);
+      }
+      
+      res.json({
+        ...pallet,
+        fileIds: assignedFileIds
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Delete a pallet (protected)
+  app.delete('/api/pallets/:palletId', isAuthenticated, async (req, res) => {
+    try {
+      const palletId = Number(req.params.palletId);
+      const deleted = await storage.deletePallet(palletId);
+      if (!deleted) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Get file assignments info for all files in a project (to show which files are on which pallets)
+  app.get('/api/orders/:id/file-pallet-info', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const files = await storage.getProjectFiles(projectId);
+      
+      // Get pallet assignments for each file
+      const fileInfo = await Promise.all(
+        files.map(async (file) => {
+          const assignments = await storage.getAssignmentsForFile(file.id);
+          return {
+            fileId: file.id,
+            filename: file.originalFilename,
+            palletIds: assignments.map(a => a.palletId),
+            palletCount: assignments.length
+          };
+        })
+      );
+      
+      res.json(fileInfo);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Sync project to Asana (duplicates template task and updates it) (protected)
   app.post(api.orders.sync.path, isAuthenticated, async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));

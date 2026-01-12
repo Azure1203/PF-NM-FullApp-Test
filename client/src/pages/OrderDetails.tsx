@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertProjectSchema } from "@shared/schema";
+import { insertProjectSchema, PALLET_SIZES, type PalletSize } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -16,7 +16,10 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -38,6 +41,18 @@ const formSchema = insertProjectSchema.pick({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Type for pallets with file assignments
+interface PalletWithFiles {
+  id: number;
+  projectId: number;
+  palletNumber: number;
+  size: string;
+  customSize: string | null;
+  notes: string | null;
+  createdAt: Date;
+  fileIds: number[];
+}
+
 export default function OrderDetails() {
   const [, params] = useRoute("/orders/:id");
   const id = parseInt(params?.id || "0");
@@ -48,6 +63,15 @@ export default function OrderDetails() {
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
   const [editingPackagingLink, setEditingPackagingLink] = useState<{ [fileId: number]: string }>({});
+  
+  // Pallet management state
+  const [expandedPallets, setExpandedPallets] = useState<Set<number>>(new Set());
+  const [palletDialogOpen, setPalletDialogOpen] = useState(false);
+  const [editingPallet, setEditingPallet] = useState<PalletWithFiles | null>(null);
+  const [palletSize, setPalletSize] = useState<PalletSize>('34" Wide Cut to Size');
+  const [palletCustomSize, setPalletCustomSize] = useState('');
+  const [palletNotes, setPalletNotes] = useState('');
+  const [palletFileIds, setPalletFileIds] = useState<number[]>([]);
 
   // All PF PRODUCTION STATUS options
   const productionStatusOptions = [
@@ -176,6 +200,139 @@ export default function OrderDetails() {
     enabled: !!id && id > 0,
   });
   
+  // ==================== PALLET QUERIES AND MUTATIONS ====================
+  
+  // Fetch pallets for this project
+  const { data: pallets = [], isLoading: isLoadingPallets } = useQuery<PalletWithFiles[]>({
+    queryKey: ['/api/orders', id, 'pallets'],
+    enabled: !!id && id > 0,
+  });
+  
+  const palletsQueryKey = ['/api/orders', id, 'pallets'];
+  
+  // Create pallet mutation
+  const { mutate: createPallet, isPending: isCreatingPallet } = useMutation({
+    mutationFn: async (data: { size: string; customSize?: string; notes?: string; fileIds: number[] }) => {
+      return apiRequest('POST', `/api/orders/${id}/pallets`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+      toast({ title: "Pallet created" });
+      closePalletDialog();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create pallet", description: error.message, variant: "destructive" });
+    }
+  });
+  
+  // Update pallet mutation
+  const { mutate: updatePallet, isPending: isUpdatingPallet } = useMutation({
+    mutationFn: async ({ palletId, ...data }: { palletId: number; size?: string; customSize?: string; notes?: string; fileIds?: number[] }) => {
+      return apiRequest('PATCH', `/api/pallets/${palletId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+      toast({ title: "Pallet updated" });
+      closePalletDialog();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update pallet", description: error.message, variant: "destructive" });
+    }
+  });
+  
+  // Delete pallet mutation
+  const { mutate: deletePallet, isPending: isDeletingPallet } = useMutation({
+    mutationFn: async (palletId: number) => {
+      return apiRequest('DELETE', `/api/pallets/${palletId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+      toast({ title: "Pallet deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete pallet", description: error.message, variant: "destructive" });
+    }
+  });
+  
+  // Pallet dialog helpers
+  const openAddPalletDialog = () => {
+    setEditingPallet(null);
+    setPalletSize('34" Wide Cut to Size');
+    setPalletCustomSize('');
+    setPalletNotes('');
+    setPalletFileIds([]);
+    setPalletDialogOpen(true);
+  };
+  
+  const openEditPalletDialog = (pallet: PalletWithFiles) => {
+    setEditingPallet(pallet);
+    setPalletSize(pallet.size as PalletSize);
+    setPalletCustomSize(pallet.customSize || '');
+    setPalletNotes(pallet.notes || '');
+    setPalletFileIds(pallet.fileIds);
+    setPalletDialogOpen(true);
+  };
+  
+  const closePalletDialog = () => {
+    setPalletDialogOpen(false);
+    setEditingPallet(null);
+    setPalletSize('34" Wide Cut to Size');
+    setPalletCustomSize('');
+    setPalletNotes('');
+    setPalletFileIds([]);
+  };
+  
+  const handleSavePallet = () => {
+    if (editingPallet) {
+      updatePallet({
+        palletId: editingPallet.id,
+        size: palletSize,
+        customSize: palletSize === 'Custom' ? palletCustomSize : undefined,
+        notes: palletNotes || undefined,
+        fileIds: palletFileIds
+      });
+    } else {
+      createPallet({
+        size: palletSize,
+        customSize: palletSize === 'Custom' ? palletCustomSize : undefined,
+        notes: palletNotes || undefined,
+        fileIds: palletFileIds
+      });
+    }
+  };
+  
+  const togglePalletFileAssignment = (fileId: number) => {
+    setPalletFileIds(prev => 
+      prev.includes(fileId) 
+        ? prev.filter(id => id !== fileId)
+        : [...prev, fileId]
+    );
+  };
+  
+  const togglePalletExpanded = (palletId: number) => {
+    setExpandedPallets(prev => {
+      const next = new Set(prev);
+      if (next.has(palletId)) {
+        next.delete(palletId);
+      } else {
+        next.add(palletId);
+      }
+      return next;
+    });
+  };
+  
+  // Calculate which files are assigned to which pallets (for showing split info)
+  const fileAssignmentCounts = project?.files?.reduce((acc, file) => {
+    const count = pallets.filter(p => p.fileIds.includes(file.id)).length;
+    acc[file.id] = count;
+    return acc;
+  }, {} as Record<number, number>) || {};
+  
+  // Get unassigned files (files not on any pallet)
+  const unassignedFiles = project?.files?.filter(file => 
+    !pallets.some(p => p.fileIds.includes(file.id))
+  ) || [];
+
   // Get the selected file's ID for CTS status query
   const selectedFileId = project?.files?.[selectedFileIndex ?? -1]?.id;
   
@@ -563,6 +720,188 @@ export default function OrderDetails() {
             <CardContent className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mr-2" />
               <span className="text-muted-foreground">Calculating order details...</span>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ==================== PALLET SECTION ==================== */}
+        {project && project.files && project.files.length > 0 && (
+          <Card className="mb-6 border-none shadow-md" data-testid="pallets-section-card">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Archive className="w-5 h-5 text-primary" />
+                  Pallets ({pallets.length})
+                </CardTitle>
+                <Button 
+                  size="sm" 
+                  onClick={openAddPalletDialog}
+                  data-testid="button-add-pallet"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Pallet
+                </Button>
+              </div>
+              <CardDescription>
+                Manage pallets for packaging workflow. Assign CSV files to pallets.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPallets ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mr-2" />
+                  <span className="text-muted-foreground">Loading pallets...</span>
+                </div>
+              ) : pallets.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Archive className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p>No pallets created yet</p>
+                  <p className="text-sm">Click "Add Pallet" to create your first pallet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pallets.map((pallet) => {
+                    const isExpanded = expandedPallets.has(pallet.id);
+                    const assignedFiles = project.files?.filter(f => pallet.fileIds.includes(f.id)) || [];
+                    const previewFiles = preview?.fileBreakdowns.filter((_, idx) => 
+                      pallet.fileIds.includes(project.files?.[idx]?.id || 0)
+                    ) || [];
+                    const palletWeight = previewFiles.reduce((sum, f) => sum + f.weightLbs, 0);
+                    const palletParts = previewFiles.reduce((sum, f) => sum + f.coreParts, 0);
+                    
+                    return (
+                      <div
+                        key={pallet.id}
+                        className="border rounded-lg overflow-hidden"
+                        data-testid={`pallet-card-${pallet.id}`}
+                      >
+                        {/* Pallet Header - always visible */}
+                        <div 
+                          className="flex items-center justify-between p-3 bg-muted/30 cursor-pointer hover-elevate"
+                          onClick={() => togglePalletExpanded(pallet.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            )}
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">Pallet #{pallet.palletNumber}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {pallet.size === 'Custom' && pallet.customSize 
+                                    ? pallet.customSize 
+                                    : pallet.size}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {assignedFiles.length} file{assignedFiles.length !== 1 ? 's' : ''} • {palletParts} parts • {Math.round(palletWeight)} lbs
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openEditPalletDialog(pallet)}
+                              data-testid={`button-edit-pallet-${pallet.id}`}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  data-testid={`button-delete-pallet-${pallet.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Pallet #{pallet.palletNumber}?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will remove the pallet and all file assignments. The files themselves won't be deleted.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deletePallet(pallet.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                        
+                        {/* Pallet Details - expanded */}
+                        {isExpanded && (
+                          <div className="p-3 border-t space-y-3">
+                            {pallet.notes && (
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Notes:</span> {pallet.notes}
+                              </div>
+                            )}
+                            
+                            {assignedFiles.length === 0 ? (
+                              <p className="text-sm text-muted-foreground italic">No files assigned to this pallet</p>
+                            ) : (
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium">Assigned Files:</p>
+                                {assignedFiles.map((file) => {
+                                  const splitCount = fileAssignmentCounts[file.id] || 0;
+                                  const palletIndex = pallets
+                                    .filter(p => p.fileIds.includes(file.id))
+                                    .findIndex(p => p.id === pallet.id) + 1;
+                                  
+                                  return (
+                                    <div 
+                                      key={file.id}
+                                      className="flex items-center gap-2 p-2 bg-muted/20 rounded text-sm"
+                                    >
+                                      <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                                      <span className="truncate">{file.originalFilename}</span>
+                                      {splitCount > 1 && (
+                                        <Badge variant="secondary" className="text-xs shrink-0">
+                                          Part {palletIndex} of {splitCount}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Show unassigned files warning */}
+                  {unassignedFiles.length > 0 && (
+                    <div className="mt-4 p-3 border border-dashed border-amber-500/50 rounded-lg bg-amber-50/50 dark:bg-amber-950/20">
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 mb-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="font-medium text-sm">Unassigned Files ({unassignedFiles.length})</span>
+                      </div>
+                      <div className="space-y-1">
+                        {unassignedFiles.map((file) => (
+                          <div key={file.id} className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <FileText className="w-3 h-3" />
+                            <span className="truncate">{file.originalFilename}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -1175,6 +1514,134 @@ export default function OrderDetails() {
           </div>
         </div>
       </div>
+      
+      {/* ==================== ADD/EDIT PALLET DIALOG ==================== */}
+      <Dialog open={palletDialogOpen} onOpenChange={(open) => !open && closePalletDialog()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingPallet ? `Edit Pallet #${editingPallet.palletNumber}` : 'Add New Pallet'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingPallet 
+                ? 'Update pallet size and file assignments'
+                : 'Create a new pallet and assign files to it'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Pallet Size Selection */}
+            <div className="space-y-2">
+              <Label>Pallet Size</Label>
+              <Select 
+                value={palletSize} 
+                onValueChange={(value) => setPalletSize(value as PalletSize)}
+              >
+                <SelectTrigger data-testid="select-pallet-size">
+                  <SelectValue placeholder="Select pallet size" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PALLET_SIZES.map((size) => (
+                    <SelectItem key={size} value={size} data-testid={`option-pallet-size-${size}`}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Custom Size Input (only shown when Custom is selected) */}
+            {palletSize === 'Custom' && (
+              <div className="space-y-2">
+                <Label>Custom Size</Label>
+                <Input
+                  placeholder="Enter custom pallet size"
+                  value={palletCustomSize}
+                  onChange={(e) => setPalletCustomSize(e.target.value)}
+                  data-testid="input-pallet-custom-size"
+                />
+              </div>
+            )}
+            
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                placeholder="Add notes about this pallet"
+                value={palletNotes}
+                onChange={(e) => setPalletNotes(e.target.value)}
+                rows={2}
+                data-testid="input-pallet-notes"
+              />
+            </div>
+            
+            {/* File Assignment Checkboxes */}
+            <div className="space-y-2">
+              <Label>Assign Files</Label>
+              <div className="border rounded-lg p-3 max-h-[200px] overflow-y-auto space-y-2">
+                {project?.files?.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No files uploaded yet</p>
+                ) : (
+                  project?.files?.map((file) => {
+                    const isAssigned = palletFileIds.includes(file.id);
+                    const otherPalletCount = pallets
+                      .filter(p => p.id !== editingPallet?.id && p.fileIds.includes(file.id))
+                      .length;
+                    
+                    return (
+                      <div 
+                        key={file.id}
+                        className="flex items-center gap-2"
+                      >
+                        <Checkbox
+                          id={`file-${file.id}`}
+                          checked={isAssigned}
+                          onCheckedChange={() => togglePalletFileAssignment(file.id)}
+                          data-testid={`checkbox-file-${file.id}`}
+                        />
+                        <label
+                          htmlFor={`file-${file.id}`}
+                          className="text-sm cursor-pointer flex-1 truncate"
+                        >
+                          {file.originalFilename}
+                        </label>
+                        {otherPalletCount > 0 && (
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            On {otherPalletCount} other pallet{otherPalletCount !== 1 ? 's' : ''}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Files can be assigned to multiple pallets (split across pallets)
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={closePalletDialog}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSavePallet}
+              disabled={isCreatingPallet || isUpdatingPallet || (palletSize === 'Custom' && !palletCustomSize.trim())}
+              data-testid="button-save-pallet"
+            >
+              {(isCreatingPallet || isUpdatingPallet) ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                editingPallet ? 'Update Pallet' : 'Create Pallet'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

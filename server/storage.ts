@@ -4,6 +4,8 @@ import {
   orderFiles,
   ctsParts,
   ctsPartConfigs,
+  pallets,
+  palletFileAssignments,
   type Project,
   type InsertProject,
   type OrderFile,
@@ -11,9 +13,13 @@ import {
   type CtsPart,
   type InsertCtsPart,
   type CtsPartConfig,
-  type InsertCtsPartConfig
+  type InsertCtsPartConfig,
+  type Pallet,
+  type InsertPallet,
+  type PalletFileAssignment,
+  type InsertPalletFileAssignment
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Project methods
@@ -40,6 +46,22 @@ export interface IStorage {
   getCtsPartConfig(partNumber: string): Promise<CtsPartConfig | undefined>;
   getAllCtsPartConfigs(): Promise<CtsPartConfig[]>;
   upsertCtsPartConfig(config: InsertCtsPartConfig): Promise<CtsPartConfig>;
+  
+  // Pallet methods
+  getPalletsForProject(projectId: number): Promise<Pallet[]>;
+  getPallet(id: number): Promise<Pallet | undefined>;
+  createPallet(pallet: InsertPallet): Promise<Pallet>;
+  updatePallet(id: number, updates: Partial<Pallet>): Promise<Pallet | undefined>;
+  deletePallet(id: number): Promise<boolean>;
+  getNextPalletNumber(projectId: number): Promise<number>;
+  
+  // Pallet file assignment methods
+  getAssignmentsForPallet(palletId: number): Promise<PalletFileAssignment[]>;
+  getAssignmentsForFile(fileId: number): Promise<PalletFileAssignment[]>;
+  createPalletFileAssignment(assignment: InsertPalletFileAssignment): Promise<PalletFileAssignment>;
+  deletePalletFileAssignment(id: number): Promise<boolean>;
+  deleteAssignmentsForPallet(palletId: number): Promise<void>;
+  setAssignmentsForPallet(palletId: number, fileIds: number[]): Promise<PalletFileAssignment[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -154,6 +176,78 @@ export class DatabaseStorage implements IStorage {
       const [created] = await db.insert(ctsPartConfigs).values(config).returning();
       return created;
     }
+  }
+
+  // Pallet methods
+  async getPalletsForProject(projectId: number): Promise<Pallet[]> {
+    return await db.select().from(pallets).where(eq(pallets.projectId, projectId)).orderBy(pallets.palletNumber);
+  }
+
+  async getPallet(id: number): Promise<Pallet | undefined> {
+    const [pallet] = await db.select().from(pallets).where(eq(pallets.id, id));
+    return pallet;
+  }
+
+  async createPallet(pallet: InsertPallet): Promise<Pallet> {
+    const [created] = await db.insert(pallets).values(pallet).returning();
+    return created;
+  }
+
+  async updatePallet(id: number, updates: Partial<Pallet>): Promise<Pallet | undefined> {
+    const [updated] = await db.update(pallets)
+      .set(updates)
+      .where(eq(pallets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePallet(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(pallets).where(eq(pallets.id, id)).returning();
+    return !!deleted;
+  }
+
+  async getNextPalletNumber(projectId: number): Promise<number> {
+    const existingPallets = await this.getPalletsForProject(projectId);
+    if (existingPallets.length === 0) return 1;
+    return Math.max(...existingPallets.map(p => p.palletNumber)) + 1;
+  }
+
+  // Pallet file assignment methods
+  async getAssignmentsForPallet(palletId: number): Promise<PalletFileAssignment[]> {
+    return await db.select().from(palletFileAssignments).where(eq(palletFileAssignments.palletId, palletId));
+  }
+
+  async getAssignmentsForFile(fileId: number): Promise<PalletFileAssignment[]> {
+    return await db.select().from(palletFileAssignments).where(eq(palletFileAssignments.fileId, fileId));
+  }
+
+  async createPalletFileAssignment(assignment: InsertPalletFileAssignment): Promise<PalletFileAssignment> {
+    const [created] = await db.insert(palletFileAssignments).values(assignment).returning();
+    return created;
+  }
+
+  async deletePalletFileAssignment(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(palletFileAssignments).where(eq(palletFileAssignments.id, id)).returning();
+    return !!deleted;
+  }
+
+  async deleteAssignmentsForPallet(palletId: number): Promise<void> {
+    await db.delete(palletFileAssignments).where(eq(palletFileAssignments.palletId, palletId));
+  }
+
+  async setAssignmentsForPallet(palletId: number, fileIds: number[]): Promise<PalletFileAssignment[]> {
+    // Delete existing assignments for this pallet
+    await this.deleteAssignmentsForPallet(palletId);
+    
+    // Create new assignments
+    if (fileIds.length === 0) return [];
+    
+    const assignments = fileIds.map(fileId => ({
+      palletId,
+      fileId
+    }));
+    
+    return await db.insert(palletFileAssignments).values(assignments).returning();
   }
 }
 

@@ -103,6 +103,53 @@ export const insertCtsPartConfigSchema = createInsertSchema(ctsPartConfigs).omit
   updatedAt: true
 });
 
+// Pallet size options
+export const PALLET_SIZES = [
+  '34" Wide Cut to Size',
+  '96" Long',
+  '105" Long',
+  '110" Long',
+  'Custom'
+] as const;
+
+export type PalletSize = typeof PALLET_SIZES[number];
+
+// Pallets table - packaging pallets for a project
+export const pallets = pgTable("pallets", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  palletNumber: integer("pallet_number").notNull(), // 1, 2, 3, etc.
+  size: text("size").notNull(), // One of PALLET_SIZES
+  customSize: text("custom_size"), // Free text if size is 'Custom'
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Pallet-File assignments - which files are on which pallet
+export const palletFileAssignments = pgTable("pallet_file_assignments", {
+  id: serial("id").primaryKey(),
+  palletId: integer("pallet_id").references(() => pallets.id, { onDelete: 'cascade' }).notNull(),
+  fileId: integer("file_id").references(() => orderFiles.id, { onDelete: 'cascade' }).notNull(),
+  notes: text("notes"), // Optional notes for this specific assignment
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPalletSchema = createInsertSchema(pallets).omit({ 
+  id: true, 
+  createdAt: true
+});
+
+export const insertPalletFileAssignmentSchema = createInsertSchema(palletFileAssignments).omit({ 
+  id: true, 
+  createdAt: true
+});
+
+export type Pallet = typeof pallets.$inferSelect;
+export type InsertPallet = z.infer<typeof insertPalletSchema>;
+
+export type PalletFileAssignment = typeof palletFileAssignments.$inferSelect;
+export type InsertPalletFileAssignment = z.infer<typeof insertPalletFileAssignmentSchema>;
+
 export type CtsPart = typeof ctsParts.$inferSelect;
 export type InsertCtsPart = z.infer<typeof insertCtsPartSchema>;
 
