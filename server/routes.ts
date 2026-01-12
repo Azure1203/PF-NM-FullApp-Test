@@ -1211,6 +1211,9 @@ ${fileBreakdown}`;
         }
       }
       
+      // Log what we found
+      console.log('[Asana] Final values - Section:', asanaSection, 'Order Status:', pfOrderStatus, 'Production Status:', pfProductionStatus);
+      
       // Update project with fetched values
       const updated = await storage.updateProject(project.id, {
         pfOrderStatus,
@@ -1219,7 +1222,15 @@ ${fileBreakdown}`;
         lastAsanaSyncAt: new Date()
       });
       
-      res.json(updated);
+      // Include debug info in response
+      res.json({
+        ...updated,
+        _debug: {
+          foundProject: perfectFitProject ? perfectFitProject.name : null,
+          sectionFound: asanaSection,
+          taskProjects: taskProjects.map((p: any) => p.name)
+        }
+      });
     } catch (e: any) {
       console.error("Asana Status Sync Error:", e.response?.body || e);
       res.status(400).json({ message: 'Failed to sync status from Asana: ' + (e.response?.body?.errors?.[0]?.message || e.message) });
