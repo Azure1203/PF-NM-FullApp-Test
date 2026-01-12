@@ -922,6 +922,32 @@ export async function registerRoutes(
     }
   });
 
+  // Update pallet packaging status (protected)
+  app.patch('/api/pallets/:palletId/packaging-status', isAuthenticated, async (req, res) => {
+    try {
+      const palletId = Number(req.params.palletId);
+      const { packagingStatus } = req.body;
+      
+      if (!packagingStatus || typeof packagingStatus !== 'object') {
+        return res.status(400).json({ message: 'packagingStatus object is required' });
+      }
+      
+      const pallet = await storage.updatePallet(palletId, { packagingStatus });
+      if (!pallet) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      // Return pallet with file assignments
+      const assignments = await storage.getAssignmentsForPallet(palletId);
+      res.json({
+        ...pallet,
+        fileIds: assignments.map(a => a.fileId)
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Get file assignments info for all files in a project (to show which files are on which pallets)
   app.get('/api/orders/:id/file-pallet-info', isAuthenticated, async (req, res) => {
     try {

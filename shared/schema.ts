@@ -1,4 +1,4 @@
-import { pgTable, text, serial, boolean, timestamp, integer, real } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp, integer, real, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -114,6 +114,31 @@ export const PALLET_SIZES = [
 
 export type PalletSize = typeof PALLET_SIZES[number];
 
+// Pallet packaging status - tracks which metrics have been packaged
+export const PALLET_PACKAGING_METRICS = [
+  'orders',
+  'parts', 
+  'dovetails',
+  'assembled',
+  'fivePiece',
+  'weight',
+  'maxLength'
+] as const;
+
+export type PalletPackagingMetric = typeof PALLET_PACKAGING_METRICS[number];
+export type PalletPackagingStatus = Record<PalletPackagingMetric, boolean>;
+
+// Default packaging status (all false/red)
+export const defaultPackagingStatus: PalletPackagingStatus = {
+  orders: false,
+  parts: false,
+  dovetails: false,
+  assembled: false,
+  fivePiece: false,
+  weight: false,
+  maxLength: false
+};
+
 // Pallets table - packaging pallets for a project
 export const pallets = pgTable("pallets", {
   id: serial("id").primaryKey(),
@@ -122,6 +147,7 @@ export const pallets = pgTable("pallets", {
   size: text("size").notNull(), // One of PALLET_SIZES
   customSize: text("custom_size"), // Free text if size is 'Custom'
   notes: text("notes"),
+  packagingStatus: jsonb("packaging_status").$type<PalletPackagingStatus>().default(defaultPackagingStatus),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

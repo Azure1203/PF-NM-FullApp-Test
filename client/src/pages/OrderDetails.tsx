@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertProjectSchema, PALLET_SIZES, type PalletSize } from "@shared/schema";
+import { insertProjectSchema, PALLET_SIZES, type PalletSize, type PalletPackagingStatus, type PalletPackagingMetric, defaultPackagingStatus } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -49,6 +49,7 @@ interface PalletWithFiles {
   size: string;
   customSize: string | null;
   notes: string | null;
+  packagingStatus: PalletPackagingStatus | null;
   createdAt: Date;
   fileIds: number[];
 }
@@ -253,6 +254,40 @@ export default function OrderDetails() {
       toast({ title: "Failed to delete pallet", description: error.message, variant: "destructive" });
     }
   });
+  
+  // Update packaging status mutation with optimistic updates
+  const { mutate: updatePackagingStatus } = useMutation({
+    mutationFn: async ({ palletId, packagingStatus }: { palletId: number; packagingStatus: PalletPackagingStatus }) => {
+      return apiRequest('PATCH', `/api/pallets/${palletId}/packaging-status`, { packagingStatus });
+    },
+    onMutate: async ({ palletId, packagingStatus }) => {
+      await queryClient.cancelQueries({ queryKey: palletsQueryKey });
+      const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
+      
+      queryClient.setQueryData<PalletWithFiles[]>(palletsQueryKey, (old) => {
+        if (!old) return old;
+        return old.map(p => p.id === palletId ? { ...p, packagingStatus } : p);
+      });
+      
+      return { previousPallets };
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousPallets) {
+        queryClient.setQueryData(palletsQueryKey, context.previousPallets);
+      }
+      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+    }
+  });
+  
+  // Toggle a specific packaging metric
+  const togglePackagingMetric = (pallet: PalletWithFiles, metric: PalletPackagingMetric) => {
+    const currentStatus = pallet.packagingStatus || defaultPackagingStatus;
+    const newStatus = { ...currentStatus, [metric]: !currentStatus[metric] };
+    updatePackagingStatus({ palletId: pallet.id, packagingStatus: newStatus });
+  };
   
   // Pallet dialog helpers
   const openAddPalletDialog = () => {
@@ -853,39 +888,46 @@ export default function OrderDetails() {
                               <p className="text-sm text-muted-foreground italic">No files assigned to this pallet</p>
                             ) : (
                               <>
-                                {/* Pallet Totals - matching Project Totals style */}
+                                {/* Pallet Totals - clickable tiles with red/green status */}
                                 <div>
-                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals</p>
-                                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                                    <div className="text-center p-2 bg-muted/30 rounded-md">
-                                      <p className="text-xl font-bold">{assignedFiles.length}</p>
-                                      <p className="text-xs text-muted-foreground">Orders</p>
-                                    </div>
-                                    <div className="text-center p-2 bg-muted/30 rounded-md">
-                                      <p className="text-xl font-bold">{palletParts}</p>
-                                      <p className="text-xs text-muted-foreground">Parts</p>
-                                    </div>
-                                    <div className="text-center p-2 bg-muted/30 rounded-md">
-                                      <p className="text-xl font-bold">{previewFiles.reduce((sum, f) => sum + f.dovetails, 0)}</p>
-                                      <p className="text-xs text-muted-foreground">Dovetails</p>
-                                    </div>
-                                    <div className="text-center p-2 bg-muted/30 rounded-md">
-                                      <p className="text-xl font-bold">{previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0)}</p>
-                                      <p className="text-xs text-muted-foreground">Assembled</p>
-                                    </div>
-                                    <div className="text-center p-2 bg-muted/30 rounded-md">
-                                      <p className="text-xl font-bold">{previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0)}</p>
-                                      <p className="text-xs text-muted-foreground">5 Piece</p>
-                                    </div>
-                                    <div className="text-center p-2 bg-muted/30 rounded-md">
-                                      <p className="text-xl font-bold">{Math.round(palletWeight)}</p>
-                                      <p className="text-xs text-muted-foreground">lbs</p>
-                                    </div>
-                                    <div className="text-center p-2 bg-muted/30 rounded-md">
-                                      <p className="text-xl font-bold">{Math.max(...previewFiles.map(f => f.maxLength || 0))}</p>
-                                      <p className="text-xs text-muted-foreground">mm max</p>
-                                    </div>
-                                  </div>
+                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals <span className="text-xs">(click to mark as packaged)</span></p>
+                                  {(() => {
+                                    const status = pallet.packagingStatus || defaultPackagingStatus;
+                                    const metrics: { key: PalletPackagingMetric; value: number | string; label: string }[] = [
+                                      { key: 'orders', value: assignedFiles.length, label: 'Orders' },
+                                      { key: 'parts', value: palletParts, label: 'Parts' },
+                                      { key: 'dovetails', value: previewFiles.reduce((sum, f) => sum + f.dovetails, 0), label: 'Dovetails' },
+                                      { key: 'assembled', value: previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0), label: 'Assembled' },
+                                      { key: 'fivePiece', value: previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0), label: '5 Piece' },
+                                      { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
+                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm max' }
+                                    ];
+                                    
+                                    return (
+                                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                                        {metrics.map(({ key, value, label }) => {
+                                          const isPackaged = status[key];
+                                          return (
+                                            <button
+                                              key={key}
+                                              onClick={() => togglePackagingMetric(pallet, key)}
+                                              className={`text-center p-2 rounded-md transition-colors cursor-pointer border-2 ${
+                                                isPackaged 
+                                                  ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' 
+                                                  : 'bg-red-100 dark:bg-red-900/30 border-red-500 text-red-700 dark:text-red-300'
+                                              }`}
+                                              data-testid={`button-pallet-packaged-${key}-${pallet.id}`}
+                                              aria-pressed={isPackaged}
+                                            >
+                                              <p className="text-xl font-bold">{value}</p>
+                                              <p className="text-xs opacity-80">{label}</p>
+                                              <p className="text-[10px] mt-1">{isPackaged ? '✓ Packaged' : 'Not Packaged'}</p>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                                 
                                 {/* Flags as Badges - matching Project Totals style */}
