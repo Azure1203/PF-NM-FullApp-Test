@@ -844,7 +844,7 @@ export default function OrderDetails() {
                         {isExpanded && (
                           <div className="p-4 border-t space-y-4">
                             {pallet.notes && (
-                              <div className="text-sm">
+                              <div className="text-sm bg-muted/20 rounded p-2">
                                 <span className="text-muted-foreground">Notes:</span> {pallet.notes}
                               </div>
                             )}
@@ -853,73 +853,73 @@ export default function OrderDetails() {
                               <p className="text-sm text-muted-foreground italic">No files assigned to this pallet</p>
                             ) : (
                               <>
-                                {/* Pallet Summary */}
-                                <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                                    <div className="font-medium"># OF ORDERS ON PALLET:</div>
-                                    <div>{assignedFiles.length}</div>
-                                    
-                                    <div className="font-medium">PALLET SIZE:</div>
-                                    <div>{pallet.size === 'Custom' && pallet.customSize ? pallet.customSize : pallet.size}</div>
-                                    
-                                    <div className="font-medium">Parts:</div>
-                                    <div>{palletParts}</div>
-                                    
-                                    <div className="font-medium">Dovetails:</div>
-                                    <div>{previewFiles.reduce((sum, f) => sum + f.dovetails, 0)}</div>
-                                    
-                                    <div className="font-medium">Assembled Netley Drawers:</div>
-                                    <div>{previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0)}</div>
-                                    
-                                    <div className="font-medium">5 Piece Shaker Doors:</div>
-                                    <div>{previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0)}</div>
-                                    
-                                    <div className="font-medium">Expected Weight:</div>
-                                    <div>{Math.round(palletWeight)} lbs</div>
+                                {/* Pallet Totals - matching Project Totals style */}
+                                <div>
+                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals</p>
+                                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                                    <div className="text-center p-2 bg-muted/30 rounded-md">
+                                      <p className="text-xl font-bold">{assignedFiles.length}</p>
+                                      <p className="text-xs text-muted-foreground">Orders</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-muted/30 rounded-md">
+                                      <p className="text-xl font-bold">{palletParts}</p>
+                                      <p className="text-xs text-muted-foreground">Parts</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-muted/30 rounded-md">
+                                      <p className="text-xl font-bold">{previewFiles.reduce((sum, f) => sum + f.dovetails, 0)}</p>
+                                      <p className="text-xs text-muted-foreground">Dovetails</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-muted/30 rounded-md">
+                                      <p className="text-xl font-bold">{previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0)}</p>
+                                      <p className="text-xs text-muted-foreground">Assembled</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-muted/30 rounded-md">
+                                      <p className="text-xl font-bold">{previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0)}</p>
+                                      <p className="text-xs text-muted-foreground">5 Piece</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-muted/30 rounded-md">
+                                      <p className="text-xl font-bold">{Math.round(palletWeight)}</p>
+                                      <p className="text-xs text-muted-foreground">lbs</p>
+                                    </div>
+                                    <div className="text-center p-2 bg-muted/30 rounded-md">
+                                      <p className="text-xl font-bold">{Math.max(...previewFiles.map(f => f.maxLength || 0))}</p>
+                                      <p className="text-xs text-muted-foreground">mm max</p>
+                                    </div>
                                   </div>
                                 </div>
                                 
-                                {/* Flags Section */}
-                                <div className="bg-muted/20 rounded-lg p-4 space-y-1 text-sm">
-                                  <div className="flex justify-between">
-                                    <span>WAS THERE BUYOUT HARDWARE:</span>
-                                    <span className={previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware'))) ? 'text-amber-600 font-medium' : ''}>
-                                      {previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware'))) ? 'YES' : 'NO'}
-                                    </span>
+                                {/* Flags as Badges - matching Project Totals style */}
+                                {(previewFiles.some(f => f.hasGlassParts) || 
+                                  previewFiles.some(f => f.hasMJDoors) || 
+                                  previewFiles.some(f => f.hasRichelieuDoors) ||
+                                  previewFiles.some(f => f.hasDoubleThick) ||
+                                  previewFiles.some(f => f.customParts && f.customParts.length > 0)) && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware'))) && (
+                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Buyout Hardware</Badge>
+                                    )}
+                                    {previewFiles.some(f => f.customParts && f.customParts.length > 0) && (
+                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Parts at Custom</Badge>
+                                    )}
+                                    {previewFiles.some(f => f.hasGlassParts) && (
+                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Glass Parts</Badge>
+                                    )}
+                                    {previewFiles.some(f => f.hasMJDoors) && (
+                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />M&J Doors</Badge>
+                                    )}
+                                    {previewFiles.some(f => f.hasRichelieuDoors) && (
+                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Richelieu Doors</Badge>
+                                    )}
+                                    {previewFiles.some(f => f.hasDoubleThick) && (
+                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Double Thick</Badge>
+                                    )}
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span>ARE THERE PARTS AT CUSTOM:</span>
-                                    <span className={previewFiles.some(f => f.customParts && f.customParts.length > 0) ? 'text-amber-600 font-medium' : ''}>
-                                      {previewFiles.some(f => f.customParts && f.customParts.length > 0) ? 'YES' : 'NO'}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>ARE THERE GLASS PARTS:</span>
-                                    <span className={previewFiles.some(f => f.hasGlassParts) ? 'text-amber-600 font-medium' : ''}>
-                                      {previewFiles.some(f => f.hasGlassParts) ? 'YES' : 'NO'}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>ARE THERE DOORS FROM M&J:</span>
-                                    <span className={previewFiles.some(f => f.hasMJDoors) ? 'text-amber-600 font-medium' : ''}>
-                                      {previewFiles.some(f => f.hasMJDoors) ? 'YES' : 'NO'}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span>ARE THERE DOORS FROM RICHELIEU:</span>
-                                    <span className={previewFiles.some(f => f.hasRichelieuDoors) ? 'text-amber-600 font-medium' : ''}>
-                                      {previewFiles.some(f => f.hasRichelieuDoors) ? 'YES' : 'NO'}
-                                    </span>
-                                  </div>
-                                </div>
+                                )}
                                 
                                 {/* Order Breakdown */}
                                 <div className="space-y-3">
-                                  <div className="font-medium text-sm border-b pb-1">--- ORDER BREAKDOWN ---</div>
+                                  <p className="text-sm font-medium text-muted-foreground">Order Breakdown</p>
                                   {assignedFiles.map((file) => {
-                                    const filePreview = preview?.fileBreakdowns.find((_, idx) => 
-                                      project.files?.[idx]?.id === file.id
-                                    );
                                     const fileIdx = project.files?.findIndex(f => f.id === file.id) ?? -1;
                                     const actualFilePreview = fileIdx >= 0 ? preview?.fileBreakdowns[fileIdx] : undefined;
                                     const splitCount = fileAssignmentCounts[file.id] || 0;
@@ -930,33 +930,43 @@ export default function OrderDetails() {
                                     return (
                                       <div 
                                         key={file.id}
-                                        className="bg-muted/10 border rounded-lg p-3 space-y-2"
+                                        className="bg-muted/20 rounded-lg p-3"
                                       >
-                                        <div className="flex items-start justify-between gap-2">
+                                        <div className="flex items-start justify-between gap-2 mb-2">
                                           <div>
                                             <p className="font-medium text-sm">{actualFilePreview?.name || file.originalFilename}</p>
                                             {file.allmoxyJobNumber && (
-                                              <p className="text-xs text-primary font-medium">{file.allmoxyJobNumber}</p>
+                                              <p className="text-xs text-primary font-medium">Job #{file.allmoxyJobNumber}</p>
                                             )}
                                           </div>
                                           {splitCount > 1 && (
-                                            <Badge variant="secondary" className="text-xs shrink-0">
+                                            <Badge variant="outline" className="text-xs shrink-0">
                                               Part {palletIndex} of {splitCount}
                                             </Badge>
                                           )}
                                         </div>
                                         {actualFilePreview && (
-                                          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                                            <span>Parts:</span>
-                                            <span>{actualFilePreview.coreParts}</span>
-                                            <span>Dovetails:</span>
-                                            <span>{actualFilePreview.dovetails}</span>
-                                            <span>Assembled Netley Drawers:</span>
-                                            <span>{actualFilePreview.assembledDrawers}</span>
-                                            <span>5 Piece Shaker Doors:</span>
-                                            <span>{actualFilePreview.fivePieceDoors}</span>
-                                            <span>Expected Weight:</span>
-                                            <span>{Math.round(actualFilePreview.weightLbs)} lbs</span>
+                                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                                            <div className="text-center p-1.5 bg-background/50 rounded">
+                                              <p className="text-sm font-semibold">{actualFilePreview.coreParts}</p>
+                                              <p className="text-[10px] text-muted-foreground">Parts</p>
+                                            </div>
+                                            <div className="text-center p-1.5 bg-background/50 rounded">
+                                              <p className="text-sm font-semibold">{actualFilePreview.dovetails}</p>
+                                              <p className="text-[10px] text-muted-foreground">Dovetails</p>
+                                            </div>
+                                            <div className="text-center p-1.5 bg-background/50 rounded">
+                                              <p className="text-sm font-semibold">{actualFilePreview.assembledDrawers}</p>
+                                              <p className="text-[10px] text-muted-foreground">Assembled</p>
+                                            </div>
+                                            <div className="text-center p-1.5 bg-background/50 rounded">
+                                              <p className="text-sm font-semibold">{actualFilePreview.fivePieceDoors}</p>
+                                              <p className="text-[10px] text-muted-foreground">5 Piece</p>
+                                            </div>
+                                            <div className="text-center p-1.5 bg-background/50 rounded">
+                                              <p className="text-sm font-semibold">{Math.round(actualFilePreview.weightLbs)}</p>
+                                              <p className="text-[10px] text-muted-foreground">lbs</p>
+                                            </div>
                                           </div>
                                         )}
                                       </div>
