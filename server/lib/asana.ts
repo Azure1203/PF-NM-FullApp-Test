@@ -64,6 +64,7 @@ export async function getAsanaApiInstances() {
     projectsApi: new Asana.ProjectsApi(),
     usersApi: new Asana.UsersApi(),
     workspacesApi: new Asana.WorkspacesApi(),
-    jobsApi: new Asana.JobsApi()
+    jobsApi: new Asana.JobsApi(),
+    sectionsApi: new Asana.SectionsApi()
   };
 }

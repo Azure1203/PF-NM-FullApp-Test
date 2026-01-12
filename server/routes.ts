@@ -1131,26 +1131,6 @@ ${fileBreakdown}`;
     }
   });
 
-  // Update ALLMOXY JOB # for a project (protected)
-  app.patch('/api/orders/:id/allmoxy-job', isAuthenticated, async (req, res) => {
-    try {
-      const projectId = Number(req.params.id);
-      const { allmoxyJobNumber } = req.body;
-      
-      if (typeof allmoxyJobNumber !== 'string') {
-        return res.status(400).json({ message: 'allmoxyJobNumber must be a string' });
-      }
-      
-      const updated = await storage.updateProject(projectId, { allmoxyJobNumber });
-      if (!updated) {
-        return res.status(404).json({ message: 'Project not found' });
-      }
-      res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
   // Sync PF ORDER STATUS and PF PRODUCTION STATUS from Asana (protected)
   app.post('/api/orders/:id/sync-asana-status', isAuthenticated, async (req, res) => {
     try {
@@ -1165,15 +1145,25 @@ ${fileBreakdown}`;
       
       const { tasksApi } = await getAsanaApiInstances();
       
-      // Fetch task with custom fields
+      // Fetch task with custom fields and section membership
       const taskResponse = await tasksApi.getTask(project.asanaTaskId, { 
-        opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
+        opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.section.name' 
       });
       
       const customFields = taskResponse.data.custom_fields || [];
+      const memberships = taskResponse.data.memberships || [];
       
       let pfOrderStatus: string | null = null;
       let pfProductionStatus: string[] = [];
+      let asanaSection: string | null = null;
+      
+      // Get the section name from memberships
+      for (const membership of memberships) {
+        if (membership.section?.name) {
+          asanaSection = membership.section.name;
+          break;
+        }
+      }
       
       for (const field of customFields) {
         const name = field.name?.toUpperCase().trim();
@@ -1192,6 +1182,7 @@ ${fileBreakdown}`;
       const updated = await storage.updateProject(project.id, {
         pfOrderStatus,
         pfProductionStatus,
+        asanaSection,
         lastAsanaSyncAt: new Date()
       });
       
@@ -1292,13 +1283,23 @@ ${fileBreakdown}`;
       for (const project of syncedProjects) {
         try {
           const taskResponse = await tasksApi.getTask(project.asanaTaskId!, { 
-            opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
+            opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.section.name' 
           });
           
           const customFields = taskResponse.data.custom_fields || [];
+          const memberships = taskResponse.data.memberships || [];
           
           let pfOrderStatus: string | null = null;
           let pfProductionStatus: string[] = [];
+          let asanaSection: string | null = null;
+          
+          // Get the section name from memberships
+          for (const membership of memberships) {
+            if (membership.section?.name) {
+              asanaSection = membership.section.name;
+              break;
+            }
+          }
           
           for (const field of customFields) {
             const name = field.name?.toUpperCase().trim();
@@ -1315,6 +1316,7 @@ ${fileBreakdown}`;
           await storage.updateProject(project.id, {
             pfOrderStatus,
             pfProductionStatus,
+            asanaSection,
             lastAsanaSyncAt: new Date()
           });
           

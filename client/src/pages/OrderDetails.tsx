@@ -46,7 +46,6 @@ export default function OrderDetails() {
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
-  const [editingAllmoxyJob, setEditingAllmoxyJob] = useState<string>("");
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
   const [editingPackagingLink, setEditingPackagingLink] = useState<{ [fileId: number]: string }>({});
 
@@ -121,20 +120,6 @@ export default function OrderDetails() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to save Packaging Link", description: error.message, variant: "destructive" });
-    }
-  });
-
-  // Mutation for updating ALLMOXY JOB #
-  const { mutate: updateAllmoxyJob, isPending: isSavingAllmoxyJob } = useMutation({
-    mutationFn: async (allmoxyJobNumber: string) => {
-      return apiRequest('PATCH', `/api/orders/${id}/allmoxy-job`, { allmoxyJobNumber });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: orderQueryKey });
-      toast({ title: "ALLMOXY JOB # saved" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to save ALLMOXY JOB #", description: error.message, variant: "destructive" });
     }
   });
 
@@ -229,7 +214,6 @@ export default function OrderDetails() {
         powerTailgate: project.powerTailgate || false,
         phoneAppointment: project.phoneAppointment || false,
       });
-      setEditingAllmoxyJob(project.allmoxyJobNumber || "");
     }
   }, [project, form]);
 
@@ -373,7 +357,7 @@ export default function OrderDetails() {
           }
         />
 
-        {/* ALLMOXY JOB #, PF ORDER STATUS, PF PRODUCTION STATUS Section */}
+        {/* PF PRODUCTION SECTION, PF ORDER STATUS, PF PRODUCTION STATUS Section */}
         <Card className="mb-6 border-none shadow-md" data-testid="order-status-card">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -400,31 +384,22 @@ export default function OrderDetails() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* ALLMOXY JOB # */}
+            {/* PF PRODUCTION SECTION */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">ALLMOXY JOB #</label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter ALLMOXY Job Number..."
-                  value={editingAllmoxyJob}
-                  onChange={(e) => setEditingAllmoxyJob(e.target.value)}
-                  className="max-w-xs"
-                  data-testid="input-allmoxy-job"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => updateAllmoxyJob(editingAllmoxyJob)}
-                  disabled={isSavingAllmoxyJob || editingAllmoxyJob === (project.allmoxyJobNumber || "")}
-                  data-testid="button-save-allmoxy-job"
-                >
-                  {isSavingAllmoxyJob ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
+              <label className="text-sm font-medium">PF PRODUCTION SECTION</label>
+              {project.status === 'synced' ? (
+                <div className="flex items-center gap-2">
+                  <Badge 
+                    variant="outline"
+                    className="text-base px-3 py-1"
+                    data-testid="badge-pf-production-section"
+                  >
+                    {project.asanaSection || 'No section'}
+                  </Badge>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sync to Asana to see section</p>
+              )}
             </div>
 
             {/* PF ORDER STATUS */}
