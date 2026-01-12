@@ -1148,14 +1148,14 @@ ${fileBreakdown}`;
       // Fetch task with custom fields and section membership
       // Include project name to filter for the correct project's section
       const taskResponse = await tasksApi.getTask(project.asanaTaskId, { 
-        opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.project.name,memberships.section.name' 
+        opt_fields: 'name,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.project.name,memberships.section.name' 
       });
+      
+      // Debug: log full task response to understand structure
+      console.log('[Asana] Full task response:', JSON.stringify(taskResponse.data, null, 2));
       
       const customFields = taskResponse.data.custom_fields || [];
       const memberships = taskResponse.data.memberships || [];
-      
-      // Debug: log what Asana returns for memberships
-      console.log('[Asana] Memberships for task:', JSON.stringify(memberships, null, 2));
       
       let pfOrderStatus: string | null = null;
       let pfProductionStatus: string[] = [];
