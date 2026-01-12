@@ -126,24 +126,11 @@ export default function OrderDetails() {
   // Mutation for syncing Asana status
   const { mutate: syncAsanaStatus, isPending: isSyncingAsanaStatus } = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/orders/${id}/sync-asana-status`, {});
-      const data = await response.json();
-      console.log('[Debug] Asana sync response:', data);
-      return data;
+      return apiRequest('POST', `/api/orders/${id}/sync-asana-status`, {});
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orderQueryKey });
-      // Show debug info temporarily
-      const debugInfo = data._debug;
-      if (debugInfo) {
-        toast({ 
-          title: "Status synced from Asana", 
-          description: `Section: ${debugInfo.sectionFound || 'null'}, Project: ${debugInfo.foundProject || 'null'}`,
-          duration: 10000
-        });
-      } else {
-        toast({ title: "Status synced from Asana" });
-      }
+      toast({ title: "Status synced from Asana" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to sync from Asana", description: error.message, variant: "destructive" });
