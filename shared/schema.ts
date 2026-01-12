@@ -56,6 +56,7 @@ export const orderFiles = pgTable("order_files", {
   hasRichelieuDoors: boolean("has_richelieu_doors").default(false),
   hasDoubleThick: boolean("has_double_thick").default(false),
   notes: text("notes"), // User notes for this file
+  allmoxyJobNumber: text("allmoxy_job_number"), // ALLMOXY JOB # for this file
   
   createdAt: timestamp("created_at").defaultNow(),
 });

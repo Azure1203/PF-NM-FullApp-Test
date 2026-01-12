@@ -47,6 +47,7 @@ export default function OrderDetails() {
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingAllmoxyJob, setEditingAllmoxyJob] = useState<string>("");
+  const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
 
   // All PF PRODUCTION STATUS options
   const productionStatusOptions = [
@@ -91,6 +92,20 @@ export default function OrderDetails() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to save notes", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mutation for updating file-level ALLMOXY JOB #
+  const { mutate: updateFileAllmoxyJob, isPending: isSavingFileAllmoxyJob } = useMutation({
+    mutationFn: async ({ fileId, allmoxyJobNumber }: { fileId: number; allmoxyJobNumber: string }) => {
+      return apiRequest('PATCH', `/api/files/${fileId}/allmoxy-job`, { allmoxyJobNumber });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      toast({ title: "ALLMOXY JOB # saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save ALLMOXY JOB #", description: error.message, variant: "destructive" });
     }
   });
 
@@ -605,6 +620,39 @@ export default function OrderDetails() {
                         <FileText className="w-5 h-5 text-primary" />
                         {preview.fileBreakdowns[selectedFileIndex].name}
                       </h4>
+                      
+                      {/* ALLMOXY JOB # for this file */}
+                      {project.files?.[selectedFileIndex] && (
+                        <div className="flex items-center gap-2 mb-4" data-testid="file-allmoxy-job-section">
+                          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">ALLMOXY JOB #:</span>
+                          <Input
+                            placeholder="Enter job number..."
+                            value={editingFileAllmoxyJob[project.files[selectedFileIndex].id] ?? project.files[selectedFileIndex].allmoxyJobNumber ?? ""}
+                            onChange={(e) => setEditingFileAllmoxyJob(prev => ({
+                              ...prev,
+                              [project.files![selectedFileIndex].id]: e.target.value
+                            }))}
+                            className="h-8 max-w-[200px]"
+                            data-testid="input-file-allmoxy-job"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const fileId = project.files![selectedFileIndex].id;
+                              const value = editingFileAllmoxyJob[fileId] ?? project.files![selectedFileIndex].allmoxyJobNumber ?? "";
+                              updateFileAllmoxyJob({ fileId, allmoxyJobNumber: value });
+                            }}
+                            disabled={isSavingFileAllmoxyJob}
+                            data-testid="button-save-file-allmoxy-job"
+                          >
+                            {isSavingFileAllmoxyJob ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
                       
                       {/* Prominent CTS Parts Link */}
                       {preview.fileBreakdowns[selectedFileIndex].ctsPartsCount > 0 && project.files?.[selectedFileIndex] && (

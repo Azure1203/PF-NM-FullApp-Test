@@ -766,6 +766,26 @@ export async function registerRoutes(
     }
   });
 
+  // Update file Allmoxy Job # (protected)
+  app.patch('/api/files/:fileId/allmoxy-job', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const { allmoxyJobNumber } = req.body;
+      
+      if (typeof allmoxyJobNumber !== 'string') {
+        return res.status(400).json({ message: 'allmoxyJobNumber must be a string' });
+      }
+      
+      const updated = await storage.updateOrderFile(fileId, { allmoxyJobNumber });
+      if (!updated) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Sync project to Asana (duplicates template task and updates it) (protected)
   app.post(api.orders.sync.path, isAuthenticated, async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));
