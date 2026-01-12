@@ -418,8 +418,14 @@ export default function OrderDetails() {
               {project.status === 'synced' ? (
                 <div className="flex items-center gap-2">
                   <Badge 
-                    variant={project.pfOrderStatus === 'ORDER CONFIRMED' ? 'default' : 'secondary'}
-                    className={project.pfOrderStatus === 'ORDER CONFIRMED' ? 'bg-green-500' : ''}
+                    variant="default"
+                    className={
+                      project.pfOrderStatus === 'SUBMIT SALES ORDER' 
+                        ? 'bg-red-500 hover:bg-red-600 text-white' 
+                        : (project.pfOrderStatus === 'SALES ORDER SUBMITTED' || project.pfOrderStatus === 'ORDER CONFIRMED')
+                          ? 'bg-green-500 hover:bg-green-600 text-white'
+                          : ''
+                    }
                     data-testid="badge-pf-order-status"
                   >
                     {project.pfOrderStatus || 'Not set'}
