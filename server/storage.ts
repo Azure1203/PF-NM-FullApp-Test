@@ -75,7 +75,7 @@ export class DatabaseStorage implements IStorage {
 
   // Order file methods
   async getProjectFiles(projectId: number): Promise<OrderFile[]> {
-    return await db.select().from(orderFiles).where(eq(orderFiles.projectId, projectId));
+    return await db.select().from(orderFiles).where(eq(orderFiles.projectId, projectId)).orderBy(orderFiles.id);
   }
 
   async getFileWithProject(fileId: number): Promise<{ file: OrderFile; projectName: string } | undefined> {
