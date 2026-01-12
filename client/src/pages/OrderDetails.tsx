@@ -50,6 +50,7 @@ interface PalletWithFiles {
   customSize: string | null;
   notes: string | null;
   packagingStatus: PalletPackagingStatus | null;
+  hardwarePackaged: boolean | null;
   createdAt: Date;
   fileIds: number[];
 }
@@ -287,6 +288,39 @@ export default function OrderDetails() {
     const currentStatus = pallet.packagingStatus || defaultPackagingStatus;
     const newStatus = { ...currentStatus, [metric]: !currentStatus[metric] };
     updatePackagingStatus({ palletId: pallet.id, packagingStatus: newStatus });
+  };
+  
+  // Update hardware packaged status mutation with optimistic updates
+  const { mutate: updateHardwarePackaged } = useMutation({
+    mutationFn: async ({ palletId, hardwarePackaged }: { palletId: number; hardwarePackaged: boolean }) => {
+      return apiRequest('PATCH', `/api/pallets/${palletId}/hardware-packaged`, { hardwarePackaged });
+    },
+    onMutate: async ({ palletId, hardwarePackaged }) => {
+      await queryClient.cancelQueries({ queryKey: palletsQueryKey });
+      const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
+      
+      queryClient.setQueryData<PalletWithFiles[]>(palletsQueryKey, (old) => {
+        if (!old) return old;
+        return old.map(p => p.id === palletId ? { ...p, hardwarePackaged } : p);
+      });
+      
+      return { previousPallets };
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousPallets) {
+        queryClient.setQueryData(palletsQueryKey, context.previousPallets);
+      }
+      toast({ title: "Failed to update hardware status", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+    }
+  });
+  
+  // Toggle hardware packaged for a pallet
+  const toggleHardwarePackaged = (pallet: PalletWithFiles) => {
+    const newValue = !pallet.hardwarePackaged;
+    updateHardwarePackaged({ palletId: pallet.id, hardwarePackaged: newValue });
   };
   
   // Pallet dialog helpers
@@ -928,6 +962,22 @@ export default function OrderDetails() {
                                       </div>
                                     );
                                   })()}
+                                </div>
+                                
+                                {/* Hardware Packaged Button */}
+                                <div>
+                                  <Button
+                                    onClick={() => toggleHardwarePackaged(pallet)}
+                                    className={`w-full ${
+                                      pallet.hardwarePackaged 
+                                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                        : 'bg-red-600 hover:bg-red-700 text-white'
+                                    }`}
+                                    data-testid={`button-hardware-packaged-${pallet.id}`}
+                                  >
+                                    <Package className="w-4 h-4 mr-2" />
+                                    {pallet.hardwarePackaged ? '✓ Hardware Packaged' : 'Hardware Not Packaged'}
+                                  </Button>
                                 </div>
                                 
                                 {/* Flags as Badges - matching Project Totals style */}

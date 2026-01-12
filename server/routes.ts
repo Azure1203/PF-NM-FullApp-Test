@@ -948,6 +948,96 @@ export async function registerRoutes(
     }
   });
 
+  // Toggle hardware packaged status and update Asana HARDWARE PACKED custom field
+  app.patch('/api/pallets/:palletId/hardware-packaged', isAuthenticated, async (req, res) => {
+    try {
+      const palletId = Number(req.params.palletId);
+      const { hardwarePackaged } = req.body;
+      
+      if (typeof hardwarePackaged !== 'boolean') {
+        return res.status(400).json({ message: 'hardwarePackaged boolean is required' });
+      }
+      
+      // Get the pallet to find its project
+      const existingPallet = await storage.getPallet(palletId);
+      if (!existingPallet) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      // Update the pallet
+      const pallet = await storage.updatePallet(palletId, { hardwarePackaged });
+      if (!pallet) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      // Get the project to find Asana task
+      const project = await storage.getProject(existingPallet.projectId);
+      
+      // Update Asana HARDWARE PACKED custom field if project is synced
+      if (project?.asanaTaskId) {
+        try {
+          const { tasksApi, projectsApi } = await getAsanaApiInstances();
+          const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
+          
+          // Get custom field settings to find HARDWARE PACKED field
+          const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
+            opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
+          });
+          
+          const customFieldSettings = projectDetails.data.custom_field_settings || [];
+          
+          for (const setting of customFieldSettings) {
+            const field = setting.custom_field;
+            const name = field.name?.toUpperCase().trim();
+            
+            if (name === 'HARDWARE PACKED') {
+              // Handle different field types
+              let customFields: Record<string, any> = {};
+              
+              if (field.type === 'enum' && field.enum_options) {
+                // Find the enum option that matches "Yes" or "No" 
+                const yesOption = field.enum_options.find((o: any) => 
+                  o.name?.toLowerCase() === 'yes' || o.name?.toLowerCase() === 'true'
+                );
+                const noOption = field.enum_options.find((o: any) => 
+                  o.name?.toLowerCase() === 'no' || o.name?.toLowerCase() === 'false'
+                );
+                
+                if (hardwarePackaged && yesOption) {
+                  customFields[field.gid] = yesOption.gid;
+                } else if (!hardwarePackaged && noOption) {
+                  customFields[field.gid] = noOption.gid;
+                }
+              } else if (field.type === 'text') {
+                customFields[field.gid] = hardwarePackaged ? 'Yes' : 'No';
+              }
+              
+              if (Object.keys(customFields).length > 0) {
+                await tasksApi.updateTask(project.asanaTaskId, {
+                  data: { custom_fields: customFields }
+                });
+                console.log(`[Asana] Updated HARDWARE PACKED to ${hardwarePackaged} for task ${project.asanaTaskId}`);
+              }
+              break;
+            }
+          }
+        } catch (asanaError: any) {
+          console.error('[Asana] Failed to update HARDWARE PACKED:', asanaError.message);
+          // Don't fail the request if Asana update fails
+        }
+      }
+      
+      // Return pallet with file assignments
+      const assignments = await storage.getAssignmentsForPallet(palletId);
+      res.json({
+        ...pallet,
+        fileIds: assignments.map(a => a.fileId)
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Get file assignments info for all files in a project (to show which files are on which pallets)
   app.get('/api/orders/:id/file-pallet-info', isAuthenticated, async (req, res) => {
     try {

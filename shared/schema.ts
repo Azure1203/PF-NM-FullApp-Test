@@ -148,6 +148,7 @@ export const pallets = pgTable("pallets", {
   customSize: text("custom_size"), // Free text if size is 'Custom'
   notes: text("notes"),
   packagingStatus: jsonb("packaging_status").$type<PalletPackagingStatus>().default(defaultPackagingStatus),
+  hardwarePackaged: boolean("hardware_packaged").default(false), // Whether hardware has been packaged
   createdAt: timestamp("created_at").defaultNow(),
 });
 
