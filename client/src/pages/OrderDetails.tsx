@@ -48,6 +48,7 @@ export default function OrderDetails() {
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingAllmoxyJob, setEditingAllmoxyJob] = useState<string>("");
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
+  const [editingPackagingLink, setEditingPackagingLink] = useState<{ [fileId: number]: string }>({});
 
   // All PF PRODUCTION STATUS options
   const productionStatusOptions = [
@@ -106,6 +107,20 @@ export default function OrderDetails() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to save ALLMOXY JOB #", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mutation for updating file-level Packaging Link
+  const { mutate: updatePackagingLink, isPending: isSavingPackagingLink } = useMutation({
+    mutationFn: async ({ fileId, packagingLink }: { fileId: number; packagingLink: string }) => {
+      return apiRequest('PATCH', `/api/files/${fileId}/packaging-link`, { packagingLink });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      toast({ title: "Packaging Link saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save Packaging Link", description: error.message, variant: "destructive" });
     }
   });
 
@@ -657,6 +672,53 @@ export default function OrderDetails() {
                               <Save className="w-4 h-4" />
                             )}
                           </Button>
+                        </div>
+                      )}
+                      
+                      {/* Packaging Link for this file */}
+                      {project.files?.[selectedFileIndex] && (
+                        <div className="flex flex-wrap items-center gap-2 mb-4" data-testid="file-packaging-link-section">
+                          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Packaging Link:</span>
+                          <Input
+                            placeholder="Paste Adobe Acrobat link..."
+                            value={editingPackagingLink[project.files[selectedFileIndex].id] ?? project.files[selectedFileIndex].packagingLink ?? ""}
+                            onChange={(e) => setEditingPackagingLink(prev => ({
+                              ...prev,
+                              [project.files![selectedFileIndex].id]: e.target.value
+                            }))}
+                            className="h-8 flex-1 min-w-[200px]"
+                            data-testid="input-file-packaging-link"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const fileId = project.files![selectedFileIndex].id;
+                              const value = editingPackagingLink[fileId] ?? project.files![selectedFileIndex].packagingLink ?? "";
+                              updatePackagingLink({ fileId, packagingLink: value });
+                            }}
+                            disabled={isSavingPackagingLink}
+                            data-testid="button-save-packaging-link"
+                          >
+                            {isSavingPackagingLink ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4" />
+                            )}
+                          </Button>
+                          {(project.files[selectedFileIndex].packagingLink || editingPackagingLink[project.files[selectedFileIndex].id]) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const link = editingPackagingLink[project.files![selectedFileIndex].id] ?? project.files![selectedFileIndex].packagingLink;
+                                if (link) window.open(link, '_blank');
+                              }}
+                              data-testid="button-open-packaging-link"
+                            >
+                              <ExternalLink className="w-4 h-4 mr-1" />
+                              Click to Open
+                            </Button>
+                          )}
                         </div>
                       )}
                       

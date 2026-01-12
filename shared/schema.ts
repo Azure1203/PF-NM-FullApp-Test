@@ -57,6 +57,7 @@ export const orderFiles = pgTable("order_files", {
   hasDoubleThick: boolean("has_double_thick").default(false),
   notes: text("notes"), // User notes for this file
   allmoxyJobNumber: text("allmoxy_job_number"), // ALLMOXY JOB # for this file
+  packagingLink: text("packaging_link"), // Link to Adobe Acrobat packaging document
   
   createdAt: timestamp("created_at").defaultNow(),
 });
