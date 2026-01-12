@@ -842,7 +842,7 @@ export default function OrderDetails() {
                         
                         {/* Pallet Details - expanded */}
                         {isExpanded && (
-                          <div className="p-3 border-t space-y-3">
+                          <div className="p-4 border-t space-y-4">
                             {pallet.notes && (
                               <div className="text-sm">
                                 <span className="text-muted-foreground">Notes:</span> {pallet.notes}
@@ -852,30 +852,118 @@ export default function OrderDetails() {
                             {assignedFiles.length === 0 ? (
                               <p className="text-sm text-muted-foreground italic">No files assigned to this pallet</p>
                             ) : (
-                              <div className="space-y-2">
-                                <p className="text-sm font-medium">Assigned Files:</p>
-                                {assignedFiles.map((file) => {
-                                  const splitCount = fileAssignmentCounts[file.id] || 0;
-                                  const palletIndex = pallets
-                                    .filter(p => p.fileIds.includes(file.id))
-                                    .findIndex(p => p.id === pallet.id) + 1;
-                                  
-                                  return (
-                                    <div 
-                                      key={file.id}
-                                      className="flex items-center gap-2 p-2 bg-muted/20 rounded text-sm"
-                                    >
-                                      <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                                      <span className="truncate">{file.originalFilename}</span>
-                                      {splitCount > 1 && (
-                                        <Badge variant="secondary" className="text-xs shrink-0">
-                                          Part {palletIndex} of {splitCount}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
+                              <>
+                                {/* Pallet Summary */}
+                                <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                    <div className="font-medium"># OF ORDERS ON PALLET:</div>
+                                    <div>{assignedFiles.length}</div>
+                                    
+                                    <div className="font-medium">PALLET SIZE:</div>
+                                    <div>{pallet.size === 'Custom' && pallet.customSize ? pallet.customSize : pallet.size}</div>
+                                    
+                                    <div className="font-medium">Parts:</div>
+                                    <div>{palletParts}</div>
+                                    
+                                    <div className="font-medium">Dovetails:</div>
+                                    <div>{previewFiles.reduce((sum, f) => sum + f.dovetails, 0)}</div>
+                                    
+                                    <div className="font-medium">Assembled Netley Drawers:</div>
+                                    <div>{previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0)}</div>
+                                    
+                                    <div className="font-medium">5 Piece Shaker Doors:</div>
+                                    <div>{previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0)}</div>
+                                    
+                                    <div className="font-medium">Expected Weight:</div>
+                                    <div>{Math.round(palletWeight)} lbs</div>
+                                  </div>
+                                </div>
+                                
+                                {/* Flags Section */}
+                                <div className="bg-muted/20 rounded-lg p-4 space-y-1 text-sm">
+                                  <div className="flex justify-between">
+                                    <span>WAS THERE BUYOUT HARDWARE:</span>
+                                    <span className={previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware'))) ? 'text-amber-600 font-medium' : ''}>
+                                      {previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware'))) ? 'YES' : 'NO'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>ARE THERE PARTS AT CUSTOM:</span>
+                                    <span className={previewFiles.some(f => f.customParts && f.customParts.length > 0) ? 'text-amber-600 font-medium' : ''}>
+                                      {previewFiles.some(f => f.customParts && f.customParts.length > 0) ? 'YES' : 'NO'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>ARE THERE GLASS PARTS:</span>
+                                    <span className={previewFiles.some(f => f.hasGlassParts) ? 'text-amber-600 font-medium' : ''}>
+                                      {previewFiles.some(f => f.hasGlassParts) ? 'YES' : 'NO'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>ARE THERE DOORS FROM M&J:</span>
+                                    <span className={previewFiles.some(f => f.hasMJDoors) ? 'text-amber-600 font-medium' : ''}>
+                                      {previewFiles.some(f => f.hasMJDoors) ? 'YES' : 'NO'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>ARE THERE DOORS FROM RICHELIEU:</span>
+                                    <span className={previewFiles.some(f => f.hasRichelieuDoors) ? 'text-amber-600 font-medium' : ''}>
+                                      {previewFiles.some(f => f.hasRichelieuDoors) ? 'YES' : 'NO'}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {/* Order Breakdown */}
+                                <div className="space-y-3">
+                                  <div className="font-medium text-sm border-b pb-1">--- ORDER BREAKDOWN ---</div>
+                                  {assignedFiles.map((file) => {
+                                    const filePreview = preview?.fileBreakdowns.find((_, idx) => 
+                                      project.files?.[idx]?.id === file.id
+                                    );
+                                    const fileIdx = project.files?.findIndex(f => f.id === file.id) ?? -1;
+                                    const actualFilePreview = fileIdx >= 0 ? preview?.fileBreakdowns[fileIdx] : undefined;
+                                    const splitCount = fileAssignmentCounts[file.id] || 0;
+                                    const palletIndex = pallets
+                                      .filter(p => p.fileIds.includes(file.id))
+                                      .findIndex(p => p.id === pallet.id) + 1;
+                                    
+                                    return (
+                                      <div 
+                                        key={file.id}
+                                        className="bg-muted/10 border rounded-lg p-3 space-y-2"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div>
+                                            <p className="font-medium text-sm">{actualFilePreview?.name || file.originalFilename}</p>
+                                            {file.allmoxyJobNumber && (
+                                              <p className="text-xs text-primary font-medium">{file.allmoxyJobNumber}</p>
+                                            )}
+                                          </div>
+                                          {splitCount > 1 && (
+                                            <Badge variant="secondary" className="text-xs shrink-0">
+                                              Part {palletIndex} of {splitCount}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        {actualFilePreview && (
+                                          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                                            <span>Parts:</span>
+                                            <span>{actualFilePreview.coreParts}</span>
+                                            <span>Dovetails:</span>
+                                            <span>{actualFilePreview.dovetails}</span>
+                                            <span>Assembled Netley Drawers:</span>
+                                            <span>{actualFilePreview.assembledDrawers}</span>
+                                            <span>5 Piece Shaker Doors:</span>
+                                            <span>{actualFilePreview.fivePieceDoors}</span>
+                                            <span>Expected Weight:</span>
+                                            <span>{Math.round(actualFilePreview.weightLbs)} lbs</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </>
                             )}
                           </div>
                         )}
