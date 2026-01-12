@@ -14,6 +14,9 @@ import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_inte
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Asana Perfect Fit Production Project GID - use this for all Asana operations
+const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
+
 // Helper to parse CSV file
 function parseCSV(fileContent: string): Promise<string[][]> {
   return new Promise((resolve, reject) => {
@@ -821,45 +824,23 @@ export async function registerRoutes(
       const me = await usersApi.getUser('me');
       const workspaceId = me.data.workspaces[0].gid;
 
-      // Use configured Asana project GID, or search for it
-      let asanaProjectGid = process.env.ASANA_PROJECT_GID;
+      // Use the configured Perfect Fit Production project GID
+      const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
       let templateTaskGid: string | undefined;
       
       try {
-        // If no project GID configured, try to find it
-        if (!asanaProjectGid) {
-          const asanaProjects = await projectsApi.getProjectsForWorkspace(workspaceId, { archived: false, opt_fields: 'name,gid' });
-          console.log("Available Asana projects:", asanaProjects.data?.map((p: any) => ({ name: p.name, gid: p.gid })));
-          
-          const asanaProject = asanaProjects.data?.find((p: any) => 
-            p.name.trim().toLowerCase().includes('perfect fit')
-          );
-          
-          if (asanaProject) {
-            console.log("Found project:", asanaProject.name, "GID:", asanaProject.gid);
-            console.log("TIP: Set ASANA_PROJECT_GID=" + asanaProject.gid + " to skip this search");
-            asanaProjectGid = asanaProject.gid;
-          }
-        }
+        // Find template task in the project
+        const projectTasks = await tasksApi.getTasksForProject(asanaProjectGid, { opt_fields: 'name,gid' });
         
-        if (asanaProjectGid) {
-          // Find template task in the project
-          const projectTasks = await tasksApi.getTasksForProject(asanaProjectGid, { opt_fields: 'name,gid' });
-          
-          const templateTask = projectTasks.data?.find((t: any) => 
-            t.name.includes('ORDER TEMPLATE')
-          );
-          if (templateTask) {
-            console.log("Found template task:", templateTask.name);
-            templateTaskGid = templateTask.gid;
-          }
+        const templateTask = projectTasks.data?.find((t: any) => 
+          t.name.includes('ORDER TEMPLATE')
+        );
+        if (templateTask) {
+          console.log("Found template task:", templateTask.name);
+          templateTaskGid = templateTask.gid;
         }
       } catch (e: any) {
-        console.error("Error finding project/template:", e.response?.body || e);
-      }
-
-      if (!asanaProjectGid) {
-        return res.status(400).json({ message: 'Asana project not found. Please set the ASANA_PROJECT_GID environment variable with your Perfect Fit Production project ID.' });
+        console.error("Error finding template task:", e.response?.body || e);
       }
 
       let totalCoreParts = 0;
@@ -1159,10 +1140,8 @@ ${fileBreakdown}`;
       let pfProductionStatus: string[] = [];
       let asanaSection: string | null = null;
       
-      // Find the PERFECT FIT PRODUCTION project (GID: 1208263802564738)
-      // First try to find by exact GID, then fall back to name matching
-      const PERFECT_FIT_PROJECT_GID = '1208263802564738';
-      let perfectFitProject = taskProjects.find((p: any) => p.gid === PERFECT_FIT_PROJECT_GID);
+      // Find the PERFECT FIT PRODUCTION project using the global constant
+      let perfectFitProject = taskProjects.find((p: any) => p.gid === ASANA_PERFECT_FIT_PROJECT_GID);
       
       // If not found by GID, try name matching for "PERFECT FIT PRODUCTION"
       if (!perfectFitProject) {
@@ -1171,7 +1150,7 @@ ${fileBreakdown}`;
         );
       }
       
-      console.log('[Asana] Looking for project GID:', PERFECT_FIT_PROJECT_GID);
+      console.log('[Asana] Looking for project GID:', ASANA_PERFECT_FIT_PROJECT_GID);
       console.log('[Asana] Task projects:', taskProjects.map((p: any) => ({ gid: p.gid, name: p.name })));
       
       if (perfectFitProject) {
@@ -1269,16 +1248,10 @@ ${fileBreakdown}`;
         try {
           const { tasksApi, projectsApi } = await getAsanaApiInstances();
           
-          // Get Asana project GID from environment or find it
-          let asanaProjectGid = process.env.ASANA_PROJECT_GID;
+          // Use the configured Perfect Fit Production project GID
+          const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
           
-          if (!asanaProjectGid) {
-            // Fallback: Get project from task
-            const taskDetails = await tasksApi.getTask(project.asanaTaskId, { opt_fields: 'projects.gid' });
-            asanaProjectGid = taskDetails.data.projects?.[0]?.gid;
-          }
-          
-          if (asanaProjectGid) {
+          {
             // Get custom field settings to find PF PRODUCTION STATUS field
             const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
               opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
@@ -1347,9 +1320,8 @@ ${fileBreakdown}`;
           let pfProductionStatus: string[] = [];
           let asanaSection: string | null = null;
           
-          // Find the PERFECT FIT PRODUCTION project (GID: 1208263802564738)
-          const PERFECT_FIT_PROJECT_GID = '1208263802564738';
-          let perfectFitProject = taskProjects.find((p: any) => p.gid === PERFECT_FIT_PROJECT_GID);
+          // Find the PERFECT FIT PRODUCTION project using the global constant
+          let perfectFitProject = taskProjects.find((p: any) => p.gid === ASANA_PERFECT_FIT_PROJECT_GID);
           if (!perfectFitProject) {
             perfectFitProject = taskProjects.find((p: any) => 
               p.name?.toUpperCase().includes('PERFECT FIT PRODUCTION')
