@@ -1146,22 +1146,40 @@ ${fileBreakdown}`;
       const { tasksApi } = await getAsanaApiInstances();
       
       // Fetch task with custom fields and section membership
+      // Include project name to filter for the correct project's section
       const taskResponse = await tasksApi.getTask(project.asanaTaskId, { 
-        opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.section.name' 
+        opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.project.name,memberships.section.name' 
       });
       
       const customFields = taskResponse.data.custom_fields || [];
       const memberships = taskResponse.data.memberships || [];
       
+      // Debug: log what Asana returns for memberships
+      console.log('[Asana] Memberships for task:', JSON.stringify(memberships, null, 2));
+      
       let pfOrderStatus: string | null = null;
       let pfProductionStatus: string[] = [];
       let asanaSection: string | null = null;
       
-      // Get the section name from memberships
+      // Get the section name from the PERFECT FIT PRODUCTION project membership
       for (const membership of memberships) {
-        if (membership.section?.name) {
+        // Look for the PERFECT FIT PRODUCTION project specifically
+        const projectName = membership.project?.name?.toUpperCase() || '';
+        if (projectName.includes('PERFECT FIT') && membership.section?.name) {
           asanaSection = membership.section.name;
+          console.log('[Asana] Found section in PERFECT FIT project:', asanaSection);
           break;
+        }
+      }
+      
+      // Fallback: if no PERFECT FIT project found, use first section
+      if (!asanaSection) {
+        for (const membership of memberships) {
+          if (membership.section?.name) {
+            asanaSection = membership.section.name;
+            console.log('[Asana] Using fallback section:', asanaSection);
+            break;
+          }
         }
       }
       
@@ -1283,7 +1301,7 @@ ${fileBreakdown}`;
       for (const project of syncedProjects) {
         try {
           const taskResponse = await tasksApi.getTask(project.asanaTaskId!, { 
-            opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.section.name' 
+            opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.project.name,memberships.section.name' 
           });
           
           const customFields = taskResponse.data.custom_fields || [];
@@ -1293,11 +1311,22 @@ ${fileBreakdown}`;
           let pfProductionStatus: string[] = [];
           let asanaSection: string | null = null;
           
-          // Get the section name from memberships
+          // Get the section name from the PERFECT FIT PRODUCTION project membership
           for (const membership of memberships) {
-            if (membership.section?.name) {
+            const projectName = membership.project?.name?.toUpperCase() || '';
+            if (projectName.includes('PERFECT FIT') && membership.section?.name) {
               asanaSection = membership.section.name;
               break;
+            }
+          }
+          
+          // Fallback: if no PERFECT FIT project found, use first section
+          if (!asanaSection) {
+            for (const membership of memberships) {
+              if (membership.section?.name) {
+                asanaSection = membership.section.name;
+                break;
+              }
             }
           }
           
