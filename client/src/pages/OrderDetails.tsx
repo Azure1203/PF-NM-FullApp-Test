@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -665,6 +665,21 @@ export default function OrderDetails() {
                               <Save className="w-4 h-4" />
                             )}
                           </Button>
+                          {(project.files[selectedFileIndex].allmoxyJobNumber || editingFileAllmoxyJob[project.files[selectedFileIndex].id]) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                const fileId = project.files![selectedFileIndex].id;
+                                setEditingFileAllmoxyJob(prev => ({ ...prev, [fileId]: "" }));
+                                updateFileAllmoxyJob({ fileId, allmoxyJobNumber: "" });
+                              }}
+                              disabled={isSavingFileAllmoxyJob}
+                              data-testid="button-clear-file-allmoxy-job"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       )}
                       
@@ -711,6 +726,21 @@ export default function OrderDetails() {
                               >
                                 <ExternalLink className="w-4 h-4 mr-1" />
                                 Open
+                              </Button>
+                            )}
+                            {(project.files[selectedFileIndex].packagingLink || editingPackagingLink[project.files[selectedFileIndex].id]) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  const fileId = project.files![selectedFileIndex].id;
+                                  setEditingPackagingLink(prev => ({ ...prev, [fileId]: "" }));
+                                  updatePackagingLink({ fileId, packagingLink: "" });
+                                }}
+                                disabled={isSavingPackagingLink}
+                                data-testid="button-clear-packaging-link"
+                              >
+                                <X className="w-4 h-4" />
                               </Button>
                             )}
                           </div>
