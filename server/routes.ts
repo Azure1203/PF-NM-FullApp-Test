@@ -1143,44 +1143,59 @@ ${fileBreakdown}`;
         return res.status(400).json({ message: 'Project not synced to Asana yet' });
       }
       
-      const { tasksApi } = await getAsanaApiInstances();
+      const { tasksApi, sectionsApi } = await getAsanaApiInstances();
       
-      // Fetch task with custom fields and section membership
-      // Include project name to filter for the correct project's section
+      // First, get the task's projects to find PERFECT FIT PRODUCTION
       const taskResponse = await tasksApi.getTask(project.asanaTaskId, { 
-        opt_fields: 'name,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.project.name,memberships.section.name' 
+        opt_fields: 'name,projects.name,projects.gid,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
       });
       
-      // Debug: log full task response to understand structure
-      console.log('[Asana] Full task response:', JSON.stringify(taskResponse.data, null, 2));
+      console.log('[Asana] Task projects:', JSON.stringify(taskResponse.data.projects, null, 2));
       
       const customFields = taskResponse.data.custom_fields || [];
-      const memberships = taskResponse.data.memberships || [];
+      const taskProjects = taskResponse.data.projects || [];
       
       let pfOrderStatus: string | null = null;
       let pfProductionStatus: string[] = [];
       let asanaSection: string | null = null;
       
-      // Get the section name from the PERFECT FIT PRODUCTION project membership
-      for (const membership of memberships) {
-        // Look for the PERFECT FIT PRODUCTION project specifically
-        const projectName = membership.project?.name?.toUpperCase() || '';
-        if (projectName.includes('PERFECT FIT') && membership.section?.name) {
-          asanaSection = membership.section.name;
-          console.log('[Asana] Found section in PERFECT FIT project:', asanaSection);
-          break;
-        }
-      }
+      // Find the PERFECT FIT PRODUCTION project
+      const perfectFitProject = taskProjects.find((p: any) => 
+        p.name?.toUpperCase().includes('PERFECT FIT')
+      );
       
-      // Fallback: if no PERFECT FIT project found, use first section
-      if (!asanaSection) {
-        for (const membership of memberships) {
-          if (membership.section?.name) {
-            asanaSection = membership.section.name;
-            console.log('[Asana] Using fallback section:', asanaSection);
-            break;
+      if (perfectFitProject) {
+        try {
+          // Get sections for this project
+          const sectionsResponse = await sectionsApi.getSectionsForProject(perfectFitProject.gid, {});
+          const sections = sectionsResponse.data || [];
+          
+          console.log('[Asana] Project sections:', JSON.stringify(sections, null, 2));
+          
+          // Now get the task's section within this project by checking which section contains the task
+          // We need to check each section to find where this task is
+          for (const section of sections) {
+            try {
+              const sectionTasksResponse = await tasksApi.getTasksForSection(section.gid, {
+                opt_fields: 'gid',
+                limit: 100
+              });
+              const sectionTasks = sectionTasksResponse.data || [];
+              
+              if (sectionTasks.some((t: any) => t.gid === project.asanaTaskId)) {
+                asanaSection = section.name;
+                console.log('[Asana] Found task in section:', asanaSection);
+                break;
+              }
+            } catch (sectionErr) {
+              console.error('[Asana] Error checking section:', section.name, sectionErr);
+            }
           }
+        } catch (sectionsErr) {
+          console.error('[Asana] Error fetching sections:', sectionsErr);
         }
+      } else {
+        console.log('[Asana] No PERFECT FIT project found for task');
       }
       
       for (const field of customFields) {
@@ -1295,38 +1310,52 @@ ${fileBreakdown}`;
         return res.json({ message: 'No synced projects to update', updated: 0 });
       }
       
-      const { tasksApi } = await getAsanaApiInstances();
+      const { tasksApi, sectionsApi } = await getAsanaApiInstances();
       let updatedCount = 0;
       
-      for (const project of syncedProjects) {
+      for (const proj of syncedProjects) {
         try {
-          const taskResponse = await tasksApi.getTask(project.asanaTaskId!, { 
-            opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name,memberships.project.name,memberships.section.name' 
+          const taskResponse = await tasksApi.getTask(proj.asanaTaskId!, { 
+            opt_fields: 'projects.name,projects.gid,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
           });
           
           const customFields = taskResponse.data.custom_fields || [];
-          const memberships = taskResponse.data.memberships || [];
+          const taskProjects = taskResponse.data.projects || [];
           
           let pfOrderStatus: string | null = null;
           let pfProductionStatus: string[] = [];
           let asanaSection: string | null = null;
           
-          // Get the section name from the PERFECT FIT PRODUCTION project membership
-          for (const membership of memberships) {
-            const projectName = membership.project?.name?.toUpperCase() || '';
-            if (projectName.includes('PERFECT FIT') && membership.section?.name) {
-              asanaSection = membership.section.name;
-              break;
-            }
-          }
+          // Find the PERFECT FIT PRODUCTION project
+          const perfectFitProject = taskProjects.find((p: any) => 
+            p.name?.toUpperCase().includes('PERFECT FIT')
+          );
           
-          // Fallback: if no PERFECT FIT project found, use first section
-          if (!asanaSection) {
-            for (const membership of memberships) {
-              if (membership.section?.name) {
-                asanaSection = membership.section.name;
-                break;
+          if (perfectFitProject) {
+            try {
+              // Get sections for this project
+              const sectionsResponse = await sectionsApi.getSectionsForProject(perfectFitProject.gid, {});
+              const sections = sectionsResponse.data || [];
+              
+              // Check each section to find where this task is
+              for (const section of sections) {
+                try {
+                  const sectionTasksResponse = await tasksApi.getTasksForSection(section.gid, {
+                    opt_fields: 'gid',
+                    limit: 100
+                  });
+                  const sectionTasks = sectionTasksResponse.data || [];
+                  
+                  if (sectionTasks.some((t: any) => t.gid === proj.asanaTaskId)) {
+                    asanaSection = section.name;
+                    break;
+                  }
+                } catch (sectionErr) {
+                  // Skip this section on error
+                }
               }
+            } catch (sectionsErr) {
+              console.error(`[Background Sync] Error fetching sections for project ${proj.id}:`, sectionsErr);
             }
           }
           
@@ -1342,7 +1371,7 @@ ${fileBreakdown}`;
             }
           }
           
-          await storage.updateProject(project.id, {
+          await storage.updateProject(proj.id, {
             pfOrderStatus,
             pfProductionStatus,
             asanaSection,
@@ -1351,7 +1380,7 @@ ${fileBreakdown}`;
           
           updatedCount++;
         } catch (projErr) {
-          console.error(`Failed to sync project ${project.id}:`, projErr);
+          console.error(`Failed to sync project ${proj.id}:`, projErr);
         }
       }
       
