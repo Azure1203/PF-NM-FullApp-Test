@@ -97,6 +97,32 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      
+      // Background sync job: Sync Asana statuses every 15 minutes
+      const SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseconds
+      
+      const runBackgroundSync = async () => {
+        try {
+          const response = await fetch(`http://localhost:${port}/api/sync-all-asana-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (response.ok) {
+            const result = await response.json();
+            log(`Background Asana sync completed: ${result.updated} projects updated`, 'sync');
+          }
+        } catch (err) {
+          log(`Background Asana sync failed: ${err}`, 'sync');
+        }
+      };
+      
+      // Run initial sync after 1 minute (to let server fully initialize)
+      setTimeout(() => {
+        runBackgroundSync();
+        // Then run every 15 minutes
+        setInterval(runBackgroundSync, SYNC_INTERVAL);
+        log(`Background Asana sync scheduled (every 15 minutes)`, 'sync');
+      }, 60000);
     },
   );
 })();

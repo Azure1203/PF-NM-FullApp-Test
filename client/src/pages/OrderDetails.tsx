@@ -16,11 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import type { ProjectWithFiles, SyncPreview } from "@shared/routes";
+import { api, type ProjectWithFiles, type SyncPreview } from "@shared/routes";
 import { Badge } from "@/components/ui/badge";
 
 const formSchema = insertProjectSchema.pick({
@@ -45,6 +46,19 @@ export default function OrderDetails() {
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
+  const [editingAllmoxyJob, setEditingAllmoxyJob] = useState<string>("");
+
+  // All PF PRODUCTION STATUS options
+  const productionStatusOptions = [
+    "EVERYTHING PACKAGED", "HARDWARE PACKED", "CLOSET RODS NOT CUT",
+    "WAITING FOR NETLEY SHAKER DOORS", "DOUBLE UP PARTS AT CUSTOM", "WAITING FOR DOVETAIL",
+    "WAITING FOR BO HARDWARE", "WAITING FOR NETLEY ASSEMBLED DRAWERS", "WAITING FOR MARATHON HARDWARE",
+    "WAITING FOR GLASS FOR DOORS", "GARAGE PANELS TO DRILL", "WAITING FOR GLASS SHELVES",
+    "BO HARDWARE ARRIVED", "DOVETAILS ARRIVED", "NETLEY SHAKER DOORS DONE",
+    "DOUBLE UP PARTS DONE", "GLASS ARRIVED", "CUSTOM DOWELING PIECES DONE",
+    "WARRANTY JOB", "SAMPLE ORDER", "COURIER PACKAGE",
+    "HARDWARE ONLY", "BARCODE SCANNING", "PICKUP BY CARRIER"
+  ];
 
   const toggleFileExpanded = (fileId: number) => {
     setExpandedFiles(prev => {
@@ -63,17 +77,81 @@ export default function OrderDetails() {
   const { mutate: syncProject, isPending: isSyncing } = useSyncOrder();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
   
+  // Query key used by useOrder hook - defined early for use in all mutations
+  const orderQueryKey = [api.orders.get.path, id];
+  
   // Mutation for updating file notes
   const { mutate: updateFileNotes, isPending: isSavingNotes } = useMutation({
     mutationFn: async ({ fileId, notes }: { fileId: number; notes: string }) => {
       return apiRequest('PATCH', `/api/files/${fileId}/notes`, { notes });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orders', id] });
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
       toast({ title: "Notes saved" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to save notes", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mutation for updating ALLMOXY JOB #
+  const { mutate: updateAllmoxyJob, isPending: isSavingAllmoxyJob } = useMutation({
+    mutationFn: async (allmoxyJobNumber: string) => {
+      return apiRequest('PATCH', `/api/orders/${id}/allmoxy-job`, { allmoxyJobNumber });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      toast({ title: "ALLMOXY JOB # saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to save ALLMOXY JOB #", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mutation for syncing Asana status
+  const { mutate: syncAsanaStatus, isPending: isSyncingAsanaStatus } = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', `/api/orders/${id}/sync-asana-status`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      toast({ title: "Status synced from Asana" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to sync from Asana", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Mutation for updating PF PRODUCTION STATUS with optimistic updates
+  const { mutate: updateProductionStatus, isPending: isUpdatingProductionStatus } = useMutation({
+    mutationFn: async (pfProductionStatus: string[]) => {
+      return apiRequest('PATCH', `/api/orders/${id}/production-status`, { pfProductionStatus });
+    },
+    onMutate: async (newStatus: string[]) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: orderQueryKey });
+      
+      // Snapshot the previous value
+      const previousProject = queryClient.getQueryData(orderQueryKey);
+      
+      // Optimistically update to the new value
+      queryClient.setQueryData(orderQueryKey, (old: any) => {
+        if (!old) return old;
+        return { ...old, pfProductionStatus: newStatus };
+      });
+      
+      return { previousProject };
+    },
+    onError: (error: Error, _newStatus, context) => {
+      // Roll back to the previous value on error
+      if (context?.previousProject) {
+        queryClient.setQueryData(orderQueryKey, context.previousProject);
+      }
+      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
     }
   });
   
@@ -121,8 +199,21 @@ export default function OrderDetails() {
         powerTailgate: project.powerTailgate || false,
         phoneAppointment: project.phoneAppointment || false,
       });
+      setEditingAllmoxyJob(project.allmoxyJobNumber || "");
     }
   }, [project, form]);
+
+  // Handle production status checkbox toggle
+  const handleProductionStatusToggle = (option: string, checked: boolean) => {
+    const currentStatus = project?.pfProductionStatus || [];
+    let newStatus: string[];
+    if (checked) {
+      newStatus = [...currentStatus, option];
+    } else {
+      newStatus = currentStatus.filter(s => s !== option);
+    }
+    updateProductionStatus(newStatus);
+  };
 
   const onSubmit = (data: FormValues) => {
     updateProject({ id, ...data });
@@ -251,6 +342,114 @@ export default function OrderDetails() {
             </div>
           }
         />
+
+        {/* ALLMOXY JOB #, PF ORDER STATUS, PF PRODUCTION STATUS Section */}
+        <Card className="mb-6 border-none shadow-md" data-testid="order-status-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ClipboardList className="w-5 h-5 text-primary" />
+                Order Status & Tracking
+              </CardTitle>
+              {project.status === 'synced' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => syncAsanaStatus()}
+                  disabled={isSyncingAsanaStatus}
+                  data-testid="button-sync-asana-status"
+                >
+                  {isSyncingAsanaStatus ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                  )}
+                  Refresh from Asana
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* ALLMOXY JOB # */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">ALLMOXY JOB #</label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter ALLMOXY Job Number..."
+                  value={editingAllmoxyJob}
+                  onChange={(e) => setEditingAllmoxyJob(e.target.value)}
+                  className="max-w-xs"
+                  data-testid="input-allmoxy-job"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => updateAllmoxyJob(editingAllmoxyJob)}
+                  disabled={isSavingAllmoxyJob || editingAllmoxyJob === (project.allmoxyJobNumber || "")}
+                  data-testid="button-save-allmoxy-job"
+                >
+                  {isSavingAllmoxyJob ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* PF ORDER STATUS */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">PF ORDER STATUS</label>
+              {project.status === 'synced' ? (
+                <div className="flex items-center gap-2">
+                  <Badge 
+                    variant={project.pfOrderStatus === 'ORDER CONFIRMED' ? 'default' : 'secondary'}
+                    className={project.pfOrderStatus === 'ORDER CONFIRMED' ? 'bg-green-500' : ''}
+                    data-testid="badge-pf-order-status"
+                  >
+                    {project.pfOrderStatus || 'Not set'}
+                  </Badge>
+                  {project.lastAsanaSyncAt && (
+                    <span className="text-xs text-muted-foreground">
+                      Last synced: {new Date(project.lastAsanaSyncAt).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sync to Asana to see status</p>
+              )}
+            </div>
+
+            {/* PF PRODUCTION STATUS */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">PF PRODUCTION STATUS</label>
+              {project.status === 'synced' ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {productionStatusOptions.map((option) => {
+                    const isChecked = (project.pfProductionStatus || []).includes(option);
+                    return (
+                      <div 
+                        key={option} 
+                        className="flex items-center gap-2 p-2 rounded-md bg-muted/20 hover-elevate cursor-pointer"
+                        onClick={() => handleProductionStatusToggle(option, !isChecked)}
+                        data-testid={`checkbox-status-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={(checked) => handleProductionStatusToggle(option, checked as boolean)}
+                          disabled={isUpdatingProductionStatus}
+                        />
+                        <span className="text-xs leading-tight">{option}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sync to Asana to manage production status</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Project Totals Summary - compact header */}
         {preview && (

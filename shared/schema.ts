@@ -22,6 +22,15 @@ export const projects = pgTable("projects", {
   
   status: text("status").notNull().default('pending'), // pending, synced
   asanaTaskId: text("asana_task_id"),
+  
+  // User-editable fields
+  allmoxyJobNumber: text("allmoxy_job_number"), // ALLMOXY JOB # - editable field
+  
+  // Asana custom fields (synced)
+  pfOrderStatus: text("pf_order_status"), // PF ORDER STATUS from Asana
+  pfProductionStatus: text("pf_production_status").array(), // PF PRODUCTION STATUS multi-select from Asana
+  lastAsanaSyncAt: timestamp("last_asana_sync_at"), // Last time we synced from Asana
+  
   createdAt: timestamp("created_at").defaultNow(),
 });
 

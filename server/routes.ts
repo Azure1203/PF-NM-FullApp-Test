@@ -1091,5 +1091,205 @@ ${fileBreakdown}`;
     }
   });
 
+  // Update ALLMOXY JOB # for a project (protected)
+  app.patch('/api/orders/:id/allmoxy-job', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const { allmoxyJobNumber } = req.body;
+      
+      if (typeof allmoxyJobNumber !== 'string') {
+        return res.status(400).json({ message: 'allmoxyJobNumber must be a string' });
+      }
+      
+      const updated = await storage.updateProject(projectId, { allmoxyJobNumber });
+      if (!updated) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Sync PF ORDER STATUS and PF PRODUCTION STATUS from Asana (protected)
+  app.post('/api/orders/:id/sync-asana-status', isAuthenticated, async (req, res) => {
+    try {
+      const project = await storage.getProject(Number(req.params.id));
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      if (!project.asanaTaskId) {
+        return res.status(400).json({ message: 'Project not synced to Asana yet' });
+      }
+      
+      const { tasksApi } = await getAsanaApiInstances();
+      
+      // Fetch task with custom fields
+      const taskResponse = await tasksApi.getTask(project.asanaTaskId, { 
+        opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
+      });
+      
+      const customFields = taskResponse.data.custom_fields || [];
+      
+      let pfOrderStatus: string | null = null;
+      let pfProductionStatus: string[] = [];
+      
+      for (const field of customFields) {
+        const name = field.name?.toUpperCase().trim();
+        
+        if (name === 'PF ORDER STATUS') {
+          pfOrderStatus = field.display_value || null;
+        } else if (name === 'PF PRODUCTION STATUS') {
+          // Multi-select field - get all selected values
+          if (field.multi_enum_values && Array.isArray(field.multi_enum_values)) {
+            pfProductionStatus = field.multi_enum_values.map((v: any) => v.name);
+          }
+        }
+      }
+      
+      // Update project with fetched values
+      const updated = await storage.updateProject(project.id, {
+        pfOrderStatus,
+        pfProductionStatus,
+        lastAsanaSyncAt: new Date()
+      });
+      
+      res.json(updated);
+    } catch (e: any) {
+      console.error("Asana Status Sync Error:", e.response?.body || e);
+      res.status(400).json({ message: 'Failed to sync status from Asana: ' + (e.response?.body?.errors?.[0]?.message || e.message) });
+    }
+  });
+
+  // Update PF PRODUCTION STATUS in both app and Asana (two-way sync) (protected)
+  app.patch('/api/orders/:id/production-status', isAuthenticated, async (req, res) => {
+    try {
+      const project = await storage.getProject(Number(req.params.id));
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      const { pfProductionStatus } = req.body;
+      
+      if (!Array.isArray(pfProductionStatus)) {
+        return res.status(400).json({ message: 'pfProductionStatus must be an array' });
+      }
+      
+      // Update locally first
+      const updated = await storage.updateProject(project.id, { pfProductionStatus });
+      
+      // If synced to Asana, update Asana too
+      if (project.asanaTaskId) {
+        try {
+          const { tasksApi, projectsApi } = await getAsanaApiInstances();
+          
+          // Get Asana project GID from environment or find it
+          let asanaProjectGid = process.env.ASANA_PROJECT_GID;
+          
+          if (!asanaProjectGid) {
+            // Fallback: Get project from task
+            const taskDetails = await tasksApi.getTask(project.asanaTaskId, { opt_fields: 'projects.gid' });
+            asanaProjectGid = taskDetails.data.projects?.[0]?.gid;
+          }
+          
+          if (asanaProjectGid) {
+            // Get custom field settings to find PF PRODUCTION STATUS field
+            const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
+              opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
+            });
+            
+            const customFieldSettings = projectDetails.data.custom_field_settings || [];
+            
+            for (const setting of customFieldSettings) {
+              const field = setting.custom_field;
+              const name = field.name?.toUpperCase().trim();
+              
+              if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
+                // Map selected status names to their GIDs
+                const selectedGids = pfProductionStatus.map((statusName: string) => {
+                  const option = field.enum_options.find((o: any) => o.name === statusName);
+                  return option?.gid;
+                }).filter(Boolean);
+                
+                // Update the task's custom field
+                await tasksApi.updateTask({ 
+                  data: { 
+                    custom_fields: { [field.gid]: selectedGids }
+                  } 
+                }, project.asanaTaskId, {});
+                
+                break;
+              }
+            }
+          }
+        } catch (asanaErr: any) {
+          console.error("Failed to update Asana production status:", asanaErr.response?.body || asanaErr);
+          // Don't fail the request - local update succeeded
+        }
+      }
+      
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Background sync all synced projects from Asana (called by cron job)
+  app.post('/api/sync-all-asana-status', async (req, res) => {
+    try {
+      // Get all synced projects
+      const projects = await storage.getProjects();
+      const syncedProjects = projects.filter(p => p.status === 'synced' && p.asanaTaskId);
+      
+      if (syncedProjects.length === 0) {
+        return res.json({ message: 'No synced projects to update', updated: 0 });
+      }
+      
+      const { tasksApi } = await getAsanaApiInstances();
+      let updatedCount = 0;
+      
+      for (const project of syncedProjects) {
+        try {
+          const taskResponse = await tasksApi.getTask(project.asanaTaskId!, { 
+            opt_fields: 'custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
+          });
+          
+          const customFields = taskResponse.data.custom_fields || [];
+          
+          let pfOrderStatus: string | null = null;
+          let pfProductionStatus: string[] = [];
+          
+          for (const field of customFields) {
+            const name = field.name?.toUpperCase().trim();
+            
+            if (name === 'PF ORDER STATUS') {
+              pfOrderStatus = field.display_value || null;
+            } else if (name === 'PF PRODUCTION STATUS') {
+              if (field.multi_enum_values && Array.isArray(field.multi_enum_values)) {
+                pfProductionStatus = field.multi_enum_values.map((v: any) => v.name);
+              }
+            }
+          }
+          
+          await storage.updateProject(project.id, {
+            pfOrderStatus,
+            pfProductionStatus,
+            lastAsanaSyncAt: new Date()
+          });
+          
+          updatedCount++;
+        } catch (projErr) {
+          console.error(`Failed to sync project ${project.id}:`, projErr);
+        }
+      }
+      
+      res.json({ message: `Synced ${updatedCount} projects`, updated: updatedCount });
+    } catch (e: any) {
+      console.error("Batch Asana Sync Error:", e);
+      res.status(500).json({ message: 'Failed to sync from Asana' });
+    }
+  });
+
   return httpServer;
 }
