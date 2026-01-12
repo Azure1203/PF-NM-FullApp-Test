@@ -75,6 +75,67 @@ export default function OrderDetails() {
   const [palletNotes, setPalletNotes] = useState('');
   const [palletFileIds, setPalletFileIds] = useState<number[]>([]);
 
+  // Color mapping for PF PRODUCTION STATUS options
+  const statusColorMap: Record<string, 'green' | 'red' | 'yellow'> = {
+    // Green when enabled
+    "EVERYTHING PACKAGED": 'green',
+    "HARDWARE PACKED": 'green',
+    "BO HARDWARE ARRIVED": 'green',
+    "DOVETAILS ARRIVED": 'green',
+    "NETLEY SHAKER DOORS DONE": 'green',
+    "DOUBLE UP PARTS DONE": 'green',
+    "GLASS ARRIVED": 'green',
+    "CUSTOM DOWELING PIECES DONE": 'green',
+    // Red when enabled
+    "CLOSET RODS NOT CUT": 'red',
+    "WAITING FOR NETLEY SHAKER DOORS": 'red',
+    "DOUBLE UP PARTS AT CUSTOM": 'red',
+    "WAITING FOR DOVETAIL": 'red',
+    "WAITING FOR BO HARDWARE": 'red',
+    "WAITING FOR NETLEY ASSEMBLED DRAWERS": 'red',
+    "WAITING FOR MARATHON HARDWARE": 'red',
+    "WAITING FOR GLASS FOR DOORS": 'red',
+    "GARAGE PANELS TO DRILL": 'red',
+    "WAITING FOR GLASS SHELVES": 'red',
+    "WARRANTY JOB": 'red',
+    // Yellow when enabled
+    "SAMPLE ORDER": 'yellow',
+    "COURIER PACKAGE": 'yellow',
+    "HARDWARE ONLY": 'yellow',
+    "BARCODE SCANNING": 'yellow',
+    "PICKUP BY CARRIER": 'yellow',
+  };
+
+  const getStatusColor = (option: string, isChecked: boolean) => {
+    if (!isChecked) return 'bg-muted/20 hover-elevate';
+    const color = statusColorMap[option] || 'green';
+    switch (color) {
+      case 'green':
+        return 'bg-green-500 text-white hover:bg-green-600';
+      case 'red':
+        return 'bg-red-500 text-white hover:bg-red-600';
+      case 'yellow':
+        return 'bg-yellow-500 text-black hover:bg-yellow-600';
+      default:
+        return 'bg-green-500 text-white hover:bg-green-600';
+    }
+  };
+
+  const getCheckboxColor = (option: string, isChecked: boolean) => {
+    if (!isChecked) return '';
+    const color = statusColorMap[option] || 'green';
+    switch (color) {
+      case 'green':
+        return 'border-white data-[state=checked]:bg-white data-[state=checked]:text-green-600';
+      case 'red':
+        return 'border-white data-[state=checked]:bg-white data-[state=checked]:text-red-600';
+      case 'yellow':
+        return 'border-black data-[state=checked]:bg-black data-[state=checked]:text-yellow-500';
+      default:
+        return 'border-white data-[state=checked]:bg-white data-[state=checked]:text-green-600';
+    }
+  };
+
   // All PF PRODUCTION STATUS options
   const productionStatusOptions = [
     "EVERYTHING PACKAGED", "HARDWARE PACKED", "CLOSET RODS NOT CUT",
@@ -677,11 +738,7 @@ export default function OrderDetails() {
                     return (
                       <div 
                         key={option} 
-                        className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
-                          isChecked 
-                            ? 'bg-green-500 text-white hover:bg-green-600' 
-                            : 'bg-muted/20 hover-elevate'
-                        }`}
+                        className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${getStatusColor(option, isChecked)}`}
                         onClick={() => handleProductionStatusToggle(option, !isChecked)}
                         data-testid={`checkbox-status-${option.toLowerCase().replace(/\s+/g, '-')}`}
                       >
@@ -689,7 +746,7 @@ export default function OrderDetails() {
                           checked={isChecked}
                           onCheckedChange={(checked) => handleProductionStatusToggle(option, checked as boolean)}
                           disabled={isUpdatingProductionStatus}
-                          className={isChecked ? 'border-white data-[state=checked]:bg-white data-[state=checked]:text-green-600' : ''}
+                          className={getCheckboxColor(option, isChecked)}
                         />
                         <span className="text-xs leading-tight">{option}</span>
                       </div>
