@@ -617,6 +617,9 @@ export default function OrderDetails() {
                             <FileText className={`w-5 h-5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
                             <div className="min-w-0">
                               <p className="font-medium text-sm truncate">{file.name}</p>
+                              {projectFile?.allmoxyJobNumber && (
+                                <p className="text-xs text-primary font-medium">Job #{projectFile.allmoxyJobNumber}</p>
+                              )}
                               <p className="text-xs text-muted-foreground">
                                 {file.coreParts} parts, {file.dovetails} dovetails, {Math.round(file.weightLbs)} lbs
                               </p>
