@@ -193,6 +193,16 @@ export default function OrderDetails() {
     }
   }, [preview, selectedFileIndex]);
 
+  // Clear editing states when switching files to avoid showing wrong file's data
+  useEffect(() => {
+    if (selectedFileIndex !== null && project?.files?.[selectedFileIndex]) {
+      const fileId = project.files[selectedFileIndex].id;
+      // Reset editing states to show saved values from the current file
+      setEditingFileAllmoxyJob({});
+      setEditingPackagingLink({});
+    }
+  }, [selectedFileIndex]);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -660,48 +670,50 @@ export default function OrderDetails() {
                       
                       {/* Packaging Link for this file */}
                       {project.files?.[selectedFileIndex] && (
-                        <div className="flex flex-wrap items-center gap-2 mb-4" data-testid="file-packaging-link-section">
-                          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Packaging Link:</span>
-                          <Input
-                            placeholder="Paste Adobe Acrobat link..."
-                            value={editingPackagingLink[project.files[selectedFileIndex].id] ?? project.files[selectedFileIndex].packagingLink ?? ""}
-                            onChange={(e) => setEditingPackagingLink(prev => ({
-                              ...prev,
-                              [project.files![selectedFileIndex].id]: e.target.value
-                            }))}
-                            className="h-8 flex-1 min-w-[200px]"
-                            data-testid="input-file-packaging-link"
-                          />
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              const fileId = project.files![selectedFileIndex].id;
-                              const value = editingPackagingLink[fileId] ?? project.files![selectedFileIndex].packagingLink ?? "";
-                              updatePackagingLink({ fileId, packagingLink: value });
-                            }}
-                            disabled={isSavingPackagingLink}
-                            data-testid="button-save-packaging-link"
-                          >
-                            {isSavingPackagingLink ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Save className="w-4 h-4" />
-                            )}
-                          </Button>
-                          {(project.files[selectedFileIndex].packagingLink || editingPackagingLink[project.files[selectedFileIndex].id]) && (
+                        <div className="space-y-2 mb-4" data-testid="file-packaging-link-section">
+                          <span className="text-sm font-medium text-muted-foreground">Packaging Link:</span>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              placeholder="Paste Adobe Acrobat link..."
+                              value={editingPackagingLink[project.files[selectedFileIndex].id] ?? project.files[selectedFileIndex].packagingLink ?? ""}
+                              onChange={(e) => setEditingPackagingLink(prev => ({
+                                ...prev,
+                                [project.files![selectedFileIndex].id]: e.target.value
+                              }))}
+                              className="h-8 flex-1"
+                              data-testid="input-file-packaging-link"
+                            />
                             <Button
                               size="sm"
-                              variant="outline"
                               onClick={() => {
-                                const link = editingPackagingLink[project.files![selectedFileIndex].id] ?? project.files![selectedFileIndex].packagingLink;
-                                if (link) window.open(link, '_blank');
+                                const fileId = project.files![selectedFileIndex].id;
+                                const value = editingPackagingLink[fileId] ?? project.files![selectedFileIndex].packagingLink ?? "";
+                                updatePackagingLink({ fileId, packagingLink: value });
                               }}
-                              data-testid="button-open-packaging-link"
+                              disabled={isSavingPackagingLink}
+                              data-testid="button-save-packaging-link"
                             >
-                              <ExternalLink className="w-4 h-4 mr-1" />
-                              Click to Open
+                              {isSavingPackagingLink ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Save className="w-4 h-4" />
+                              )}
                             </Button>
-                          )}
+                            {project.files[selectedFileIndex].packagingLink && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const link = project.files![selectedFileIndex].packagingLink;
+                                  if (link) window.open(link, '_blank');
+                                }}
+                                data-testid="button-open-packaging-link"
+                              >
+                                <ExternalLink className="w-4 h-4 mr-1" />
+                                Open
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       )}
                       
