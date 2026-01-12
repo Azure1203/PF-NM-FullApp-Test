@@ -466,7 +466,11 @@ export default function OrderDetails() {
                     return (
                       <div 
                         key={option} 
-                        className="flex items-center gap-2 p-2 rounded-md bg-muted/20 hover-elevate cursor-pointer"
+                        className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
+                          isChecked 
+                            ? 'bg-green-500 text-white hover:bg-green-600' 
+                            : 'bg-muted/20 hover-elevate'
+                        }`}
                         onClick={() => handleProductionStatusToggle(option, !isChecked)}
                         data-testid={`checkbox-status-${option.toLowerCase().replace(/\s+/g, '-')}`}
                       >
@@ -474,6 +478,7 @@ export default function OrderDetails() {
                           checked={isChecked}
                           onCheckedChange={(checked) => handleProductionStatusToggle(option, checked as boolean)}
                           disabled={isUpdatingProductionStatus}
+                          className={isChecked ? 'border-white data-[state=checked]:bg-white data-[state=checked]:text-green-600' : ''}
                         />
                         <span className="text-xs leading-tight">{option}</span>
                       </div>
