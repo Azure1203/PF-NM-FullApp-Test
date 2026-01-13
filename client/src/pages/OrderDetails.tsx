@@ -1335,36 +1335,6 @@ export default function OrderDetails() {
                   <p className="text-xs text-muted-foreground">mm max</p>
                 </div>
               </div>
-              
-              {/* BUYOUT HARDWARE Toggle */}
-              <div className="flex items-center gap-3 mt-4 pt-3 border-t">
-                <span className="text-sm font-medium">BUYOUT HARDWARE:</span>
-                <div
-                  className={`px-4 py-2 rounded-md cursor-pointer text-sm font-medium transition-colors ${
-                    project.buyoutHardware 
-                      ? 'bg-green-500 text-white hover-elevate' 
-                      : 'bg-blue-500 text-white hover-elevate'
-                  }`}
-                  onClick={() => {
-                    const newValue = !project.buyoutHardware;
-                    updateProject({ id, buyoutHardware: newValue } as any, {
-                      onSuccess: () => {
-                        toast({
-                          title: newValue ? "Buyout Hardware: YES" : "Buyout Hardware: NO",
-                          description: "Buyout hardware status updated"
-                        });
-                      }
-                    });
-                  }}
-                  data-testid="button-buyout-hardware"
-                >
-                  {isUpdating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    project.buyoutHardware ? "YES" : "NO"
-                  )}
-                </div>
-              </div>
             </CardContent>
           </Card>
         )}
