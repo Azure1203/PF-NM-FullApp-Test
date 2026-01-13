@@ -62,6 +62,8 @@ export interface IStorage {
   deletePalletFileAssignment(id: number): Promise<boolean>;
   deleteAssignmentsForPallet(palletId: number): Promise<void>;
   setAssignmentsForPallet(palletId: number, fileIds: number[]): Promise<PalletFileAssignment[]>;
+  getAssignment(id: number): Promise<PalletFileAssignment | undefined>;
+  updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean): Promise<PalletFileAssignment | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -248,6 +250,19 @@ export class DatabaseStorage implements IStorage {
     }));
     
     return await db.insert(palletFileAssignments).values(assignments).returning();
+  }
+
+  async getAssignment(id: number): Promise<PalletFileAssignment | undefined> {
+    const [assignment] = await db.select().from(palletFileAssignments).where(eq(palletFileAssignments.id, id));
+    return assignment;
+  }
+
+  async updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean): Promise<PalletFileAssignment | undefined> {
+    const [updated] = await db.update(palletFileAssignments)
+      .set({ hardwarePackaged })
+      .where(eq(palletFileAssignments.id, id))
+      .returning();
+    return updated;
   }
 }
 
