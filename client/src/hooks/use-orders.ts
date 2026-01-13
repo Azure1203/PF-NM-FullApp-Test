@@ -82,6 +82,7 @@ export function useUpdateOrder() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: number } & Partial<InsertOrder>) => {
       const url = buildUrl(api.orders.update.path, { id });
+      console.log('[useUpdateOrder] Sending update:', { id, updates });
       const res = await fetch(url, {
         method: api.orders.update.method,
         headers: { "Content-Type": "application/json" },
@@ -90,7 +91,9 @@ export function useUpdateOrder() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to update order");
+        const errorData = await res.json().catch(() => ({ message: "Failed to update order" }));
+        console.error('[useUpdateOrder] Error response:', res.status, errorData);
+        throw new Error(errorData.message || "Failed to update order");
       }
       return api.orders.update.responses[200].parse(await res.json());
     },
