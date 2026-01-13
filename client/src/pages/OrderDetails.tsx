@@ -1322,9 +1322,9 @@ export default function OrderDetails() {
                                   </div>
                                 )}
                                 
-                                {/* Order Breakdown */}
+                                {/* Orders On This Pallet */}
                                 <div className="space-y-3">
-                                  <p className="text-sm font-medium text-muted-foreground">Order Breakdown</p>
+                                  <p className="text-sm font-medium text-muted-foreground">Orders On This Pallet</p>
                                   {assignedFiles.map((file) => {
                                     const fileIdx = project.files?.findIndex(f => f.id === file.id) ?? -1;
                                     const actualFilePreview = fileIdx >= 0 ? preview?.fileBreakdowns[fileIdx] : undefined;
