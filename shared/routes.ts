@@ -33,6 +33,7 @@ export interface SyncPreview {
     weightLbs: number;
     maxLength: number;
     fileCount: number;
+    wallRailPieces: number;
   };
   palletSize: string;
   customParts: string[];
@@ -63,6 +64,7 @@ export interface SyncPreview {
     customParts: string[];
     ctsPartsCount: number;
     fileId: number;
+    wallRailPieces: number;
   }>;
 }
 

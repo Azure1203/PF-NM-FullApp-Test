@@ -130,6 +130,7 @@ export const PALLET_PACKAGING_METRICS = [
   'richelieuDoors',
   'doubleThick',
   'cts',
+  'wallRail',
   'weight',
   'maxLength'
 ] as const;
@@ -150,6 +151,7 @@ export const defaultPackagingStatus: PalletPackagingStatus = {
   richelieuDoors: false,
   doubleThick: false,
   cts: false,
+  wallRail: false,
   weight: false,
   maxLength: false
 };

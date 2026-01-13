@@ -1371,6 +1371,10 @@ export default function OrderDetails() {
                   <p className="text-2xl font-bold" data-testid="text-total-cts">{preview.totals.ctsPartsCount}</p>
                   <p className="text-xs text-muted-foreground">Cut to Size Parts</p>
                 </div>
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.wallRailPieces === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
+                  <p className="text-2xl font-bold" data-testid="text-total-wallrail">{preview.totals.wallRailPieces}</p>
+                  <p className="text-xs text-muted-foreground">Wall Rail Pieces</p>
+                </div>
                 <div className={`text-center p-2 rounded-md border-2 ${preview.totals.weightLbs === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
                   <p className="text-xs text-muted-foreground">lbs</p>
@@ -1545,6 +1549,7 @@ export default function OrderDetails() {
                                       { key: 'richelieuDoors', value: previewFiles.reduce((sum, f) => sum + ((f as any).richelieuDoorsCount || 0), 0), label: 'Richelieu Doors' },
                                       { key: 'doubleThick', value: previewFiles.reduce((sum, f) => sum + ((f as any).doubleThickCount || 0), 0), label: 'Double Thick Parts' },
                                       { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'Cut to Size Parts' },
+                                      { key: 'wallRail', value: previewFiles.reduce((sum, f) => sum + ((f as any).wallRailPieces || 0), 0), label: 'Wall Rail Pieces' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
                                       { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm max' }
                                     ];

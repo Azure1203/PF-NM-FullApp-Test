@@ -81,6 +81,15 @@ const GLASS_INSERT_KEYWORDS = [
 // Glass Shelf keywords to detect
 const GLASS_SHELF_KEYWORDS = ['GLSHFA_6', 'GLSHFA_10'];
 
+// Wall Rail part numbers to count
+const WALL_RAIL_PARTS = [
+  'H.290.11.901.CTS', 'H.290.11.907.CTS', 'H.290.11.901', 'H.290.11.907',
+  'H.290.12.781.CTS', 'H.290.12.790.CTS', 'H.290.12.380.CTS', 'H.290.12.390.CTS',
+  'H.290.12.180.CTS', 'H.290.12.190.CTS', 'H.290.12.481.CTS', 'H.290.12.490.CTS',
+  'H.290.12.781', 'H.290.12.790', 'H.290.12.380', 'H.290.12.390',
+  'H.290.12.180', 'H.290.12.190', 'H.290.12.481', 'H.290.12.490'
+];
+
 // Compute auto-enabled production statuses based on order content
 function computeAutoProductionStatuses(params: {
   hasCTSParts: boolean;
@@ -173,7 +182,7 @@ function extractCTSParts(records: string[][]): Array<{ partNumber: string; descr
 }
 
 // Count parts from actual CSV data rows
-function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[] } {
+function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[]; wallRailPieces: number } {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
@@ -190,6 +199,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
   let richelieuDoorsCount = 0;
   let maxLength = 0;
   let weightLbs = 0;
+  let wallRailPieces = 0;
   
   // Weight constant: 3/4" melamine ~3 lbs per sq ft
   const LBS_PER_SQFT = 3;
@@ -205,7 +215,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     }
   }
 
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts: [] };
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts: [], wallRailPieces };
 
   // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
@@ -214,6 +224,11 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     const quantity = parseInt(row[2] || '0') || 0;
 
     if (!sku || quantity === 0) continue;
+
+    // Check for wall rail parts BEFORE skipping hardware (since wall rails start with H.)
+    if (WALL_RAIL_PARTS.some(part => sku === part.toUpperCase())) {
+      wallRailPieces += quantity;
+    }
 
     // Skip hardware (starts with H., M., R-, S.)
     if (sku.startsWith('H.') || sku.startsWith('M.') || sku.startsWith('M-') || 
@@ -328,7 +343,7 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
   if (hasDoubleThick) customParts.push('DOUBLE THICK PARTS');
   if (hasShakerDoors) customParts.push('SHAKER DOORS');
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts, wallRailPieces };
 }
 
 export async function registerRoutes(
@@ -421,6 +436,7 @@ export async function registerRoutes(
     let totalRichelieuDoors = 0;
     let totalDoubleThick = 0;
     let totalWeight = 0;
+    let totalWallRailPieces = 0;
     let hasDoubleThick = false;
     let hasShakerDoors = false;
     let hasGlassParts = false;
@@ -449,6 +465,7 @@ export async function registerRoutes(
       ctsPartsCount: number;
       fileId: number;
       ctsAllCut: boolean;
+      wallRailPieces: number;
     }
     const fileBreakdowns: FileBreakdown[] = [];
     let totalCtsPartsCount = 0;
@@ -468,6 +485,7 @@ export async function registerRoutes(
         totalRichelieuDoors += counts.richelieuDoorsCount;
         totalDoubleThick += counts.doubleThickCount;
         totalWeight += counts.weightLbs;
+        totalWallRailPieces += counts.wallRailPieces;
         if (counts.hasDoubleThick) hasDoubleThick = true;
         if (counts.hasShakerDoors) hasShakerDoors = true;
         if (counts.hasGlassParts) hasGlassParts = true;
@@ -500,7 +518,8 @@ export async function registerRoutes(
           customParts: counts.customParts,
           ctsPartsCount: fileCtsPartsCount,
           fileId: file.id,
-          ctsAllCut: fileCtsStatus.allCut
+          ctsAllCut: fileCtsStatus.allCut,
+          wallRailPieces: counts.wallRailPieces
         });
       }
     }
@@ -536,7 +555,8 @@ export async function registerRoutes(
         ctsPartsCount: totalCtsPartsCount,
         weightLbs: Math.round(totalWeight),
         maxLength: overallMaxLength,
-        fileCount: projectFiles.length
+        fileCount: projectFiles.length,
+        wallRailPieces: totalWallRailPieces
       },
       palletSize,
       customParts,
