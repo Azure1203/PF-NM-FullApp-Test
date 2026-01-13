@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -65,6 +65,8 @@ export default function OrderDetails() {
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
   const [csvSectionOpen, setCsvSectionOpen] = useState(false);
   const [projectDetailsOpen, setProjectDetailsOpen] = useState(false);
+  const [projectNotesOpen, setProjectNotesOpen] = useState(false);
+  const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
   const [editingPackagingLink, setEditingPackagingLink] = useState<{ [fileId: number]: string }>({});
@@ -658,6 +660,69 @@ export default function OrderDetails() {
             </div>
           }
         />
+
+        {/* Project Notes - Collapsible */}
+        <Collapsible open={projectNotesOpen} onOpenChange={setProjectNotesOpen}>
+          <Card className="mb-6 border-none shadow-md" data-testid="project-notes-card">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-lg">
+                <CardTitle className="flex items-center justify-between gap-2 text-lg">
+                  <div className="flex items-center gap-2">
+                    <StickyNote className="w-5 h-5 text-primary" />
+                    Project Notes
+                  </div>
+                  {projectNotesOpen ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {projectNotesOpen ? 'Click to collapse' : 'Click to expand and add notes'}
+                </CardDescription>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <div className="space-y-4">
+                  <Textarea
+                    placeholder="Add project notes here..."
+                    value={editingProjectNotes ?? project.notes ?? ""}
+                    onChange={(e) => setEditingProjectNotes(e.target.value)}
+                    className="min-h-[120px] bg-slate-50/50"
+                    data-testid="textarea-project-notes"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const notes = editingProjectNotes ?? project.notes ?? "";
+                        updateProject({ notes: notes.trim() || null } as any, {
+                          onSuccess: () => {
+                            setEditingProjectNotes(null);
+                            toast({
+                              title: "Notes saved",
+                              description: "Project notes have been updated"
+                            });
+                          }
+                        });
+                      }}
+                      disabled={isUpdating}
+                      data-testid="button-save-project-notes"
+                    >
+                      {isUpdating ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Notes
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Project Details - Collapsible */}
         <Collapsible open={projectDetailsOpen} onOpenChange={setProjectDetailsOpen}>

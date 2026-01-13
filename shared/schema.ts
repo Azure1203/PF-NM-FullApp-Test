@@ -28,6 +28,7 @@ export const projects = pgTable("projects", {
   pfProductionStatus: text("pf_production_status").array(), // PF PRODUCTION STATUS multi-select from Asana
   asanaSection: text("asana_section"), // PF PRODUCTION SECTION - the Asana section the task is in
   lastAsanaSyncAt: timestamp("last_asana_sync_at"), // Last time we synced from Asana
+  notes: text("notes"), // Project-level notes
   
   createdAt: timestamp("created_at").defaultNow(),
 });
