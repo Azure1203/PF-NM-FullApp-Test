@@ -35,6 +35,7 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: true,
+      sameSite: "lax",
       maxAge: sessionTtl,
     },
   });
@@ -144,6 +145,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
+    console.log("[auth] Token expired and no refresh token available");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
@@ -152,8 +154,26 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
+    
+    // Update the session passport user with refreshed tokens so they persist
+    (req.session as any).passport.user = user;
+    
+    // Save the updated session to the database and wait for it to complete
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => {
+        if (err) {
+          console.error("[auth] Failed to save session after token refresh:", err);
+          reject(err);
+        } else {
+          console.log("[auth] Successfully refreshed and persisted tokens");
+          resolve();
+        }
+      });
+    });
+    
     return next();
   } catch (error) {
+    console.error("[auth] Token refresh failed:", error);
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
