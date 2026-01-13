@@ -673,7 +673,7 @@ export async function registerRoutes(
       // Track Asana sync status
       let asanaSyncStatus: { synced: boolean; error?: string; fieldNotFound?: boolean } = { synced: false };
       
-      // If CIENAPPS JOB NUMBER was updated and project is synced to Asana, sync it
+      // If CIENAPPS JOB NUMBER was updated and project is synced to Asana, sync it to the task
       if ('cienappsJobNumber' in input && existingProject.asanaTaskId) {
         console.log(`[Asana] Syncing CIENAPPS JOB NUMBER to Asana task ${existingProject.asanaTaskId}`);
         try {
@@ -688,7 +688,8 @@ export async function registerRoutes(
           const customFieldSettings = projectDetails.data.custom_field_settings || [];
           console.log(`[Asana] Found ${customFieldSettings.length} custom fields in project. Fields:`, customFieldSettings.map((s: any) => ({
             name: s.custom_field.name,
-            type: s.custom_field.type
+            type: s.custom_field.type,
+            gid: s.custom_field.gid
           })));
           
           let customFields: Record<string, any> = {};
@@ -697,25 +698,30 @@ export async function registerRoutes(
             const field = setting.custom_field;
             const name = field.name?.trim();
             
-            // Match exact field name "CIENAPPS JOB NUMBER"
+            // Match exact field name "CIENAPPS JOB NUMBER" (case-sensitive)
             if (name === 'CIENAPPS JOB NUMBER' && field.type === 'text') {
               customFields[field.gid] = input.cienappsJobNumber || '';
-              console.log(`[Asana] Found CIENAPPS JOB NUMBER field (gid: ${field.gid}), setting to: ${input.cienappsJobNumber}`);
+              console.log(`[Asana] Found CIENAPPS JOB NUMBER field (gid: ${field.gid}), setting to: "${input.cienappsJobNumber}"`);
             }
           }
           
           if (Object.keys(customFields).length > 0) {
+            // Update the task's custom fields
+            console.log(`[Asana] Calling updateTask for task ${existingProject.asanaTaskId} with custom_fields:`, customFields);
             await tasksApi.updateTask(existingProject.asanaTaskId, {
               data: { custom_fields: customFields }
             });
-            console.log(`[Asana] Updated CIENAPPS JOB NUMBER for task ${existingProject.asanaTaskId}`);
+            console.log(`[Asana] Successfully updated CIENAPPS JOB NUMBER on task ${existingProject.asanaTaskId}`);
             asanaSyncStatus = { synced: true };
           } else {
-            console.log(`[Asana] CIENAPPS JOB NUMBER field not found in Asana project custom fields`);
+            console.log(`[Asana] CIENAPPS JOB NUMBER field not found in Asana project custom fields (or not a text field)`);
             asanaSyncStatus = { synced: false, fieldNotFound: true };
           }
         } catch (asanaError: any) {
-          console.error('[Asana] Failed to update CIENAPPS JOB NUMBER:', asanaError.message, asanaError.response?.body);
+          console.error('[Asana] Failed to update CIENAPPS JOB NUMBER:', asanaError.message);
+          if (asanaError.response?.body) {
+            console.error('[Asana] Error response body:', JSON.stringify(asanaError.response.body));
+          }
           asanaSyncStatus = { synced: false, error: asanaError.message };
         }
       } else if ('cienappsJobNumber' in input && !existingProject.asanaTaskId) {

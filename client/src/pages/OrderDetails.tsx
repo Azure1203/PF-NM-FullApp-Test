@@ -443,8 +443,30 @@ export default function OrderDetails() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: palletsQueryKey });
     },
-    onSuccess: () => {
-      toast({ title: "Pallet size saved and synced to Asana" });
+    onSuccess: (data: any) => {
+      const syncStatus = data?.asanaSyncStatus;
+      if (syncStatus?.synced) {
+        toast({ title: "Pallet size saved and synced to Asana" });
+      } else if (syncStatus?.notLinked) {
+        toast({ 
+          title: "Pallet size saved",
+          description: "Project not synced to Asana yet"
+        });
+      } else if (syncStatus?.fieldNotFound) {
+        toast({ 
+          title: "Pallet size saved (Asana sync failed)",
+          description: "Field 'PALLET SIZE' not found in Asana",
+          variant: "destructive"
+        });
+      } else if (syncStatus?.error) {
+        toast({ 
+          title: "Pallet size saved (Asana sync failed)",
+          description: syncStatus.error,
+          variant: "destructive"
+        });
+      } else {
+        toast({ title: "Pallet size saved" });
+      }
     }
   });
   
@@ -759,12 +781,34 @@ export default function OrderDetails() {
                       className="h-7 w-7 p-0"
                       onClick={() => {
                         updateProject({ id, cienappsJobNumber: editingCienappsJobNumber.trim() || null } as any, {
-                          onSuccess: () => {
+                          onSuccess: (data: any) => {
                             setEditingCienappsJobNumber(null);
-                            toast({
-                              title: "Job number saved",
-                              description: "CIENAPPS Job Number has been updated"
-                            });
+                            const syncStatus = data?.asanaSyncStatus;
+                            if (syncStatus?.synced) {
+                              toast({
+                                title: "Job number saved and synced",
+                                description: "CIENAPPS Job Number has been updated in the app and Asana"
+                              });
+                            } else if (syncStatus?.fieldNotFound) {
+                              toast({
+                                title: "Job number saved (Asana sync failed)",
+                                description: "Field 'CIENAPPS JOB NUMBER' not found in Asana",
+                                variant: "destructive"
+                              });
+                            } else if (syncStatus?.error) {
+                              toast({
+                                title: "Job number saved (Asana sync failed)",
+                                description: syncStatus.error,
+                                variant: "destructive"
+                              });
+                            } else {
+                              toast({
+                                title: "Job number saved",
+                                description: project.asanaTaskId 
+                                  ? "Saved locally (Asana sync status unknown)" 
+                                  : "Saved locally (project not synced to Asana yet)"
+                              });
+                            }
                           }
                         });
                       }}
