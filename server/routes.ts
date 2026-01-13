@@ -1356,10 +1356,15 @@ export async function registerRoutes(
   app.patch('/api/assignments/:assignmentId/hardware-packaged', isAuthenticated, async (req, res) => {
     try {
       const assignmentId = Number(req.params.assignmentId);
-      const { hardwarePackaged } = req.body;
+      const { hardwarePackaged, hardwarePackedBy } = req.body;
       
       if (typeof hardwarePackaged !== 'boolean') {
         return res.status(400).json({ message: 'hardwarePackaged boolean is required' });
+      }
+      
+      // If marking as packed, require the packer's name
+      if (hardwarePackaged && (!hardwarePackedBy || typeof hardwarePackedBy !== 'string' || hardwarePackedBy.trim() === '')) {
+        return res.status(400).json({ message: 'hardwarePackedBy is required when marking hardware as packed' });
       }
       
       // Get the assignment to find its pallet
@@ -1369,7 +1374,7 @@ export async function registerRoutes(
       }
       
       // Update the assignment's hardware status
-      const updated = await storage.updateAssignmentHardwareStatus(assignmentId, hardwarePackaged);
+      const updated = await storage.updateAssignmentHardwareStatus(assignmentId, hardwarePackaged, hardwarePackedBy?.trim());
       if (!updated) {
         return res.status(404).json({ message: 'Failed to update assignment' });
       }

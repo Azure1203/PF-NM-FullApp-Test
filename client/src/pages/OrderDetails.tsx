@@ -47,6 +47,7 @@ interface AssignmentInfo {
   id: number;
   fileId: number;
   hardwarePackaged: boolean;
+  hardwarePackedBy: string | null;
 }
 
 // Type for pallets with file assignments
@@ -94,6 +95,11 @@ export default function OrderDetails() {
   const [palletNotes, setPalletNotes] = useState('');
   const [palletFileIds, setPalletFileIds] = useState<number[]>([]);
   const [editingPalletFinalSize, setEditingPalletFinalSize] = useState<{ [palletId: number]: string }>({});
+  
+  // Hardware packaged dialog state
+  const [hardwareDialogOpen, setHardwareDialogOpen] = useState(false);
+  const [hardwareDialogAssignment, setHardwareDialogAssignment] = useState<AssignmentInfo | null>(null);
+  const [hardwarePackedByName, setHardwarePackedByName] = useState('');
 
   // Color mapping for PF PRODUCTION STATUS options
   const statusColorMap: Record<string, 'green' | 'red' | 'yellow'> = {
@@ -373,10 +379,10 @@ export default function OrderDetails() {
   
   // Update per-assignment hardware packaged status mutation with optimistic updates
   const { mutate: updateAssignmentHardwarePackaged } = useMutation({
-    mutationFn: async ({ assignmentId, hardwarePackaged }: { assignmentId: number; hardwarePackaged: boolean }) => {
-      return apiRequest('PATCH', `/api/assignments/${assignmentId}/hardware-packaged`, { hardwarePackaged });
+    mutationFn: async ({ assignmentId, hardwarePackaged, hardwarePackedBy }: { assignmentId: number; hardwarePackaged: boolean; hardwarePackedBy?: string }) => {
+      return apiRequest('PATCH', `/api/assignments/${assignmentId}/hardware-packaged`, { hardwarePackaged, hardwarePackedBy });
     },
-    onMutate: async ({ assignmentId, hardwarePackaged }) => {
+    onMutate: async ({ assignmentId, hardwarePackaged, hardwarePackedBy }) => {
       await queryClient.cancelQueries({ queryKey: palletsQueryKey });
       const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
       
@@ -391,7 +397,7 @@ export default function OrderDetails() {
           return {
             ...pallet,
             assignments: pallet.assignments.map(a => 
-              a.id === assignmentId ? { ...a, hardwarePackaged } : a
+              a.id === assignmentId ? { ...a, hardwarePackaged, hardwarePackedBy: hardwarePackaged ? hardwarePackedBy || null : null } : a
             )
           };
         });
@@ -412,10 +418,30 @@ export default function OrderDetails() {
     }
   });
   
-  // Toggle hardware packaged for a specific order (assignment)
-  const toggleAssignmentHardwarePackaged = (assignment: AssignmentInfo) => {
-    const newValue = !assignment.hardwarePackaged;
-    updateAssignmentHardwarePackaged({ assignmentId: assignment.id, hardwarePackaged: newValue });
+  // Open dialog to mark hardware as packed (requires name)
+  const openHardwarePackedDialog = (assignment: AssignmentInfo) => {
+    if (assignment.hardwarePackaged) {
+      // If already packed, allow unpacking directly
+      updateAssignmentHardwarePackaged({ assignmentId: assignment.id, hardwarePackaged: false });
+    } else {
+      // If not packed, open dialog to get packer's name
+      setHardwareDialogAssignment(assignment);
+      setHardwarePackedByName('');
+      setHardwareDialogOpen(true);
+    }
+  };
+  
+  // Submit hardware packed with name
+  const submitHardwarePacked = () => {
+    if (!hardwareDialogAssignment || !hardwarePackedByName.trim()) return;
+    updateAssignmentHardwarePackaged({ 
+      assignmentId: hardwareDialogAssignment.id, 
+      hardwarePackaged: true, 
+      hardwarePackedBy: hardwarePackedByName.trim() 
+    });
+    setHardwareDialogOpen(false);
+    setHardwareDialogAssignment(null);
+    setHardwarePackedByName('');
   };
 
   // Update pallet final size mutation with optimistic updates
@@ -1731,7 +1757,7 @@ export default function OrderDetails() {
                                           return (
                                             <Button
                                               size="sm"
-                                              onClick={() => toggleAssignmentHardwarePackaged(assignment)}
+                                              onClick={() => openHardwarePackedDialog(assignment)}
                                               className={`w-full text-xs ${
                                                 assignment.hardwarePackaged 
                                                   ? 'bg-green-600 hover:bg-green-700 text-white' 
@@ -1740,7 +1766,9 @@ export default function OrderDetails() {
                                               data-testid={`button-order-hardware-${file.id}`}
                                             >
                                               <Package className="w-3 h-3 mr-1" />
-                                              {assignment.hardwarePackaged ? '✓ Hardware Packaged' : 'Hardware Not Packaged, Click Here When Done'}
+                                              {assignment.hardwarePackaged 
+                                                ? `Packed by: ${assignment.hardwarePackedBy || 'Unknown'}` 
+                                                : 'Hardware Not Packaged, Click Here When Done'}
                                             </Button>
                                           );
                                         })()}
@@ -2335,6 +2363,63 @@ export default function OrderDetails() {
               ) : (
                 editingPallet ? 'Update Pallet' : 'Create Pallet'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* ==================== HARDWARE PACKED DIALOG ==================== */}
+      <Dialog open={hardwareDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setHardwareDialogOpen(false);
+          setHardwareDialogAssignment(null);
+          setHardwarePackedByName('');
+        }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Who Packed the Hardware?</DialogTitle>
+            <DialogDescription>
+              Enter your name to confirm you packed the hardware for this order.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Label htmlFor="hardware-packed-by">Your Name</Label>
+            <Input
+              id="hardware-packed-by"
+              placeholder="Enter your name"
+              value={hardwarePackedByName}
+              onChange={(e) => setHardwarePackedByName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && hardwarePackedByName.trim()) {
+                  submitHardwarePacked();
+                }
+              }}
+              className="mt-2"
+              autoFocus
+              data-testid="input-hardware-packed-by"
+            />
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setHardwareDialogOpen(false);
+                setHardwareDialogAssignment(null);
+                setHardwarePackedByName('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={submitHardwarePacked}
+              disabled={!hardwarePackedByName.trim()}
+              data-testid="button-save-hardware-packed"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
