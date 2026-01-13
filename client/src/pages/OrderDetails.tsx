@@ -1336,16 +1336,6 @@ export default function OrderDetails() {
                 </div>
               </div>
               
-              {/* Special Parts Flags */}
-              {(preview.flags.hasMJDoors || preview.flags.hasRichelieuDoors || preview.flags.hasDoubleThick || preview.flags.hasShakerDoors) && (
-                <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t">
-                  {preview.flags.hasMJDoors && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />M&J Doors</Badge>}
-                  {preview.flags.hasRichelieuDoors && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Richelieu Doors</Badge>}
-                  {preview.flags.hasDoubleThick && <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Double Thick</Badge>}
-                  {preview.flags.hasShakerDoors && <Badge variant="secondary">Shaker Doors</Badge>}
-                </div>
-              )}
-              
               {/* BUYOUT HARDWARE Toggle */}
               <div className="flex items-center gap-3 mt-4 pt-3 border-t">
                 <span className="text-sm font-medium">BUYOUT HARDWARE:</span>
