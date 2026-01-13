@@ -1246,6 +1246,11 @@ export async function registerRoutes(
       // Variable to hold auto statuses for database update
       let autoStatusesForDb: string[] = [];
       
+      // Get pallets for packaging cost calculation
+      const projectPallets = await storage.getPalletsForProject(project.id);
+      const palletCount = projectPallets.length;
+      const packagingCost = palletCount * 150; // $150 per pallet
+      
       // Update custom fields if available
       try {
         const asanaProjectDetails = await projectsApi.getProject(asanaProjectGid, { opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options' });
@@ -1324,6 +1329,12 @@ export async function registerRoutes(
               o.name.toLowerCase() === (isCanadian ? 'no' : 'yes')
             );
             if (option) customFields[field.gid] = option.gid;
+          } else if (name === 'PACKAGING COST' && field.type === 'number') {
+            // Calculate packaging cost: number of pallets × $150
+            customFields[field.gid] = packagingCost;
+          } else if (name === 'PACKAGING COST' && field.type === 'text') {
+            // Fallback for text field type
+            customFields[field.gid] = `$${packagingCost}`;
           }
         }
         
