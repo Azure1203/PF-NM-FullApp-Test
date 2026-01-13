@@ -155,6 +155,19 @@ export default function Dashboard() {
                         <span>Date: {project.createdAt ? format(new Date(project.createdAt), 'PPP') : 'N/A'}</span>
                       </div>
                       
+                      {/* PF Production Section Status */}
+                      {project.asanaSection && (
+                        <div className="mt-2">
+                          <Badge 
+                            variant="outline" 
+                            className="bg-blue-50 text-blue-700 border-blue-200 text-sm font-medium"
+                            data-testid="badge-production-section"
+                          >
+                            {project.asanaSection}
+                          </Badge>
+                        </div>
+                      )}
+                      
                       {/* Status Badges */}
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {/* CTS Parts Status */}
