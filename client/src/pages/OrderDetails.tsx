@@ -1039,51 +1039,51 @@ export default function OrderDetails() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3">
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.parts === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
                   <p className="text-xs text-muted-foreground">Parts Overall</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.dovetails === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-dovetails">{preview.totals.dovetails}</p>
                   <p className="text-xs text-muted-foreground">Dovetails</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.assembledDrawers === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-assembled">{preview.totals.assembledDrawers}</p>
                   <p className="text-xs text-muted-foreground">Assembled Drawers</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.fivePieceDoors === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-fivepiece">{preview.totals.fivePieceDoors}</p>
                   <p className="text-xs text-muted-foreground">5 Piece Shaker</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.glassInserts === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-glass-inserts">{preview.totals.glassInserts}</p>
                   <p className="text-xs text-muted-foreground">Glass Inserts</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.glassShelves === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-glass-shelves">{preview.totals.glassShelves}</p>
                   <p className="text-xs text-muted-foreground">Glass Shelves</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.mjDoors === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-mj-doors">{preview.totals.mjDoors}</p>
                   <p className="text-xs text-muted-foreground">M&J Doors</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.richelieuDoors === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-richelieu">{preview.totals.richelieuDoors}</p>
                   <p className="text-xs text-muted-foreground">Richelieu Doors</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.doubleThick === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-doublethick">{preview.totals.doubleThick}</p>
                   <p className="text-xs text-muted-foreground">Double Thick Parts</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.ctsPartsCount === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-cts">{preview.totals.ctsPartsCount}</p>
                   <p className="text-xs text-muted-foreground">Cut to Size Parts</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.weightLbs === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
                   <p className="text-xs text-muted-foreground">lbs</p>
                 </div>
-                <div className="text-center p-2 bg-muted/30 rounded-md">
+                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.maxLength === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
                   <p className="text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
                   <p className="text-xs text-muted-foreground">mm max</p>
                 </div>
@@ -1265,21 +1265,26 @@ export default function OrderDetails() {
                                       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
                                         {metrics.map(({ key, value, label }) => {
                                           const isPackaged = status[key];
+                                          const numValue = typeof value === 'number' ? value : parseInt(value) || 0;
+                                          const isAutoGreen = numValue === 0;
+                                          const showGreen = isPackaged || isAutoGreen;
                                           return (
                                             <button
                                               key={key}
-                                              onClick={() => togglePackagingMetric(pallet, key)}
-                                              className={`text-center p-2 rounded-md transition-colors cursor-pointer border-2 ${
-                                                isPackaged 
+                                              onClick={() => !isAutoGreen && togglePackagingMetric(pallet, key)}
+                                              className={`text-center p-2 rounded-md transition-colors border-2 ${
+                                                isAutoGreen ? 'cursor-default' : 'cursor-pointer'
+                                              } ${
+                                                showGreen 
                                                   ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' 
                                                   : 'bg-red-100 dark:bg-red-900/30 border-red-500 text-red-700 dark:text-red-300'
                                               }`}
                                               data-testid={`button-pallet-packaged-${key}-${pallet.id}`}
-                                              aria-pressed={isPackaged}
+                                              aria-pressed={showGreen}
                                             >
                                               <p className="text-xl font-bold">{value}</p>
                                               <p className="text-xs opacity-80">{label}</p>
-                                              <p className="text-[10px] mt-1">{isPackaged ? '✓ Packaged' : 'Click when packed'}</p>
+                                              <p className="text-[10px] mt-1">{isAutoGreen ? 'N/A' : (isPackaged ? '✓ Packaged' : 'Click when packed')}</p>
                                             </button>
                                           );
                                         })}
