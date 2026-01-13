@@ -768,17 +768,10 @@ export default function OrderDetails() {
         {preview && (
           <Card className="mb-6 border-none shadow-md" data-testid="project-totals-card">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Truck className="w-5 h-5 text-primary" />
-                  Project Totals
-                </CardTitle>
-                {preview.palletSize && (
-                  <Badge variant="outline" className="text-sm" data-testid="text-pallet-size">
-                    {preview.palletSize}
-                  </Badge>
-                )}
-              </div>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Truck className="w-5 h-5 text-primary" />
+                Project Totals
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3">
