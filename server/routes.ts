@@ -707,10 +707,13 @@ export async function registerRoutes(
           
           if (Object.keys(customFields).length > 0) {
             // Update the task's custom fields
+            // Note: Asana SDK updateTask signature is (body, taskGid, opts)
             console.log(`[Asana] Calling updateTask for task ${existingProject.asanaTaskId} with custom_fields:`, customFields);
-            await tasksApi.updateTask(existingProject.asanaTaskId, {
-              data: { custom_fields: customFields }
-            });
+            await tasksApi.updateTask(
+              { data: { custom_fields: customFields } },
+              existingProject.asanaTaskId,
+              {}
+            );
             console.log(`[Asana] Successfully updated CIENAPPS JOB NUMBER on task ${existingProject.asanaTaskId}`);
             asanaSyncStatus = { synced: true };
           } else {
@@ -1158,9 +1161,12 @@ export async function registerRoutes(
           }
           
           if (Object.keys(customFields).length > 0) {
-            await tasksApi.updateTask(project.asanaTaskId, {
-              data: { custom_fields: customFields }
-            });
+            // Note: Asana SDK updateTask signature is (body, taskGid, opts)
+            await tasksApi.updateTask(
+              { data: { custom_fields: customFields } },
+              project.asanaTaskId,
+              {}
+            );
             console.log(`[Asana] Updated PALLET SIZE for task ${project.asanaTaskId}: ${palletSizeLines}`);
             asanaSyncStatus = { synced: true };
           } else {
@@ -1321,9 +1327,12 @@ export async function registerRoutes(
           }
           
           if (Object.keys(customFields).length > 0) {
-            await tasksApi.updateTask(project.asanaTaskId, {
-              data: { custom_fields: customFields }
-            });
+            // Note: Asana SDK updateTask signature is (body, taskGid, opts)
+            await tasksApi.updateTask(
+              { data: { custom_fields: customFields } },
+              project.asanaTaskId,
+              {}
+            );
             console.log(`[Asana] Updated HARDWARE PACKED to ${allHardwarePackaged} (all pallets packed: ${allHardwarePackaged}) and PF PRODUCTION STATUS for task ${project.asanaTaskId}`);
           }
         } catch (asanaError: any) {
@@ -1463,9 +1472,12 @@ export async function registerRoutes(
           }
           
           if (Object.keys(customFields).length > 0) {
-            await tasksApi.updateTask(project.asanaTaskId, {
-              data: { custom_fields: customFields }
-            });
+            // Note: Asana SDK updateTask signature is (body, taskGid, opts)
+            await tasksApi.updateTask(
+              { data: { custom_fields: customFields } },
+              project.asanaTaskId,
+              {}
+            );
             console.log(`[Asana] Updated HARDWARE PACKED via assignment toggle for task ${project.asanaTaskId}`);
           }
         } catch (asanaError: any) {
