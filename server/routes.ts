@@ -1652,6 +1652,11 @@ export async function registerRoutes(
           } else if (name === 'PACKAGING COST' && field.type === 'text') {
             // Fallback for text field type
             customFields[field.gid] = `$${packagingCost}`;
+          } else if (name === 'CIENAPPS JOB NUMBER' && field.type === 'text') {
+            // Sync CIENAPPS JOB NUMBER to Asana if we have a local value
+            if (project.cienappsJobNumber) {
+              customFields[field.gid] = project.cienappsJobNumber;
+            }
           }
         }
         
@@ -1745,6 +1750,7 @@ export async function registerRoutes(
       let pfOrderStatus: string | null = null;
       let pfProductionStatus: string[] = [];
       let asanaSection: string | null = null;
+      let cienappsJobNumber: string | null = null;
       
       // Find the PERFECT FIT PRODUCTION project using the global constant
       let perfectFitProject = taskProjects.find((p: any) => p.gid === ASANA_PERFECT_FIT_PROJECT_GID);
@@ -1803,6 +1809,9 @@ export async function registerRoutes(
           if (field.multi_enum_values && Array.isArray(field.multi_enum_values)) {
             pfProductionStatus = field.multi_enum_values.map((v: any) => v.name);
           }
+        } else if (name === 'CIENAPPS JOB NUMBER') {
+          // Text field - use display_value
+          cienappsJobNumber = field.display_value || null;
         }
       }
       
@@ -1811,6 +1820,7 @@ export async function registerRoutes(
         pfOrderStatus,
         pfProductionStatus,
         asanaSection,
+        cienappsJobNumber,
         lastAsanaSyncAt: new Date()
       });
       
@@ -1951,6 +1961,8 @@ export async function registerRoutes(
             }
           }
           
+          let cienappsJobNumber: string | null = null;
+          
           for (const field of customFields) {
             const name = field.name?.toUpperCase().trim();
             
@@ -1960,6 +1972,8 @@ export async function registerRoutes(
               if (field.multi_enum_values && Array.isArray(field.multi_enum_values)) {
                 pfProductionStatus = field.multi_enum_values.map((v: any) => v.name);
               }
+            } else if (name === 'CIENAPPS JOB NUMBER') {
+              cienappsJobNumber = field.display_value || null;
             }
           }
           
@@ -1967,6 +1981,7 @@ export async function registerRoutes(
             pfOrderStatus,
             pfProductionStatus,
             asanaSection,
+            cienappsJobNumber,
             lastAsanaSyncAt: new Date()
           });
           

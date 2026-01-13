@@ -80,6 +80,7 @@ export default function OrderDetails() {
   const [orderStatusOpen, setOrderStatusOpen] = useState(false);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
+  const [editingCienappsJobNumber, setEditingCienappsJobNumber] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
   const [editingPackagingLink, setEditingPackagingLink] = useState<{ [fileId: number]: string }>({});
@@ -737,7 +738,69 @@ export default function OrderDetails() {
 
         <PageHeader 
           title={project.name} 
-          description={`${project.files?.length || 0} Order(s) in this project`}
+          description={
+            <div className="flex flex-col gap-2">
+              <span>{`${project.files?.length || 0} Order(s) in this project`}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">CIENAPPS Job:</span>
+                {editingCienappsJobNumber !== null ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={editingCienappsJobNumber}
+                      onChange={(e) => setEditingCienappsJobNumber(e.target.value)}
+                      className="h-7 w-40 text-sm"
+                      placeholder="Enter job number"
+                      data-testid="input-cienapps-job-number"
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => {
+                        updateProject({ cienappsJobNumber: editingCienappsJobNumber.trim() || null } as any, {
+                          onSuccess: () => {
+                            setEditingCienappsJobNumber(null);
+                            toast({
+                              title: "Job number saved",
+                              description: "CIENAPPS Job Number has been updated"
+                            });
+                          }
+                        });
+                      }}
+                      disabled={isUpdating}
+                      data-testid="button-save-cienapps-job"
+                    >
+                      <Check className="w-4 h-4 text-green-600" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => setEditingCienappsJobNumber(null)}
+                      data-testid="button-cancel-cienapps-job"
+                    >
+                      <X className="w-4 h-4 text-red-600" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium text-primary">
+                      {project.cienappsJobNumber || "—"}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setEditingCienappsJobNumber(project.cienappsJobNumber || "")}
+                      data-testid="button-edit-cienapps-job"
+                    >
+                      <Edit2 className="w-3 h-3 text-muted-foreground" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          }
           actions={
             <div className="flex items-center gap-4">
               <StatusBadge status={project.status as any} />
