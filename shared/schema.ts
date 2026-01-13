@@ -162,6 +162,7 @@ export const pallets = pgTable("pallets", {
   notes: text("notes"),
   packagingStatus: jsonb("packaging_status").$type<PalletPackagingStatus>().default(defaultPackagingStatus),
   hardwarePackaged: boolean("hardware_packaged").default(false), // Whether hardware has been packaged
+  finalSize: text("final_size"), // User-entered final pallet size for Asana sync
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -1011,6 +1011,92 @@ export async function registerRoutes(
     }
   });
 
+  // Update pallet final size and sync to Asana PALLET SIZE custom field (protected)
+  app.patch('/api/pallets/:palletId/final-size', isAuthenticated, async (req, res) => {
+    try {
+      const palletId = Number(req.params.palletId);
+      const { finalSize } = req.body;
+      
+      if (typeof finalSize !== 'string') {
+        return res.status(400).json({ message: 'finalSize string is required' });
+      }
+      
+      // Get the pallet to find its project
+      const existingPallet = await storage.getPallet(palletId);
+      if (!existingPallet) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      // Update the pallet's final size
+      const pallet = await storage.updatePallet(palletId, { finalSize: finalSize || null });
+      if (!pallet) {
+        return res.status(404).json({ message: 'Failed to update pallet' });
+      }
+      
+      // Get the project for Asana sync
+      const project = await storage.getProject(existingPallet.projectId);
+      
+      // Get all pallets for this project to build the combined PALLET SIZE string
+      const allPallets = await storage.getPalletsForProject(existingPallet.projectId);
+      
+      // Build newline-separated pallet sizes string
+      const palletSizeLines = allPallets
+        .sort((a, b) => a.palletNumber - b.palletNumber)
+        .filter(p => p.finalSize && p.finalSize.trim())
+        .map(p => `PALLET ${p.palletNumber} SIZE: ${p.finalSize}`)
+        .join('\n');
+      
+      // Sync to Asana if project is synced
+      if (project?.asanaTaskId) {
+        try {
+          const { tasksApi, projectsApi } = await getAsanaApiInstances();
+          const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
+          
+          // Get custom field settings to find PALLET SIZE field
+          const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
+            opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type'
+          });
+          
+          const customFieldSettings = projectDetails.data.custom_field_settings || [];
+          let customFields: Record<string, any> = {};
+          
+          for (const setting of customFieldSettings) {
+            const field = setting.custom_field;
+            const name = field.name?.toUpperCase().trim();
+            
+            if (name === 'PALLET SIZE' && field.type === 'text') {
+              customFields[field.gid] = palletSizeLines;
+            }
+          }
+          
+          if (Object.keys(customFields).length > 0) {
+            await tasksApi.updateTask(project.asanaTaskId, {
+              data: { custom_fields: customFields }
+            });
+            console.log(`[Asana] Updated PALLET SIZE for task ${project.asanaTaskId}: ${palletSizeLines}`);
+          }
+        } catch (asanaError: any) {
+          console.error('[Asana] Failed to update PALLET SIZE:', asanaError.message);
+          // Don't fail the request if Asana update fails
+        }
+      }
+      
+      // Return pallet with file assignments
+      const assignments = await storage.getAssignmentsForPallet(palletId);
+      res.json({
+        ...pallet,
+        fileIds: assignments.map(a => a.fileId),
+        assignments: assignments.map(a => ({
+          id: a.id,
+          fileId: a.fileId,
+          hardwarePackaged: a.hardwarePackaged ?? false
+        }))
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Update pallet packaging status (protected)
   app.patch('/api/pallets/:palletId/packaging-status', isAuthenticated, async (req, res) => {
     try {

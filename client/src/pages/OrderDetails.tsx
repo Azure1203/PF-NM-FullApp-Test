@@ -59,6 +59,7 @@ interface PalletWithFiles {
   notes: string | null;
   packagingStatus: PalletPackagingStatus | null;
   hardwarePackaged: boolean | null;
+  finalSize: string | null;
   createdAt: Date;
   fileIds: number[];
   assignments: AssignmentInfo[];
@@ -413,6 +414,36 @@ export default function OrderDetails() {
     const newValue = !assignment.hardwarePackaged;
     updateAssignmentHardwarePackaged({ assignmentId: assignment.id, hardwarePackaged: newValue });
   };
+
+  // Update pallet final size mutation with optimistic updates
+  const { mutate: updatePalletFinalSize } = useMutation({
+    mutationFn: async ({ palletId, finalSize }: { palletId: number; finalSize: string }) => {
+      return apiRequest('PATCH', `/api/pallets/${palletId}/final-size`, { finalSize });
+    },
+    onMutate: async ({ palletId, finalSize }) => {
+      await queryClient.cancelQueries({ queryKey: palletsQueryKey });
+      const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
+      
+      queryClient.setQueryData<PalletWithFiles[]>(palletsQueryKey, (old) => {
+        if (!old) return old;
+        return old.map(p => p.id === palletId ? { ...p, finalSize } : p);
+      });
+      
+      return { previousPallets };
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.previousPallets) {
+        queryClient.setQueryData(palletsQueryKey, context.previousPallets);
+      }
+      toast({ title: "Failed to update pallet size", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+    },
+    onSuccess: () => {
+      toast({ title: "Pallet size saved and synced to Asana" });
+    }
+  });
   
   // Pallet dialog helpers
   const openAddPalletDialog = () => {
@@ -1288,9 +1319,14 @@ export default function OrderDetails() {
                               <>
                                 {/* Pallet Totals - clickable tiles with red/green status */}
                                 <div>
-                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals <span className="text-xs">(click when packed)</span></p>
+                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals, Click Each Button When Packed, Then Add Final Pallet Size Below</p>
                                   {(() => {
                                     const status = pallet.packagingStatus || defaultPackagingStatus;
+                                    // Check if all CTS parts in all files in this pallet are cut
+                                    const allCtsCut = previewFiles.every(f => {
+                                      const ctsCount = (f as any).ctsPartsCount || 0;
+                                      return ctsCount === 0 || (f as any).ctsAllCut === true;
+                                    });
                                     const metrics: { key: PalletPackagingMetric; value: number | string; label: string }[] = [
                                       { key: 'orders', value: assignedFiles.length, label: 'Orders' },
                                       { key: 'parts', value: palletParts, label: 'Parts Overall' },
@@ -1313,7 +1349,9 @@ export default function OrderDetails() {
                                           const isPackaged = status[key];
                                           const numValue = typeof value === 'number' ? value : parseInt(value) || 0;
                                           const isInfoOnly = key === 'weight' || key === 'maxLength';
-                                          const isAutoGreen = numValue === 0 || isInfoOnly;
+                                          // CTS button is auto-green when all CTS parts in all orders are cut
+                                          const isCtsAutoGreen = key === 'cts' && allCtsCut;
+                                          const isAutoGreen = numValue === 0 || isInfoOnly || isCtsAutoGreen;
                                           const showGreen = isPackaged || isAutoGreen;
                                           return (
                                             <button
@@ -1331,13 +1369,33 @@ export default function OrderDetails() {
                                             >
                                               <p className="text-xl font-bold">{value}</p>
                                               <p className="text-xs opacity-80">{label}</p>
-                                              <p className="text-[10px] mt-1">{isInfoOnly ? '' : (numValue === 0 ? 'N/A' : (isPackaged ? '✓ Packaged' : 'Click when packed'))}</p>
+                                              <p className="text-[10px] mt-1">{isInfoOnly ? '' : (isCtsAutoGreen ? '✓ All Cut' : (numValue === 0 ? 'N/A' : (isPackaged ? '✓ Packaged' : 'Click when packed')))}</p>
                                             </button>
                                           );
                                         })}
                                       </div>
                                     );
                                   })()}
+                                </div>
+                                
+                                {/* Final Pallet Size Input */}
+                                <div className="mt-3">
+                                  <Label htmlFor={`pallet-size-${pallet.id}`} className="text-sm font-medium text-muted-foreground">
+                                    Final Pallet Size
+                                  </Label>
+                                  <Input
+                                    id={`pallet-size-${pallet.id}`}
+                                    placeholder="Enter final pallet size (e.g., 34&quot; x 96&quot;)"
+                                    defaultValue={pallet.finalSize || ''}
+                                    onBlur={(e) => {
+                                      const newSize = e.target.value.trim();
+                                      if (newSize !== (pallet.finalSize || '')) {
+                                        updatePalletFinalSize({ palletId: pallet.id, finalSize: newSize });
+                                      }
+                                    }}
+                                    className="mt-1"
+                                    data-testid={`input-pallet-size-${pallet.id}`}
+                                  />
                                 </div>
                                 
                                 {/* Flags as Badges - matching Project Totals style */}
