@@ -654,10 +654,58 @@ export async function registerRoutes(
   app.put(api.orders.update.path, isAuthenticated, async (req, res) => {
     try {
       const input = api.orders.update.input.parse(req.body);
-      const project = await storage.updateProject(Number(req.params.id), input);
+      const projectId = Number(req.params.id);
+      
+      // Get current project to check if it's synced to Asana
+      const existingProject = await storage.getProject(projectId);
+      if (!existingProject) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      const project = await storage.updateProject(projectId, input);
       if (!project) {
         return res.status(404).json({ message: 'Project not found' });
       }
+      
+      // If CIENAPPS JOB NUMBER was updated and project is synced to Asana, sync it
+      if ('cienappsJobNumber' in input && existingProject.asanaTaskId) {
+        try {
+          const { tasksApi, projectsApi } = await getAsanaApiInstances();
+          const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
+          
+          // Get custom field settings to find CIENAPPS JOB NUMBER field
+          const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
+            opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type'
+          });
+          
+          const customFieldSettings = projectDetails.data.custom_field_settings || [];
+          let customFields: Record<string, any> = {};
+          
+          for (const setting of customFieldSettings) {
+            const field = setting.custom_field;
+            const name = field.name?.trim();
+            
+            // Match exact field name "CIENAPPS JOB NUMBER"
+            if (name === 'CIENAPPS JOB NUMBER' && field.type === 'text') {
+              customFields[field.gid] = input.cienappsJobNumber || '';
+              console.log(`[Asana] Found CIENAPPS JOB NUMBER field (gid: ${field.gid}), setting to: ${input.cienappsJobNumber}`);
+            }
+          }
+          
+          if (Object.keys(customFields).length > 0) {
+            await tasksApi.updateTask(existingProject.asanaTaskId, {
+              data: { custom_fields: customFields }
+            });
+            console.log(`[Asana] Updated CIENAPPS JOB NUMBER for task ${existingProject.asanaTaskId}`);
+          } else {
+            console.log(`[Asana] CIENAPPS JOB NUMBER field not found in Asana project`);
+          }
+        } catch (asanaError: any) {
+          console.error('[Asana] Failed to update CIENAPPS JOB NUMBER:', asanaError.message);
+          // Don't fail the request if Asana update fails
+        }
+      }
+      
       res.json(project);
     } catch (err: any) {
        if (err instanceof z.ZodError) {
@@ -1063,24 +1111,23 @@ export async function registerRoutes(
           const customFieldSettings = projectDetails.data.custom_field_settings || [];
           console.log(`[Pallet Size] Found ${customFieldSettings.length} custom fields`);
           
-          // Log available fields for debugging
-          const palletSizeField = customFieldSettings.find((s: any) => 
-            s.custom_field.name?.toUpperCase().trim() === 'PALLET SIZE'
-          );
-          if (palletSizeField) {
-            console.log(`[Pallet Size] Found PALLET SIZE field: type=${palletSizeField.custom_field.type}, gid=${palletSizeField.custom_field.gid}`);
-          } else {
-            console.log(`[Pallet Size] PALLET SIZE field NOT FOUND in Asana project`);
-          }
+          // Log all available fields for debugging
+          console.log(`[Pallet Size] Available custom fields:`, customFieldSettings.map((s: any) => ({
+            name: s.custom_field.name,
+            type: s.custom_field.type,
+            gid: s.custom_field.gid
+          })));
           
           let customFields: Record<string, any> = {};
           
           for (const setting of customFieldSettings) {
             const field = setting.custom_field;
-            const name = field.name?.toUpperCase().trim();
+            const fieldName = field.name?.trim();
             
-            if (name === 'PALLET SIZE' && field.type === 'text') {
+            // Match exact field name "PALLET SIZE"
+            if (fieldName === 'PALLET SIZE' && field.type === 'text') {
               customFields[field.gid] = palletSizeLines;
+              console.log(`[Pallet Size] Found PALLET SIZE field (gid: ${field.gid}), setting to: ${palletSizeLines}`);
             }
           }
           
