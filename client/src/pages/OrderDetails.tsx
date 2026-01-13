@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -844,6 +844,28 @@ export default function OrderDetails() {
                   </div>
                 )}
               </div>
+              {/* Project Link */}
+              <div className="flex items-center gap-2">
+                <LinkIcon className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-blue-600 dark:text-blue-400 font-mono">
+                  {`${window.location.origin}/orders/${id}`}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/orders/${id}`);
+                    toast({
+                      title: "Link copied",
+                      description: "Project link copied to clipboard"
+                    });
+                  }}
+                  data-testid="button-copy-project-link"
+                >
+                  <Copy className="w-3 h-3 text-muted-foreground" />
+                </Button>
+              </div>
             </div>
           }
           actions={
@@ -1323,6 +1345,36 @@ export default function OrderDetails() {
                   {preview.flags.hasShakerDoors && <Badge variant="secondary">Shaker Doors</Badge>}
                 </div>
               )}
+              
+              {/* BUYOUT HARDWARE Toggle */}
+              <div className="flex items-center gap-3 mt-4 pt-3 border-t">
+                <span className="text-sm font-medium">BUYOUT HARDWARE:</span>
+                <div
+                  className={`px-4 py-2 rounded-md cursor-pointer text-sm font-medium transition-colors ${
+                    project.buyoutHardware 
+                      ? 'bg-green-500 text-white hover-elevate' 
+                      : 'bg-blue-500 text-white hover-elevate'
+                  }`}
+                  onClick={() => {
+                    const newValue = !project.buyoutHardware;
+                    updateProject({ id, buyoutHardware: newValue } as any, {
+                      onSuccess: () => {
+                        toast({
+                          title: newValue ? "Buyout Hardware: YES" : "Buyout Hardware: NO",
+                          description: "Buyout hardware status updated"
+                        });
+                      }
+                    });
+                  }}
+                  data-testid="button-buyout-hardware"
+                >
+                  {isUpdating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    project.buyoutHardware ? "YES" : "NO"
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

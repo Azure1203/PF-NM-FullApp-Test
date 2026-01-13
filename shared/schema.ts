@@ -30,6 +30,7 @@ export const projects = pgTable("projects", {
   cienappsJobNumber: text("cienapps_job_number"), // CIENAPPS JOB NUMBER from Asana
   lastAsanaSyncAt: timestamp("last_asana_sync_at"), // Last time we synced from Asana
   notes: text("notes"), // Project-level notes
+  buyoutHardware: boolean("buyout_hardware").default(false), // Manual toggle for buyout hardware
   
   createdAt: timestamp("created_at").defaultNow(),
 });

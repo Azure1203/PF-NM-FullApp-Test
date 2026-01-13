@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
   title: string;
-  description?: string;
+  description?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }
@@ -14,7 +14,7 @@ export function PageHeader({ title, description, actions, className }: PageHeade
       <div className="space-y-1">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
         {description && (
-          <p className="text-muted-foreground text-lg">{description}</p>
+          <div className="text-muted-foreground text-lg">{description}</div>
         )}
       </div>
       {actions && (
