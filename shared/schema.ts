@@ -171,6 +171,7 @@ export const palletFileAssignments = pgTable("pallet_file_assignments", {
   palletId: integer("pallet_id").references(() => pallets.id, { onDelete: 'cascade' }).notNull(),
   fileId: integer("file_id").references(() => orderFiles.id, { onDelete: 'cascade' }).notNull(),
   notes: text("notes"), // Optional notes for this specific assignment
+  hardwarePackaged: boolean("hardware_packaged").default(false), // Per-order hardware packaged status
   createdAt: timestamp("created_at").defaultNow(),
 });
 
