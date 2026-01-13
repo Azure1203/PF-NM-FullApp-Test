@@ -1744,9 +1744,23 @@ export async function registerRoutes(
       const devDomain = process.env.REPLIT_DEV_DOMAIN;
       const appDomain = publishedDomain || devDomain || '';
       const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
-      const taskNotes = projectAppUrl 
-        ? `<body><a href="${projectAppUrl}">View Project in App</a></body>`
-        : '';
+      
+      // Build task description with file names and Allmoxy Job numbers
+      let taskNotes = '<body>';
+      
+      // Add each file name with its Allmoxy Job #
+      for (const file of projectFiles) {
+        const fileName = file.originalFilename || 'Unknown File';
+        const jobNumber = file.allmoxyJobNumber || 'N/A';
+        taskNotes += `${fileName} - Allmoxy Job #${jobNumber}<br/>`;
+      }
+      
+      // Add spacing and packaging link at the bottom
+      if (projectAppUrl) {
+        taskNotes += `<br/><a href="${projectAppUrl}">Packaging Link, Click Here</a>`;
+      }
+      
+      taskNotes += '</body>';
 
       let newTaskGid: string;
 
