@@ -758,7 +758,7 @@ export default function OrderDetails() {
                       variant="ghost"
                       className="h-7 w-7 p-0"
                       onClick={() => {
-                        updateProject({ cienappsJobNumber: editingCienappsJobNumber.trim() || null } as any, {
+                        updateProject({ id, cienappsJobNumber: editingCienappsJobNumber.trim() || null } as any, {
                           onSuccess: () => {
                             setEditingCienappsJobNumber(null);
                             toast({
@@ -862,7 +862,7 @@ export default function OrderDetails() {
                       size="sm"
                       onClick={() => {
                         const notes = editingProjectNotes ?? project.notes ?? "";
-                        updateProject({ notes: notes.trim() || null } as any, {
+                        updateProject({ id, notes: notes.trim() || null } as any, {
                           onSuccess: () => {
                             setEditingProjectNotes(null);
                             toast({
@@ -2123,7 +2123,7 @@ export default function OrderDetails() {
                       className="w-full text-slate-300 border-slate-600 hover:bg-slate-800"
                       onClick={() => {
                         const newStatus = project.status === 'synced' ? 'pending' : 'synced';
-                        updateProject({ status: newStatus } as any, {
+                        updateProject({ id, status: newStatus } as any, {
                           onSuccess: () => {
                             toast({ 
                               title: "Status updated", 
