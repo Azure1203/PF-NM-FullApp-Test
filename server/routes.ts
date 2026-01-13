@@ -1047,6 +1047,9 @@ export async function registerRoutes(
         .join('\n');
       
       // Sync to Asana if project is synced
+      console.log(`[Pallet Size] Checking Asana sync for project ${existingPallet.projectId}, asanaTaskId: ${project?.asanaTaskId || 'none'}`);
+      console.log(`[Pallet Size] Size lines to sync: ${palletSizeLines}`);
+      
       if (project?.asanaTaskId) {
         try {
           const { tasksApi, projectsApi } = await getAsanaApiInstances();
@@ -1058,6 +1061,18 @@ export async function registerRoutes(
           });
           
           const customFieldSettings = projectDetails.data.custom_field_settings || [];
+          console.log(`[Pallet Size] Found ${customFieldSettings.length} custom fields`);
+          
+          // Log available fields for debugging
+          const palletSizeField = customFieldSettings.find((s: any) => 
+            s.custom_field.name?.toUpperCase().trim() === 'PALLET SIZE'
+          );
+          if (palletSizeField) {
+            console.log(`[Pallet Size] Found PALLET SIZE field: type=${palletSizeField.custom_field.type}, gid=${palletSizeField.custom_field.gid}`);
+          } else {
+            console.log(`[Pallet Size] PALLET SIZE field NOT FOUND in Asana project`);
+          }
+          
           let customFields: Record<string, any> = {};
           
           for (const setting of customFieldSettings) {
@@ -1074,11 +1089,15 @@ export async function registerRoutes(
               data: { custom_fields: customFields }
             });
             console.log(`[Asana] Updated PALLET SIZE for task ${project.asanaTaskId}: ${palletSizeLines}`);
+          } else {
+            console.log(`[Pallet Size] No matching custom fields to update (field may not be type 'text')`);
           }
         } catch (asanaError: any) {
           console.error('[Asana] Failed to update PALLET SIZE:', asanaError.message);
           // Don't fail the request if Asana update fails
         }
+      } else {
+        console.log(`[Pallet Size] Project not synced to Asana, skipping sync`);
       }
       
       // Return pallet with file assignments
