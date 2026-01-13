@@ -273,6 +273,14 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated;
   }
+
+  async updateAssignmentBuyoutStatus(id: number, buyoutHardwareStatus: string | null): Promise<PalletFileAssignment | undefined> {
+    const [updated] = await db.update(palletFileAssignments)
+      .set({ buyoutHardwareStatus })
+      .where(eq(palletFileAssignments.id, id))
+      .returning();
+    return updated;
+  }
 }
 
 export const storage = new DatabaseStorage();

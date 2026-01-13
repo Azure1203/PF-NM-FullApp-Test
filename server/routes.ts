@@ -1496,6 +1496,36 @@ export async function registerRoutes(
     }
   });
 
+  // Update buyout hardware status for an assignment
+  app.patch('/api/assignments/:assignmentId/buyout-status', isAuthenticated, async (req, res) => {
+    try {
+      const assignmentId = Number(req.params.assignmentId);
+      const { buyoutHardwareStatus } = req.body;
+      
+      // Validate the status value
+      const validStatuses = ['arrived', 'missing', 'no_buyout', null];
+      if (!validStatuses.includes(buyoutHardwareStatus)) {
+        return res.status(400).json({ message: 'buyoutHardwareStatus must be arrived, missing, no_buyout, or null' });
+      }
+      
+      // Get the assignment to verify it exists
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignment not found' });
+      }
+      
+      // Update the assignment's buyout status
+      const updated = await storage.updateAssignmentBuyoutStatus(assignmentId, buyoutHardwareStatus);
+      if (!updated) {
+        return res.status(404).json({ message: 'Failed to update assignment' });
+      }
+      
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Get file assignments info for all files in a project (to show which files are on which pallets)
   app.get('/api/orders/:id/file-pallet-info', isAuthenticated, async (req, res) => {
     try {

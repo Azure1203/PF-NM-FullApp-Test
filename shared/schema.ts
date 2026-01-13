@@ -168,6 +168,15 @@ export const pallets = pgTable("pallets", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Buyout hardware status enum values
+export const BUYOUT_HARDWARE_STATUS = {
+  ARRIVED: 'arrived',
+  MISSING: 'missing',
+  NO_BUYOUT: 'no_buyout',
+} as const;
+
+export type BuyoutHardwareStatus = typeof BUYOUT_HARDWARE_STATUS[keyof typeof BUYOUT_HARDWARE_STATUS];
+
 // Pallet-File assignments - which files are on which pallet
 export const palletFileAssignments = pgTable("pallet_file_assignments", {
   id: serial("id").primaryKey(),
@@ -176,6 +185,7 @@ export const palletFileAssignments = pgTable("pallet_file_assignments", {
   notes: text("notes"), // Optional notes for this specific assignment
   hardwarePackaged: boolean("hardware_packaged").default(false), // Per-order hardware packaged status
   hardwarePackedBy: text("hardware_packed_by"), // Who packed the hardware
+  buyoutHardwareStatus: text("buyout_hardware_status").$type<BuyoutHardwareStatus>(), // Buyout hardware status: arrived, missing, or no_buyout
   createdAt: timestamp("created_at").defaultNow(),
 });
 
