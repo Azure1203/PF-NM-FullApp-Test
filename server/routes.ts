@@ -1520,7 +1520,84 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Failed to update assignment' });
       }
       
-      res.json(updated);
+      // Update the project's PF PRODUCTION STATUS based on buyout status
+      let updatedPfProductionStatus: string[] | null = null;
+      const fileWithProject = await storage.getFileWithProject(assignment.fileId);
+      if (fileWithProject) {
+        const project = await storage.getProject(fileWithProject.file.projectId);
+        if (project) {
+          let currentStatuses = project.pfProductionStatus || [];
+          
+          // Define the buyout-related statuses
+          const BO_ARRIVED = 'BO HARDWARE ARRIVED';
+          const BO_MISSING = 'WAITING FOR BO HARDWARE';
+          
+          // Remove both buyout-related statuses first
+          currentStatuses = currentStatuses.filter(s => s !== BO_ARRIVED && s !== BO_MISSING);
+          
+          // Add the appropriate status based on buyout hardware status
+          if (buyoutHardwareStatus === 'arrived') {
+            currentStatuses.push(BO_ARRIVED);
+          } else if (buyoutHardwareStatus === 'missing') {
+            currentStatuses.push(BO_MISSING);
+          }
+          // For 'no_buyout' and null, we don't add any status (both are removed)
+          
+          await storage.updateProject(project.id, { pfProductionStatus: currentStatuses });
+          updatedPfProductionStatus = currentStatuses;
+          
+          // Sync to Asana if the project is linked
+          if (project.asanaTaskId) {
+            try {
+              const { tasksApi, projectsApi } = await getAsanaApiInstances();
+              const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
+              
+              // Get custom field settings to find PF PRODUCTION STATUS field
+              const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
+                opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
+              });
+              
+              const customFieldSettings = projectDetails.data.custom_field_settings || [];
+              const customFields: Record<string, any> = {};
+              
+              for (const setting of customFieldSettings) {
+                const field = setting.custom_field;
+                const name = field?.name?.toUpperCase().trim();
+                
+                if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
+                  // Map selected status names to their GIDs (empty array if no statuses)
+                  const selectedGids = currentStatuses.map((statusName: string) => {
+                    const opt = field.enum_options.find((o: any) => 
+                      o.name?.toUpperCase().trim() === statusName.toUpperCase().trim()
+                    );
+                    return opt?.gid;
+                  }).filter(Boolean);
+                  
+                  // Always set the field, even if empty (to clear previous selections)
+                  customFields[field.gid] = selectedGids;
+                  break; // Found the field, no need to continue
+                }
+              }
+              
+              // Always update Asana when we found the PF PRODUCTION STATUS field
+              if (Object.keys(customFields).length > 0) {
+                await tasksApi.updateTask(
+                  { data: { custom_fields: customFields } },
+                  project.asanaTaskId,
+                  {}
+                );
+                console.log(`[Asana] Updated PF PRODUCTION STATUS via buyout hardware status for task ${project.asanaTaskId} with ${currentStatuses.length} statuses`);
+              }
+            } catch (asanaError: any) {
+              console.error('[Asana] Failed to update PF PRODUCTION STATUS:', asanaError.message);
+              // Don't fail the request if Asana update fails
+            }
+          }
+        }
+      }
+      
+      // Return both the assignment and the updated PF production status
+      res.json({ ...updated, pfProductionStatus: updatedPfProductionStatus });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

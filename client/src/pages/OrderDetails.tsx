@@ -478,6 +478,8 @@ export default function OrderDetails() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+      // Also invalidate order query to refresh pfProductionStatus which is updated by the backend
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
     }
   });
 
