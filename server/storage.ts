@@ -63,7 +63,7 @@ export interface IStorage {
   deleteAssignmentsForPallet(palletId: number): Promise<void>;
   setAssignmentsForPallet(palletId: number, fileIds: number[]): Promise<PalletFileAssignment[]>;
   getAssignment(id: number): Promise<PalletFileAssignment | undefined>;
-  updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean): Promise<PalletFileAssignment | undefined>;
+  updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean, hardwarePackedBy?: string | null): Promise<PalletFileAssignment | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -257,9 +257,18 @@ export class DatabaseStorage implements IStorage {
     return assignment;
   }
 
-  async updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean): Promise<PalletFileAssignment | undefined> {
+  async updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean, hardwarePackedBy?: string | null): Promise<PalletFileAssignment | undefined> {
+    const updateData: { hardwarePackaged: boolean; hardwarePackedBy?: string | null } = { hardwarePackaged };
+    
+    // If marking as packed, store who packed it. If unpacking, clear the name.
+    if (hardwarePackaged && hardwarePackedBy) {
+      updateData.hardwarePackedBy = hardwarePackedBy;
+    } else if (!hardwarePackaged) {
+      updateData.hardwarePackedBy = null;
+    }
+    
     const [updated] = await db.update(palletFileAssignments)
-      .set({ hardwarePackaged })
+      .set(updateData)
       .where(eq(palletFileAssignments.id, id))
       .returning();
     return updated;
