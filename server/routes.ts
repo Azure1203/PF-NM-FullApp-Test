@@ -81,6 +81,50 @@ const GLASS_INSERT_KEYWORDS = [
 // Glass Shelf keywords to detect
 const GLASS_SHELF_KEYWORDS = ['GLSHFA_6', 'GLSHFA_10'];
 
+// Compute auto-enabled production statuses based on order content
+function computeAutoProductionStatuses(params: {
+  hasCTSParts: boolean;
+  hasFivePiece: boolean;
+  hasDoubleThick: boolean;
+  hasDovetails: boolean;
+  hasAssembledDrawers: boolean;
+  hasGlassParts: boolean;
+}): string[] {
+  const statuses: string[] = [];
+  
+  // CTS Parts → CLOSET RODS NOT CUT
+  if (params.hasCTSParts) {
+    statuses.push('CLOSET RODS NOT CUT');
+  }
+  
+  // 5 Piece Shaker → WAITING FOR NETLEY SHAKER DOORS
+  if (params.hasFivePiece) {
+    statuses.push('WAITING FOR NETLEY SHAKER DOORS');
+  }
+  
+  // Double Thick Parts → DOUBLE UP PARTS AT CUSTOM
+  if (params.hasDoubleThick) {
+    statuses.push('DOUBLE UP PARTS AT CUSTOM');
+  }
+  
+  // Dovetails → WAITING FOR DOVETAIL
+  if (params.hasDovetails) {
+    statuses.push('WAITING FOR DOVETAIL');
+  }
+  
+  // Assembled Drawers → WAITING FOR NETLEY ASSEMBLED DRAWERS
+  if (params.hasAssembledDrawers) {
+    statuses.push('WAITING FOR NETLEY ASSEMBLED DRAWERS');
+  }
+  
+  // Glass Parts → WAITING FOR GLASS FOR DOORS
+  if (params.hasGlassParts) {
+    statuses.push('WAITING FOR GLASS FOR DOORS');
+  }
+  
+  return statuses;
+}
+
 // Extract CTS (Cut To Size) parts from CSV
 function extractCTSParts(records: string[][]): Array<{ partNumber: string; description: string; cutLength: number; quantity: number }> {
   const ctsParts: Array<{ partNumber: string; description: string; cutLength: number; quantity: number }> = [];
@@ -1107,6 +1151,7 @@ export async function registerRoutes(
       let hasMJDoors = false;
       let hasRichelieuDoors = false;
       let overallMaxLength = 0;
+      let hasCTSParts = false;
 
       interface FileData {
         name: string;
@@ -1122,6 +1167,7 @@ export async function registerRoutes(
         if (file.rawContent) {
           const records = await parseCSV(file.rawContent);
           const counts = countPartsFromCSV(records);
+          const ctsParts = extractCTSParts(records);
           
           totalCoreParts += counts.coreParts;
           totalDovetails += counts.dovetails;
@@ -1133,6 +1179,7 @@ export async function registerRoutes(
           if (counts.hasMJDoors) hasMJDoors = true;
           if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
           if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
+          if (ctsParts.length > 0) hasCTSParts = true;
 
           // Use full PO name for the file listing
           const fullPoName = file.poNumber || file.originalFilename;
@@ -1343,6 +1390,42 @@ ${fileBreakdown}`;
           }
         }
         
+        // Compute auto-enabled production statuses based on order content
+        const autoStatuses = computeAutoProductionStatuses({
+          hasCTSParts,
+          hasFivePiece: totalFivePiece > 0,
+          hasDoubleThick,
+          hasDovetails: totalDovetails > 0,
+          hasAssembledDrawers: totalAssembledDrawers > 0,
+          hasGlassParts
+        });
+        
+        // Set PF PRODUCTION STATUS if there are auto statuses to set
+        if (autoStatuses.length > 0) {
+          for (const setting of customFieldSettings) {
+            const field = setting.custom_field;
+            const name = field.name?.toUpperCase().trim();
+            
+            if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
+              // Map status names to their GIDs
+              const selectedGids = autoStatuses
+                .map((statusName: string) => {
+                  const option = field.enum_options.find((o: any) => 
+                    o.name?.toUpperCase().trim() === statusName.toUpperCase().trim()
+                  );
+                  return option?.gid;
+                })
+                .filter((gid: string | undefined) => gid);
+              
+              if (selectedGids.length > 0) {
+                customFields[field.gid] = selectedGids;
+                console.log('[Asana] Auto-enabling production statuses:', autoStatuses);
+              }
+              break;
+            }
+          }
+        }
+        
         console.log("Setting custom fields:", customFields);
         
         if (Object.keys(customFields).length > 0) {
@@ -1352,10 +1435,21 @@ ${fileBreakdown}`;
         console.error("Error updating custom fields:", e);
       }
 
-      // Update project status in our database
+      // Compute auto-enabled production statuses for local storage
+      const autoStatuses = computeAutoProductionStatuses({
+        hasCTSParts,
+        hasFivePiece: totalFivePiece > 0,
+        hasDoubleThick,
+        hasDovetails: totalDovetails > 0,
+        hasAssembledDrawers: totalAssembledDrawers > 0,
+        hasGlassParts
+      });
+
+      // Update project status in our database (including auto-enabled production statuses)
       const updatedProject = await storage.updateProject(project.id, {
         asanaTaskId: newTaskGid,
-        status: 'synced'
+        status: 'synced',
+        pfProductionStatus: autoStatuses
       });
 
       res.json(updatedProject);
