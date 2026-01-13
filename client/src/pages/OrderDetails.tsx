@@ -93,6 +93,7 @@ export default function OrderDetails() {
   const [palletCustomSize, setPalletCustomSize] = useState('');
   const [palletNotes, setPalletNotes] = useState('');
   const [palletFileIds, setPalletFileIds] = useState<number[]>([]);
+  const [editingPalletFinalSize, setEditingPalletFinalSize] = useState<{ [palletId: number]: string }>({});
 
   // Color mapping for PF PRODUCTION STATUS options
   const statusColorMap: Record<string, 'green' | 'red' | 'yellow'> = {
@@ -1487,19 +1488,37 @@ export default function OrderDetails() {
                                   <Label htmlFor={`pallet-size-${pallet.id}`} className="text-sm font-medium text-muted-foreground">
                                     Final Pallet Size
                                   </Label>
-                                  <Input
-                                    id={`pallet-size-${pallet.id}`}
-                                    placeholder="Enter final pallet size (e.g., 34&quot; x 96&quot;)"
-                                    defaultValue={pallet.finalSize || ''}
-                                    onBlur={(e) => {
-                                      const newSize = e.target.value.trim();
-                                      if (newSize !== (pallet.finalSize || '')) {
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Input
+                                      id={`pallet-size-${pallet.id}`}
+                                      placeholder="Enter final pallet size (e.g., 34&quot; x 96&quot;)"
+                                      value={editingPalletFinalSize[pallet.id] ?? pallet.finalSize ?? ''}
+                                      onChange={(e) => {
+                                        setEditingPalletFinalSize(prev => ({
+                                          ...prev,
+                                          [pallet.id]: e.target.value
+                                        }));
+                                      }}
+                                      className="flex-1"
+                                      data-testid={`input-pallet-size-${pallet.id}`}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        const newSize = (editingPalletFinalSize[pallet.id] ?? pallet.finalSize ?? '').trim();
                                         updatePalletFinalSize({ palletId: pallet.id, finalSize: newSize });
-                                      }
-                                    }}
-                                    className="mt-1"
-                                    data-testid={`input-pallet-size-${pallet.id}`}
-                                  />
+                                        setEditingPalletFinalSize(prev => {
+                                          const updated = { ...prev };
+                                          delete updated[pallet.id];
+                                          return updated;
+                                        });
+                                      }}
+                                      data-testid={`button-save-pallet-size-${pallet.id}`}
+                                    >
+                                      <Save className="w-4 h-4 mr-1" />
+                                      Save
+                                    </Button>
+                                  </div>
                                 </div>
                                 
                                 {/* Flags as Badges - matching Project Totals style */}
