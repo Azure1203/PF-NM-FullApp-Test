@@ -89,6 +89,7 @@ function computeAutoProductionStatuses(params: {
   hasDovetails: boolean;
   hasAssembledDrawers: boolean;
   hasGlassParts: boolean;
+  hasGlassShelves: boolean;
 }): string[] {
   const statuses: string[] = [];
   
@@ -117,9 +118,14 @@ function computeAutoProductionStatuses(params: {
     statuses.push('WAITING FOR NETLEY ASSEMBLED DRAWERS');
   }
   
-  // Glass Parts → WAITING FOR GLASS FOR DOORS
+  // Glass Parts (inserts) → WAITING FOR GLASS FOR DOORS
   if (params.hasGlassParts) {
     statuses.push('WAITING FOR GLASS FOR DOORS');
+  }
+  
+  // Glass Shelves (GLSHFA_6, GLSHFA_10) → WAITING FOR GLASS SHELVES
+  if (params.hasGlassShelves) {
+    statuses.push('WAITING FOR GLASS SHELVES');
   }
   
   return statuses;
@@ -1148,6 +1154,7 @@ export async function registerRoutes(
       let hasDoubleThick = false;
       let hasShakerDoors = false;
       let hasGlassParts = false;
+      let hasGlassShelves = false;
       let hasMJDoors = false;
       let hasRichelieuDoors = false;
       let overallMaxLength = 0;
@@ -1176,6 +1183,7 @@ export async function registerRoutes(
           if (counts.hasDoubleThick) hasDoubleThick = true;
           if (counts.hasShakerDoors) hasShakerDoors = true;
           if (counts.hasGlassParts) hasGlassParts = true;
+          if (counts.glassShelves > 0) hasGlassShelves = true;
           if (counts.hasMJDoors) hasMJDoors = true;
           if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
           if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
@@ -1400,7 +1408,8 @@ ${fileBreakdown}`;
           hasDoubleThick,
           hasDovetails: totalDovetails > 0,
           hasAssembledDrawers: totalAssembledDrawers > 0,
-          hasGlassParts
+          hasGlassParts,
+          hasGlassShelves
         });
         
         // Set PF PRODUCTION STATUS if there are auto statuses to set
