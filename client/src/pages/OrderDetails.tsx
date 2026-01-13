@@ -42,6 +42,13 @@ const formSchema = insertProjectSchema.pick({
 
 type FormValues = z.infer<typeof formSchema>;
 
+// Type for assignment info with hardware status
+interface AssignmentInfo {
+  id: number;
+  fileId: number;
+  hardwarePackaged: boolean;
+}
+
 // Type for pallets with file assignments
 interface PalletWithFiles {
   id: number;
@@ -54,6 +61,7 @@ interface PalletWithFiles {
   hardwarePackaged: boolean | null;
   createdAt: Date;
   fileIds: number[];
+  assignments: AssignmentInfo[];
 }
 
 export default function OrderDetails() {
@@ -359,18 +367,30 @@ export default function OrderDetails() {
     updatePackagingStatus({ palletId: pallet.id, packagingStatus: newStatus });
   };
   
-  // Update hardware packaged status mutation with optimistic updates
-  const { mutate: updateHardwarePackaged } = useMutation({
-    mutationFn: async ({ palletId, hardwarePackaged }: { palletId: number; hardwarePackaged: boolean }) => {
-      return apiRequest('PATCH', `/api/pallets/${palletId}/hardware-packaged`, { hardwarePackaged });
+  // Update per-assignment hardware packaged status mutation with optimistic updates
+  const { mutate: updateAssignmentHardwarePackaged } = useMutation({
+    mutationFn: async ({ assignmentId, hardwarePackaged }: { assignmentId: number; hardwarePackaged: boolean }) => {
+      return apiRequest('PATCH', `/api/assignments/${assignmentId}/hardware-packaged`, { hardwarePackaged });
     },
-    onMutate: async ({ palletId, hardwarePackaged }) => {
+    onMutate: async ({ assignmentId, hardwarePackaged }) => {
       await queryClient.cancelQueries({ queryKey: palletsQueryKey });
       const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
       
+      // Optimistically update only the assignment in the pallet that contains it
       queryClient.setQueryData<PalletWithFiles[]>(palletsQueryKey, (old) => {
         if (!old) return old;
-        return old.map(p => p.id === palletId ? { ...p, hardwarePackaged } : p);
+        return old.map(pallet => {
+          // Check if this pallet contains the assignment
+          const hasAssignment = pallet.assignments?.some(a => a.id === assignmentId);
+          if (!hasAssignment) return pallet;
+          // Only update the assignment within the matching pallet
+          return {
+            ...pallet,
+            assignments: pallet.assignments.map(a => 
+              a.id === assignmentId ? { ...a, hardwarePackaged } : a
+            )
+          };
+        });
       });
       
       return { previousPallets };
@@ -388,10 +408,10 @@ export default function OrderDetails() {
     }
   });
   
-  // Toggle hardware packaged for a pallet
-  const toggleHardwarePackaged = (pallet: PalletWithFiles) => {
-    const newValue = !pallet.hardwarePackaged;
-    updateHardwarePackaged({ palletId: pallet.id, hardwarePackaged: newValue });
+  // Toggle hardware packaged for a specific order (assignment)
+  const toggleAssignmentHardwarePackaged = (assignment: AssignmentInfo) => {
+    const newValue = !assignment.hardwarePackaged;
+    updateAssignmentHardwarePackaged({ assignmentId: assignment.id, hardwarePackaged: newValue });
   };
   
   // Pallet dialog helpers
@@ -1468,19 +1488,25 @@ export default function OrderDetails() {
                                         </div>
                                         
                                         {/* Per-Order Hardware Packaged Button */}
-                                        <Button
-                                          size="sm"
-                                          onClick={() => toggleHardwarePackaged(pallet)}
-                                          className={`w-full text-xs ${
-                                            pallet.hardwarePackaged 
-                                              ? 'bg-green-600 hover:bg-green-700 text-white' 
-                                              : 'bg-red-600 hover:bg-red-700 text-white'
-                                          }`}
-                                          data-testid={`button-order-hardware-${file.id}`}
-                                        >
-                                          <Package className="w-3 h-3 mr-1" />
-                                          {pallet.hardwarePackaged ? '✓ Hardware Packaged' : 'Hardware Not Packaged, Click Here When Done'}
-                                        </Button>
+                                        {(() => {
+                                          const assignment = pallet.assignments?.find(a => a.fileId === file.id);
+                                          if (!assignment) return null;
+                                          return (
+                                            <Button
+                                              size="sm"
+                                              onClick={() => toggleAssignmentHardwarePackaged(assignment)}
+                                              className={`w-full text-xs ${
+                                                assignment.hardwarePackaged 
+                                                  ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                                  : 'bg-red-600 hover:bg-red-700 text-white'
+                                              }`}
+                                              data-testid={`button-order-hardware-${file.id}`}
+                                            >
+                                              <Package className="w-3 h-3 mr-1" />
+                                              {assignment.hardwarePackaged ? '✓ Hardware Packaged' : 'Hardware Not Packaged, Click Here When Done'}
+                                            </Button>
+                                          );
+                                        })()}
                                       </div>
                                     );
                                   })}

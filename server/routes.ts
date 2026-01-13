@@ -901,13 +901,18 @@ export async function registerRoutes(
       const projectId = Number(req.params.id);
       const projectPallets = await storage.getPalletsForProject(projectId);
       
-      // Get file assignments for each pallet
+      // Get file assignments for each pallet with full assignment details
       const palletsWithAssignments = await Promise.all(
         projectPallets.map(async (pallet) => {
           const assignments = await storage.getAssignmentsForPallet(pallet.id);
           return {
             ...pallet,
-            fileIds: assignments.map(a => a.fileId)
+            fileIds: assignments.map(a => a.fileId),
+            assignments: assignments.map(a => ({
+              id: a.id,
+              fileId: a.fileId,
+              hardwarePackaged: a.hardwarePackaged ?? false
+            }))
           };
         })
       );
