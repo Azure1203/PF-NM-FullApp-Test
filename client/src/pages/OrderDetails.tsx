@@ -633,7 +633,7 @@ export default function OrderDetails() {
 
         <PageHeader 
           title={project.name} 
-          description={`${project.files?.length || 0} file(s) in this project`}
+          description={`${project.files?.length || 0} Order(s) in this project`}
           actions={
             <div className="flex items-center gap-4">
               <StatusBadge status={project.status as any} />
