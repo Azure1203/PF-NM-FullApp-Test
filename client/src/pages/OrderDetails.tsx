@@ -1594,13 +1594,10 @@ export default function OrderDetails() {
                                   previewFiles.some(f => f.hasMJDoors) || 
                                   previewFiles.some(f => f.hasRichelieuDoors) ||
                                   previewFiles.some(f => f.hasDoubleThick) ||
-                                  previewFiles.some(f => f.customParts && f.customParts.length > 0)) && (
+                                  previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware')))) && (
                                   <div className="flex flex-wrap gap-2">
                                     {previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware'))) && (
                                       <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Buyout Hardware</Badge>
-                                    )}
-                                    {previewFiles.some(f => f.customParts && f.customParts.length > 0) && (
-                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Parts at Custom</Badge>
                                     )}
                                     {previewFiles.some(f => f.hasGlassParts) && (
                                       <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Glass Parts</Badge>
