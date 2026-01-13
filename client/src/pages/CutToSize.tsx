@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { useRoute } from "wouter";
+import { useState, useRef, useEffect } from "react";
+import { useRoute, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -21,6 +21,9 @@ interface CtsPartWithConfig extends CtsPart {
 export default function CutToSize() {
   const [, params] = useRoute("/files/:fileId/cts");
   const fileId = parseInt(params?.fileId || "0");
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const palletId = searchParams.get('palletId');
   const { toast } = useToast();
   
   const [editingConfig, setEditingConfig] = useState<{ [partNumber: string]: { rackLocation: string } }>({});
@@ -129,7 +132,7 @@ export default function CutToSize() {
             </Button>
           </Link>
           {fileInfo && (
-            <Link href={`/orders/${fileInfo.file.projectId}`}>
+            <Link href={`/orders/${fileInfo.file.projectId}${palletId ? `?scrollToPallet=${palletId}` : ''}`}>
               <Button variant="ghost" className="pl-0 text-muted-foreground hover:text-foreground">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Order

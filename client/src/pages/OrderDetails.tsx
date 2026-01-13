@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRoute, useLocation } from "wouter";
+import { useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -60,6 +60,9 @@ export default function OrderDetails() {
   const [, params] = useRoute("/orders/:id");
   const id = parseInt(params?.id || "0");
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const searchParams = new URLSearchParams(searchString);
+  const scrollToPalletId = searchParams.get('scrollToPallet');
   const { toast } = useToast();
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
@@ -520,6 +523,24 @@ export default function OrderDetails() {
       });
     }
   }, [project, form]);
+
+  // Scroll to pallet when returning from CTS page
+  useEffect(() => {
+    if (scrollToPalletId && pallets.length > 0) {
+      const palletIdNum = parseInt(scrollToPalletId);
+      if (!isNaN(palletIdNum)) {
+        // Expand the pallet
+        setExpandedPallets(prev => new Set([...prev, palletIdNum]));
+        // Scroll to the pallet after a short delay to allow DOM to update
+        setTimeout(() => {
+          const palletElement = document.getElementById(`pallet-${palletIdNum}`);
+          if (palletElement) {
+            palletElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      }
+    }
+  }, [scrollToPalletId, pallets]);
 
   // Handle production status checkbox toggle
   const handleProductionStatusToggle = (option: string, checked: boolean) => {
@@ -1159,6 +1180,7 @@ export default function OrderDetails() {
                     return (
                       <div
                         key={pallet.id}
+                        id={`pallet-${pallet.id}`}
                         className="border rounded-lg overflow-hidden"
                         data-testid={`pallet-card-${pallet.id}`}
                       >
@@ -1410,7 +1432,7 @@ export default function OrderDetails() {
                                         <div className="flex flex-wrap items-center gap-2">
                                           {/* CTS Parts Button - turns green when all cut */}
                                           {actualFilePreview && (actualFilePreview as any).ctsPartsCount > 0 && (
-                                            <Link href={`/files/${file.id}/cts`}>
+                                            <Link href={`/files/${file.id}/cts?palletId=${pallet.id}`}>
                                               <Button
                                                 size="sm"
                                                 variant="outline"
