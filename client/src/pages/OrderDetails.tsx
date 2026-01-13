@@ -95,7 +95,6 @@ export default function OrderDetails() {
   const [palletCustomSize, setPalletCustomSize] = useState('');
   const [palletNotes, setPalletNotes] = useState('');
   const [palletFileIds, setPalletFileIds] = useState<number[]>([]);
-  const [editingPalletFinalSize, setEditingPalletFinalSize] = useState<{ [palletId: number]: string }>({});
   
   // Hardware packaged dialog state
   const [hardwareDialogOpen, setHardwareDialogOpen] = useState(false);
@@ -536,58 +535,6 @@ export default function OrderDetails() {
     }
   };
 
-  // Update pallet final size mutation with optimistic updates
-  const { mutate: updatePalletFinalSize } = useMutation({
-    mutationFn: async ({ palletId, finalSize }: { palletId: number; finalSize: string }) => {
-      return apiRequest('PATCH', `/api/pallets/${palletId}/final-size`, { finalSize });
-    },
-    onMutate: async ({ palletId, finalSize }) => {
-      await queryClient.cancelQueries({ queryKey: palletsQueryKey });
-      const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
-      
-      queryClient.setQueryData<PalletWithFiles[]>(palletsQueryKey, (old) => {
-        if (!old) return old;
-        return old.map(p => p.id === palletId ? { ...p, finalSize } : p);
-      });
-      
-      return { previousPallets };
-    },
-    onError: (error: Error, _variables, context) => {
-      if (context?.previousPallets) {
-        queryClient.setQueryData(palletsQueryKey, context.previousPallets);
-      }
-      toast({ title: "Failed to update pallet size", description: error.message, variant: "destructive" });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
-    },
-    onSuccess: (data: any) => {
-      const syncStatus = data?.asanaSyncStatus;
-      if (syncStatus?.synced) {
-        toast({ title: "Pallet size saved and synced to Asana" });
-      } else if (syncStatus?.notLinked) {
-        toast({ 
-          title: "Pallet size saved",
-          description: "Project not synced to Asana yet"
-        });
-      } else if (syncStatus?.fieldNotFound) {
-        toast({ 
-          title: "Pallet size saved (Asana sync failed)",
-          description: "Field 'PALLET SIZE' not found in Asana",
-          variant: "destructive"
-        });
-      } else if (syncStatus?.error) {
-        toast({ 
-          title: "Pallet size saved (Asana sync failed)",
-          description: syncStatus.error,
-          variant: "destructive"
-        });
-      } else {
-        toast({ title: "Pallet size saved" });
-      }
-    }
-  });
-  
   // Pallet dialog helpers
   const openAddPalletDialog = () => {
     setEditingPallet(null);
@@ -1598,7 +1545,7 @@ export default function OrderDetails() {
                               <>
                                 {/* Pallet Totals - clickable tiles with red/green status */}
                                 <div>
-                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals, Click Each Button When Packed, Then Add Final Pallet Size Below</p>
+                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals, Click Each Button When Packed</p>
                                   {(() => {
                                     const status = pallet.packagingStatus || defaultPackagingStatus;
                                     // Check if all CTS parts in all files in this pallet are cut
@@ -1655,44 +1602,6 @@ export default function OrderDetails() {
                                       </div>
                                     );
                                   })()}
-                                </div>
-                                
-                                {/* Final Pallet Size Input */}
-                                <div className="mt-3">
-                                  <Label htmlFor={`pallet-size-${pallet.id}`} className="text-sm font-medium text-muted-foreground">
-                                    Final Pallet Size
-                                  </Label>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <Input
-                                      id={`pallet-size-${pallet.id}`}
-                                      placeholder="Enter final pallet size (e.g., 34&quot; x 96&quot;)"
-                                      value={editingPalletFinalSize[pallet.id] ?? pallet.finalSize ?? ''}
-                                      onChange={(e) => {
-                                        setEditingPalletFinalSize(prev => ({
-                                          ...prev,
-                                          [pallet.id]: e.target.value
-                                        }));
-                                      }}
-                                      className="flex-1"
-                                      data-testid={`input-pallet-size-${pallet.id}`}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() => {
-                                        const newSize = (editingPalletFinalSize[pallet.id] ?? pallet.finalSize ?? '').trim();
-                                        updatePalletFinalSize({ palletId: pallet.id, finalSize: newSize });
-                                        setEditingPalletFinalSize(prev => {
-                                          const updated = { ...prev };
-                                          delete updated[pallet.id];
-                                          return updated;
-                                        });
-                                      }}
-                                      data-testid={`button-save-pallet-size-${pallet.id}`}
-                                    >
-                                      <Save className="w-4 h-4 mr-1" />
-                                      Save
-                                    </Button>
-                                  </div>
                                 </div>
                                 
                                 {/* Flags as Badges - matching Project Totals style */}
