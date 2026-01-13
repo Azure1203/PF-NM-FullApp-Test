@@ -1156,6 +1156,142 @@ export async function registerRoutes(
     }
   });
 
+  // Toggle per-order (assignment) hardware packaged status
+  app.patch('/api/assignments/:assignmentId/hardware-packaged', isAuthenticated, async (req, res) => {
+    try {
+      const assignmentId = Number(req.params.assignmentId);
+      const { hardwarePackaged } = req.body;
+      
+      if (typeof hardwarePackaged !== 'boolean') {
+        return res.status(400).json({ message: 'hardwarePackaged boolean is required' });
+      }
+      
+      // Get the assignment to find its pallet
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: 'Assignment not found' });
+      }
+      
+      // Update the assignment's hardware status
+      const updated = await storage.updateAssignmentHardwareStatus(assignmentId, hardwarePackaged);
+      if (!updated) {
+        return res.status(404).json({ message: 'Failed to update assignment' });
+      }
+      
+      // Get the pallet to find the project
+      const pallet = await storage.getPallet(assignment.palletId);
+      if (!pallet) {
+        return res.status(404).json({ message: 'Pallet not found' });
+      }
+      
+      // Check if all assignments in this pallet are hardware packaged
+      const palletAssignments = await storage.getAssignmentsForPallet(pallet.id);
+      const allAssignmentsPackaged = palletAssignments.length > 0 && 
+        palletAssignments.every(a => a.hardwarePackaged === true);
+      
+      // Update the pallet-level hardwarePackaged status (derived aggregate)
+      await storage.updatePallet(pallet.id, { hardwarePackaged: allAssignmentsPackaged });
+      
+      // Get the project to check/update Asana
+      const project = await storage.getProject(pallet.projectId);
+      
+      // Check ALL pallets for this project to determine project-level HARDWARE PACKED status
+      const allPallets = await storage.getPalletsForProject(pallet.projectId);
+      
+      // For each pallet, check if all its assignments are hardware packed
+      let allProjectAssignmentsPacked = true;
+      for (const p of allPallets) {
+        const pAssignments = await storage.getAssignmentsForPallet(p.id);
+        if (pAssignments.length > 0 && !pAssignments.every(a => a.hardwarePackaged === true)) {
+          allProjectAssignmentsPacked = false;
+          break;
+        }
+      }
+      
+      // Update local pfProductionStatus based on whether ALL assignments in ALL pallets are packed
+      const currentStatuses = project?.pfProductionStatus || [];
+      let newStatuses: string[];
+      
+      if (allProjectAssignmentsPacked && allPallets.length > 0) {
+        // Add HARDWARE PACKED if not already present
+        if (!currentStatuses.includes('HARDWARE PACKED')) {
+          newStatuses = [...currentStatuses, 'HARDWARE PACKED'];
+        } else {
+          newStatuses = currentStatuses;
+        }
+      } else {
+        // Remove HARDWARE PACKED
+        newStatuses = currentStatuses.filter(s => s !== 'HARDWARE PACKED');
+      }
+      
+      // Update local database
+      if (project) {
+        await storage.updateProject(project.id, { pfProductionStatus: newStatuses });
+      }
+      
+      // Update Asana if project is synced
+      if (project?.asanaTaskId) {
+        try {
+          const { tasksApi, projectsApi } = await getAsanaApiInstances();
+          const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
+          
+          const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
+            opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
+          });
+          
+          const customFieldSettings = projectDetails.data.custom_field_settings || [];
+          let customFields: Record<string, any> = {};
+          
+          for (const setting of customFieldSettings) {
+            const field = setting.custom_field;
+            const name = field.name?.toUpperCase().trim();
+            
+            if (name === 'HARDWARE PACKED') {
+              if (field.type === 'enum' && field.enum_options) {
+                const yesOption = field.enum_options.find((o: any) => 
+                  o.name?.toLowerCase() === 'yes' || o.name?.toLowerCase() === 'true'
+                );
+                const noOption = field.enum_options.find((o: any) => 
+                  o.name?.toLowerCase() === 'no' || o.name?.toLowerCase() === 'false'
+                );
+                
+                if (allProjectAssignmentsPacked && yesOption) {
+                  customFields[field.gid] = yesOption.gid;
+                } else if (!allProjectAssignmentsPacked && noOption) {
+                  customFields[field.gid] = noOption.gid;
+                }
+              } else if (field.type === 'text') {
+                customFields[field.gid] = allProjectAssignmentsPacked ? 'Yes' : 'No';
+              }
+            } else if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
+              const selectedGids = newStatuses.map((statusName: string) => {
+                const opt = field.enum_options.find((o: any) => 
+                  o.name?.toUpperCase().trim() === statusName.toUpperCase().trim()
+                );
+                return opt?.gid;
+              }).filter(Boolean);
+              
+              customFields[field.gid] = selectedGids;
+            }
+          }
+          
+          if (Object.keys(customFields).length > 0) {
+            await tasksApi.updateTask(project.asanaTaskId, {
+              data: { custom_fields: customFields }
+            });
+            console.log(`[Asana] Updated HARDWARE PACKED via assignment toggle for task ${project.asanaTaskId}`);
+          }
+        } catch (asanaError: any) {
+          console.error('[Asana] Failed to update HARDWARE PACKED:', asanaError.message);
+        }
+      }
+      
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Get file assignments info for all files in a project (to show which files are on which pallets)
   app.get('/api/orders/:id/file-pallet-info', isAuthenticated, async (req, res) => {
     try {
