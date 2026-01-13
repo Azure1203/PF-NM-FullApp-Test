@@ -670,6 +670,9 @@ export async function registerRoutes(
       }
       console.log(`[Project Update] Successfully updated project ${projectId} in database`);
       
+      // Track Asana sync status
+      let asanaSyncStatus: { synced: boolean; error?: string; fieldNotFound?: boolean } = { synced: false };
+      
       // If CIENAPPS JOB NUMBER was updated and project is synced to Asana, sync it
       if ('cienappsJobNumber' in input && existingProject.asanaTaskId) {
         console.log(`[Asana] Syncing CIENAPPS JOB NUMBER to Asana task ${existingProject.asanaTaskId}`);
@@ -706,16 +709,20 @@ export async function registerRoutes(
               data: { custom_fields: customFields }
             });
             console.log(`[Asana] Updated CIENAPPS JOB NUMBER for task ${existingProject.asanaTaskId}`);
+            asanaSyncStatus = { synced: true };
           } else {
             console.log(`[Asana] CIENAPPS JOB NUMBER field not found in Asana project custom fields`);
+            asanaSyncStatus = { synced: false, fieldNotFound: true };
           }
         } catch (asanaError: any) {
           console.error('[Asana] Failed to update CIENAPPS JOB NUMBER:', asanaError.message, asanaError.response?.body);
-          // Don't fail the request if Asana update fails
+          asanaSyncStatus = { synced: false, error: asanaError.message };
         }
+      } else if ('cienappsJobNumber' in input && !existingProject.asanaTaskId) {
+        console.log(`[Asana] Project not synced to Asana yet, skipping CIENAPPS JOB NUMBER sync`);
       }
       
-      res.json(project);
+      res.json({ ...project, asanaSyncStatus });
     } catch (err: any) {
       console.error('[Project Update] Error:', err.message, err.stack);
        if (err instanceof z.ZodError) {
@@ -1104,6 +1111,9 @@ export async function registerRoutes(
         .map(p => `PALLET ${p.palletNumber} SIZE: ${p.finalSize}`)
         .join('\n');
       
+      // Track Asana sync status
+      let asanaSyncStatus: { synced: boolean; error?: string; fieldNotFound?: boolean; notLinked?: boolean } = { synced: false };
+      
       // Sync to Asana if project is synced
       console.log(`[Pallet Size] Checking Asana sync for project ${existingPallet.projectId}, asanaTaskId: ${project?.asanaTaskId || 'none'}`);
       console.log(`[Pallet Size] Size lines to sync: ${palletSizeLines}`);
@@ -1146,18 +1156,21 @@ export async function registerRoutes(
               data: { custom_fields: customFields }
             });
             console.log(`[Asana] Updated PALLET SIZE for task ${project.asanaTaskId}: ${palletSizeLines}`);
+            asanaSyncStatus = { synced: true };
           } else {
             console.log(`[Pallet Size] No matching custom fields to update (field may not be type 'text')`);
+            asanaSyncStatus = { synced: false, fieldNotFound: true };
           }
         } catch (asanaError: any) {
           console.error('[Asana] Failed to update PALLET SIZE:', asanaError.message);
-          // Don't fail the request if Asana update fails
+          asanaSyncStatus = { synced: false, error: asanaError.message };
         }
       } else {
         console.log(`[Pallet Size] Project not synced to Asana, skipping sync`);
+        asanaSyncStatus = { synced: false, notLinked: true };
       }
       
-      // Return pallet with file assignments
+      // Return pallet with file assignments and sync status
       const assignments = await storage.getAssignmentsForPallet(palletId);
       res.json({
         ...pallet,
@@ -1166,7 +1179,8 @@ export async function registerRoutes(
           id: a.id,
           fileId: a.fileId,
           hardwarePackaged: a.hardwarePackaged ?? false
-        }))
+        })),
+        asanaSyncStatus
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
