@@ -1247,7 +1247,10 @@ export async function registerRoutes(
       const taskName = `(PERFECT FIT) ${project.name}`;
       
       // Build project app link for Asana description
-      const appDomain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0] || '';
+      // Prefer published domain (REPLIT_DOMAINS) over dev domain for stable links
+      const publishedDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
+      const devDomain = process.env.REPLIT_DEV_DOMAIN;
+      const appDomain = publishedDomain || devDomain || '';
       const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
       const taskNotes = projectAppUrl 
         ? `<body><a href="${projectAppUrl}">View Project in App</a></body>`
