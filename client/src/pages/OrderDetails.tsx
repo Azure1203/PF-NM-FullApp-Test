@@ -1402,7 +1402,7 @@ export default function OrderDetails() {
                                                 data-testid={`button-cts-${file.id}`}
                                               >
                                                 <Scissors className="w-3 h-3 mr-1" />
-                                                CTS Parts ({(actualFilePreview as any).ctsPartsCount})
+                                                CTS Parts To Cut, Click Here.
                                               </Button>
                                             </Link>
                                           )}
@@ -1416,7 +1416,7 @@ export default function OrderDetails() {
                                               data-testid={`button-packaging-${file.id}`}
                                             >
                                               <Package className="w-3 h-3 mr-1" />
-                                              Packaging
+                                              Packaging Link, Click Here.
                                             </Button>
                                           </Link>
                                         </div>
