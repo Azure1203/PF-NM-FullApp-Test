@@ -924,7 +924,7 @@ export default function OrderDetails() {
                                 </Badge>
                               </div>
                               <p className="text-xs text-muted-foreground">
-                                {assignedFiles.length} file{assignedFiles.length !== 1 ? 's' : ''} • {palletParts} parts • {Math.round(palletWeight)} lbs
+                                {assignedFiles.length} Order{assignedFiles.length !== 1 ? 's' : ''} • {palletParts} parts • {Math.round(palletWeight)} lbs
                               </p>
                             </div>
                           </div>
@@ -983,7 +983,7 @@ export default function OrderDetails() {
                               <>
                                 {/* Pallet Totals - clickable tiles with red/green status */}
                                 <div>
-                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals <span className="text-xs">(click to mark as packaged)</span></p>
+                                  <p className="text-sm font-medium text-muted-foreground mb-2">Pallet Totals <span className="text-xs">(click when packed)</span></p>
                                   {(() => {
                                     const status = pallet.packagingStatus || defaultPackagingStatus;
                                     const metrics: { key: PalletPackagingMetric; value: number | string; label: string }[] = [
@@ -1014,7 +1014,7 @@ export default function OrderDetails() {
                                             >
                                               <p className="text-xl font-bold">{value}</p>
                                               <p className="text-xs opacity-80">{label}</p>
-                                              <p className="text-[10px] mt-1">{isPackaged ? '✓ Packaged' : 'Not Packaged'}</p>
+                                              <p className="text-[10px] mt-1">{isPackaged ? '✓ Packaged' : 'Click when packed'}</p>
                                             </button>
                                           );
                                         })}
@@ -1081,9 +1081,9 @@ export default function OrderDetails() {
                                     return (
                                       <div 
                                         key={file.id}
-                                        className="bg-muted/20 rounded-lg p-3"
+                                        className="bg-muted/20 rounded-lg p-3 space-y-3"
                                       >
-                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                        <div className="flex items-start justify-between gap-2">
                                           <div>
                                             <p className="font-medium text-sm">{actualFilePreview?.name || file.originalFilename}</p>
                                             {file.allmoxyJobNumber && (
@@ -1096,30 +1096,103 @@ export default function OrderDetails() {
                                             </Badge>
                                           )}
                                         </div>
+                                        
+                                        {/* All Metrics Grid */}
                                         {actualFilePreview && (
-                                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                                            <div className="text-center p-1.5 bg-background/50 rounded">
-                                              <p className="text-sm font-semibold">{actualFilePreview.coreParts}</p>
-                                              <p className="text-[10px] text-muted-foreground">Parts</p>
+                                          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1">
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{actualFilePreview.coreParts}</p>
+                                              <p className="text-[9px] text-muted-foreground">Parts</p>
                                             </div>
-                                            <div className="text-center p-1.5 bg-background/50 rounded">
-                                              <p className="text-sm font-semibold">{actualFilePreview.dovetails}</p>
-                                              <p className="text-[10px] text-muted-foreground">Dovetails</p>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{actualFilePreview.dovetails}</p>
+                                              <p className="text-[9px] text-muted-foreground">Dovetails</p>
                                             </div>
-                                            <div className="text-center p-1.5 bg-background/50 rounded">
-                                              <p className="text-sm font-semibold">{actualFilePreview.assembledDrawers}</p>
-                                              <p className="text-[10px] text-muted-foreground">Assembled</p>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{actualFilePreview.assembledDrawers}</p>
+                                              <p className="text-[9px] text-muted-foreground">Assembled</p>
                                             </div>
-                                            <div className="text-center p-1.5 bg-background/50 rounded">
-                                              <p className="text-sm font-semibold">{actualFilePreview.fivePieceDoors}</p>
-                                              <p className="text-[10px] text-muted-foreground">5 Piece</p>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{actualFilePreview.fivePieceDoors}</p>
+                                              <p className="text-[9px] text-muted-foreground">5 Piece</p>
                                             </div>
-                                            <div className="text-center p-1.5 bg-background/50 rounded">
-                                              <p className="text-sm font-semibold">{Math.round(actualFilePreview.weightLbs)}</p>
-                                              <p className="text-[10px] text-muted-foreground">lbs</p>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{(actualFilePreview as any).glassInserts || 0}</p>
+                                              <p className="text-[9px] text-muted-foreground">Glass Ins</p>
+                                            </div>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{(actualFilePreview as any).glassShelves || 0}</p>
+                                              <p className="text-[9px] text-muted-foreground">Glass Shv</p>
+                                            </div>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{(actualFilePreview as any).mjDoorsCount || 0}</p>
+                                              <p className="text-[9px] text-muted-foreground">M&J</p>
+                                            </div>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{(actualFilePreview as any).richelieuDoorsCount || 0}</p>
+                                              <p className="text-[9px] text-muted-foreground">Richelieu</p>
+                                            </div>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{Math.round(actualFilePreview.weightLbs)}</p>
+                                              <p className="text-[9px] text-muted-foreground">lbs</p>
+                                            </div>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{actualFilePreview.maxLength}</p>
+                                              <p className="text-[9px] text-muted-foreground">mm max</p>
                                             </div>
                                           </div>
                                         )}
+                                        
+                                        {/* CTS Button and Packaging Link */}
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          {/* CTS Parts Button - turns green when all cut */}
+                                          {actualFilePreview && (actualFilePreview as any).ctsPartsCount > 0 && (
+                                            <Link href={`/cts/${file.id}`}>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className={`text-xs ${
+                                                  (actualFilePreview as any).ctsAllCut
+                                                    ? 'bg-green-100 border-green-500 text-green-700 hover:bg-green-200'
+                                                    : 'bg-red-100 border-red-500 text-red-700 hover:bg-red-200'
+                                                }`}
+                                                data-testid={`button-cts-${file.id}`}
+                                              >
+                                                <Scissors className="w-3 h-3 mr-1" />
+                                                CTS Parts ({(actualFilePreview as any).ctsPartsCount})
+                                              </Button>
+                                            </Link>
+                                          )}
+                                          
+                                          {/* Packaging Link */}
+                                          <Link href={`/orders/${project.id}#packaging`}>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs"
+                                              data-testid={`button-packaging-${file.id}`}
+                                            >
+                                              <Package className="w-3 h-3 mr-1" />
+                                              Packaging
+                                            </Button>
+                                          </Link>
+                                        </div>
+                                        
+                                        {/* Per-Order Hardware Packaged Button */}
+                                        <Button
+                                          size="sm"
+                                          onClick={() => toggleHardwarePackaged(pallet)}
+                                          className={`w-full text-xs ${
+                                            pallet.hardwarePackaged 
+                                              ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                              : 'bg-red-600 hover:bg-red-700 text-white'
+                                          }`}
+                                          data-testid={`button-order-hardware-${file.id}`}
+                                        >
+                                          {pallet.hardwarePackaged 
+                                            ? '✓ HARDWARE PACKED' 
+                                            : 'CLICK WHEN HARDWARE PACKED, BUTTON WILL SHOW GREEN'}
+                                        </Button>
                                       </div>
                                     );
                                   })}

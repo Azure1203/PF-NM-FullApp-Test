@@ -448,6 +448,7 @@ export async function registerRoutes(
       customParts: string[];
       ctsPartsCount: number;
       fileId: number;
+      ctsAllCut: boolean;
     }
     const fileBreakdowns: FileBreakdown[] = [];
     let totalCtsPartsCount = 0;
@@ -474,8 +475,9 @@ export async function registerRoutes(
         if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
         if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
 
-        // Get CTS parts count for this file
+        // Get CTS parts count and cut status for this file
         const fileCtsPartsCount = await storage.getCtsPartsCountForFile(file.id);
+        const fileCtsStatus = await storage.getCtsPartsCutStatus(file.id);
         totalCtsPartsCount += fileCtsPartsCount;
 
         fileBreakdowns.push({
@@ -497,7 +499,8 @@ export async function registerRoutes(
           doubleThickCount: counts.doubleThickCount,
           customParts: counts.customParts,
           ctsPartsCount: fileCtsPartsCount,
-          fileId: file.id
+          fileId: file.id,
+          ctsAllCut: fileCtsStatus.allCut
         });
       }
     }
