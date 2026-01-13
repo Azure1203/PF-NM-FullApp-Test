@@ -64,6 +64,7 @@ export default function OrderDetails() {
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
   const [csvSectionOpen, setCsvSectionOpen] = useState(false);
+  const [projectDetailsOpen, setProjectDetailsOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
   const [editingPackagingLink, setEditingPackagingLink] = useState<{ [fileId: number]: string }>({});
@@ -657,6 +658,204 @@ export default function OrderDetails() {
             </div>
           }
         />
+
+        {/* Project Details - Collapsible */}
+        <Collapsible open={projectDetailsOpen} onOpenChange={setProjectDetailsOpen}>
+          <Card className="mb-6 border-none shadow-md" data-testid="project-details-card">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-lg">
+                <CardTitle className="flex items-center justify-between gap-2 text-lg">
+                  <div className="flex items-center gap-2">
+                    <Edit2 className="w-5 h-5 text-primary" />
+                    Project Details
+                  </div>
+                  {projectDetailsOpen ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {projectDetailsOpen ? 'Click to collapse' : 'Click to expand and edit project information'}
+                </CardDescription>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Project Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="e.g. Anderson PO25-391065" className="bg-slate-50/50" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="dealer"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Dealer Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ""} placeholder="e.g. Closet World" className="bg-slate-50/50" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="date"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Order Date</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ""} type="date" className="bg-slate-50/50" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="orderId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Order ID</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="shippingAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Shipping Address</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              {...field}
+                              value={field.value ?? ""}
+                              className="bg-slate-50/50 min-h-[80px]" 
+                              placeholder="Full shipping address..."
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <FormField
+                        control={form.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="taxId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Tax ID</FormLabel>
+                            <FormControl>
+                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                      <FormField
+                        control={form.control}
+                        name="powerTailgate"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-slate-50/30">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Power Tailgate</FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value ?? false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="phoneAppointment"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-slate-50/30">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Phone Appointment</FormLabel>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value ?? false}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t">
+                      <Button 
+                        type="submit" 
+                        disabled={isUpdating}
+                        className="w-full sm:w-auto min-w-[120px]"
+                      >
+                        {isUpdating ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* PF PRODUCTION SECTION, PF ORDER STATUS, PF PRODUCTION STATUS Section */}
         <Card className="mb-6 border-none shadow-md" data-testid="order-status-card">
@@ -1588,195 +1787,8 @@ export default function OrderDetails() {
           </Collapsible>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Main Form Column */}
-          <div className="lg:col-span-2 space-y-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)}>
-                <Card className="border-none shadow-md">
-                  <CardHeader>
-                    <CardTitle>Project Details</CardTitle>
-                    <CardDescription>
-                      Review and edit project information before syncing to Asana.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Project Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="e.g. Anderson PO25-391065" className="bg-slate-50/50" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="dealer"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Dealer Name</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value ?? ""} placeholder="e.g. Closet World" className="bg-slate-50/50" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="date"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Order Date</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value ?? ""} type="date" className="bg-slate-50/50" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="orderId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Order ID</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <FormField
-                      control={form.control}
-                      name="shippingAddress"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Shipping Address</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              {...field}
-                              value={field.value ?? ""}
-                              className="bg-slate-50/50 min-h-[80px]" 
-                              placeholder="Full shipping address..."
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Phone Number</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="taxId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tax ID</FormLabel>
-                            <FormControl>
-                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                      <FormField
-                        control={form.control}
-                        name="powerTailgate"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-slate-50/30">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">Power Tailgate</FormLabel>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value ?? false}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="phoneAppointment"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-slate-50/30">
-                            <div className="space-y-0.5">
-                              <FormLabel className="text-base">Phone Appointment</FormLabel>
-                            </div>
-                            <FormControl>
-                              <Switch
-                                checked={field.value ?? false}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t">
-                      <Button 
-                        type="submit" 
-                        disabled={isUpdating}
-                        className="w-full sm:w-auto min-w-[120px]"
-                      >
-                        {isUpdating ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4 mr-2" />
-                            Save Changes
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </form>
-            </Form>
-          </div>
-
-          {/* Sidebar / Context Column */}
-          <div className="space-y-6">
+        {/* Sidebar / Sync Status Card */}
+        <div className="mb-6">
             <Card className="border-none shadow-md bg-slate-900 text-slate-100">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
@@ -1839,8 +1851,6 @@ export default function OrderDetails() {
                 </div>
               </CardContent>
             </Card>
-
-          </div>
         </div>
       </div>
       
