@@ -1160,16 +1160,6 @@ export async function registerRoutes(
       let overallMaxLength = 0;
       let hasCTSParts = false;
 
-      interface FileData {
-        name: string;
-        coreParts: number;
-        dovetails: number;
-        assembledDrawers: number;
-        fivePiece: number;
-        weightLbs: number;
-      }
-      const fileDataList: FileData[] = [];
-
       for (const file of projectFiles) {
         if (file.rawContent) {
           const records = await parseCSV(file.rawContent);
@@ -1188,83 +1178,10 @@ export async function registerRoutes(
           if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
           if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
           if (ctsParts.length > 0) hasCTSParts = true;
-
-          // Use full PO name for the file listing
-          const fullPoName = file.poNumber || file.originalFilename;
-          
-          fileDataList.push({
-            name: fullPoName,
-            coreParts: counts.coreParts,
-            dovetails: counts.dovetails,
-            assembledDrawers: counts.assembledDrawers,
-            fivePiece: counts.fivePiece,
-            weightLbs: counts.weightLbs
-          });
         }
       }
 
-      // Build per-file breakdown (values are bolded, not labels)
-      const fileBreakdown = fileDataList.map(f => 
-        `${f.name}
-Parts: <strong>${f.coreParts}</strong>
-Dovetails: <strong>${f.dovetails}</strong>
-Assembled Netley Drawers: <strong>${f.assembledDrawers}</strong>
-5 Piece Shaker Doors: <strong>${f.fivePiece}</strong>
-Expected Weight: <strong>${Math.round(f.weightLbs)} lbs</strong>`
-      ).join('\n\n');
-      
-      // Calculate total weight
-      const totalWeight = fileDataList.reduce((sum, f) => sum + f.weightLbs, 0);
-
-      // Build custom parts answer
-      const customPartsList: string[] = [];
-      if (hasDoubleThick) customPartsList.push('DOUBLE THICK PARTS');
-      if (hasShakerDoors) customPartsList.push('SHAKER DOORS');
-      const customPartsAnswer = customPartsList.length > 0 ? customPartsList.join(', ') : '';
-
-      // Determine pallet size based on part count and max length
-      let palletSize = '';
-      if (totalCoreParts < 100 && overallMaxLength <= 2550) {
-        palletSize = 'USE 34" WIDE PALLET CUT TO SIZE';
-      } else if (totalCoreParts >= 100 && overallMaxLength < 2400) {
-        palletSize = 'USE 96" LONG PALLET';
-      } else if (totalCoreParts >= 100 && overallMaxLength >= 2400 && overallMaxLength <= 2550) {
-        palletSize = 'USE 105" LONG PALLET';
-      } else if (totalCoreParts >= 100 && overallMaxLength > 2550) {
-        palletSize = 'USE 110" LONG PALLET';
-      }
-
       const taskName = `(PERFECT FIT) ${project.name}`;
-      
-      // Build description in the user's preferred format (values are bolded, not labels)
-      // Using html_notes with <body> wrapper for Asana HTML formatting
-      let taskNotes = `<body>PALLET 1:
-${project.dealer || project.name}
-# OF ORDER ON PALLET: <strong>${projectFiles.length}</strong>
-PALLET SIZE: <strong>${palletSize}</strong>
-Parts: <strong>${totalCoreParts}</strong>
-Dovetails: <strong>${totalDovetails}</strong>
-Assembled Netley Drawers: <strong>${totalAssembledDrawers}</strong>
-5 Piece Shaker Doors: <strong>${totalFivePiece}</strong>
-Expected Weight: <strong>${Math.round(totalWeight)} lbs</strong>
-
-WAS THERE BUYOUT HARDWARE: 
-ARE THERE PARTS AT CUSTOM: <strong>${customPartsAnswer}</strong>
-ARE THERE GLASS PARTS: <strong>${hasGlassParts ? 'YES' : 'NO'}</strong>
-ARE THERE DOORS FROM M&J: <strong>${hasMJDoors ? 'YES' : 'NO'}</strong>
-ARE THERE DOORS FROM RICHELIEU: <strong>${hasRichelieuDoors ? 'YES' : 'NO'}</strong>`;
-
-      // Add per-file breakdown if there are multiple files
-      if (fileDataList.length > 1) {
-        taskNotes += `
-
---- ORDER BREAKDOWN ---
-
-${fileBreakdown}`;
-      }
-      
-      taskNotes += '</body>';
-      taskNotes = taskNotes.trim();
 
       let newTaskGid: string;
 
@@ -1300,16 +1217,12 @@ ${fileBreakdown}`;
 
         newTaskGid = newTask.gid;
 
-        // Update the duplicated task with project-specific notes (using html_notes for formatting)
-        await tasksApi.updateTask({ data: { html_notes: taskNotes } }, newTaskGid, {});
-
       } else {
         // Fallback: create task from scratch if template not found
         console.log('Template task not found, creating task from scratch');
         
         const taskData: any = {
           name: taskName,
-          html_notes: taskNotes,
           projects: [asanaProjectGid],
         };
 
