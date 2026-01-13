@@ -77,6 +77,7 @@ export default function OrderDetails() {
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
   const [csvSectionOpen, setCsvSectionOpen] = useState(false);
   const [projectDetailsOpen, setProjectDetailsOpen] = useState(false);
+  const [orderStatusOpen, setOrderStatusOpen] = useState(false);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
@@ -998,111 +999,127 @@ export default function OrderDetails() {
           </Card>
         </Collapsible>
 
-        {/* PF PRODUCTION SECTION, PF ORDER STATUS, PF PRODUCTION STATUS Section */}
-        <Card className="mb-6 border-none shadow-md" data-testid="order-status-card">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <ClipboardList className="w-5 h-5 text-primary" />
-                Order Status & Tracking
-              </CardTitle>
-              {project.status === 'synced' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => syncAsanaStatus()}
-                  disabled={isSyncingAsanaStatus}
-                  data-testid="button-sync-asana-status"
-                >
-                  {isSyncingAsanaStatus ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-1" />
-                  )}
-                  Refresh from Asana
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* PF PRODUCTION SECTION */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">PF PRODUCTION SECTION</label>
-              {project.status === 'synced' ? (
-                <div className="flex items-center gap-2">
-                  <Badge 
-                    variant="outline"
-                    className="text-base px-3 py-1 bg-yellow-100 border-yellow-500 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-600"
-                    data-testid="badge-pf-production-section"
-                  >
-                    {project.asanaSection || 'No section'}
-                  </Badge>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Sync to Asana to see section</p>
-              )}
-            </div>
-
-            {/* PF ORDER STATUS */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">PF ORDER STATUS</label>
-              {project.status === 'synced' ? (
-                <div className="flex items-center gap-2">
-                  <Badge 
-                    variant="default"
-                    className={
-                      project.pfOrderStatus === 'SUBMIT SALES ORDER' 
-                        ? 'bg-red-500 hover:bg-red-600 text-white' 
-                        : (project.pfOrderStatus === 'SALES ORDER SUBMITTED' || project.pfOrderStatus === 'ORDER CONFIRMED')
-                          ? 'bg-green-500 hover:bg-green-600 text-white'
-                          : ''
-                    }
-                    data-testid="badge-pf-order-status"
-                  >
-                    {project.pfOrderStatus || 'Not set'}
-                  </Badge>
-                  {project.lastAsanaSyncAt && (
+        {/* PF PRODUCTION SECTION, PF ORDER STATUS, PF PRODUCTION STATUS Section - Collapsible */}
+        <Collapsible open={orderStatusOpen} onOpenChange={setOrderStatusOpen}>
+          <Card className="mb-6 border-none shadow-md" data-testid="order-status-card">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="pb-2 cursor-pointer hover-elevate">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <ClipboardList className="w-5 h-5 text-primary" />
+                    Order Status & Packaging Info
+                    {orderStatusOpen ? (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
-                      Last synced: {new Date(project.lastAsanaSyncAt).toLocaleString()}
+                      {orderStatusOpen ? 'Click to collapse' : 'Click to expand'}
                     </span>
+                    {project.status === 'synced' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); syncAsanaStatus(); }}
+                        disabled={isSyncingAsanaStatus}
+                        data-testid="button-sync-asana-status"
+                      >
+                        {isSyncingAsanaStatus ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                        ) : (
+                          <RefreshCw className="w-4 h-4 mr-1" />
+                        )}
+                        Refresh from Asana
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                {/* PF PRODUCTION SECTION */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">PF PRODUCTION SECTION</label>
+                  {project.status === 'synced' ? (
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant="outline"
+                        className="text-base px-3 py-1 bg-yellow-100 border-yellow-500 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-600"
+                        data-testid="badge-pf-production-section"
+                      >
+                        {project.asanaSection || 'No section'}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sync to Asana to see section</p>
                   )}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Sync to Asana to see status</p>
-              )}
-            </div>
 
-            {/* PF PRODUCTION STATUS */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">PF PRODUCTION STATUS</label>
-              {project.status === 'synced' ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {productionStatusOptions.map((option) => {
-                    const isChecked = (project.pfProductionStatus || []).includes(option);
-                    return (
-                      <div 
-                        key={option} 
-                        className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${getStatusColor(option, isChecked)}`}
-                        onClick={() => handleProductionStatusToggle(option, !isChecked)}
-                        data-testid={`checkbox-status-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                {/* PF ORDER STATUS */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">PF ORDER STATUS</label>
+                  {project.status === 'synced' ? (
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant="default"
+                        className={
+                          project.pfOrderStatus === 'SUBMIT SALES ORDER' 
+                            ? 'bg-red-500 hover:bg-red-600 text-white' 
+                            : (project.pfOrderStatus === 'SALES ORDER SUBMITTED' || project.pfOrderStatus === 'ORDER CONFIRMED')
+                              ? 'bg-green-500 hover:bg-green-600 text-white'
+                              : ''
+                        }
+                        data-testid="badge-pf-order-status"
                       >
-                        <Checkbox
-                          checked={isChecked}
-                          onCheckedChange={(checked) => handleProductionStatusToggle(option, checked as boolean)}
-                          disabled={isUpdatingProductionStatus}
-                          className={getCheckboxColor(option, isChecked)}
-                        />
-                        <span className="text-xs leading-tight">{option}</span>
-                      </div>
-                    );
-                  })}
+                        {project.pfOrderStatus || 'Not set'}
+                      </Badge>
+                      {project.lastAsanaSyncAt && (
+                        <span className="text-xs text-muted-foreground">
+                          Last synced: {new Date(project.lastAsanaSyncAt).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sync to Asana to see status</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Sync to Asana to manage production status</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+
+                {/* PF PRODUCTION STATUS */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">PF PRODUCTION STATUS</label>
+                  {project.status === 'synced' ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {productionStatusOptions.map((option) => {
+                        const isChecked = (project.pfProductionStatus || []).includes(option);
+                        return (
+                          <div 
+                            key={option} 
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${getStatusColor(option, isChecked)}`}
+                            onClick={() => handleProductionStatusToggle(option, !isChecked)}
+                            data-testid={`checkbox-status-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={(checked) => handleProductionStatusToggle(option, checked as boolean)}
+                              disabled={isUpdatingProductionStatus}
+                              className={getCheckboxColor(option, isChecked)}
+                            />
+                            <span className="text-xs leading-tight">{option}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sync to Asana to manage production status</p>
+                  )}
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Project Totals Summary - compact header */}
         {preview && (
