@@ -149,7 +149,7 @@ export default function Dashboard() {
                     
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg text-slate-800 group-hover:text-primary transition-colors">
-                        {project.name}
+                        <span className="text-muted-foreground font-medium">Project Name:</span> {project.name}
                       </h3>
                       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-1 text-sm text-muted-foreground">
                         <span>Dealer: <span className="font-medium text-slate-700">{project.dealer || "N/A"}</span></span>
