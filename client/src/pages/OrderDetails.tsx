@@ -1282,22 +1282,6 @@ export default function OrderDetails() {
                                   })()}
                                 </div>
                                 
-                                {/* Hardware Packaged Button */}
-                                <div>
-                                  <Button
-                                    onClick={() => toggleHardwarePackaged(pallet)}
-                                    className={`w-full ${
-                                      pallet.hardwarePackaged 
-                                        ? 'bg-green-600 hover:bg-green-700 text-white' 
-                                        : 'bg-red-600 hover:bg-red-700 text-white'
-                                    }`}
-                                    data-testid={`button-hardware-packaged-${pallet.id}`}
-                                  >
-                                    <Package className="w-4 h-4 mr-2" />
-                                    {pallet.hardwarePackaged ? '✓ Hardware Packaged' : 'Hardware Not Packaged'}
-                                  </Button>
-                                </div>
-                                
                                 {/* Flags as Badges - matching Project Totals style */}
                                 {(previewFiles.some(f => f.hasGlassParts) || 
                                   previewFiles.some(f => f.hasMJDoors) || 
