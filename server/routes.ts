@@ -346,10 +346,41 @@ export async function registerRoutes(
   // Create object storage service instance
   const objectStorageService = new ObjectStorageService();
 
-  // List all projects (protected)
+  // List all projects with status summaries (protected)
   app.get(api.orders.list.path, isAuthenticated, async (req, res) => {
-    const projects = await storage.getProjects();
-    res.json(projects);
+    const allProjects = await storage.getProjects();
+    
+    // Enrich each project with status summary
+    const projectsWithStatus = await Promise.all(
+      allProjects.map(async (project) => {
+        // Get CTS parts status across all files
+        const files = await storage.getProjectFiles(project.id);
+        let hasCTSParts = false;
+        let allCtsCut = true;
+        
+        for (const file of files) {
+          const ctsStatus = await storage.getCtsPartsCutStatus(file.id);
+          if (ctsStatus.total > 0) {
+            hasCTSParts = true;
+            if (!ctsStatus.allCut) {
+              allCtsCut = false;
+            }
+          }
+        }
+        
+        // Get hardware packed status from pallets
+        const pallets = await storage.getPalletsForProject(project.id);
+        const hardwarePackaged = pallets.some(p => p.hardwarePackaged === true);
+        
+        return {
+          ...project,
+          ctsStatus: { hasCTSParts, allCtsCut },
+          hardwarePackaged
+        };
+      })
+    );
+    
+    res.json(projectsWithStatus);
   });
 
   // Get a single project with its files (protected)

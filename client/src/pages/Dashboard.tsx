@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { useOrders, useDeleteOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut } from "lucide-react";
@@ -12,6 +13,19 @@ import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const RED_PRODUCTION_STATUSES = [
+  "WAITING FOR BO HARDWARE",
+  "WAITING FOR DOVETAIL", 
+  "WAITING FOR MARATHON HARDWARE",
+  "WAITING FOR GLASS SHELVES",
+  "WAITING FOR GLASS FOR DOORS",
+  "WAITING FOR NETLEY SHAKER DOORS",
+  "GARAGE PANELS TO DRILL",
+  "DOUBLE UP PARTS AT CUSTOM",
+  "WAITING FOR NETLEY ASSEMBLED DRAWERS",
+  "CLOSET RODS NOT CUT"
+];
 
 export default function Dashboard() {
   const { data: projects, isLoading } = useOrders();
@@ -132,13 +146,54 @@ export default function Dashboard() {
                       <FolderOpen className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
                     </div>
                     
-                    <div>
+                    <div className="flex-1">
                       <h3 className="font-semibold text-lg text-slate-800 group-hover:text-primary transition-colors">
                         {project.name}
                       </h3>
                       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-1 text-sm text-muted-foreground">
                         <span>Dealer: <span className="font-medium text-slate-700">{project.dealer || "N/A"}</span></span>
                         <span>Date: {project.createdAt ? format(new Date(project.createdAt), 'PPP') : 'N/A'}</span>
+                      </div>
+                      
+                      {/* Status Badges */}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {/* CTS Parts Status */}
+                        {(project as any).ctsStatus?.hasCTSParts && (
+                          (project as any).ctsStatus?.allCtsCut ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs" data-testid="badge-cts-cut">
+                              CTS PARTS CUT
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs" data-testid="badge-cts-not-done">
+                              CTS PARTS NOT DONE
+                            </Badge>
+                          )
+                        )}
+                        
+                        {/* Hardware Packed Status */}
+                        {(project as any).hardwarePackaged ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs" data-testid="badge-hardware-packed">
+                            HARDWARE PACKED
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs" data-testid="badge-hardware-not-packed">
+                            HARDWARE NOT PACKED
+                          </Badge>
+                        )}
+                        
+                        {/* Red Production Statuses */}
+                        {project.pfProductionStatus?.filter(status => 
+                          RED_PRODUCTION_STATUSES.includes(status)
+                        ).map(status => (
+                          <Badge 
+                            key={status} 
+                            variant="outline" 
+                            className="bg-red-50 text-red-700 border-red-200 text-xs"
+                            data-testid={`badge-status-${status.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            {status}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
                   </Link>
