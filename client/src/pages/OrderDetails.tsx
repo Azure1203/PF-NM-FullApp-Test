@@ -692,7 +692,7 @@ export default function OrderDetails() {
                 <div className="flex items-center gap-2">
                   <Badge 
                     variant="outline"
-                    className="text-base px-3 py-1"
+                    className="text-base px-3 py-1 bg-yellow-100 border-yellow-500 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-600"
                     data-testid="badge-pf-production-section"
                   >
                     {project.asanaSection || 'No section'}
