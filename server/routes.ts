@@ -1057,19 +1057,24 @@ export async function registerRoutes(
       // Get the project to find Asana task
       const project = await storage.getProject(existingPallet.projectId);
       
-      // Update local pfProductionStatus to add/remove HARDWARE PACKED
+      // Check ALL pallets for this project to determine HARDWARE PACKED status
+      // Only add HARDWARE PACKED if ALL pallets have hardwarePackaged = true
+      const allPallets = await storage.getPalletsForProject(existingPallet.projectId);
+      const allHardwarePackaged = allPallets.length > 0 && allPallets.every(p => p.hardwarePackaged === true);
+      
+      // Update local pfProductionStatus based on whether ALL pallets are hardware packed
       const currentStatuses = project?.pfProductionStatus || [];
       let newStatuses: string[];
       
-      if (hardwarePackaged) {
-        // Add HARDWARE PACKED if not already present
+      if (allHardwarePackaged) {
+        // Add HARDWARE PACKED if not already present (all pallets are packed)
         if (!currentStatuses.includes('HARDWARE PACKED')) {
           newStatuses = [...currentStatuses, 'HARDWARE PACKED'];
         } else {
           newStatuses = currentStatuses;
         }
       } else {
-        // Remove HARDWARE PACKED
+        // Remove HARDWARE PACKED (not all pallets are packed)
         newStatuses = currentStatuses.filter(s => s !== 'HARDWARE PACKED');
       }
       
@@ -1097,7 +1102,7 @@ export async function registerRoutes(
             const name = field.name?.toUpperCase().trim();
             
             if (name === 'HARDWARE PACKED') {
-              // Handle different field types
+              // Handle different field types - use allHardwarePackaged (all pallets packed)
               if (field.type === 'enum' && field.enum_options) {
                 // Find the enum option that matches "Yes" or "No" 
                 const yesOption = field.enum_options.find((o: any) => 
@@ -1107,13 +1112,13 @@ export async function registerRoutes(
                   o.name?.toLowerCase() === 'no' || o.name?.toLowerCase() === 'false'
                 );
                 
-                if (hardwarePackaged && yesOption) {
+                if (allHardwarePackaged && yesOption) {
                   customFields[field.gid] = yesOption.gid;
-                } else if (!hardwarePackaged && noOption) {
+                } else if (!allHardwarePackaged && noOption) {
                   customFields[field.gid] = noOption.gid;
                 }
               } else if (field.type === 'text') {
-                customFields[field.gid] = hardwarePackaged ? 'Yes' : 'No';
+                customFields[field.gid] = allHardwarePackaged ? 'Yes' : 'No';
               }
             } else if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
               // Update PF PRODUCTION STATUS multi-select
@@ -1132,7 +1137,7 @@ export async function registerRoutes(
             await tasksApi.updateTask(project.asanaTaskId, {
               data: { custom_fields: customFields }
             });
-            console.log(`[Asana] Updated HARDWARE PACKED to ${hardwarePackaged} and PF PRODUCTION STATUS for task ${project.asanaTaskId}`);
+            console.log(`[Asana] Updated HARDWARE PACKED to ${allHardwarePackaged} (all pallets packed: ${allHardwarePackaged}) and PF PRODUCTION STATUS for task ${project.asanaTaskId}`);
           }
         } catch (asanaError: any) {
           console.error('[Asana] Failed to update HARDWARE PACKED:', asanaError.message);
