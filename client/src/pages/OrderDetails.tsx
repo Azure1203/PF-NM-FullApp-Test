@@ -1433,7 +1433,7 @@ export default function OrderDetails() {
                                           data-testid={`button-order-hardware-${file.id}`}
                                         >
                                           <Package className="w-3 h-3 mr-1" />
-                                          {pallet.hardwarePackaged ? '✓ Hardware Packaged' : 'Hardware Not Packaged'}
+                                          {pallet.hardwarePackaged ? '✓ Hardware Packaged' : 'Hardware Not Packaged, Click Here When Done'}
                                         </Button>
                                       </div>
                                     );
