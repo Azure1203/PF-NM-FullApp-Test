@@ -1085,7 +1085,7 @@ export default function OrderDetails() {
                                           <div>
                                             <p className="font-medium text-sm">{actualFilePreview?.name || file.originalFilename}</p>
                                             {file.allmoxyJobNumber && (
-                                              <p className="text-xs text-primary font-medium">Job #{file.allmoxyJobNumber}</p>
+                                              <p className="text-xs text-primary font-medium">Allmoxy Job #{file.allmoxyJobNumber}</p>
                                             )}
                                           </div>
                                           {splitCount > 1 && (
@@ -1189,7 +1189,7 @@ export default function OrderDetails() {
                             <div className="min-w-0">
                               <p className="font-medium text-sm truncate">{file.name}</p>
                               {projectFile?.allmoxyJobNumber && (
-                                <p className="text-xs text-primary font-medium">Job #{projectFile.allmoxyJobNumber}</p>
+                                <p className="text-xs text-primary font-medium">Allmoxy Job #{projectFile.allmoxyJobNumber}</p>
                               )}
                               <p className="text-xs text-muted-foreground">
                                 {file.coreParts} parts, {file.dovetails} dovetails, {Math.round(file.weightLbs)} lbs

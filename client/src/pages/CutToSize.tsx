@@ -150,10 +150,10 @@ export default function CutToSize() {
               <div className="flex items-center gap-3">
                 <Scissors className="w-6 h-6 text-primary" />
                 <div>
-                  <p className="font-semibold text-lg">{fileInfo.file?.poNumber || fileInfo.file?.originalFilename || 'Order File'}</p>
                   {fileInfo.file?.allmoxyJobNumber && (
-                    <p className="text-sm text-primary font-medium">Job #{fileInfo.file.allmoxyJobNumber}</p>
+                    <p className="text-sm text-primary font-medium">Allmoxy Job #{fileInfo.file.allmoxyJobNumber}</p>
                   )}
+                  <p className="text-xs text-muted-foreground">Order Name: {fileInfo.file?.poNumber || fileInfo.file?.originalFilename || 'N/A'}</p>
                   <p className="text-xs text-muted-foreground">Project: {fileInfo.projectName}</p>
                 </div>
               </div>
