@@ -1266,7 +1266,8 @@ export default function OrderDetails() {
                                         {metrics.map(({ key, value, label }) => {
                                           const isPackaged = status[key];
                                           const numValue = typeof value === 'number' ? value : parseInt(value) || 0;
-                                          const isAutoGreen = numValue === 0;
+                                          const isInfoOnly = key === 'weight' || key === 'maxLength';
+                                          const isAutoGreen = numValue === 0 || isInfoOnly;
                                           const showGreen = isPackaged || isAutoGreen;
                                           return (
                                             <button
@@ -1284,7 +1285,7 @@ export default function OrderDetails() {
                                             >
                                               <p className="text-xl font-bold">{value}</p>
                                               <p className="text-xs opacity-80">{label}</p>
-                                              <p className="text-[10px] mt-1">{isAutoGreen ? 'N/A' : (isPackaged ? '✓ Packaged' : 'Click when packed')}</p>
+                                              <p className="text-[10px] mt-1">{isInfoOnly ? '' : (numValue === 0 ? 'N/A' : (isPackaged ? '✓ Packaged' : 'Click when packed'))}</p>
                                             </button>
                                           );
                                         })}
