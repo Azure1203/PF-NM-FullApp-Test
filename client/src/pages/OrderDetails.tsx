@@ -375,6 +375,8 @@ export default function OrderDetails() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: palletsQueryKey });
+      // Also refresh project data since pfProductionStatus is updated
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', id] });
     }
   });
   

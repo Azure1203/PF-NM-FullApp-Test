@@ -1054,18 +1054,40 @@ export async function registerRoutes(
       // Get the project to find Asana task
       const project = await storage.getProject(existingPallet.projectId);
       
-      // Update Asana HARDWARE PACKED custom field if project is synced
+      // Update local pfProductionStatus to add/remove HARDWARE PACKED
+      const currentStatuses = project?.pfProductionStatus || [];
+      let newStatuses: string[];
+      
+      if (hardwarePackaged) {
+        // Add HARDWARE PACKED if not already present
+        if (!currentStatuses.includes('HARDWARE PACKED')) {
+          newStatuses = [...currentStatuses, 'HARDWARE PACKED'];
+        } else {
+          newStatuses = currentStatuses;
+        }
+      } else {
+        // Remove HARDWARE PACKED
+        newStatuses = currentStatuses.filter(s => s !== 'HARDWARE PACKED');
+      }
+      
+      // Update local database
+      if (project) {
+        await storage.updateProject(project.id, { pfProductionStatus: newStatuses });
+      }
+      
+      // Update Asana HARDWARE PACKED custom field and PF PRODUCTION STATUS if project is synced
       if (project?.asanaTaskId) {
         try {
           const { tasksApi, projectsApi } = await getAsanaApiInstances();
           const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
           
-          // Get custom field settings to find HARDWARE PACKED field
+          // Get custom field settings to find HARDWARE PACKED field and PF PRODUCTION STATUS
           const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
             opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
           });
           
           const customFieldSettings = projectDetails.data.custom_field_settings || [];
+          let customFields: Record<string, any> = {};
           
           for (const setting of customFieldSettings) {
             const field = setting.custom_field;
@@ -1073,8 +1095,6 @@ export async function registerRoutes(
             
             if (name === 'HARDWARE PACKED') {
               // Handle different field types
-              let customFields: Record<string, any> = {};
-              
               if (field.type === 'enum' && field.enum_options) {
                 // Find the enum option that matches "Yes" or "No" 
                 const yesOption = field.enum_options.find((o: any) => 
@@ -1092,15 +1112,24 @@ export async function registerRoutes(
               } else if (field.type === 'text') {
                 customFields[field.gid] = hardwarePackaged ? 'Yes' : 'No';
               }
+            } else if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
+              // Update PF PRODUCTION STATUS multi-select
+              const selectedGids = newStatuses.map((statusName: string) => {
+                const opt = field.enum_options.find((o: any) => 
+                  o.name?.toUpperCase().trim() === statusName.toUpperCase().trim()
+                );
+                return opt?.gid;
+              }).filter(Boolean);
               
-              if (Object.keys(customFields).length > 0) {
-                await tasksApi.updateTask(project.asanaTaskId, {
-                  data: { custom_fields: customFields }
-                });
-                console.log(`[Asana] Updated HARDWARE PACKED to ${hardwarePackaged} for task ${project.asanaTaskId}`);
-              }
-              break;
+              customFields[field.gid] = selectedGids;
             }
+          }
+          
+          if (Object.keys(customFields).length > 0) {
+            await tasksApi.updateTask(project.asanaTaskId, {
+              data: { custom_fields: customFields }
+            });
+            console.log(`[Asana] Updated HARDWARE PACKED to ${hardwarePackaged} and PF PRODUCTION STATUS for task ${project.asanaTaskId}`);
           }
         } catch (asanaError: any) {
           console.error('[Asana] Failed to update HARDWARE PACKED:', asanaError.message);
