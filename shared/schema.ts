@@ -122,6 +122,12 @@ export const PALLET_PACKAGING_METRICS = [
   'dovetails',
   'assembled',
   'fivePiece',
+  'glassInserts',
+  'glassShelves',
+  'mjDoors',
+  'richelieuDoors',
+  'doubleThick',
+  'cts',
   'weight',
   'maxLength'
 ] as const;
@@ -136,6 +142,12 @@ export const defaultPackagingStatus: PalletPackagingStatus = {
   dovetails: false,
   assembled: false,
   fivePiece: false,
+  glassInserts: false,
+  glassShelves: false,
+  mjDoors: false,
+  richelieuDoors: false,
+  doubleThick: false,
+  cts: false,
   weight: false,
   maxLength: false
 };

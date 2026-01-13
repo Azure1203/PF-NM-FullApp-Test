@@ -1251,12 +1251,18 @@ export default function OrderDetails() {
                                       { key: 'dovetails', value: previewFiles.reduce((sum, f) => sum + f.dovetails, 0), label: 'Dovetails' },
                                       { key: 'assembled', value: previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0), label: 'Assembled' },
                                       { key: 'fivePiece', value: previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0), label: '5 Piece' },
+                                      { key: 'glassInserts', value: previewFiles.reduce((sum, f) => sum + (f.glassInserts || 0), 0), label: 'Glass Inserts' },
+                                      { key: 'glassShelves', value: previewFiles.reduce((sum, f) => sum + (f.glassShelves || 0), 0), label: 'Glass Shelves' },
+                                      { key: 'mjDoors', value: previewFiles.reduce((sum, f) => sum + ((f as any).mjDoorsCount || 0), 0), label: 'M&J Doors' },
+                                      { key: 'richelieuDoors', value: previewFiles.reduce((sum, f) => sum + ((f as any).richelieuDoorsCount || 0), 0), label: 'Richelieu' },
+                                      { key: 'doubleThick', value: previewFiles.reduce((sum, f) => sum + ((f as any).doubleThickCount || 0), 0), label: 'Double Thick' },
+                                      { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'CTS Parts' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
                                       { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm max' }
                                     ];
                                     
                                     return (
-                                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+                                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
                                         {metrics.map(({ key, value, label }) => {
                                           const isPackaged = status[key];
                                           return (
