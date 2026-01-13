@@ -1247,16 +1247,16 @@ export default function OrderDetails() {
                                     const status = pallet.packagingStatus || defaultPackagingStatus;
                                     const metrics: { key: PalletPackagingMetric; value: number | string; label: string }[] = [
                                       { key: 'orders', value: assignedFiles.length, label: 'Orders' },
-                                      { key: 'parts', value: palletParts, label: 'Parts' },
+                                      { key: 'parts', value: palletParts, label: 'Parts Overall' },
                                       { key: 'dovetails', value: previewFiles.reduce((sum, f) => sum + f.dovetails, 0), label: 'Dovetails' },
-                                      { key: 'assembled', value: previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0), label: 'Assembled' },
-                                      { key: 'fivePiece', value: previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0), label: '5 Piece' },
+                                      { key: 'assembled', value: previewFiles.reduce((sum, f) => sum + f.assembledDrawers, 0), label: 'Assembled Drawers' },
+                                      { key: 'fivePiece', value: previewFiles.reduce((sum, f) => sum + f.fivePieceDoors, 0), label: '5 Piece Shaker' },
                                       { key: 'glassInserts', value: previewFiles.reduce((sum, f) => sum + (f.glassInserts || 0), 0), label: 'Glass Inserts' },
                                       { key: 'glassShelves', value: previewFiles.reduce((sum, f) => sum + (f.glassShelves || 0), 0), label: 'Glass Shelves' },
                                       { key: 'mjDoors', value: previewFiles.reduce((sum, f) => sum + ((f as any).mjDoorsCount || 0), 0), label: 'M&J Doors' },
-                                      { key: 'richelieuDoors', value: previewFiles.reduce((sum, f) => sum + ((f as any).richelieuDoorsCount || 0), 0), label: 'Richelieu' },
-                                      { key: 'doubleThick', value: previewFiles.reduce((sum, f) => sum + ((f as any).doubleThickCount || 0), 0), label: 'Double Thick' },
-                                      { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'CTS Parts' },
+                                      { key: 'richelieuDoors', value: previewFiles.reduce((sum, f) => sum + ((f as any).richelieuDoorsCount || 0), 0), label: 'Richelieu Doors' },
+                                      { key: 'doubleThick', value: previewFiles.reduce((sum, f) => sum + ((f as any).doubleThickCount || 0), 0), label: 'Double Thick Parts' },
+                                      { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'Cut to Size Parts' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
                                       { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm max' }
                                     ];
@@ -1353,10 +1353,10 @@ export default function OrderDetails() {
                                         
                                         {/* All Metrics Grid */}
                                         {actualFilePreview && (
-                                          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1">
+                                          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1">
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{actualFilePreview.coreParts}</p>
-                                              <p className="text-[9px] text-muted-foreground">Parts</p>
+                                              <p className="text-[9px] text-muted-foreground">Parts Overall</p>
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{actualFilePreview.dovetails}</p>
@@ -1364,27 +1364,35 @@ export default function OrderDetails() {
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{actualFilePreview.assembledDrawers}</p>
-                                              <p className="text-[9px] text-muted-foreground">Assembled</p>
+                                              <p className="text-[9px] text-muted-foreground">Assembled Drawers</p>
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{actualFilePreview.fivePieceDoors}</p>
-                                              <p className="text-[9px] text-muted-foreground">5 Piece</p>
+                                              <p className="text-[9px] text-muted-foreground">5 Piece Shaker</p>
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{(actualFilePreview as any).glassInserts || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Glass Ins</p>
+                                              <p className="text-[9px] text-muted-foreground">Glass Inserts</p>
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{(actualFilePreview as any).glassShelves || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Glass Shv</p>
+                                              <p className="text-[9px] text-muted-foreground">Glass Shelves</p>
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{(actualFilePreview as any).mjDoorsCount || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">M&J</p>
+                                              <p className="text-[9px] text-muted-foreground">M&J Doors</p>
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{(actualFilePreview as any).richelieuDoorsCount || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Richelieu</p>
+                                              <p className="text-[9px] text-muted-foreground">Richelieu Doors</p>
+                                            </div>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{(actualFilePreview as any).doubleThickCount || 0}</p>
+                                              <p className="text-[9px] text-muted-foreground">Double Thick Parts</p>
+                                            </div>
+                                            <div className="text-center p-1 bg-background/50 rounded">
+                                              <p className="text-xs font-semibold">{(actualFilePreview as any).ctsPartsCount || 0}</p>
+                                              <p className="text-[9px] text-muted-foreground">Cut to Size Parts</p>
                                             </div>
                                             <div className="text-center p-1 bg-background/50 rounded">
                                               <p className="text-xs font-semibold">{Math.round(actualFilePreview.weightLbs)}</p>
