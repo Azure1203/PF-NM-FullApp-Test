@@ -70,7 +70,7 @@ export default function Dashboard() {
         </div>
         
         <PageHeader 
-          title="Project Dashboard" 
+          title="Perfect Fit Jobs" 
           description="Manage and sync your closet order projects."
           actions={
             <Link href="/upload">
@@ -86,7 +86,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
           {[
             { label: "Total Projects", value: projects?.length || 0, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Projects Confirmed", value: projects?.filter(p => p.pfOrderStatus === 'ORDER CONFIRMED').length || 0, color: "text-purple-600", bg: "bg-purple-50" },
+            { label: "Projects In Production", value: projects?.filter(p => p.pfOrderStatus === 'ORDER CONFIRMED').length || 0, color: "text-purple-600", bg: "bg-purple-50" },
             { label: "Pending Sync", value: projects?.filter(p => p.status === 'pending').length || 0, color: "text-amber-600", bg: "bg-amber-50" },
             { label: "Synced to Asana", value: projects?.filter(p => p.status === 'synced').length || 0, color: "text-green-600", bg: "bg-green-50" },
           ].map((stat, i) => (
