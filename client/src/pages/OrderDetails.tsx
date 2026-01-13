@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { api, type ProjectWithFiles, type SyncPreview } from "@shared/routes";
 import { Badge } from "@/components/ui/badge";
 
@@ -62,6 +63,7 @@ export default function OrderDetails() {
   const { toast } = useToast();
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const [selectedFileIndex, setSelectedFileIndex] = useState<number | null>(null);
+  const [csvSectionOpen, setCsvSectionOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
   const [editingPackagingLink, setEditingPackagingLink] = useState<{ [fileId: number]: string }>({});
@@ -1228,19 +1230,30 @@ export default function OrderDetails() {
           </Card>
         )}
 
-        {/* CSV Files Section - Selectable with Details */}
+        {/* CSV Files Section - Collapsible with Details */}
         {preview && preview.fileBreakdowns.length > 0 && (
-          <Card className="mb-6 border-none shadow-md" data-testid="files-section-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FolderOpen className="w-5 h-5 text-primary" />
-                CSV Files ({preview.fileBreakdowns.length})
-              </CardTitle>
-              <CardDescription>
-                Click on a file to view its computed order details
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Collapsible open={csvSectionOpen} onOpenChange={setCsvSectionOpen}>
+            <Card className="mb-6 border-none shadow-md" data-testid="files-section-card">
+              <CollapsibleTrigger asChild>
+                <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-lg">
+                  <CardTitle className="flex items-center justify-between gap-2 text-lg">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-5 h-5 text-primary" />
+                      CSV Files ({preview.fileBreakdowns.length})
+                    </div>
+                    {csvSectionOpen ? (
+                      <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {csvSectionOpen ? 'Click to collapse' : 'Click to expand and add packaging links, Allmoxy job #s, and view details'}
+                  </CardDescription>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* File List */}
                 <div className="space-y-2">
@@ -1577,8 +1590,10 @@ export default function OrderDetails() {
                   )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
