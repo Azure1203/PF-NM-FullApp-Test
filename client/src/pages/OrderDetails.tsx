@@ -89,6 +89,8 @@ export default function OrderDetails() {
   const [expandedPallets, setExpandedPallets] = useState<Set<number>>(new Set());
   const [palletDialogOpen, setPalletDialogOpen] = useState(false);
   const [editingPallet, setEditingPallet] = useState<PalletWithFiles | null>(null);
+  const [palletSize, setPalletSize] = useState<PalletSize>('34" Wide Cut to Size');
+  const [palletCustomSize, setPalletCustomSize] = useState('');
   const [palletNotes, setPalletNotes] = useState('');
   const [palletFileIds, setPalletFileIds] = useState<number[]>([]);
   const [editingPalletFinalSize, setEditingPalletFinalSize] = useState<{ [palletId: number]: string }>({});
@@ -471,6 +473,8 @@ export default function OrderDetails() {
   // Pallet dialog helpers
   const openAddPalletDialog = () => {
     setEditingPallet(null);
+    setPalletSize('34" Wide Cut to Size');
+    setPalletCustomSize('');
     setPalletNotes('');
     setPalletFileIds([]);
     setPalletDialogOpen(true);
@@ -478,6 +482,8 @@ export default function OrderDetails() {
   
   const openEditPalletDialog = (pallet: PalletWithFiles) => {
     setEditingPallet(pallet);
+    setPalletSize(pallet.size as PalletSize);
+    setPalletCustomSize(pallet.customSize || '');
     setPalletNotes(pallet.notes || '');
     setPalletFileIds(pallet.fileIds);
     setPalletDialogOpen(true);
@@ -486,6 +492,8 @@ export default function OrderDetails() {
   const closePalletDialog = () => {
     setPalletDialogOpen(false);
     setEditingPallet(null);
+    setPalletSize('34" Wide Cut to Size');
+    setPalletCustomSize('');
     setPalletNotes('');
     setPalletFileIds([]);
   };
@@ -494,13 +502,15 @@ export default function OrderDetails() {
     if (editingPallet) {
       updatePallet({
         palletId: editingPallet.id,
-        size: editingPallet.size,
+        size: palletSize,
+        customSize: palletSize === 'Custom' ? palletCustomSize : undefined,
         notes: palletNotes || undefined,
         fileIds: palletFileIds
       });
     } else {
       createPallet({
-        size: '34" Wide Cut to Size',
+        size: palletSize,
+        customSize: palletSize === 'Custom' ? palletCustomSize : undefined,
         notes: palletNotes || undefined,
         fileIds: palletFileIds
       });
@@ -2211,12 +2221,45 @@ export default function OrderDetails() {
             </DialogTitle>
             <DialogDescription>
               {editingPallet 
-                ? 'Update pallet file assignments'
+                ? 'Update pallet size and file assignments'
                 : 'Create a new pallet and assign files to it'}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
+            {/* Pallet Size Selection */}
+            <div className="space-y-2">
+              <Label>Pallet Size</Label>
+              <Select 
+                value={palletSize} 
+                onValueChange={(value) => setPalletSize(value as PalletSize)}
+              >
+                <SelectTrigger data-testid="select-pallet-size">
+                  <SelectValue placeholder="Select pallet size" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PALLET_SIZES.map((size) => (
+                    <SelectItem key={size} value={size} data-testid={`option-pallet-size-${size}`}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Custom Size Input (only shown when Custom is selected) */}
+            {palletSize === 'Custom' && (
+              <div className="space-y-2">
+                <Label>Custom Size</Label>
+                <Input
+                  placeholder="Enter custom pallet size"
+                  value={palletCustomSize}
+                  onChange={(e) => setPalletCustomSize(e.target.value)}
+                  data-testid="input-pallet-custom-size"
+                />
+              </div>
+            )}
+            
             {/* Notes */}
             <div className="space-y-2">
               <Label>Notes (optional)</Label>
@@ -2281,7 +2324,7 @@ export default function OrderDetails() {
             </Button>
             <Button 
               onClick={handleSavePallet}
-              disabled={isCreatingPallet || isUpdatingPallet}
+              disabled={isCreatingPallet || isUpdatingPallet || (palletSize === 'Custom' && !palletCustomSize.trim())}
               data-testid="button-save-pallet"
             >
               {(isCreatingPallet || isUpdatingPallet) ? (
