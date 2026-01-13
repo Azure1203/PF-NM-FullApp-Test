@@ -67,6 +67,10 @@ export default function CutToSize() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'cts-status'] });
+      // Also invalidate the project preview so CTS button color updates in pallet view
+      if (fileInfo?.file?.projectId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/orders', fileInfo.file.projectId, 'preview'] });
+      }
     },
     onError: (error: Error, _, context) => {
       if (context?.previousParts) {
