@@ -160,7 +160,7 @@ export default function OrderDetails() {
     "WAITING FOR NETLEY SHAKER DOORS", "DOUBLE UP PARTS AT CUSTOM", "WAITING FOR DOVETAIL",
     "WAITING FOR BO HARDWARE", "WAITING FOR NETLEY ASSEMBLED DRAWERS", "WAITING FOR MARATHON HARDWARE",
     "WAITING FOR GLASS FOR DOORS", "GARAGE PANELS TO DRILL", "WAITING FOR GLASS SHELVES",
-    "BO HARDWARE ARRIVED", "DOVETAILS ARRIVED", "NETLEY SHAKER DOORS DONE",
+    "BO HARDWARE ARRIVED", "CTS PARTS DONE", "DOVETAILS ARRIVED", "NETLEY SHAKER DOORS DONE",
     "DOUBLE UP PARTS DONE", "GLASS ARRIVED", "CUSTOM DOWELING PIECES DONE",
     "WARRANTY JOB", "SAMPLE ORDER", "COURIER PACKAGE",
     "HARDWARE ONLY", "BARCODE SCANNING", "PICKUP BY CARRIER"
@@ -597,6 +597,30 @@ export default function OrderDetails() {
       }
     }
   }, [scrollToPalletId, pallets, isLoadingPallets]);
+
+  // Auto-select "CTS PARTS DONE" when all CTS parts across all files are cut
+  useEffect(() => {
+    if (!preview || !project || project.status !== 'synced') return;
+    
+    // Check if all files have their CTS parts done (or have no CTS parts)
+    const allCtsDone = preview.fileBreakdowns.every((fb: any) => {
+      const ctsCount = fb.ctsPartsCount || 0;
+      return ctsCount === 0 || fb.ctsAllCut === true;
+    });
+    
+    // Check if there are any CTS parts at all (to avoid auto-selecting when there are none)
+    const hasCtsPartsInProject = preview.fileBreakdowns.some((fb: any) => (fb.ctsPartsCount || 0) > 0);
+    
+    const currentStatus = project.pfProductionStatus || [];
+    const alreadyHasCtsDone = currentStatus.includes("CTS PARTS DONE");
+    
+    // Auto-select whenever: all CTS parts are done, there are CTS parts, and not already selected
+    // This will re-apply even if user manually unchecked it while CTS parts remain complete
+    if (allCtsDone && hasCtsPartsInProject && !alreadyHasCtsDone) {
+      const newStatus = [...currentStatus, "CTS PARTS DONE"];
+      updateProductionStatus(newStatus);
+    }
+  }, [preview, project?.status, project?.pfProductionStatus]);
 
   // Handle production status checkbox toggle
   const handleProductionStatusToggle = (option: string, checked: boolean) => {
