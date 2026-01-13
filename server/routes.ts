@@ -1559,7 +1559,7 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Failed to update assignment' });
       }
       
-      // Update the project's PF PRODUCTION STATUS based on buyout statuses
+      // Update the project's PF PRODUCTION STATUS based on buyout statuses across ALL pallets
       let updatedPfProductionStatus: string[] | null = null;
       const fileWithProject = await storage.getFileWithProject(assignment.fileId);
       if (fileWithProject) {
@@ -1571,17 +1571,50 @@ export async function registerRoutes(
           const BO_ARRIVED = 'BO HARDWARE ARRIVED';
           const BO_MISSING = 'WAITING FOR BO HARDWARE';
           
+          // Get all pallets for this project and aggregate buyout statuses across all assignments
+          const allPallets = await storage.getPalletsForProject(project.id);
+          let anyHasWaiting = false;
+          let countWithBuyoutHardware = 0; // Assignments that have buyout hardware (not "NO BUYOUT" only)
+          let countWithArrived = 0; // Assignments that have ARRIVED selected
+          
+          for (const pallet of allPallets) {
+            const palletAssignments = await storage.getAssignmentsForPallet(pallet.id);
+            for (const a of palletAssignments) {
+              const statuses = a.buyoutHardwareStatuses || [];
+              
+              // Check if this assignment has buyout hardware (WAITING or ARRIVED, not just NO BUYOUT)
+              const hasBuyoutHardware = statuses.includes('WAITING FOR BO HARDWARE') || statuses.includes('BO HARDWARE ARRIVED');
+              
+              if (hasBuyoutHardware) {
+                countWithBuyoutHardware++;
+                
+                // Check if this assignment has WAITING
+                if (statuses.includes('WAITING FOR BO HARDWARE')) {
+                  anyHasWaiting = true;
+                }
+                
+                // Check if this assignment has ARRIVED
+                if (statuses.includes('BO HARDWARE ARRIVED')) {
+                  countWithArrived++;
+                }
+              }
+              // Assignments with only "NO BUYOUT HARDWARE" or empty are not counted
+            }
+          }
+          
           // Remove both buyout-related statuses first
           currentStatuses = currentStatuses.filter(s => s !== BO_ARRIVED && s !== BO_MISSING);
           
-          // Add statuses based on selected buyout options
-          if (buyoutHardwareStatuses.includes('BO HARDWARE ARRIVED')) {
+          // Apply priority logic:
+          // - If ANY assignment has WAITING → add WAITING FOR BO HARDWARE (takes precedence)
+          // - Only if ALL assignments with buyout hardware have ARRIVED (and none have WAITING) → add BO HARDWARE ARRIVED
+          if (anyHasWaiting) {
+            currentStatuses.push(BO_MISSING);
+          } else if (countWithBuyoutHardware > 0 && countWithArrived === countWithBuyoutHardware) {
+            // All assignments with buyout hardware have ARRIVED selected
             currentStatuses.push(BO_ARRIVED);
           }
-          if (buyoutHardwareStatuses.includes('WAITING FOR BO HARDWARE')) {
-            currentStatuses.push(BO_MISSING);
-          }
-          // 'NO BUYOUT HARDWARE' doesn't add any PF status
+          // If no assignments have buyout hardware, neither status is added
           
           await storage.updateProject(project.id, { pfProductionStatus: currentStatuses });
           updatedPfProductionStatus = currentStatuses;
