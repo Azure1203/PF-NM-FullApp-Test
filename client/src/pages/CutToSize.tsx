@@ -329,7 +329,7 @@ export default function CutToSize() {
         {/* Navigation buttons at bottom */}
         <div className="flex flex-col sm:flex-row gap-3 pt-8 border-t mt-8">
           {fileInfo?.file?.projectId && (
-            <Link href={`/orders/${fileInfo.file.projectId}`}>
+            <Link href={`/orders/${fileInfo.file.projectId}${palletId ? `?scrollToPallet=${palletId}` : ''}`}>
               <Button variant="outline" className="w-full sm:w-auto" data-testid="button-back-to-order">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Order
