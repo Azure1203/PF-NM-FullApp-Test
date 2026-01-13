@@ -1406,7 +1406,7 @@ export default function OrderDetails() {
                                         <div className="flex flex-wrap items-center gap-2">
                                           {/* CTS Parts Button - turns green when all cut */}
                                           {actualFilePreview && (actualFilePreview as any).ctsPartsCount > 0 && (
-                                            <Link href={`/cts/${file.id}`}>
+                                            <Link href={`/files/${file.id}/cts`}>
                                               <Button
                                                 size="sm"
                                                 variant="outline"
