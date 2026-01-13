@@ -653,8 +653,10 @@ export async function registerRoutes(
   // Update project data (protected)
   app.put(api.orders.update.path, isAuthenticated, async (req, res) => {
     try {
+      console.log(`[Project Update] Received update request:`, JSON.stringify(req.body));
       const input = api.orders.update.input.parse(req.body);
       const projectId = Number(req.params.id);
+      console.log(`[Project Update] Parsed input for project ${projectId}:`, JSON.stringify(input));
       
       // Get current project to check if it's synced to Asana
       const existingProject = await storage.getProject(projectId);
@@ -666,9 +668,11 @@ export async function registerRoutes(
       if (!project) {
         return res.status(404).json({ message: 'Project not found' });
       }
+      console.log(`[Project Update] Successfully updated project ${projectId} in database`);
       
       // If CIENAPPS JOB NUMBER was updated and project is synced to Asana, sync it
       if ('cienappsJobNumber' in input && existingProject.asanaTaskId) {
+        console.log(`[Asana] Syncing CIENAPPS JOB NUMBER to Asana task ${existingProject.asanaTaskId}`);
         try {
           const { tasksApi, projectsApi } = await getAsanaApiInstances();
           const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
@@ -679,6 +683,11 @@ export async function registerRoutes(
           });
           
           const customFieldSettings = projectDetails.data.custom_field_settings || [];
+          console.log(`[Asana] Found ${customFieldSettings.length} custom fields in project. Fields:`, customFieldSettings.map((s: any) => ({
+            name: s.custom_field.name,
+            type: s.custom_field.type
+          })));
+          
           let customFields: Record<string, any> = {};
           
           for (const setting of customFieldSettings) {
@@ -698,16 +707,17 @@ export async function registerRoutes(
             });
             console.log(`[Asana] Updated CIENAPPS JOB NUMBER for task ${existingProject.asanaTaskId}`);
           } else {
-            console.log(`[Asana] CIENAPPS JOB NUMBER field not found in Asana project`);
+            console.log(`[Asana] CIENAPPS JOB NUMBER field not found in Asana project custom fields`);
           }
         } catch (asanaError: any) {
-          console.error('[Asana] Failed to update CIENAPPS JOB NUMBER:', asanaError.message);
+          console.error('[Asana] Failed to update CIENAPPS JOB NUMBER:', asanaError.message, asanaError.response?.body);
           // Don't fail the request if Asana update fails
         }
       }
       
       res.json(project);
     } catch (err: any) {
+      console.error('[Project Update] Error:', err.message, err.stack);
        if (err instanceof z.ZodError) {
           return res.status(400).json({
             message: err.errors[0].message,
