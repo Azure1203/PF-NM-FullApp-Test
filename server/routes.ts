@@ -1182,6 +1182,13 @@ export async function registerRoutes(
       }
 
       const taskName = `(PERFECT FIT) ${project.name}`;
+      
+      // Build project app link for Asana description
+      const appDomain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS?.split(',')[0] || '';
+      const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
+      const taskNotes = projectAppUrl 
+        ? `<body><a href="${projectAppUrl}">View Project in App</a></body>`
+        : '';
 
       let newTaskGid: string;
 
@@ -1216,6 +1223,11 @@ export async function registerRoutes(
         }
 
         newTaskGid = newTask.gid;
+        
+        // Update the task with the project app link
+        if (taskNotes) {
+          await tasksApi.updateTask({ data: { html_notes: taskNotes } }, newTaskGid, {});
+        }
 
       } else {
         // Fallback: create task from scratch if template not found
@@ -1224,6 +1236,7 @@ export async function registerRoutes(
         const taskData: any = {
           name: taskName,
           projects: [asanaProjectGid],
+          ...(taskNotes && { html_notes: taskNotes }),
         };
 
         const task = await tasksApi.createTask({ data: taskData });
