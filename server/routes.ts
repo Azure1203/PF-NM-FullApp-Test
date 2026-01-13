@@ -1309,6 +1309,9 @@ ${fileBreakdown}`;
         newTaskGid = task.data.gid;
       }
 
+      // Variable to hold auto statuses for database update
+      let autoStatusesForDb: string[] = [];
+      
       // Update custom fields if available
       try {
         const asanaProjectDetails = await projectsApi.getProject(asanaProjectGid, { opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options' });
@@ -1431,25 +1434,17 @@ ${fileBreakdown}`;
         if (Object.keys(customFields).length > 0) {
           await tasksApi.updateTask({ data: { custom_fields: customFields } }, newTaskGid, {});
         }
+        // Store auto statuses for database update
+        autoStatusesForDb = autoStatuses;
       } catch (e) {
         console.error("Error updating custom fields:", e);
       }
-
-      // Compute auto-enabled production statuses for local storage
-      const autoStatuses = computeAutoProductionStatuses({
-        hasCTSParts,
-        hasFivePiece: totalFivePiece > 0,
-        hasDoubleThick,
-        hasDovetails: totalDovetails > 0,
-        hasAssembledDrawers: totalAssembledDrawers > 0,
-        hasGlassParts
-      });
 
       // Update project status in our database (including auto-enabled production statuses)
       const updatedProject = await storage.updateProject(project.id, {
         asanaTaskId: newTaskGid,
         status: 'synced',
-        pfProductionStatus: autoStatuses
+        pfProductionStatus: autoStatusesForDb
       });
 
       res.json(updatedProject);
