@@ -3,7 +3,7 @@ import { useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertProjectSchema, PALLET_SIZES, type PalletSize, type PalletPackagingStatus, type PalletPackagingMetric, defaultPackagingStatus, type BuyoutHardwareStatusNullable } from "@shared/schema";
+import { insertProjectSchema, PALLET_SIZES, type PalletSize, type PalletPackagingStatus, type PalletPackagingMetric, defaultPackagingStatus, BUYOUT_HARDWARE_OPTIONS, type BuyoutHardwareOption } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -48,7 +48,7 @@ interface AssignmentInfo {
   fileId: number;
   hardwarePackaged: boolean;
   hardwarePackedBy: string | null;
-  buyoutHardwareStatus: BuyoutHardwareStatusNullable;
+  buyoutHardwareStatuses: BuyoutHardwareOption[];
 }
 
 // Type for pallets with file assignments
@@ -444,12 +444,12 @@ export default function OrderDetails() {
     setHardwarePackedByName('');
   };
 
-  // Update buyout hardware status mutation with optimistic updates
-  const { mutate: updateBuyoutStatus } = useMutation({
-    mutationFn: async ({ assignmentId, buyoutHardwareStatus }: { assignmentId: number; buyoutHardwareStatus: BuyoutHardwareStatusNullable }) => {
-      return apiRequest('PATCH', `/api/assignments/${assignmentId}/buyout-status`, { buyoutHardwareStatus });
+  // Update buyout hardware statuses mutation with optimistic updates (multi-select)
+  const { mutate: updateBuyoutStatuses } = useMutation({
+    mutationFn: async ({ assignmentId, buyoutHardwareStatuses }: { assignmentId: number; buyoutHardwareStatuses: BuyoutHardwareOption[] }) => {
+      return apiRequest('PATCH', `/api/assignments/${assignmentId}/buyout-statuses`, { buyoutHardwareStatuses });
     },
-    onMutate: async ({ assignmentId, buyoutHardwareStatus }) => {
+    onMutate: async ({ assignmentId, buyoutHardwareStatuses }) => {
       await queryClient.cancelQueries({ queryKey: palletsQueryKey });
       const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
       
@@ -461,7 +461,7 @@ export default function OrderDetails() {
           return {
             ...pallet,
             assignments: pallet.assignments.map(a => 
-              a.id === assignmentId ? { ...a, buyoutHardwareStatus } : a
+              a.id === assignmentId ? { ...a, buyoutHardwareStatuses } : a
             )
           };
         });
@@ -482,56 +482,36 @@ export default function OrderDetails() {
     }
   });
 
-  // Cycle through buyout status: null -> arrived -> missing -> no_buyout -> null
-  const cycleBuyoutStatus = (assignment: AssignmentInfo) => {
-    const currentStatus = assignment.buyoutHardwareStatus;
-    let nextStatus: BuyoutHardwareStatusNullable;
+  // Toggle a specific buyout status option
+  const toggleBuyoutStatus = (assignment: AssignmentInfo, option: BuyoutHardwareOption) => {
+    const currentStatuses = assignment.buyoutHardwareStatuses || [];
+    let newStatuses: BuyoutHardwareOption[];
     
-    switch (currentStatus) {
-      case null:
-        nextStatus = 'arrived';
-        break;
-      case 'arrived':
-        nextStatus = 'missing';
-        break;
-      case 'missing':
-        nextStatus = 'no_buyout';
-        break;
-      case 'no_buyout':
-        nextStatus = null;
-        break;
-      default:
-        nextStatus = 'arrived';
+    if (currentStatuses.includes(option)) {
+      // Remove the option
+      newStatuses = currentStatuses.filter(s => s !== option);
+    } else {
+      // Add the option
+      newStatuses = [...currentStatuses, option];
     }
     
-    updateBuyoutStatus({ assignmentId: assignment.id, buyoutHardwareStatus: nextStatus });
+    updateBuyoutStatuses({ assignmentId: assignment.id, buyoutHardwareStatuses: newStatuses });
   };
 
-  // Get buyout button styling based on status
-  const getBuyoutButtonStyle = (status: BuyoutHardwareStatusNullable) => {
-    switch (status) {
-      case 'arrived':
+  // Get buyout button styling based on whether it's selected and the option type
+  const getBuyoutOptionStyle = (isSelected: boolean, option: BuyoutHardwareOption) => {
+    if (!isSelected) {
+      return 'bg-muted hover:bg-muted/80 text-muted-foreground border border-muted-foreground/20';
+    }
+    switch (option) {
+      case 'BO HARDWARE ARRIVED':
         return 'bg-green-600 hover:bg-green-700 text-white';
-      case 'missing':
+      case 'WAITING FOR BO HARDWARE':
         return 'bg-red-600 hover:bg-red-700 text-white';
-      case 'no_buyout':
+      case 'NO BUYOUT HARDWARE':
         return 'bg-blue-600 hover:bg-blue-700 text-white';
       default:
         return 'bg-muted hover:bg-muted/80 text-muted-foreground';
-    }
-  };
-
-  // Get buyout button label based on status
-  const getBuyoutButtonLabel = (status: BuyoutHardwareStatusNullable) => {
-    switch (status) {
-      case 'arrived':
-        return 'BO HARDWARE ARRIVED';
-      case 'missing':
-        return 'BO HARDWARE STILL MISSING';
-      case 'no_buyout':
-        return 'NO BUYOUT HARDWARE';
-      default:
-        return 'BUYOUT STATUS';
     }
   };
 
@@ -1750,20 +1730,29 @@ export default function OrderDetails() {
                                             </Button>
                                           </Link>
                                           
-                                          {/* Buyout Hardware Status Button */}
+                                          {/* Buyout Hardware Status Buttons (Multi-select) */}
                                           {(() => {
                                             const assignment = pallet.assignments?.find(a => a.fileId === file.id);
                                             if (!assignment) return null;
+                                            const statuses = assignment.buyoutHardwareStatuses || [];
                                             return (
-                                              <Button
-                                                size="sm"
-                                                onClick={() => cycleBuyoutStatus(assignment)}
-                                                className={`text-xs ${getBuyoutButtonStyle(assignment.buyoutHardwareStatus)}`}
-                                                data-testid={`button-buyout-${file.id}`}
-                                              >
-                                                <Truck className="w-3 h-3 mr-1" />
-                                                {getBuyoutButtonLabel(assignment.buyoutHardwareStatus)}
-                                              </Button>
+                                              <div className="flex flex-wrap gap-1">
+                                                {BUYOUT_HARDWARE_OPTIONS.map((option) => {
+                                                  const isSelected = statuses.includes(option);
+                                                  return (
+                                                    <Button
+                                                      key={option}
+                                                      size="sm"
+                                                      onClick={() => toggleBuyoutStatus(assignment, option)}
+                                                      className={`text-xs ${getBuyoutOptionStyle(isSelected, option)}`}
+                                                      data-testid={`button-buyout-${option.replace(/\s+/g, '-').toLowerCase()}-${file.id}`}
+                                                    >
+                                                      <Truck className="w-3 h-3 mr-1" />
+                                                      {option}
+                                                    </Button>
+                                                  );
+                                                })}
+                                              </div>
                                             );
                                           })()}
                                         </div>

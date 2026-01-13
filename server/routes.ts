@@ -985,7 +985,9 @@ export async function registerRoutes(
             assignments: assignments.map(a => ({
               id: a.id,
               fileId: a.fileId,
-              hardwarePackaged: a.hardwarePackaged ?? false
+              hardwarePackaged: a.hardwarePackaged ?? false,
+              hardwarePackedBy: a.hardwarePackedBy ?? null,
+              buyoutHardwareStatuses: a.buyoutHardwareStatuses ?? []
             }))
           };
         })
@@ -1190,7 +1192,9 @@ export async function registerRoutes(
         assignments: assignments.map(a => ({
           id: a.id,
           fileId: a.fileId,
-          hardwarePackaged: a.hardwarePackaged ?? false
+          hardwarePackaged: a.hardwarePackaged ?? false,
+          hardwarePackedBy: a.hardwarePackedBy ?? null,
+          buyoutHardwareStatuses: a.buyoutHardwareStatuses ?? []
         })),
         asanaSyncStatus
       });
@@ -1345,7 +1349,14 @@ export async function registerRoutes(
       const assignments = await storage.getAssignmentsForPallet(palletId);
       res.json({
         ...pallet,
-        fileIds: assignments.map(a => a.fileId)
+        fileIds: assignments.map(a => a.fileId),
+        assignments: assignments.map(a => ({
+          id: a.id,
+          fileId: a.fileId,
+          hardwarePackaged: a.hardwarePackaged ?? false,
+          hardwarePackedBy: a.hardwarePackedBy ?? null,
+          buyoutHardwareStatuses: a.buyoutHardwareStatuses ?? []
+        }))
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1496,16 +1507,24 @@ export async function registerRoutes(
     }
   });
 
-  // Update buyout hardware status for an assignment
-  app.patch('/api/assignments/:assignmentId/buyout-status', isAuthenticated, async (req, res) => {
+  // Update buyout hardware statuses for an assignment (multi-select)
+  app.patch('/api/assignments/:assignmentId/buyout-statuses', isAuthenticated, async (req, res) => {
     try {
       const assignmentId = Number(req.params.assignmentId);
-      const { buyoutHardwareStatus } = req.body;
+      const { buyoutHardwareStatuses } = req.body;
       
-      // Validate the status value
-      const validStatuses = ['arrived', 'missing', 'no_buyout', null];
-      if (!validStatuses.includes(buyoutHardwareStatus)) {
-        return res.status(400).json({ message: 'buyoutHardwareStatus must be arrived, missing, no_buyout, or null' });
+      // Valid status options
+      const validOptions = ['WAITING FOR BO HARDWARE', 'BO HARDWARE ARRIVED', 'NO BUYOUT HARDWARE'];
+      
+      // Validate the statuses array
+      if (!Array.isArray(buyoutHardwareStatuses)) {
+        return res.status(400).json({ message: 'buyoutHardwareStatuses must be an array' });
+      }
+      
+      for (const status of buyoutHardwareStatuses) {
+        if (!validOptions.includes(status)) {
+          return res.status(400).json({ message: `Invalid status: ${status}. Must be one of: ${validOptions.join(', ')}` });
+        }
       }
       
       // Get the assignment to verify it exists
@@ -1514,13 +1533,13 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Assignment not found' });
       }
       
-      // Update the assignment's buyout status
-      const updated = await storage.updateAssignmentBuyoutStatus(assignmentId, buyoutHardwareStatus);
+      // Update the assignment's buyout statuses
+      const updated = await storage.updateAssignmentBuyoutStatuses(assignmentId, buyoutHardwareStatuses);
       if (!updated) {
         return res.status(404).json({ message: 'Failed to update assignment' });
       }
       
-      // Update the project's PF PRODUCTION STATUS based on buyout status
+      // Update the project's PF PRODUCTION STATUS based on buyout statuses
       let updatedPfProductionStatus: string[] | null = null;
       const fileWithProject = await storage.getFileWithProject(assignment.fileId);
       if (fileWithProject) {
@@ -1528,20 +1547,21 @@ export async function registerRoutes(
         if (project) {
           let currentStatuses = project.pfProductionStatus || [];
           
-          // Define the buyout-related statuses
+          // Define the buyout-related PF statuses
           const BO_ARRIVED = 'BO HARDWARE ARRIVED';
           const BO_MISSING = 'WAITING FOR BO HARDWARE';
           
           // Remove both buyout-related statuses first
           currentStatuses = currentStatuses.filter(s => s !== BO_ARRIVED && s !== BO_MISSING);
           
-          // Add the appropriate status based on buyout hardware status
-          if (buyoutHardwareStatus === 'arrived') {
+          // Add statuses based on selected buyout options
+          if (buyoutHardwareStatuses.includes('BO HARDWARE ARRIVED')) {
             currentStatuses.push(BO_ARRIVED);
-          } else if (buyoutHardwareStatus === 'missing') {
+          }
+          if (buyoutHardwareStatuses.includes('WAITING FOR BO HARDWARE')) {
             currentStatuses.push(BO_MISSING);
           }
-          // For 'no_buyout' and null, we don't add any status (both are removed)
+          // 'NO BUYOUT HARDWARE' doesn't add any PF status
           
           await storage.updateProject(project.id, { pfProductionStatus: currentStatuses });
           updatedPfProductionStatus = currentStatuses;
@@ -1586,7 +1606,7 @@ export async function registerRoutes(
                   project.asanaTaskId,
                   {}
                 );
-                console.log(`[Asana] Updated PF PRODUCTION STATUS via buyout hardware status for task ${project.asanaTaskId} with ${currentStatuses.length} statuses`);
+                console.log(`[Asana] Updated PF PRODUCTION STATUS via buyout hardware statuses for task ${project.asanaTaskId} with ${currentStatuses.length} statuses`);
               }
             } catch (asanaError: any) {
               console.error('[Asana] Failed to update PF PRODUCTION STATUS:', asanaError.message);
