@@ -17,7 +17,8 @@ import {
   type Pallet,
   type InsertPallet,
   type PalletFileAssignment,
-  type InsertPalletFileAssignment
+  type InsertPalletFileAssignment,
+  type BuyoutHardwareStatusNullable
 } from "@shared/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 
@@ -274,7 +275,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async updateAssignmentBuyoutStatus(id: number, buyoutHardwareStatus: string | null): Promise<PalletFileAssignment | undefined> {
+  async updateAssignmentBuyoutStatus(id: number, buyoutHardwareStatus: BuyoutHardwareStatusNullable): Promise<PalletFileAssignment | undefined> {
     const [updated] = await db.update(palletFileAssignments)
       .set({ buyoutHardwareStatus })
       .where(eq(palletFileAssignments.id, id))
