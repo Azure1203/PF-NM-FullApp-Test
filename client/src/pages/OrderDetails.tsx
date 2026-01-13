@@ -526,21 +526,25 @@ export default function OrderDetails() {
 
   // Scroll to pallet when returning from CTS page
   useEffect(() => {
-    if (scrollToPalletId && pallets.length > 0) {
+    if (scrollToPalletId && pallets.length > 0 && !isLoadingPallets) {
       const palletIdNum = parseInt(scrollToPalletId);
-      if (!isNaN(palletIdNum)) {
+      if (!isNaN(palletIdNum) && pallets.some(p => p.id === palletIdNum)) {
         // Expand the pallet
-        setExpandedPallets(prev => new Set([...prev, palletIdNum]));
+        setExpandedPallets(prev => {
+          const arr = Array.from(prev);
+          arr.push(palletIdNum);
+          return new Set(arr);
+        });
         // Scroll to the pallet after a short delay to allow DOM to update
         setTimeout(() => {
           const palletElement = document.getElementById(`pallet-${palletIdNum}`);
           if (palletElement) {
             palletElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
-        }, 100);
+        }, 200);
       }
     }
-  }, [scrollToPalletId, pallets]);
+  }, [scrollToPalletId, pallets, isLoadingPallets]);
 
   // Handle production status checkbox toggle
   const handleProductionStatusToggle = (option: string, checked: boolean) => {
