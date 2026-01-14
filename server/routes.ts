@@ -472,57 +472,58 @@ export async function registerRoutes(
     let totalCtsPartsCount = 0;
 
     for (const file of projectFiles) {
-      if (file.rawContent) {
-        const records = await parseCSV(file.rawContent);
-        const counts = countPartsFromCSV(records);
-        
-        totalCoreParts += counts.coreParts;
-        totalDovetails += counts.dovetails;
-        totalAssembledDrawers += counts.assembledDrawers;
-        totalFivePiece += counts.fivePiece;
-        totalGlassInserts += counts.glassInserts;
-        totalGlassShelves += counts.glassShelves;
-        totalMJDoors += counts.mjDoorsCount;
-        totalRichelieuDoors += counts.richelieuDoorsCount;
-        totalDoubleThick += counts.doubleThickCount;
-        totalWeight += counts.weightLbs;
-        totalWallRailPieces += counts.wallRailPieces;
-        if (counts.hasDoubleThick) hasDoubleThick = true;
-        if (counts.hasShakerDoors) hasShakerDoors = true;
-        if (counts.hasGlassParts) hasGlassParts = true;
-        if (counts.hasMJDoors) hasMJDoors = true;
-        if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
-        if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
+      // Use stored values from database instead of re-parsing CSV
+      totalCoreParts += file.coreParts || 0;
+      totalDovetails += file.dovetails || 0;
+      totalAssembledDrawers += file.assembledDrawers || 0;
+      totalFivePiece += file.fivePieceDoors || 0;
+      totalGlassInserts += file.glassInserts || 0;
+      totalGlassShelves += file.glassShelves || 0;
+      totalMJDoors += file.mjDoorsCount || 0;
+      totalRichelieuDoors += file.richelieuDoorsCount || 0;
+      totalDoubleThick += file.doubleThickCount || 0;
+      totalWeight += file.weightLbs || 0;
+      totalWallRailPieces += file.wallRailPieces || 0;
+      if (file.hasDoubleThick) hasDoubleThick = true;
+      if (file.hasShakerDoors) hasShakerDoors = true;
+      if (file.hasGlassParts) hasGlassParts = true;
+      if (file.hasMJDoors) hasMJDoors = true;
+      if (file.hasRichelieuDoors) hasRichelieuDoors = true;
+      if ((file.maxLength || 0) > overallMaxLength) overallMaxLength = file.maxLength || 0;
 
-        // Get CTS parts count and cut status for this file
-        const fileCtsPartsCount = await storage.getCtsPartsCountForFile(file.id);
-        const fileCtsStatus = await storage.getCtsPartsCutStatus(file.id);
-        totalCtsPartsCount += fileCtsPartsCount;
+      // Get CTS parts count and cut status for this file
+      const fileCtsPartsCount = await storage.getCtsPartsCountForFile(file.id);
+      const fileCtsStatus = await storage.getCtsPartsCutStatus(file.id);
+      totalCtsPartsCount += fileCtsPartsCount;
 
-        fileBreakdowns.push({
-          name: file.poNumber || file.originalFilename,
-          coreParts: counts.coreParts,
-          dovetails: counts.dovetails,
-          assembledDrawers: counts.assembledDrawers,
-          fivePieceDoors: counts.fivePiece,
-          weightLbs: counts.weightLbs,
-          maxLength: counts.maxLength,
-          hasGlassParts: counts.hasGlassParts,
-          glassInserts: counts.glassInserts,
-          glassShelves: counts.glassShelves,
-          hasMJDoors: counts.hasMJDoors,
-          hasRichelieuDoors: counts.hasRichelieuDoors,
-          mjDoorsCount: counts.mjDoorsCount,
-          richelieuDoorsCount: counts.richelieuDoorsCount,
-          hasDoubleThick: counts.hasDoubleThick,
-          doubleThickCount: counts.doubleThickCount,
-          customParts: counts.customParts,
-          ctsPartsCount: fileCtsPartsCount,
-          fileId: file.id,
-          ctsAllCut: fileCtsStatus.allCut,
-          wallRailPieces: counts.wallRailPieces
-        });
-      }
+      // Build customParts list from boolean flags
+      const fileCustomParts: string[] = [];
+      if (file.hasDoubleThick) fileCustomParts.push('DOUBLE THICK PARTS');
+      if (file.hasShakerDoors) fileCustomParts.push('SHAKER DOORS');
+
+      fileBreakdowns.push({
+        name: file.poNumber || file.originalFilename,
+        coreParts: file.coreParts || 0,
+        dovetails: file.dovetails || 0,
+        assembledDrawers: file.assembledDrawers || 0,
+        fivePieceDoors: file.fivePieceDoors || 0,
+        weightLbs: file.weightLbs || 0,
+        maxLength: file.maxLength || 0,
+        hasGlassParts: file.hasGlassParts || false,
+        glassInserts: file.glassInserts || 0,
+        glassShelves: file.glassShelves || 0,
+        hasMJDoors: file.hasMJDoors || false,
+        hasRichelieuDoors: file.hasRichelieuDoors || false,
+        mjDoorsCount: file.mjDoorsCount || 0,
+        richelieuDoorsCount: file.richelieuDoorsCount || 0,
+        hasDoubleThick: file.hasDoubleThick || false,
+        doubleThickCount: file.doubleThickCount || 0,
+        customParts: fileCustomParts,
+        ctsPartsCount: fileCtsPartsCount,
+        fileId: file.id,
+        ctsAllCut: fileCtsStatus.allCut,
+        wallRailPieces: file.wallRailPieces || 0
+      });
     }
 
     // Determine pallet size
@@ -1754,25 +1755,23 @@ export async function registerRoutes(
       let overallMaxLength = 0;
       let hasCTSParts = false;
 
+      // Use stored values from database instead of re-parsing CSV
       for (const file of projectFiles) {
-        if (file.rawContent) {
-          const records = await parseCSV(file.rawContent);
-          const counts = countPartsFromCSV(records);
-          const ctsParts = extractCTSParts(records);
-          
-          totalCoreParts += counts.coreParts;
-          totalDovetails += counts.dovetails;
-          totalAssembledDrawers += counts.assembledDrawers;
-          totalFivePiece += counts.fivePiece;
-          if (counts.hasDoubleThick) hasDoubleThick = true;
-          if (counts.hasShakerDoors) hasShakerDoors = true;
-          if (counts.hasGlassParts) hasGlassParts = true;
-          if (counts.glassShelves > 0) hasGlassShelves = true;
-          if (counts.hasMJDoors) hasMJDoors = true;
-          if (counts.hasRichelieuDoors) hasRichelieuDoors = true;
-          if (counts.maxLength > overallMaxLength) overallMaxLength = counts.maxLength;
-          if (ctsParts.length > 0) hasCTSParts = true;
-        }
+        totalCoreParts += file.coreParts || 0;
+        totalDovetails += file.dovetails || 0;
+        totalAssembledDrawers += file.assembledDrawers || 0;
+        totalFivePiece += file.fivePieceDoors || 0;
+        if (file.hasDoubleThick) hasDoubleThick = true;
+        if (file.hasShakerDoors) hasShakerDoors = true;
+        if (file.hasGlassParts) hasGlassParts = true;
+        if ((file.glassShelves || 0) > 0) hasGlassShelves = true;
+        if (file.hasMJDoors) hasMJDoors = true;
+        if (file.hasRichelieuDoors) hasRichelieuDoors = true;
+        if ((file.maxLength || 0) > overallMaxLength) overallMaxLength = file.maxLength || 0;
+        
+        // Check for CTS parts using stored data
+        const ctsCount = await storage.getCtsPartsCountForFile(file.id);
+        if (ctsCount > 0) hasCTSParts = true;
       }
 
       const taskName = `(PERFECT FIT) ${project.name}`;
@@ -2429,6 +2428,58 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error("[Gmail] Error processing emails:", e);
       res.status(500).json({ message: 'Failed to process Gmail orders', error: e.message });
+    }
+  });
+
+  // Admin endpoint to backfill stored calculated values for existing files
+  app.post('/api/admin/backfill-file-metrics', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[Admin] Starting backfill of file metrics...');
+      
+      // Get all projects
+      const projects = await storage.getAllProjects();
+      let filesUpdated = 0;
+      
+      for (const project of projects) {
+        const files = await storage.getProjectFiles(project.id);
+        
+        for (const file of files) {
+          if (file.rawContent) {
+            const records = await parseCSV(file.rawContent);
+            const counts = countPartsFromCSV(records);
+            
+            // Update file with calculated values
+            await storage.updateOrderFile(file.id, {
+              coreParts: counts.coreParts,
+              dovetails: counts.dovetails,
+              assembledDrawers: counts.assembledDrawers,
+              fivePieceDoors: counts.fivePiece,
+              weightLbs: Math.round(counts.weightLbs),
+              maxLength: Math.round(counts.maxLength),
+              hasGlassParts: counts.hasGlassParts,
+              glassInserts: counts.glassInserts,
+              glassShelves: counts.glassShelves,
+              hasMJDoors: counts.hasMJDoors,
+              hasRichelieuDoors: counts.hasRichelieuDoors,
+              hasDoubleThick: counts.hasDoubleThick,
+              hasShakerDoors: counts.hasShakerDoors,
+              mjDoorsCount: counts.mjDoorsCount,
+              richelieuDoorsCount: counts.richelieuDoorsCount,
+              doubleThickCount: counts.doubleThickCount,
+              wallRailPieces: counts.wallRailPieces,
+            });
+            
+            filesUpdated++;
+          }
+        }
+      }
+      
+      console.log(`[Admin] Backfill complete. Updated ${filesUpdated} files.`);
+      res.json({ message: `Backfill complete. Updated ${filesUpdated} files.`, filesUpdated });
+      
+    } catch (e: any) {
+      console.error('[Admin] Backfill error:', e);
+      res.status(500).json({ message: 'Backfill failed', error: e.message });
     }
   });
 
