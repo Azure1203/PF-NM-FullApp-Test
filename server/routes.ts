@@ -2328,15 +2328,14 @@ export async function registerRoutes(
       let matchedCount = 0;
       
       // Helper function to normalize order names for matching
-      // Removes timestamps, underscores, hyphens, extra spaces, and normalizes case
+      // Converts "K_Kearney_(Caretaker_V3).csv" to "k kearney caretaker v3"
       const normalizeForMatching = (str: string): string => {
         return str
           .toLowerCase()
           .replace(/\.csv$/i, '')           // Remove .csv extension
           .replace(/_\d{10,}$/i, '')         // Remove trailing timestamps (10+ digits)
-          .replace(/[_\-]/g, ' ')            // Replace underscores and hyphens with spaces
+          .replace(/[_()\-]/g, ' ')          // Replace underscores, parens, hyphens with spaces
           .replace(/\s+/g, ' ')              // Collapse multiple spaces
-          .replace(/\([^)]*\)/g, '')         // Remove parenthetical content
           .trim();
       };
       
