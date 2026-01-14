@@ -1778,13 +1778,23 @@ export async function registerRoutes(
       const appDomain = publishedDomain || devDomain || '';
       const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
       
+      // Helper function to escape XML special characters
+      const escapeXml = (str: string): string => {
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      };
+      
       // Build task description with file names and Allmoxy Job numbers
       let taskNotes = '<body>';
       
       // Add each file name with its Allmoxy Job #
       for (const file of projectFiles) {
-        const fileName = file.originalFilename || 'Unknown File';
-        const jobNumber = file.allmoxyJobNumber || 'N/A';
+        const fileName = escapeXml(file.originalFilename || 'Unknown File');
+        const jobNumber = escapeXml(file.allmoxyJobNumber || 'N/A');
         taskNotes += `${fileName} - Allmoxy Job #${jobNumber}<br/>`;
       }
       
