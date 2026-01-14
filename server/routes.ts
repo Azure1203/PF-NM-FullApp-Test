@@ -1778,33 +1778,20 @@ export async function registerRoutes(
       const appDomain = publishedDomain || devDomain || '';
       const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
       
-      // Helper function to escape XML special characters
-      const escapeXml = (str: string): string => {
-        return str
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;')
-          .replace(/'/g, '&#39;');
-      };
+      // Build task description with file names and Allmoxy Job numbers (plain text)
+      let taskNotes = '';
       
-      // Build task description with file names and Allmoxy Job numbers
-      let taskNotes = '<body>';
+      // Add packaging link first
+      if (projectAppUrl) {
+        taskNotes += `Packaging Link: ${projectAppUrl}\n\n`;
+      }
       
       // Add each file name with its Allmoxy Job #
       for (const file of projectFiles) {
-        const fileName = escapeXml(file.originalFilename || 'Unknown File');
-        const jobNumber = escapeXml(file.allmoxyJobNumber || 'N/A');
-        taskNotes += `${fileName} - Allmoxy Job #${jobNumber}<br />`;
+        const fileName = file.originalFilename || 'Unknown File';
+        const jobNumber = file.allmoxyJobNumber || 'N/A';
+        taskNotes += `${fileName} - Allmoxy Job #${jobNumber}\n`;
       }
-      
-      // Add spacing and packaging link at the bottom
-      if (projectAppUrl) {
-        const escapedUrl = escapeXml(projectAppUrl);
-        taskNotes += `<br /><a href="${escapedUrl}">Packaging Link, Click Here</a>`;
-      }
-      
-      taskNotes += '</body>';
 
       let newTaskGid: string;
 
@@ -1840,15 +1827,14 @@ export async function registerRoutes(
 
         newTaskGid = newTask.gid;
         
-        // Update the task with the project app link
+        // Update the task with the project app link and file list
         if (taskNotes) {
           try {
-            console.log('[Asana] Updating task html_notes:', taskNotes);
-            await tasksApi.updateTask({ data: { html_notes: taskNotes } }, newTaskGid, {});
-            console.log('[Asana] Successfully updated html_notes');
-          } catch (htmlNotesError: any) {
-            console.error('[Asana] Failed to update html_notes:', htmlNotesError.message);
-            console.error('[Asana] html_notes content that failed:', taskNotes);
+            console.log('[Asana] Updating task notes:', taskNotes);
+            await tasksApi.updateTask({ data: { notes: taskNotes } }, newTaskGid, {});
+            console.log('[Asana] Successfully updated notes');
+          } catch (notesError: any) {
+            console.error('[Asana] Failed to update notes:', notesError.message);
             // Continue with the rest of the sync - don't fail the whole operation
           }
         }
@@ -1860,7 +1846,7 @@ export async function registerRoutes(
         const taskData: any = {
           name: taskName,
           projects: [asanaProjectGid],
-          ...(taskNotes && { html_notes: taskNotes }),
+          ...(taskNotes && { notes: taskNotes }),
         };
 
         const task = await tasksApi.createTask({ data: taskData });
