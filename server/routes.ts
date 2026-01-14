@@ -2327,26 +2327,46 @@ export async function registerRoutes(
       
       let matchedCount = 0;
       
+      // Helper function to normalize order names for matching
+      // Removes timestamps, underscores, hyphens, extra spaces, and normalizes case
+      const normalizeForMatching = (str: string): string => {
+        return str
+          .toLowerCase()
+          .replace(/\.csv$/i, '')           // Remove .csv extension
+          .replace(/_\d{10,}$/i, '')         // Remove trailing timestamps (10+ digits)
+          .replace(/[_\-]/g, ' ')            // Replace underscores and hyphens with spaces
+          .replace(/\s+/g, ' ')              // Collapse multiple spaces
+          .replace(/\([^)]*\)/g, '')         // Remove parenthetical content
+          .trim();
+      };
+      
       for (const email of emails) {
         try {
           // Get all files across all projects to find a match
           const allProjects = await storage.getProjects();
           let matched = false;
           
+          const normalizedEmailName = normalizeForMatching(email.allmoxyOrderName);
+          console.log(`[Gmail] Looking for match: "${email.allmoxyOrderName}" (normalized: "${normalizedEmailName}")`);
+          
           for (const project of allProjects) {
             const files = await storage.getProjectFiles(project.id);
             
             for (const file of files) {
-              // Match email order name to CSV filename (case-insensitive)
-              // Also try matching without .csv extension
               const filename = file.originalFilename || '';
-              const filenameWithoutExt = filename.toLowerCase().replace(/\.csv$/i, '');
-              const emailOrderName = email.allmoxyOrderName.toLowerCase().trim();
+              const normalizedFilename = normalizeForMatching(filename);
               
-              if (filenameWithoutExt === emailOrderName || 
-                  filename.toLowerCase() === emailOrderName ||
-                  filename.toLowerCase() === emailOrderName + '.csv') {
-                
+              // Try multiple matching strategies
+              const exactMatch = normalizedFilename === normalizedEmailName;
+              const containsMatch = normalizedFilename.includes(normalizedEmailName) || 
+                                   normalizedEmailName.includes(normalizedFilename);
+              
+              // Log for debugging unmatched cases
+              if (!exactMatch && !containsMatch) {
+                console.log(`[Gmail] No match: file="${normalizedFilename}" vs email="${normalizedEmailName}"`);
+              }
+              
+              if (exactMatch || containsMatch) {
                 // Found a match! Update the allmoxyJobNumber
                 await storage.updateOrderFile(file.id, {
                   allmoxyJobNumber: email.allmoxyOrderNumber
