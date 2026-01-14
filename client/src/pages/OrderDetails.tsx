@@ -548,14 +548,14 @@ export default function OrderDetails() {
       updatePallet({
         palletId: editingPallet.id,
         size: palletSize,
-        customSize: palletSize === 'Custom' ? palletCustomSize : undefined,
+        customSize: (palletSize === 'Custom' || palletSize === '34" Wide Cut to Size') ? palletCustomSize : undefined,
         notes: palletNotes || undefined,
         fileIds: palletFileIds
       });
     } else {
       createPallet({
         size: palletSize,
-        customSize: palletSize === 'Custom' ? palletCustomSize : undefined,
+        customSize: (palletSize === 'Custom' || palletSize === '34" Wide Cut to Size') ? palletCustomSize : undefined,
         notes: palletNotes || undefined,
         fileIds: palletFileIds
       });
@@ -1466,6 +1466,8 @@ export default function OrderDetails() {
                                 <Badge variant="outline" className="text-xs">
                                   {pallet.size === 'Custom' && pallet.customSize 
                                     ? pallet.customSize 
+                                    : pallet.size === '34" Wide Cut to Size' && pallet.customSize
+                                    ? `34" Wide Cut to Size - ${pallet.customSize}`
                                     : pallet.size}
                                 </Badge>
                               </div>
@@ -2283,6 +2285,19 @@ export default function OrderDetails() {
                 </SelectContent>
               </Select>
             </div>
+            
+            {/* Cut Length Input (shown when 34" Wide Cut to Size is selected) */}
+            {palletSize === '34" Wide Cut to Size' && (
+              <div className="space-y-2">
+                <Label>Cut Length</Label>
+                <Input
+                  placeholder="Enter cut length (e.g., 72 inches)"
+                  value={palletCustomSize}
+                  onChange={(e) => setPalletCustomSize(e.target.value)}
+                  data-testid="input-pallet-cut-length"
+                />
+              </div>
+            )}
             
             {/* Custom Size Input (only shown when Custom is selected) */}
             {palletSize === 'Custom' && (
