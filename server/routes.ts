@@ -1842,7 +1842,15 @@ export async function registerRoutes(
         
         // Update the task with the project app link
         if (taskNotes) {
-          await tasksApi.updateTask({ data: { html_notes: taskNotes } }, newTaskGid, {});
+          try {
+            console.log('[Asana] Updating task html_notes:', taskNotes);
+            await tasksApi.updateTask({ data: { html_notes: taskNotes } }, newTaskGid, {});
+            console.log('[Asana] Successfully updated html_notes');
+          } catch (htmlNotesError: any) {
+            console.error('[Asana] Failed to update html_notes:', htmlNotesError.message);
+            console.error('[Asana] html_notes content that failed:', taskNotes);
+            // Continue with the rest of the sync - don't fail the whole operation
+          }
         }
 
       } else {
