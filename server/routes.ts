@@ -649,6 +649,11 @@ export async function registerRoutes(
           hasMJDoors: partCounts.hasMJDoors,
           hasRichelieuDoors: partCounts.hasRichelieuDoors,
           hasDoubleThick: partCounts.hasDoubleThick,
+          hasShakerDoors: partCounts.hasShakerDoors,
+          mjDoorsCount: partCounts.mjDoorsCount,
+          richelieuDoorsCount: partCounts.richelieuDoorsCount,
+          doubleThickCount: partCounts.doubleThickCount,
+          wallRailPieces: partCounts.wallRailPieces,
         });
         
         // Extract and save CTS parts for this file

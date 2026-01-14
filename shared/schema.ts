@@ -56,6 +56,11 @@ export const orderFiles = pgTable("order_files", {
   hasMJDoors: boolean("has_mj_doors").default(false),
   hasRichelieuDoors: boolean("has_richelieu_doors").default(false),
   hasDoubleThick: boolean("has_double_thick").default(false),
+  hasShakerDoors: boolean("has_shaker_doors").default(false),
+  mjDoorsCount: integer("mj_doors_count").default(0),
+  richelieuDoorsCount: integer("richelieu_doors_count").default(0),
+  doubleThickCount: integer("double_thick_count").default(0),
+  wallRailPieces: integer("wall_rail_pieces").default(0),
   notes: text("notes"), // User notes for this file
   allmoxyJobNumber: text("allmoxy_job_number"), // ALLMOXY JOB # for this file
   packagingLink: text("packaging_link"), // Link to Adobe Acrobat packaging document
