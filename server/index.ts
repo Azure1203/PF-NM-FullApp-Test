@@ -116,12 +116,39 @@ app.use((req, res, next) => {
         }
       };
       
+      // Background job: Check Gmail for Allmoxy orders every 5 minutes
+      const GMAIL_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+      
+      const runGmailSync = async () => {
+        try {
+          const response = await fetch(`http://localhost:${port}/api/process-gmail-orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (response.ok) {
+            const result = await response.json();
+            if (result.processed > 0) {
+              log(`Gmail sync completed: ${result.matched}/${result.processed} orders matched`, 'gmail');
+            }
+          }
+        } catch (err) {
+          log(`Gmail sync failed: ${err}`, 'gmail');
+        }
+      };
+      
       // Run initial sync after 1 minute (to let server fully initialize)
       setTimeout(() => {
         runBackgroundSync();
         // Then run every 15 minutes
         setInterval(runBackgroundSync, SYNC_INTERVAL);
         log(`Background Asana sync scheduled (every 15 minutes)`, 'sync');
+        
+        // Start Gmail sync after 2 minutes, then every 5 minutes
+        setTimeout(() => {
+          runGmailSync();
+          setInterval(runGmailSync, GMAIL_SYNC_INTERVAL);
+          log(`Gmail order sync scheduled (every 5 minutes)`, 'gmail');
+        }, 60000);
       }, 60000);
     },
   );

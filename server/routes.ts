@@ -11,6 +11,7 @@ import path from 'path';
 import fs from 'fs';
 import express from 'express';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
+import { fetchUnreadAllmoxyEmails, markEmailAsRead, ParsedOrderEmail } from "./gmail";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2293,6 +2294,117 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error("Batch Asana Sync Error:", e);
       res.status(500).json({ message: 'Failed to sync from Asana' });
+    }
+  });
+
+  // Process Allmoxy emails from Gmail
+  // Matches order names from email body to CSV filenames and updates Allmoxy Job #
+  app.post("/api/process-gmail-orders", async (req, res) => {
+    try {
+      console.log('[Gmail] Starting email processing...');
+      
+      const emails = await fetchUnreadAllmoxyEmails();
+      console.log(`[Gmail] Found ${emails.length} Allmoxy order emails to process`);
+      
+      if (emails.length === 0) {
+        res.json({ 
+          message: 'No Allmoxy order emails found', 
+          processed: 0, 
+          matched: 0,
+          results: [] 
+        });
+        return;
+      }
+      
+      const results: Array<{
+        orderName: string;
+        orderNumber: string;
+        matched: boolean;
+        matchedFileId?: number;
+        matchedFilename?: string;
+        error?: string;
+      }> = [];
+      
+      let matchedCount = 0;
+      
+      for (const email of emails) {
+        try {
+          // Get all files across all projects to find a match
+          const allProjects = await storage.getProjects();
+          let matched = false;
+          
+          for (const project of allProjects) {
+            const files = await storage.getProjectFiles(project.id);
+            
+            for (const file of files) {
+              // Match email order name to CSV filename (case-insensitive)
+              // Also try matching without .csv extension
+              const filename = file.originalFilename || '';
+              const filenameWithoutExt = filename.toLowerCase().replace(/\.csv$/i, '');
+              const emailOrderName = email.allmoxyOrderName.toLowerCase().trim();
+              
+              if (filenameWithoutExt === emailOrderName || 
+                  filename.toLowerCase() === emailOrderName ||
+                  filename.toLowerCase() === emailOrderName + '.csv') {
+                
+                // Found a match! Update the allmoxyJobNumber
+                await storage.updateOrderFile(file.id, {
+                  allmoxyJobNumber: email.allmoxyOrderNumber
+                });
+                
+                console.log(`[Gmail] Matched "${email.allmoxyOrderName}" to file "${filename}" - Set Allmoxy Job # to ${email.allmoxyOrderNumber}`);
+                
+                results.push({
+                  orderName: email.allmoxyOrderName,
+                  orderNumber: email.allmoxyOrderNumber,
+                  matched: true,
+                  matchedFileId: file.id,
+                  matchedFilename: filename
+                });
+                
+                matched = true;
+                matchedCount++;
+                break;
+              }
+            }
+            
+            if (matched) break;
+          }
+          
+          if (!matched) {
+            console.log(`[Gmail] No match found for order "${email.allmoxyOrderName}"`);
+            results.push({
+              orderName: email.allmoxyOrderName,
+              orderNumber: email.allmoxyOrderNumber,
+              matched: false,
+              error: 'No matching CSV file found'
+            });
+          }
+          
+          // Mark email as read after processing (whether matched or not)
+          await markEmailAsRead(email.messageId);
+          
+        } catch (emailErr: any) {
+          console.error(`[Gmail] Error processing email for "${email.allmoxyOrderName}":`, emailErr.message);
+          results.push({
+            orderName: email.allmoxyOrderName,
+            orderNumber: email.allmoxyOrderNumber,
+            matched: false,
+            error: emailErr.message
+          });
+        }
+      }
+      
+      res.json({
+        message: `Processed ${emails.length} emails, matched ${matchedCount}`,
+        processed: emails.length,
+        matched: matchedCount,
+        results
+      });
+      
+    } catch (e: any) {
+      console.error("[Gmail] Error processing emails:", e);
+      res.status(500).json({ message: 'Failed to process Gmail orders', error: e.message });
     }
   });
 
