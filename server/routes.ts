@@ -1772,10 +1772,11 @@ export async function registerRoutes(
       const taskName = `(PERFECT FIT) ${project.name}`;
       
       // Build project app link for Asana description
-      // Prefer published domain (REPLIT_DOMAINS) over dev domain for stable links
+      // Priority: Custom domain > published domain > dev domain
+      const customDomain = process.env.CUSTOM_APP_DOMAIN;
       const publishedDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
       const devDomain = process.env.REPLIT_DEV_DOMAIN;
-      const appDomain = publishedDomain || devDomain || '';
+      const appDomain = customDomain || publishedDomain || devDomain || '';
       const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
       
       // Build task description with file names and Allmoxy Job numbers (plain text)
