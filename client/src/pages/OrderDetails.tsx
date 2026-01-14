@@ -482,17 +482,17 @@ export default function OrderDetails() {
     }
   });
 
-  // Toggle a specific buyout status option
+  // Toggle a specific buyout status option (mutually exclusive)
   const toggleBuyoutStatus = (assignment: AssignmentInfo, option: BuyoutHardwareOption) => {
     const currentStatuses = assignment.buyoutHardwareStatuses || [];
     let newStatuses: BuyoutHardwareOption[];
     
     if (currentStatuses.includes(option)) {
-      // Remove the option
+      // Remove the option (deselect)
       newStatuses = currentStatuses.filter(s => s !== option);
     } else {
-      // Add the option
-      newStatuses = [...currentStatuses, option];
+      // Select this option and deselect the others (mutually exclusive)
+      newStatuses = [option];
     }
     
     updateBuyoutStatuses({ assignmentId: assignment.id, buyoutHardwareStatuses: newStatuses });
