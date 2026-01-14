@@ -1786,9 +1786,13 @@ export async function registerRoutes(
         taskNotes += `Packaging Link: ${projectAppUrl}\n\n`;
       }
       
-      // Add each file name with its Allmoxy Job #
+      // Add each file name with its Allmoxy Job # (remove .csv extension)
       for (const file of projectFiles) {
-        const fileName = file.originalFilename || 'Unknown File';
+        let fileName = file.originalFilename || 'Unknown File';
+        // Remove .csv extension if present
+        if (fileName.toLowerCase().endsWith('.csv')) {
+          fileName = fileName.slice(0, -4);
+        }
         const jobNumber = file.allmoxyJobNumber || 'N/A';
         taskNotes += `${fileName} - Allmoxy Job #${jobNumber}\n`;
       }
