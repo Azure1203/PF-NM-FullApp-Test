@@ -1795,12 +1795,13 @@ export async function registerRoutes(
       for (const file of projectFiles) {
         const fileName = escapeXml(file.originalFilename || 'Unknown File');
         const jobNumber = escapeXml(file.allmoxyJobNumber || 'N/A');
-        taskNotes += `${fileName} - Allmoxy Job #${jobNumber}<br/>`;
+        taskNotes += `${fileName} - Allmoxy Job #${jobNumber}<br />`;
       }
       
       // Add spacing and packaging link at the bottom
       if (projectAppUrl) {
-        taskNotes += `<br/><a href="${projectAppUrl}">Packaging Link, Click Here</a>`;
+        const escapedUrl = escapeXml(projectAppUrl);
+        taskNotes += `<br /><a href="${escapedUrl}">Packaging Link, Click Here</a>`;
       }
       
       taskNotes += '</body>';
