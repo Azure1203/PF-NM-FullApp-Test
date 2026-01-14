@@ -1463,7 +1463,7 @@ export default function OrderDetails() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">Pallet #{pallet.palletNumber}</span>
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-sm px-3 py-1 font-medium">
                                   {pallet.size === 'Custom' && pallet.customSize 
                                     ? pallet.customSize 
                                     : pallet.size === '34" Wide Cut to Size' && pallet.customSize
