@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +13,9 @@ import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const RED_PRODUCTION_STATUSES = [
   "WAITING FOR BO HARDWARE",
@@ -31,7 +34,36 @@ export default function Dashboard() {
   const { data: projects, isLoading } = useOrders();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
+
+  const { mutate: fetchOutlookEmails, isPending: isFetchingEmails } = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/outlook/process-netley-emails', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to fetch emails');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({
+        title: "Outlook emails processed",
+        description: `Processed ${data.processed} emails, matched ${data.matched} packing slips to orders.`
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to fetch emails",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
 
   const filteredProjects = projects?.filter(project => {
     const term = search.toLowerCase();
@@ -73,12 +105,29 @@ export default function Dashboard() {
           title="Perfect Fit Jobs" 
           description="Manage and sync your closet order projects."
           actions={
-            <Link href="/upload">
-              <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6" data-testid="button-upload-new">
-                <Plus className="w-5 h-5" />
-                Upload New Project
+            <div className="flex items-center gap-3">
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="gap-2 rounded-xl h-12 px-5" 
+                onClick={() => fetchOutlookEmails()}
+                disabled={isFetchingEmails}
+                data-testid="button-fetch-outlook-emails"
+              >
+                {isFetchingEmails ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Mail className="w-5 h-5" />
+                )}
+                Fetch Netley Emails
               </Button>
-            </Link>
+              <Link href="/upload">
+                <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6" data-testid="button-upload-new">
+                  <Plus className="w-5 h-5" />
+                  Upload New Project
+                </Button>
+              </Link>
+            </div>
           }
         />
 

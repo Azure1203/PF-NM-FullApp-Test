@@ -12,7 +12,7 @@ import fs from 'fs';
 import express from 'express';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { fetchUnreadAllmoxyEmails, markEmailAsRead, ParsedOrderEmail, fetchNetleyPackingSlipEmails, NetleyPackingSlipEmail } from "./gmail";
-import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, type NetleyEmail } from "./outlook";
+import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2690,13 +2690,40 @@ export async function registerRoutes(
     }
   });
 
+  // List all mail folders
+  app.get('/api/outlook/folders', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[Outlook] Listing mail folders...');
+      const folders = await listMailFolders();
+      console.log(`[Outlook] Found ${folders.length} folders`);
+      res.json({ folders });
+    } catch (err: any) {
+      console.error('[Outlook] Error listing folders:', err.message);
+      res.status(500).json({ message: 'Failed to list folders', error: err.message });
+    }
+  });
+
   // List Netley packing slip emails from Outlook
   app.get('/api/outlook/netley-emails', isAuthenticated, async (req, res) => {
     try {
       console.log('[Outlook] Fetching Netley packing slip emails...');
-      const emails = await searchNetleyEmails();
-      console.log(`[Outlook] Found ${emails.length} emails with PDF attachments`);
-      res.json({ emails });
+      const result = await searchNetleyEmails();
+      
+      if (!result.folderFound) {
+        console.log(`[Outlook] Folder not found: ${result.folderName}`);
+        return res.status(404).json({
+          message: result.error,
+          folderFound: false,
+          folderName: result.folderName
+        });
+      }
+      
+      console.log(`[Outlook] Found ${result.emails.length} emails with PDF attachments in folder "${result.folderName}"`);
+      res.json({
+        emails: result.emails,
+        folderFound: true,
+        folderName: result.folderName
+      });
     } catch (err: any) {
       console.error('[Outlook] Error fetching emails:', err.message);
       res.status(500).json({ message: 'Failed to fetch emails', error: err.message });
@@ -2708,12 +2735,28 @@ export async function registerRoutes(
     try {
       console.log('[Outlook] Starting Netley Packing Slip email processing...');
       
-      const emails = await searchNetleyEmails();
-      console.log(`[Outlook] Found ${emails.length} emails with PDF attachments`);
+      const searchResult = await searchNetleyEmails();
+      
+      if (!searchResult.folderFound) {
+        console.log(`[Outlook] Folder not found: ${searchResult.folderName}`);
+        return res.status(404).json({
+          message: searchResult.error,
+          folderFound: false,
+          folderName: searchResult.folderName,
+          processed: 0,
+          matched: 0,
+          results: []
+        });
+      }
+      
+      const emails = searchResult.emails;
+      console.log(`[Outlook] Found ${emails.length} emails with PDF attachments in folder "${searchResult.folderName}"`);
       
       if (emails.length === 0) {
         return res.json({
-          message: 'No Netley Packing Slip emails found',
+          message: 'No emails with PDF attachments found in the folder',
+          folderFound: true,
+          folderName: searchResult.folderName,
           processed: 0,
           matched: 0,
           results: []
