@@ -1945,13 +1945,35 @@ export default function OrderDetails() {
                         </div>
                       )}
                       
+                      {/* Packing Slip PDF Download */}
+                      {project.files?.[selectedFileIndex]?.packingSlipPdfPath && (
+                        <div className="mb-4" data-testid="file-packing-slip-section">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full justify-start text-left"
+                            onClick={() => {
+                              const fileId = project.files![selectedFileIndex].id;
+                              window.open(`/api/files/${fileId}/packing-slip-pdf`, '_blank');
+                            }}
+                            data-testid="button-download-packing-slip"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Netley Packing Slip PDF
+                          </Button>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Download PDF, then upload to Adobe Acrobat Document Cloud and paste the share link below
+                          </p>
+                        </div>
+                      )}
+                      
                       {/* Packaging Link for this file */}
                       {project.files?.[selectedFileIndex] && (
                         <div className="space-y-2 mb-4" data-testid="file-packaging-link-section">
-                          <span className="text-sm font-medium text-muted-foreground">Packaging Link:</span>
+                          <span className="text-sm font-medium text-muted-foreground">Adobe Acrobat Share Link:</span>
                           <div className="flex items-center gap-2">
                             <Input
-                              placeholder="Paste Adobe Acrobat link..."
+                              placeholder="Paste Adobe Acrobat share link..."
                               value={editingPackagingLink[project.files[selectedFileIndex].id] ?? project.files[selectedFileIndex].packagingLink ?? ""}
                               onChange={(e) => setEditingPackagingLink(prev => ({
                                 ...prev,
