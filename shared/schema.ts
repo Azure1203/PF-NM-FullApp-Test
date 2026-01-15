@@ -64,6 +64,7 @@ export const orderFiles = pgTable("order_files", {
   notes: text("notes"), // User notes for this file
   allmoxyJobNumber: text("allmoxy_job_number"), // ALLMOXY JOB # for this file
   packagingLink: text("packaging_link"), // Link to Adobe Acrobat packaging document
+  packingSlipPdfPath: text("packing_slip_pdf_path"), // Path to Netley packing slip PDF in object storage
   
   createdAt: timestamp("created_at").defaultNow(),
 });
