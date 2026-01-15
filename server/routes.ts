@@ -12,6 +12,7 @@ import fs from 'fs';
 import express from 'express';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { fetchUnreadAllmoxyEmails, markEmailAsRead, ParsedOrderEmail, fetchNetleyPackingSlipEmails, NetleyPackingSlipEmail } from "./gmail";
+import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, type NetleyEmail } from "./outlook";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2675,6 +2676,163 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[API] Error uploading packing slip PDF:', err.message);
       res.status(500).json({ message: 'Failed to upload PDF', error: err.message });
+    }
+  });
+
+  // Test Outlook connection
+  app.get('/api/outlook/test', isAuthenticated, async (req, res) => {
+    try {
+      const result = await testOutlookConnection();
+      res.json(result);
+    } catch (err: any) {
+      console.error('[Outlook] Connection test failed:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // List Netley packing slip emails from Outlook
+  app.get('/api/outlook/netley-emails', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[Outlook] Fetching Netley packing slip emails...');
+      const emails = await searchNetleyEmails();
+      console.log(`[Outlook] Found ${emails.length} emails with PDF attachments`);
+      res.json({ emails });
+    } catch (err: any) {
+      console.error('[Outlook] Error fetching emails:', err.message);
+      res.status(500).json({ message: 'Failed to fetch emails', error: err.message });
+    }
+  });
+
+  // Process Netley packing slip emails from Outlook and match to orders
+  app.post('/api/outlook/process-netley-emails', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[Outlook] Starting Netley Packing Slip email processing...');
+      
+      const emails = await searchNetleyEmails();
+      console.log(`[Outlook] Found ${emails.length} emails with PDF attachments`);
+      
+      if (emails.length === 0) {
+        return res.json({
+          message: 'No Netley Packing Slip emails found',
+          processed: 0,
+          matched: 0,
+          results: []
+        });
+      }
+      
+      // Get all projects with files for matching
+      const projects = await storage.getProjects();
+      const allFiles: Array<{
+        projectId: number;
+        fileId: number;
+        filename: string;
+        hasPackingSlip: boolean;
+      }> = [];
+      
+      for (const project of projects) {
+        const files = await storage.getProjectFiles(project.id);
+        for (const file of files) {
+          allFiles.push({
+            projectId: project.id,
+            fileId: file.id,
+            filename: file.originalFilename || '',
+            hasPackingSlip: !!file.packingSlipPdfPath
+          });
+        }
+      }
+      
+      const results: Array<{
+        subject: string;
+        from: string;
+        attachmentName: string;
+        matched: boolean;
+        matchedTo?: string;
+        error?: string;
+      }> = [];
+      let matchedCount = 0;
+      
+      for (const email of emails) {
+        for (const attachment of email.attachments) {
+          try {
+            // Try to extract order number from subject or attachment name
+            // Common patterns: "Order 1234", "1234 - Netley", etc.
+            const subjectMatch = email.subject.match(/(\d{3,6})/);
+            const attachmentMatch = attachment.name.match(/(\d{3,6})/);
+            const orderNumber = subjectMatch?.[1] || attachmentMatch?.[1];
+            
+            if (!orderNumber) {
+              results.push({
+                subject: email.subject,
+                from: email.from,
+                attachmentName: attachment.name,
+                matched: false,
+                error: 'Could not extract order number from email'
+              });
+              continue;
+            }
+            
+            // Find matching file by order number in filename
+            const matchingFile = allFiles.find(f => 
+              f.filename.includes(orderNumber) && !f.hasPackingSlip
+            );
+            
+            if (matchingFile) {
+              // Download the attachment
+              const pdfBuffer = await downloadEmailAttachment(email.id, attachment.id);
+              
+              // Store in object storage
+              const sanitizedFilename = `${matchingFile.filename.replace(/\.csv$/i, '').replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_')}_Netley_Packing_Slip.pdf`;
+              const storagePath = `.private/packing-slips/${sanitizedFilename}`;
+              
+              await objectStorageService.uploadBuffer(pdfBuffer, storagePath, 'application/pdf');
+              
+              // Update the order file with the PDF path
+              await storage.updateOrderFile(matchingFile.fileId, {
+                packingSlipPdfPath: storagePath
+              });
+              
+              console.log(`[Outlook] Matched and stored PDF for order ${orderNumber} -> ${matchingFile.filename}`);
+              
+              results.push({
+                subject: email.subject,
+                from: email.from,
+                attachmentName: attachment.name,
+                matched: true,
+                matchedTo: matchingFile.filename
+              });
+              matchedCount++;
+            } else {
+              results.push({
+                subject: email.subject,
+                from: email.from,
+                attachmentName: attachment.name,
+                matched: false,
+                error: `No matching order found for number ${orderNumber}`
+              });
+            }
+          } catch (attachErr: any) {
+            console.error(`[Outlook] Error processing attachment ${attachment.name}:`, attachErr.message);
+            results.push({
+              subject: email.subject,
+              from: email.from,
+              attachmentName: attachment.name,
+              matched: false,
+              error: attachErr.message
+            });
+          }
+        }
+      }
+      
+      res.json({
+        message: `Processed ${emails.length} emails, matched ${matchedCount} attachments`,
+        processed: emails.length,
+        matched: matchedCount,
+        results
+      });
+      
+    } catch (err: any) {
+      console.error('[Outlook] Error processing Netley emails:', err.message);
+      res.status(500).json({ message: 'Failed to process emails', error: err.message });
     }
   });
 
