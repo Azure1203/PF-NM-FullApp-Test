@@ -61,6 +61,20 @@ export interface ParsedOrderEmail {
   date: string;
 }
 
+export interface NetleyPackingSlipEmail {
+  messageId: string;
+  allmoxyOrderName: string;
+  allmoxyOrderNumber: string;
+  subject: string;
+  from: string;
+  date: string;
+  pdfAttachment: {
+    filename: string;
+    data: Buffer;
+    mimeType: string;
+  } | null;
+}
+
 // Parse email body to extract Allmoxy Order Name and Order Number
 export function parseAllmoxyEmailBody(body: string): { orderName: string | null; orderNumber: string | null } {
   let orderName: string | null = null;
@@ -198,4 +212,137 @@ export async function markEmailAsRead(messageId: string): Promise<void> {
   });
   
   console.log(`[Gmail] Marked message ${messageId} as read`);
+}
+
+// Extract PDF attachment from email parts
+function extractPdfAttachment(parts: any[], gmail: any, messageId: string): Promise<{ filename: string; data: Buffer; mimeType: string } | null> {
+  return new Promise(async (resolve) => {
+    for (const part of parts) {
+      // Check if this part is a PDF attachment
+      if (part.mimeType === 'application/pdf' && part.filename && part.body?.attachmentId) {
+        try {
+          // Download the attachment
+          const attachment = await gmail.users.messages.attachments.get({
+            userId: 'me',
+            messageId: messageId,
+            id: part.body.attachmentId
+          });
+          
+          if (attachment.data?.data) {
+            // Decode base64url data
+            const base64Data = attachment.data.data.replace(/-/g, '+').replace(/_/g, '/');
+            const buffer = Buffer.from(base64Data, 'base64');
+            
+            resolve({
+              filename: part.filename,
+              data: buffer,
+              mimeType: part.mimeType
+            });
+            return;
+          }
+        } catch (err: any) {
+          console.error(`[Gmail] Error downloading attachment: ${err.message}`);
+        }
+      }
+      
+      // Recursively check nested parts
+      if (part.parts) {
+        const nested = await extractPdfAttachment(part.parts, gmail, messageId);
+        if (nested) {
+          resolve(nested);
+          return;
+        }
+      }
+    }
+    resolve(null);
+  });
+}
+
+// Fetch Netley Packing Slip emails with PDF attachments
+// These emails contain "Allmoxy Order Name" and "Allmoxy Order Number" in the body
+// and have a PDF attachment named like "1870 - Netley Packing Slip.pdf"
+export async function fetchNetleyPackingSlipEmails(): Promise<NetleyPackingSlipEmail[]> {
+  const gmail = await getGmailClient();
+  const parsedEmails: NetleyPackingSlipEmail[] = [];
+
+  try {
+    // Search for unread emails with "Netley Packing Slip" in subject or attachment name
+    const response = await gmail.users.messages.list({
+      userId: 'me',
+      q: 'is:unread (subject:"Netley Packing Slip" OR filename:"Netley Packing Slip")',
+      maxResults: 50
+    });
+
+    const messages = response.data.messages || [];
+    console.log(`[Gmail] Found ${messages.length} unread Netley Packing Slip messages`);
+
+    for (const msg of messages) {
+      if (!msg.id) continue;
+
+      // Get full message details with attachments
+      const fullMessage = await gmail.users.messages.get({
+        userId: 'me',
+        id: msg.id,
+        format: 'full'
+      });
+
+      const headers = fullMessage.data.payload?.headers || [];
+      const subject = getHeader(headers, 'Subject');
+      const from = getHeader(headers, 'From');
+      const date = getHeader(headers, 'Date');
+
+      // Extract email body to get Allmoxy Order Name and Number
+      const body = extractEmailBody(fullMessage.data.payload);
+      const { orderName, orderNumber } = parseAllmoxyEmailBody(body);
+
+      if (!orderName || !orderNumber) {
+        console.log(`[Gmail] Skipping message ${msg.id} - no Allmoxy order info found`);
+        continue;
+      }
+
+      // Extract PDF attachment
+      let pdfAttachment = null;
+      if (fullMessage.data.payload?.parts) {
+        pdfAttachment = await extractPdfAttachment(fullMessage.data.payload.parts, gmail, msg.id);
+      } else if (fullMessage.data.payload?.body?.attachmentId) {
+        // Single-part message with attachment
+        try {
+          const attachment = await gmail.users.messages.attachments.get({
+            userId: 'me',
+            messageId: msg.id,
+            id: fullMessage.data.payload.body.attachmentId
+          });
+          
+          if (attachment.data?.data && fullMessage.data.payload.filename) {
+            const base64Data = attachment.data.data.replace(/-/g, '+').replace(/_/g, '/');
+            const buffer = Buffer.from(base64Data, 'base64');
+            pdfAttachment = {
+              filename: fullMessage.data.payload.filename,
+              data: buffer,
+              mimeType: fullMessage.data.payload.mimeType || 'application/pdf'
+            };
+          }
+        } catch (err: any) {
+          console.error(`[Gmail] Error downloading single-part attachment: ${err.message}`);
+        }
+      }
+
+      parsedEmails.push({
+        messageId: msg.id,
+        allmoxyOrderName: orderName,
+        allmoxyOrderNumber: orderNumber,
+        subject,
+        from,
+        date,
+        pdfAttachment
+      });
+      
+      console.log(`[Gmail] Found Netley Packing Slip: ${orderName} - #${orderNumber}, PDF: ${pdfAttachment ? pdfAttachment.filename : 'none'}`);
+    }
+
+    return parsedEmails;
+  } catch (error: any) {
+    console.error('[Gmail] Error fetching Netley Packing Slip emails:', error.message);
+    throw error;
+  }
 }

@@ -237,6 +237,46 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  // Uploads a buffer to object storage at the specified path
+  async uploadBuffer(buffer: Buffer, objectPath: string, contentType: string = 'application/octet-stream'): Promise<void> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fullPath = `${privateObjectDir}/${objectPath}`;
+    
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    await file.save(buffer, {
+      contentType,
+      resumable: false,
+    });
+    
+    console.log(`[ObjectStorage] Uploaded ${buffer.length} bytes to ${fullPath}`);
+  }
+
+  // Downloads an object as a buffer from object storage
+  async downloadBuffer(objectPath: string): Promise<Buffer | null> {
+    try {
+      const privateObjectDir = this.getPrivateObjectDir();
+      const fullPath = `${privateObjectDir}/${objectPath}`;
+      
+      const { bucketName, objectName } = parseObjectPath(fullPath);
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      
+      const [exists] = await file.exists();
+      if (!exists) {
+        return null;
+      }
+      
+      const [buffer] = await file.download();
+      return buffer;
+    } catch (error) {
+      console.error('[ObjectStorage] Error downloading buffer:', error);
+      return null;
+    }
+  }
 }
 
 function parseObjectPath(path: string): {

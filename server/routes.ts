@@ -11,7 +11,7 @@ import path from 'path';
 import fs from 'fs';
 import express from 'express';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { fetchUnreadAllmoxyEmails, markEmailAsRead, ParsedOrderEmail } from "./gmail";
+import { fetchUnreadAllmoxyEmails, markEmailAsRead, ParsedOrderEmail, fetchNetleyPackingSlipEmails, NetleyPackingSlipEmail } from "./gmail";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2431,13 +2431,210 @@ export async function registerRoutes(
     }
   });
 
+  // Process Netley Packing Slip emails from Gmail
+  // Downloads PDF attachments, renames them with order name, stores in object storage, and links to order files
+  app.post("/api/process-netley-packing-slips", async (req, res) => {
+    try {
+      console.log('[Gmail] Starting Netley Packing Slip email processing...');
+      
+      const emails = await fetchNetleyPackingSlipEmails();
+      console.log(`[Gmail] Found ${emails.length} Netley Packing Slip emails to process`);
+      
+      if (emails.length === 0) {
+        res.json({ 
+          message: 'No Netley Packing Slip emails found', 
+          processed: 0, 
+          matched: 0,
+          results: [] 
+        });
+        return;
+      }
+      
+      const results: Array<{
+        orderName: string;
+        orderNumber: string;
+        matched: boolean;
+        matchedFileId?: number;
+        matchedFilename?: string;
+        pdfStored?: boolean;
+        pdfPath?: string;
+        renamedPdfFilename?: string;
+        error?: string;
+      }> = [];
+      
+      let matchedCount = 0;
+      
+      // Helper function to normalize order names for matching
+      const normalizeForMatching = (str: string): string => {
+        return str
+          .toLowerCase()
+          .replace(/\.csv$/i, '')           // Remove .csv extension
+          .replace(/_\d{10,}$/i, '')         // Remove trailing timestamps (10+ digits)
+          .replace(/[_()\-]/g, ' ')          // Replace underscores, parens, hyphens with spaces
+          .replace(/\s+/g, ' ')              // Collapse multiple spaces
+          .trim();
+      };
+      
+      for (const email of emails) {
+        try {
+          // Get all files across all projects to find a match
+          const allProjects = await storage.getProjects();
+          let matched = false;
+          
+          const normalizedEmailName = normalizeForMatching(email.allmoxyOrderName);
+          console.log(`[Gmail] Looking for match: "${email.allmoxyOrderName}" (normalized: "${normalizedEmailName}")`);
+          
+          for (const project of allProjects) {
+            const files = await storage.getProjectFiles(project.id);
+            
+            for (const file of files) {
+              const filename = file.originalFilename || '';
+              const normalizedFilename = normalizeForMatching(filename);
+              
+              // Try multiple matching strategies
+              const exactMatch = normalizedFilename === normalizedEmailName;
+              const containsMatch = normalizedFilename.includes(normalizedEmailName) || 
+                                   normalizedEmailName.includes(normalizedFilename);
+              
+              if (exactMatch || containsMatch) {
+                // Found a match! Store the PDF if available
+                let pdfStored = false;
+                let pdfPath: string | undefined;
+                let renamedPdfFilename: string | undefined;
+                
+                if (email.pdfAttachment) {
+                  // Rename the PDF: "{orderName} {orderNumber} - Netley Packing Slip.pdf"
+                  // Original: "1870 - Netley Packing Slip.pdf"
+                  // New: "test banding locations 1870 - Netley Packing Slip.pdf"
+                  const originalFilename = email.pdfAttachment.filename;
+                  renamedPdfFilename = `${email.allmoxyOrderName} ${originalFilename}`;
+                  
+                  // Sanitize filename for storage
+                  const sanitizedFilename = renamedPdfFilename.replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_');
+                  
+                  try {
+                    // Store in object storage under .private directory
+                    const storagePath = `.private/packing-slips/${sanitizedFilename}`;
+                    await objectStorageService.uploadBuffer(
+                      email.pdfAttachment.data,
+                      storagePath,
+                      'application/pdf'
+                    );
+                    
+                    pdfPath = storagePath;
+                    pdfStored = true;
+                    
+                    // Update the order file with the PDF path
+                    await storage.updateOrderFile(file.id, {
+                      packingSlipPdfPath: storagePath
+                    });
+                    
+                    console.log(`[Gmail] Stored PDF "${renamedPdfFilename}" at ${storagePath} for file ${file.id}`);
+                  } catch (storageErr: any) {
+                    console.error(`[Gmail] Error storing PDF: ${storageErr.message}`);
+                  }
+                }
+                
+                console.log(`[Gmail] Matched "${email.allmoxyOrderName}" to file "${filename}"`);
+                
+                results.push({
+                  orderName: email.allmoxyOrderName,
+                  orderNumber: email.allmoxyOrderNumber,
+                  matched: true,
+                  matchedFileId: file.id,
+                  matchedFilename: filename,
+                  pdfStored,
+                  pdfPath,
+                  renamedPdfFilename
+                });
+                
+                matched = true;
+                matchedCount++;
+                break;
+              }
+            }
+            
+            if (matched) break;
+          }
+          
+          if (!matched) {
+            console.log(`[Gmail] No match found for order "${email.allmoxyOrderName}"`);
+            results.push({
+              orderName: email.allmoxyOrderName,
+              orderNumber: email.allmoxyOrderNumber,
+              matched: false,
+              error: 'No matching CSV file found'
+            });
+          }
+          
+          // Mark email as read after processing (whether matched or not)
+          await markEmailAsRead(email.messageId);
+          
+        } catch (emailErr: any) {
+          console.error(`[Gmail] Error processing email for "${email.allmoxyOrderName}":`, emailErr.message);
+          results.push({
+            orderName: email.allmoxyOrderName,
+            orderNumber: email.allmoxyOrderNumber,
+            matched: false,
+            error: emailErr.message
+          });
+        }
+      }
+      
+      res.json({
+        message: `Processed ${emails.length} Netley emails, matched ${matchedCount}`,
+        processed: emails.length,
+        matched: matchedCount,
+        results
+      });
+      
+    } catch (e: any) {
+      console.error("[Gmail] Error processing Netley Packing Slip emails:", e);
+      res.status(500).json({ message: 'Failed to process Netley Packing Slip emails', error: e.message });
+    }
+  });
+
+  // Download Netley packing slip PDF for a file
+  app.get('/api/files/:fileId/packing-slip-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.packingSlipPdfPath) {
+        return res.status(404).json({ message: 'No packing slip PDF found for this file' });
+      }
+      
+      // Download from object storage
+      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.packingSlipPdfPath);
+      
+      if (!pdfBuffer) {
+        return res.status(404).json({ message: 'PDF file not found in storage' });
+      }
+      
+      // Extract filename from path
+      const filename = fileData.file.packingSlipPdfPath.split('/').pop() || 'packing-slip.pdf';
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+      
+    } catch (err: any) {
+      console.error('[API] Error downloading packing slip PDF:', err.message);
+      res.status(500).json({ message: 'Failed to download PDF', error: err.message });
+    }
+  });
+
   // Admin endpoint to backfill stored calculated values for existing files
   app.post('/api/admin/backfill-file-metrics', isAuthenticated, async (req, res) => {
     try {
       console.log('[Admin] Starting backfill of file metrics...');
       
       // Get all projects
-      const projects = await storage.getAllProjects();
+      const projects = await storage.getProjects();
       let filesUpdated = 0;
       
       for (const project of projects) {
