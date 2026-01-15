@@ -2628,6 +2628,56 @@ export async function registerRoutes(
     }
   });
 
+  // Upload Netley packing slip PDF for a file (manual upload)
+  app.post('/api/files/:fileId/packing-slip-pdf', isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!req.file) {
+        return res.status(400).json({ message: 'No PDF file provided' });
+      }
+      
+      // Validate it's a PDF
+      if (req.file.mimetype !== 'application/pdf') {
+        return res.status(400).json({ message: 'File must be a PDF' });
+      }
+      
+      // Create a sanitized filename from the original filename and order name
+      const orderName = fileData.file.originalFilename?.replace(/\.csv$/i, '') || `order-${fileId}`;
+      const originalName = req.file.originalname.replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_');
+      const sanitizedFilename = `${orderName.replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_')}_${originalName}`;
+      
+      // Store in object storage under .private directory
+      const storagePath = `.private/packing-slips/${sanitizedFilename}`;
+      await objectStorageService.uploadBuffer(
+        req.file.buffer,
+        storagePath,
+        'application/pdf'
+      );
+      
+      // Update the order file with the PDF path
+      await storage.updateOrderFile(fileId, {
+        packingSlipPdfPath: storagePath
+      });
+      
+      console.log(`[API] Uploaded packing slip PDF "${sanitizedFilename}" for file ${fileId}`);
+      
+      res.json({ 
+        message: 'Packing slip PDF uploaded successfully',
+        path: storagePath
+      });
+      
+    } catch (err: any) {
+      console.error('[API] Error uploading packing slip PDF:', err.message);
+      res.status(500).json({ message: 'Failed to upload PDF', error: err.message });
+    }
+  });
+
   // Admin endpoint to backfill stored calculated values for existing files
   app.post('/api/admin/backfill-file-metrics', isAuthenticated, async (req, res) => {
     try {
