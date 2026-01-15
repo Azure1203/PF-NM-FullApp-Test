@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -233,6 +233,37 @@ export default function OrderDetails() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to save Packaging Link", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Ref for packing slip PDF file input
+  const packingSlipInputRef = useRef<HTMLInputElement>(null);
+
+  // Mutation for uploading packing slip PDF
+  const { mutate: uploadPackingSlipPdf, isPending: isUploadingPackingSlip } = useMutation({
+    mutationFn: async ({ fileId, file }: { fileId: number; file: File }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`/api/files/${fileId}/packing-slip-pdf`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Upload failed');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      toast({ title: "Packing slip PDF uploaded" });
+      if (packingSlipInputRef.current) {
+        packingSlipInputRef.current.value = '';
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to upload PDF", description: error.message, variant: "destructive" });
     }
   });
 
@@ -1945,24 +1976,57 @@ export default function OrderDetails() {
                         </div>
                       )}
                       
-                      {/* Packing Slip PDF Download */}
-                      {project.files?.[selectedFileIndex]?.packingSlipPdfPath && (
-                        <div className="mb-4" data-testid="file-packing-slip-section">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full justify-start text-left"
-                            onClick={() => {
-                              const fileId = project.files![selectedFileIndex].id;
-                              window.open(`/api/files/${fileId}/packing-slip-pdf`, '_blank');
-                            }}
-                            data-testid="button-download-packing-slip"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Download Netley Packing Slip PDF
-                          </Button>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Download PDF, then upload to Adobe Acrobat Document Cloud and paste the share link below
+                      {/* Packing Slip PDF Upload/Download */}
+                      {project.files?.[selectedFileIndex] && (
+                        <div className="mb-4 space-y-2" data-testid="file-packing-slip-section">
+                          <span className="text-sm font-medium text-muted-foreground">Netley Packing Slip PDF:</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              ref={packingSlipInputRef}
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file && project.files?.[selectedFileIndex]) {
+                                  uploadPackingSlipPdf({ fileId: project.files[selectedFileIndex].id, file });
+                                }
+                              }}
+                              data-testid="input-packing-slip-upload"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => packingSlipInputRef.current?.click()}
+                              disabled={isUploadingPackingSlip}
+                              data-testid="button-upload-packing-slip"
+                            >
+                              {isUploadingPackingSlip ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Upload className="w-4 h-4 mr-2" />
+                              )}
+                              {project.files[selectedFileIndex].packingSlipPdfPath ? 'Replace PDF' : 'Upload PDF'}
+                            </Button>
+                            {project.files[selectedFileIndex].packingSlipPdfPath && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const fileId = project.files![selectedFileIndex].id;
+                                  window.open(`/api/files/${fileId}/packing-slip-pdf`, '_blank');
+                                }}
+                                data-testid="button-download-packing-slip"
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Download PDF
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {project.files[selectedFileIndex].packingSlipPdfPath 
+                              ? "PDF uploaded. Download it, upload to Adobe Acrobat Document Cloud, and paste the share link below." 
+                              : "Upload the Netley Packing Slip PDF you received via email."}
                           </p>
                         </div>
                       )}
