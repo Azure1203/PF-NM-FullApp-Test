@@ -150,7 +150,17 @@ export async function searchNetleyEmails(): Promise<SearchResult> {
     .top(100)
     .get();
   
-  const emails = await processMessages(client, messages.value || []);
+  const allMessages = messages.value || [];
+  console.log(`[Outlook DEBUG] Total messages in folder: ${allMessages.length}`);
+  
+  // Log details of each message for debugging
+  for (const msg of allMessages) {
+    console.log(`[Outlook DEBUG] Message: "${msg.subject}" | hasAttachments: ${msg.hasAttachments} | from: ${msg.from?.emailAddress?.address || 'Unknown'} | received: ${msg.receivedDateTime}`);
+  }
+  
+  const emails = await processMessages(client, allMessages);
+  
+  console.log(`[Outlook DEBUG] Messages with PDF attachments: ${emails.length}`);
   
   return {
     emails,
@@ -164,14 +174,24 @@ async function processMessages(client: Client, messages: any[]): Promise<NetleyE
   
   for (const message of messages) {
     if (message.hasAttachments) {
+      console.log(`[Outlook DEBUG] Fetching attachments for: "${message.subject}"`);
+      
       const attachments = await client
         .api(`/me/messages/${message.id}/attachments`)
         .select('id,name,contentType,size')
         .get();
       
-      const pdfAttachments = (attachments.value || []).filter(
+      const allAttachments = attachments.value || [];
+      console.log(`[Outlook DEBUG] Found ${allAttachments.length} attachments:`);
+      for (const att of allAttachments) {
+        console.log(`[Outlook DEBUG]   - "${att.name}" (type: ${att.contentType}, size: ${att.size})`);
+      }
+      
+      const pdfAttachments = allAttachments.filter(
         (att: any) => att.contentType === 'application/pdf' || att.name?.toLowerCase().endsWith('.pdf')
       );
+      
+      console.log(`[Outlook DEBUG] PDF attachments: ${pdfAttachments.length}`);
       
       if (pdfAttachments.length > 0) {
         emailsWithAttachments.push({
@@ -187,6 +207,8 @@ async function processMessages(client: Client, messages: any[]): Promise<NetleyE
           }))
         });
       }
+    } else {
+      console.log(`[Outlook DEBUG] Skipping "${message.subject}" - hasAttachments is false`);
     }
   }
   
