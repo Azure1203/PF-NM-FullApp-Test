@@ -1,11 +1,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { createRequire } from 'module';
 import { PDFDocument } from 'pdf-lib';
 import { ObjectStorageService } from './replit_integrations/object_storage';
 
-const require = createRequire(import.meta.url);
-const pdf = require('pdf-parse');
+// Dynamic import for pdf-parse to avoid bundler issues with createRequire
+let pdfParse: any = null;
+
+async function getPdfParser() {
+  if (!pdfParse) {
+    const module = await import('pdf-parse');
+    // Handle both CommonJS and ESM exports
+    pdfParse = module.default || module;
+  }
+  return pdfParse;
+}
 
 export interface PackingSlipPart {
   partCode: string;
@@ -36,6 +44,7 @@ export async function parsePackingSlipPdf(pdfBuffer: Buffer, fileId: number): Pr
   };
 
   try {
+    const pdf = await getPdfParser();
     const data = await pdf(pdfBuffer);
     const text = data.text;
     
