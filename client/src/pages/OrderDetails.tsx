@@ -1732,9 +1732,6 @@ export default function OrderDetails() {
                                     {previewFiles.some(f => f.customParts?.some(p => p.toLowerCase().includes('hardware'))) && (
                                       <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Buyout Hardware</Badge>
                                     )}
-                                    {previewFiles.some(f => f.hasGlassParts) && (
-                                      <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />Glass Parts</Badge>
-                                    )}
                                     {previewFiles.some(f => f.hasMJDoors) && (
                                       <Badge variant="secondary"><AlertTriangle className="w-3 h-3 mr-1" />M&J Doors</Badge>
                                     )}
@@ -1862,6 +1859,19 @@ export default function OrderDetails() {
                                             >
                                               <Package className="w-3 h-3 mr-1" />
                                               Packaging Link, Click Here.
+                                            </Button>
+                                          </Link>
+                                          
+                                          {/* Packing Checklist Link */}
+                                          <Link href={`/files/${file.id}/checklist`}>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs"
+                                              data-testid={`button-checklist-${file.id}`}
+                                            >
+                                              <CheckCircle className="w-3 h-3 mr-1" />
+                                              Packing Checklist
                                             </Button>
                                           </Link>
                                           

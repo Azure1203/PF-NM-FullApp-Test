@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import UploadOrder from "@/pages/UploadOrder";
 import OrderDetails from "@/pages/OrderDetails";
 import CutToSize from "@/pages/CutToSize";
+import PackingChecklist from "@/pages/PackingChecklist";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 
@@ -34,6 +35,7 @@ function AppRouter() {
       <Route path="/upload" component={UploadOrder} />
       <Route path="/orders/:id" component={OrderDetails} />
       <Route path="/files/:fileId/cts" component={CutToSize} />
+      <Route path="/files/:fileId/checklist" component={PackingChecklist} />
       <Route component={NotFound} />
     </Switch>
   );
