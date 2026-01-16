@@ -1390,81 +1390,23 @@ export default function OrderDetails() {
                   ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' 
                   : 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500 text-yellow-700 dark:text-yellow-300';
                 
-                // Find files with each PDF type
-                const fileWithPackingSlip = project?.files?.find(f => f.packingSlipPdfPath);
-                const fileWithCutToFile = project?.files?.find(f => f.cutToFilePdfPath);
-                const fileWithEliasDovetail = project?.files?.find(f => f.eliasDovetailPdfPath);
-                const fileWithNetley5Piece = project?.files?.find(f => f.netley5PiecePdfPath);
-                
-                // Download handler
-                const handleDownload = async (fileId: number, pdfType: string) => {
-                  try {
-                    const response = await fetch(`/api/files/${fileId}/${pdfType}`, { credentials: 'include' });
-                    if (!response.ok) throw new Error('Download failed');
-                    const blob = await response.blob();
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-                    const filename = filenameMatch ? filenameMatch[1] : `${pdfType}.pdf`;
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                  } catch (err) {
-                    toast({ title: 'Download failed', variant: 'destructive' });
-                  }
-                };
-                
                 return (
                   <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3">
-                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.parts)}`}>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.parts)}`}>
                       <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
                       <p className="text-xs text-muted-foreground">Parts Overall</p>
-                      {fileWithPackingSlip && (
-                        <button 
-                          onClick={() => handleDownload(fileWithPackingSlip.id, 'packing-slip-pdf')}
-                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
-                          title="Download Netley Packing Slip"
-                          data-testid="button-download-packing-slip"
-                        >
-                          <Download className="w-3 h-3" />
-                        </button>
-                      )}
                     </div>
-                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.dovetails)}`}>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.dovetails)}`}>
                       <p className="text-2xl font-bold" data-testid="text-total-dovetails">{preview.totals.dovetails}</p>
                       <p className="text-xs text-muted-foreground">Dovetails</p>
-                      {fileWithEliasDovetail && (
-                        <button 
-                          onClick={() => handleDownload(fileWithEliasDovetail.id, 'elias-dovetail-pdf')}
-                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
-                          title="Download Elias PF Dovetail Drawers"
-                          data-testid="button-download-elias-dovetail"
-                        >
-                          <Download className="w-3 h-3" />
-                        </button>
-                      )}
                     </div>
                     <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.assembledDrawers)}`}>
                       <p className="text-2xl font-bold" data-testid="text-total-assembled">{preview.totals.assembledDrawers}</p>
                       <p className="text-xs text-muted-foreground">Assembled Drawers</p>
                     </div>
-                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.fivePieceDoors)}`}>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.fivePieceDoors)}`}>
                       <p className="text-2xl font-bold" data-testid="text-total-fivepiece">{preview.totals.fivePieceDoors}</p>
                       <p className="text-xs text-muted-foreground">5 Piece Shaker</p>
-                      {fileWithNetley5Piece && (
-                        <button 
-                          onClick={() => handleDownload(fileWithNetley5Piece.id, 'netley-5-piece-pdf')}
-                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
-                          title="Download Netley 5 Piece Shaker Door"
-                          data-testid="button-download-netley-5-piece"
-                        >
-                          <Download className="w-3 h-3" />
-                        </button>
-                      )}
                     </div>
                     <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.glassInserts)}`}>
                       <p className="text-2xl font-bold" data-testid="text-total-glass-inserts">{preview.totals.glassInserts}</p>
@@ -1486,19 +1428,9 @@ export default function OrderDetails() {
                       <p className="text-2xl font-bold" data-testid="text-total-doublethick">{preview.totals.doubleThick}</p>
                       <p className="text-xs text-muted-foreground">Double Thick Parts</p>
                     </div>
-                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.ctsPartsCount)}`}>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.ctsPartsCount)}`}>
                       <p className="text-2xl font-bold" data-testid="text-total-cts">{preview.totals.ctsPartsCount}</p>
                       <p className="text-xs text-muted-foreground">Cut to Size Parts</p>
-                      {fileWithCutToFile && (
-                        <button 
-                          onClick={() => handleDownload(fileWithCutToFile.id, 'cut-to-file-pdf')}
-                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
-                          title="Download Cut To File"
-                          data-testid="button-download-cut-to-file"
-                        >
-                          <Download className="w-3 h-3" />
-                        </button>
-                      )}
                     </div>
                     <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.wallRailPieces)}`}>
                       <p className="text-2xl font-bold" data-testid="text-total-wallrail">{preview.totals.wallRailPieces}</p>
@@ -1774,56 +1706,159 @@ export default function OrderDetails() {
                                           )}
                                         </div>
                                         
-                                        {/* All Metrics Grid */}
+                                        {/* All Metrics Grid with PDF Download Buttons */}
                                         {actualFilePreview && (
-                                          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1">
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{actualFilePreview.coreParts}</p>
-                                              <p className="text-[9px] text-muted-foreground">Parts Overall</p>
+                                          <div className="space-y-2">
+                                            {/* Metrics Grid */}
+                                            <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1">
+                                              {(() => {
+                                                const getMetricStyle = (count: number) => count === 0 
+                                                  ? 'bg-green-100 dark:bg-green-900/30 border border-green-400 text-green-700 dark:text-green-300' 
+                                                  : 'bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 text-yellow-700 dark:text-yellow-300';
+                                                
+                                                return (
+                                                  <>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.coreParts)}`} data-testid={`metric-parts-${file.id}`}>
+                                                      <p className="text-lg font-bold">{actualFilePreview.coreParts}</p>
+                                                      <p className="text-[9px]">Parts Overall</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.dovetails)}`} data-testid={`metric-dovetails-${file.id}`}>
+                                                      <p className="text-lg font-bold">{actualFilePreview.dovetails}</p>
+                                                      <p className="text-[9px]">Dovetails</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.assembledDrawers)}`} data-testid={`metric-assembled-${file.id}`}>
+                                                      <p className="text-lg font-bold">{actualFilePreview.assembledDrawers}</p>
+                                                      <p className="text-[9px]">Assembled Drawers</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.fivePieceDoors)}`} data-testid={`metric-5piece-${file.id}`}>
+                                                      <p className="text-lg font-bold">{actualFilePreview.fivePieceDoors}</p>
+                                                      <p className="text-[9px]">5 Piece Shaker</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle((actualFilePreview as any).glassInserts || 0)}`} data-testid={`metric-glass-inserts-${file.id}`}>
+                                                      <p className="text-lg font-bold">{(actualFilePreview as any).glassInserts || 0}</p>
+                                                      <p className="text-[9px]">Glass Inserts</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle((actualFilePreview as any).glassShelves || 0)}`} data-testid={`metric-glass-shelves-${file.id}`}>
+                                                      <p className="text-lg font-bold">{(actualFilePreview as any).glassShelves || 0}</p>
+                                                      <p className="text-[9px]">Glass Shelves</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle((actualFilePreview as any).mjDoorsCount || 0)}`} data-testid={`metric-mj-doors-${file.id}`}>
+                                                      <p className="text-lg font-bold">{(actualFilePreview as any).mjDoorsCount || 0}</p>
+                                                      <p className="text-[9px]">M&J Doors</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle((actualFilePreview as any).richelieuDoorsCount || 0)}`} data-testid={`metric-richelieu-${file.id}`}>
+                                                      <p className="text-lg font-bold">{(actualFilePreview as any).richelieuDoorsCount || 0}</p>
+                                                      <p className="text-[9px]">Richelieu Doors</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle((actualFilePreview as any).doubleThickCount || 0)}`} data-testid={`metric-doublethick-${file.id}`}>
+                                                      <p className="text-lg font-bold">{(actualFilePreview as any).doubleThickCount || 0}</p>
+                                                      <p className="text-[9px]">Double Thick</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle((actualFilePreview as any).ctsPartsCount || 0)}`} data-testid={`metric-cts-${file.id}`}>
+                                                      <p className="text-lg font-bold">{(actualFilePreview as any).ctsPartsCount || 0}</p>
+                                                      <p className="text-[9px]">Cut to Size</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle(Math.round(actualFilePreview.weightLbs))}`} data-testid={`metric-weight-${file.id}`}>
+                                                      <p className="text-lg font-bold">{Math.round(actualFilePreview.weightLbs)}</p>
+                                                      <p className="text-[9px]">lbs</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.maxLength)}`} data-testid={`metric-maxlength-${file.id}`}>
+                                                      <p className="text-lg font-bold">{actualFilePreview.maxLength}</p>
+                                                      <p className="text-[9px]">mm max</p>
+                                                    </div>
+                                                  </>
+                                                );
+                                              })()}
                                             </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{actualFilePreview.dovetails}</p>
-                                              <p className="text-[9px] text-muted-foreground">Dovetails</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{actualFilePreview.assembledDrawers}</p>
-                                              <p className="text-[9px] text-muted-foreground">Assembled Drawers</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{actualFilePreview.fivePieceDoors}</p>
-                                              <p className="text-[9px] text-muted-foreground">5 Piece Shaker</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{(actualFilePreview as any).glassInserts || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Glass Inserts</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{(actualFilePreview as any).glassShelves || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Glass Shelves</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{(actualFilePreview as any).mjDoorsCount || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">M&J Doors</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{(actualFilePreview as any).richelieuDoorsCount || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Richelieu Doors</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{(actualFilePreview as any).doubleThickCount || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Double Thick Parts</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{(actualFilePreview as any).ctsPartsCount || 0}</p>
-                                              <p className="text-[9px] text-muted-foreground">Cut to Size Parts</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{Math.round(actualFilePreview.weightLbs)}</p>
-                                              <p className="text-[9px] text-muted-foreground">lbs</p>
-                                            </div>
-                                            <div className="text-center p-1 bg-background/50 rounded">
-                                              <p className="text-xs font-semibold">{actualFilePreview.maxLength}</p>
-                                              <p className="text-[9px] text-muted-foreground">mm max</p>
+                                            
+                                            {/* PDF Download Buttons Row */}
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                              {(() => {
+                                                const getPdfButtonStyle = (count: number) => count === 0 
+                                                  ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' 
+                                                  : 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500 text-yellow-700 dark:text-yellow-300';
+                                                
+                                                const handlePdfDownload = async (fileId: number, pdfType: string) => {
+                                                  try {
+                                                    const response = await fetch(`/api/files/${fileId}/${pdfType}`, { credentials: 'include' });
+                                                    if (!response.ok) throw new Error('Download failed');
+                                                    const blob = await response.blob();
+                                                    const contentDisposition = response.headers.get('Content-Disposition');
+                                                    const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+                                                    const filename = filenameMatch ? filenameMatch[1] : `${pdfType}.pdf`;
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    const a = document.createElement('a');
+                                                    a.href = url;
+                                                    a.download = filename;
+                                                    document.body.appendChild(a);
+                                                    a.click();
+                                                    window.URL.revokeObjectURL(url);
+                                                    document.body.removeChild(a);
+                                                  } catch (err) {
+                                                    toast({ title: 'Download failed', variant: 'destructive' });
+                                                  }
+                                                };
+                                                
+                                                return (
+                                                  <>
+                                                    {/* Packing Slip PDF - based on Parts Overall count */}
+                                                    {file.packingSlipPdfPath && (
+                                                      <Button
+                                                        size="lg"
+                                                        variant="outline"
+                                                        onClick={() => handlePdfDownload(file.id, 'packing-slip-pdf')}
+                                                        className={`border-2 ${getPdfButtonStyle(actualFilePreview.coreParts)}`}
+                                                        data-testid={`button-download-packing-slip-${file.id}`}
+                                                      >
+                                                        <Download className="w-5 h-5 mr-2" />
+                                                        Packing Slip ({actualFilePreview.coreParts})
+                                                      </Button>
+                                                    )}
+                                                    
+                                                    {/* Dovetail PDF - based on Dovetails count */}
+                                                    {file.eliasDovetailPdfPath && (
+                                                      <Button
+                                                        size="lg"
+                                                        variant="outline"
+                                                        onClick={() => handlePdfDownload(file.id, 'elias-dovetail-pdf')}
+                                                        className={`border-2 ${getPdfButtonStyle(actualFilePreview.dovetails)}`}
+                                                        data-testid={`button-download-dovetail-${file.id}`}
+                                                      >
+                                                        <Download className="w-5 h-5 mr-2" />
+                                                        Dovetail PDF ({actualFilePreview.dovetails})
+                                                      </Button>
+                                                    )}
+                                                    
+                                                    {/* 5 Piece Shaker PDF - based on 5 Piece count */}
+                                                    {file.netley5PiecePdfPath && (
+                                                      <Button
+                                                        size="lg"
+                                                        variant="outline"
+                                                        onClick={() => handlePdfDownload(file.id, 'netley-5-piece-pdf')}
+                                                        className={`border-2 ${getPdfButtonStyle(actualFilePreview.fivePieceDoors)}`}
+                                                        data-testid={`button-download-5piece-${file.id}`}
+                                                      >
+                                                        <Download className="w-5 h-5 mr-2" />
+                                                        5 Piece PDF ({actualFilePreview.fivePieceDoors})
+                                                      </Button>
+                                                    )}
+                                                    
+                                                    {/* Cut To File PDF - based on CTS count */}
+                                                    {file.cutToFilePdfPath && (
+                                                      <Button
+                                                        size="lg"
+                                                        variant="outline"
+                                                        onClick={() => handlePdfDownload(file.id, 'cut-to-file-pdf')}
+                                                        className={`border-2 ${getPdfButtonStyle((actualFilePreview as any).ctsPartsCount || 0)}`}
+                                                        data-testid={`button-download-cuttofile-${file.id}`}
+                                                      >
+                                                        <Download className="w-5 h-5 mr-2" />
+                                                        Cut To File ({(actualFilePreview as any).ctsPartsCount || 0})
+                                                      </Button>
+                                                    )}
+                                                  </>
+                                                );
+                                              })()}
                                             </div>
                                           </div>
                                         )}
