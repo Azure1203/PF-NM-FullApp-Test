@@ -11,6 +11,42 @@ let pollIntervalId: NodeJS.Timeout | null = null;
 
 const objectStorageService = new ObjectStorageService();
 
+// PDF type definitions for matching attachments
+const PDF_TYPES = {
+  packingSlip: {
+    patterns: ['Netley Packing Slip', 'Packing Slip'],
+    dbColumn: 'packingSlipPdfPath',
+    suffix: 'Netley Packing Slip'
+  },
+  cutToFile: {
+    patterns: ['Cut To File', 'Cut to File'],
+    dbColumn: 'cutToFilePdfPath',
+    suffix: 'Cut To File'
+  },
+  eliasDovetail: {
+    patterns: ['Elias PF Dovetail Drawers', 'Elias Dovetail', 'Dovetail Drawers'],
+    dbColumn: 'eliasDovetailPdfPath',
+    suffix: 'Elias PF Dovetail Drawers'
+  },
+  netley5Piece: {
+    patterns: ['Netley 5 Piece Shaker Door', '5 Piece Shaker Door', 'Netley 5 Piece'],
+    dbColumn: 'netley5PiecePdfPath',
+    suffix: 'Netley 5 Piece Shaker Door'
+  }
+} as const;
+
+type PdfType = keyof typeof PDF_TYPES;
+
+function identifyPdfType(attachmentName: string): PdfType | null {
+  const lowerName = attachmentName.toLowerCase();
+  for (const [type, config] of Object.entries(PDF_TYPES)) {
+    if (config.patterns.some(pattern => lowerName.includes(pattern.toLowerCase()))) {
+      return type as PdfType;
+    }
+  }
+  return null;
+}
+
 async function isMessageProcessed(messageId: string): Promise<boolean> {
   const existing = await db
     .select()
@@ -120,13 +156,19 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
       filename: file.originalFilename || '',
       allmoxyJobNumber: file.allmoxyJobNumber || '',
       allmoxyJobNumberNormalized: file.allmoxyJobNumber ? normalizeOrderNumber(file.allmoxyJobNumber) : '',
-      hasPackingSlip: !!file.packingSlipPdfPath
+      hasPdfs: {
+        packingSlip: !!file.packingSlipPdfPath,
+        cutToFile: !!file.cutToFilePdfPath,
+        eliasDovetail: !!file.eliasDovetailPdfPath,
+        netley5Piece: !!file.netley5PiecePdfPath
+      }
     }));
     
     // Debug: Log all files and their Allmoxy Job Numbers
     log(`Total files in system: ${allFiles.length}`, 'outlook-scheduler');
     for (const f of allFiles) {
-      log(`  File ${f.fileId}: "${f.filename}" | Allmoxy Job #: "${f.allmoxyJobNumber}" | Has Packing Slip: ${f.hasPackingSlip}`, 'outlook-scheduler');
+      const pdfStatus = Object.entries(f.hasPdfs).filter(([_, has]) => has).map(([type]) => type).join(', ') || 'none';
+      log(`  File ${f.fileId}: "${f.filename}" | Allmoxy Job #: "${f.allmoxyJobNumber}" | PDFs: ${pdfStatus}`, 'outlook-scheduler');
     }
     
     for (const email of emails) {
@@ -141,6 +183,17 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
         processed++;
         
         try {
+          // Identify what type of PDF this attachment is
+          const pdfType = identifyPdfType(attachment.name);
+          if (!pdfType) {
+            log(`Unknown PDF type: ${attachment.name}`, 'outlook-scheduler');
+            await markMessageProcessed(messageAttachmentKey, email.subject, 'skipped');
+            continue;
+          }
+          
+          const pdfConfig = PDF_TYPES[pdfType];
+          log(`Identified PDF type: ${pdfType} for attachment: ${attachment.name}`, 'outlook-scheduler');
+          
           const subjectMatch = email.subject.match(/(\d{3,6})/);
           const attachmentMatch = attachment.name.match(/(\d{3,6})/);
           const orderNumber = subjectMatch?.[1] || attachmentMatch?.[1];
@@ -153,41 +206,51 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
           
           // Match by Allmoxy Job # first (using normalized comparison), then fall back to filename matching
           const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
-          log(`Looking for order number: "${orderNumber}" (normalized: "${normalizedOrderNumber}")`, 'outlook-scheduler');
+          log(`Looking for order number: "${orderNumber}" (normalized: "${normalizedOrderNumber}") for ${pdfType}`, 'outlook-scheduler');
           
           const matchingFile = allFiles.find(f => {
             // Normalized comparison for job numbers (handles leading zeros, whitespace, case)
             const jobMatch = f.allmoxyJobNumberNormalized === normalizedOrderNumber;
             const filenameMatch = f.filename.includes(orderNumber);
+            // Check if this specific PDF type is already present
+            const alreadyHasPdf = f.hasPdfs[pdfType];
             if (jobMatch || filenameMatch) {
-              log(`  Potential match: File ${f.fileId} | jobMatch: ${jobMatch} (db: "${f.allmoxyJobNumber}" -> "${f.allmoxyJobNumberNormalized}") | filenameMatch: ${filenameMatch} | hasPackingSlip: ${f.hasPackingSlip}`, 'outlook-scheduler');
+              log(`  Potential match: File ${f.fileId} | jobMatch: ${jobMatch} | filenameMatch: ${filenameMatch} | has${pdfType}: ${alreadyHasPdf}`, 'outlook-scheduler');
             }
-            return !f.hasPackingSlip && (jobMatch || filenameMatch);
+            return !alreadyHasPdf && (jobMatch || filenameMatch);
           });
           
           if (matchingFile) {
             const pdfBuffer = await downloadEmailAttachment(email.id, attachment.id);
             
-            // Build filename: {Original CSV Filename} {Allmoxy Job #} - Netley Packing Slip.pdf
+            // Build filename: {Original CSV Filename} {Allmoxy Job #} - {PDF Type}.pdf
             const baseFilename = matchingFile.filename.replace(/\.csv$/i, '');
             const jobNumber = matchingFile.allmoxyJobNumber || orderNumber;
-            const sanitizedFilename = `${baseFilename} ${jobNumber} - Netley Packing Slip.pdf`.replace(/[^a-zA-Z0-9\s\-_().]/g, '').replace(/\s+/g, ' ').trim();
+            const sanitizedFilename = `${baseFilename} ${jobNumber} - ${pdfConfig.suffix}.pdf`.replace(/[^a-zA-Z0-9\s\-_().]/g, '').replace(/\s+/g, ' ').trim();
             const storagePath = `.private/packing-slips/${sanitizedFilename}`;
             
             await objectStorageService.uploadBuffer(pdfBuffer, storagePath, 'application/pdf');
             
+            // Update the appropriate column based on PDF type
+            const updateData: Record<string, string> = {};
+            updateData[pdfConfig.dbColumn] = storagePath;
+            
             await db.update(orderFiles)
-              .set({ packingSlipPdfPath: storagePath })
+              .set(updateData)
               .where(eq(orderFiles.id, matchingFile.fileId));
             
             await markMessageProcessed(messageAttachmentKey, email.subject, 'processed', matchingFile.fileId);
             
-            allFiles.find(f => f.fileId === matchingFile.fileId)!.hasPackingSlip = true;
+            // Update local cache
+            const fileInCache = allFiles.find(f => f.fileId === matchingFile.fileId);
+            if (fileInCache) {
+              fileInCache.hasPdfs[pdfType] = true;
+            }
             
-            log(`Matched: ${email.subject} -> ${matchingFile.filename}`, 'outlook-scheduler');
+            log(`Matched ${pdfType}: ${email.subject} -> ${matchingFile.filename}`, 'outlook-scheduler');
             matched++;
           } else {
-            log(`No match for order ${orderNumber}: ${email.subject}`, 'outlook-scheduler');
+            log(`No match for order ${orderNumber} (${pdfType}): ${email.subject}`, 'outlook-scheduler');
             await markMessageProcessed(messageAttachmentKey, email.subject, 'skipped');
           }
         } catch (attachErr: any) {
