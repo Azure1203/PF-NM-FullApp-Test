@@ -117,6 +117,12 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
       hasPackingSlip: !!file.packingSlipPdfPath
     }));
     
+    // Debug: Log all files and their Allmoxy Job Numbers
+    log(`Total files in system: ${allFiles.length}`, 'outlook-scheduler');
+    for (const f of allFiles) {
+      log(`  File ${f.fileId}: "${f.filename}" | Allmoxy Job #: "${f.allmoxyJobNumber}" | Has Packing Slip: ${f.hasPackingSlip}`, 'outlook-scheduler');
+    }
+    
     for (const email of emails) {
       for (const attachment of email.attachments) {
         const messageAttachmentKey = `${email.id}:${attachment.id}`;
@@ -140,12 +146,16 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
           }
           
           // Match by Allmoxy Job # first, then fall back to filename matching
-          const matchingFile = allFiles.find(f => 
-            !f.hasPackingSlip && (
-              f.allmoxyJobNumber === orderNumber ||
-              f.filename.includes(orderNumber)
-            )
-          );
+          log(`Looking for order number: "${orderNumber}" (type: ${typeof orderNumber})`, 'outlook-scheduler');
+          
+          const matchingFile = allFiles.find(f => {
+            const jobMatch = f.allmoxyJobNumber === orderNumber;
+            const filenameMatch = f.filename.includes(orderNumber);
+            if (jobMatch || filenameMatch) {
+              log(`  Potential match: File ${f.fileId} | jobMatch: ${jobMatch} | filenameMatch: ${filenameMatch} | hasPackingSlip: ${f.hasPackingSlip}`, 'outlook-scheduler');
+            }
+            return !f.hasPackingSlip && (jobMatch || filenameMatch);
+          });
           
           if (matchingFile) {
             const pdfBuffer = await downloadEmailAttachment(email.id, attachment.id);
