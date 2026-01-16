@@ -2,11 +2,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument } from 'pdf-lib';
 import { ObjectStorageService } from './replit_integrations/object_storage';
-import { createRequire } from 'module';
 
-// Use createRequire to properly import CommonJS pdf-parse module
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+// Import pdf-parse via CJS helper to avoid ESM/CJS interop issues
+// The .cjs extension ensures Node treats it as CommonJS regardless of package type
+import pdfParse from './pdfParseLoader.cjs';
 
 async function getPdfParser() {
   return pdfParse;

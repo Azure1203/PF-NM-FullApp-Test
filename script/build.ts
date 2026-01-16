@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, copyFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -56,9 +56,13 @@ async function buildAll() {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
-    external: externals,
+    external: [...externals, "./pdfParseLoader.cjs"],
     logLevel: "info",
   });
+
+  // Copy CJS helper modules to dist
+  console.log("copying CJS helpers...");
+  await copyFile("server/pdfParseLoader.cjs", "dist/pdfParseLoader.cjs");
 }
 
 buildAll().catch((err) => {
