@@ -27,6 +27,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { api, type ProjectWithFiles, type SyncPreview } from "@shared/routes";
 import { Badge } from "@/components/ui/badge";
+import { PackingSlipChecklist } from "@/components/PackingSlipChecklist";
 
 const formSchema = insertProjectSchema.pick({
   name: true,
@@ -2147,6 +2148,14 @@ export default function OrderDetails() {
                               : "Upload the Netley Packing Slip PDF you received via email."}
                           </p>
                         </div>
+                      )}
+                      
+                      {/* Packaging Checklist - shown when packing slip PDF is available */}
+                      {project.files?.[selectedFileIndex]?.packingSlipPdfPath && (
+                        <PackingSlipChecklist 
+                          fileId={project.files[selectedFileIndex].id}
+                          fileName={project.files[selectedFileIndex].originalFilename}
+                        />
                       )}
                       
                       {/* Packaging Link for this file */}

@@ -2623,6 +2623,80 @@ export async function registerRoutes(
     }
   });
 
+  // Serve packing slip images from object storage
+  // Security: Only allow images matching the expected pattern to prevent path traversal
+  app.get('/api/packing-slip-images/:imagePath', isAuthenticated, async (req, res) => {
+    try {
+      const imagePath = req.params.imagePath;
+      
+      // Validate image path format to prevent path traversal
+      // Expected format: file-{fileId}-item-{sortOrder}.png
+      const validPattern = /^file-\d+-item-\d+\.png$/;
+      if (!validPattern.test(imagePath)) {
+        return res.status(400).json({ message: 'Invalid image path format' });
+      }
+      
+      const fullPath = `.private/packing-slip-images/${imagePath}`;
+      
+      const { ObjectStorageService } = await import('./replit_integrations/object_storage');
+      const objectStorage = new ObjectStorageService();
+      const imageBuffer = await objectStorage.downloadFile(fullPath);
+      
+      if (!imageBuffer) {
+        return res.status(404).json({ message: 'Image not found' });
+      }
+      
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.send(imageBuffer);
+    } catch (err: any) {
+      console.error('[API] Error serving packing slip image:', err.message);
+      res.status(500).json({ message: 'Failed to serve image', error: err.message });
+    }
+  });
+
+  // Get packing slip checklist items for a file
+  app.get('/api/files/:fileId/checklist', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const items = await storage.getPackingSlipItems(fileId);
+      const progress = await storage.getPackingSlipProgress(fileId);
+      res.json({ items, progress });
+    } catch (err: any) {
+      console.error('[API] Error getting checklist items:', err.message);
+      res.status(500).json({ message: 'Failed to get checklist items', error: err.message });
+    }
+  });
+
+  // Toggle packing slip checklist item
+  app.patch('/api/checklist/:itemId/toggle', isAuthenticated, async (req, res) => {
+    try {
+      const itemId = Number(req.params.itemId);
+      const { isChecked, checkedBy } = req.body;
+      
+      const updated = await storage.togglePackingSlipItem(itemId, isChecked, checkedBy);
+      if (!updated) {
+        return res.status(404).json({ message: 'Checklist item not found' });
+      }
+      res.json(updated);
+    } catch (err: any) {
+      console.error('[API] Error toggling checklist item:', err.message);
+      res.status(500).json({ message: 'Failed to toggle checklist item', error: err.message });
+    }
+  });
+
+  // Get packing slip checklist progress for a file
+  app.get('/api/files/:fileId/checklist/progress', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const progress = await storage.getPackingSlipProgress(fileId);
+      res.json(progress);
+    } catch (err: any) {
+      console.error('[API] Error getting checklist progress:', err.message);
+      res.status(500).json({ message: 'Failed to get checklist progress', error: err.message });
+    }
+  });
+
   // Test Outlook connection
   app.get('/api/outlook/test', isAuthenticated, async (req, res) => {
     try {

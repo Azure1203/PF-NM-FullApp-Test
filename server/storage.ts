@@ -7,6 +7,7 @@ import {
   pallets,
   palletFileAssignments,
   processedOutlookEmails,
+  packingSlipItems,
   type Project,
   type InsertProject,
   type OrderFile,
@@ -19,7 +20,9 @@ import {
   type InsertPallet,
   type PalletFileAssignment,
   type InsertPalletFileAssignment,
-  type BuyoutHardwareOption
+  type BuyoutHardwareOption,
+  type PackingSlipItem,
+  type InsertPackingSlipItem
 } from "@shared/schema";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
 
@@ -69,6 +72,11 @@ export interface IStorage {
   
   // Outlook email tracking methods
   clearProcessedOutlookEmails(): Promise<number>;
+  
+  // Packing slip checklist methods
+  getPackingSlipItems(fileId: number): Promise<PackingSlipItem[]>;
+  togglePackingSlipItem(itemId: number, isChecked: boolean, checkedBy?: string): Promise<PackingSlipItem | undefined>;
+  getPackingSlipProgress(fileId: number): Promise<{ total: number; checked: number; percentage: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -296,6 +304,40 @@ export class DatabaseStorage implements IStorage {
   async clearProcessedOutlookEmails(): Promise<number> {
     const result = await db.delete(processedOutlookEmails).returning();
     return result.length;
+  }
+
+  // Packing slip checklist methods
+  async getPackingSlipItems(fileId: number): Promise<PackingSlipItem[]> {
+    return await db.select()
+      .from(packingSlipItems)
+      .where(eq(packingSlipItems.fileId, fileId))
+      .orderBy(packingSlipItems.sortOrder);
+  }
+
+  async togglePackingSlipItem(itemId: number, isChecked: boolean, checkedBy?: string): Promise<PackingSlipItem | undefined> {
+    const updateData: { isChecked: boolean; checkedAt: Date | null; checkedBy: string | null } = {
+      isChecked,
+      checkedAt: isChecked ? new Date() : null,
+      checkedBy: isChecked && checkedBy ? checkedBy : null
+    };
+    
+    const [updated] = await db.update(packingSlipItems)
+      .set(updateData)
+      .where(eq(packingSlipItems.id, itemId))
+      .returning();
+    return updated;
+  }
+
+  async getPackingSlipProgress(fileId: number): Promise<{ total: number; checked: number; percentage: number }> {
+    const items = await db.select()
+      .from(packingSlipItems)
+      .where(eq(packingSlipItems.fileId, fileId));
+    
+    const total = items.length;
+    const checked = items.filter(item => item.isChecked).length;
+    const percentage = total > 0 ? Math.round((checked / total) * 100) : 0;
+    
+    return { total, checked, percentage };
   }
 }
 
