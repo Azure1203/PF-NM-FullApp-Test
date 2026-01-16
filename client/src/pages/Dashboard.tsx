@@ -13,9 +13,10 @@ import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const RED_PRODUCTION_STATUSES = [
   "WAITING FOR BO HARDWARE",
@@ -37,6 +38,11 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
 
+  const { data: outlookSyncStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; emailsProcessed: number; emailsMatched: number } | null }>({
+    queryKey: ['/api/outlook/sync-status'],
+    refetchInterval: 60000
+  });
+
   const { mutate: fetchOutlookEmails, isPending: isFetchingEmails } = useMutation({
     mutationFn: async () => {
       const response = await fetch('/api/outlook/process-netley-emails', {
@@ -51,6 +57,7 @@ export default function Dashboard() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/outlook/sync-status'] });
       toast({
         title: "Outlook emails processed",
         description: `Processed ${data.processed} emails, matched ${data.matched} packing slips to orders.`
@@ -106,21 +113,37 @@ export default function Dashboard() {
           description="Manage and sync your closet order projects."
           actions={
             <div className="flex items-center gap-3">
-              <Button 
-                size="lg" 
-                variant="outline"
-                className="gap-2 rounded-xl h-12 px-5" 
-                onClick={() => fetchOutlookEmails()}
-                disabled={isFetchingEmails}
-                data-testid="button-fetch-outlook-emails"
-              >
-                {isFetchingEmails ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Mail className="w-5 h-5" />
-                )}
-                Fetch Netley Emails
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="lg" 
+                    variant="outline"
+                    className="gap-2 rounded-xl h-12 px-5" 
+                    onClick={() => fetchOutlookEmails()}
+                    disabled={isFetchingEmails}
+                    data-testid="button-fetch-outlook-emails"
+                  >
+                    {isFetchingEmails ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Mail className="w-5 h-5" />
+                    )}
+                    Fetch Netley Emails
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">
+                    {outlookSyncStatus?.status?.lastSuccessAt ? (
+                      <>
+                        <p>Last sync: {format(new Date(outlookSyncStatus.status.lastSuccessAt), 'MMM d, h:mm a')}</p>
+                        <p className="text-muted-foreground">Auto-syncs every 15 min</p>
+                      </>
+                    ) : (
+                      <p>Auto-syncs every 15 minutes</p>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
               <Link href="/upload">
                 <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6" data-testid="button-upload-new">
                   <Plus className="w-5 h-5" />

@@ -227,6 +227,30 @@ export type InsertOrderFile = z.infer<typeof insertOrderFileSchema>;
 
 export type ProjectStatus = 'pending' | 'synced' | 'error';
 
+// Processed Outlook emails - track which emails have been processed to avoid duplicates
+export const processedOutlookEmails = pgTable("processed_outlook_emails", {
+  id: serial("id").primaryKey(),
+  messageId: text("message_id").notNull().unique(), // Outlook message ID
+  subject: text("subject"),
+  processedAt: timestamp("processed_at").defaultNow(),
+  matchedFileId: integer("matched_file_id").references(() => orderFiles.id, { onDelete: 'set null' }),
+  status: text("status").notNull().default('processed'), // processed, failed, skipped
+});
+
+export type ProcessedOutlookEmail = typeof processedOutlookEmails.$inferSelect;
+
+// Outlook sync status - tracks the last sync time and status
+export const outlookSyncStatus = pgTable("outlook_sync_status", {
+  id: serial("id").primaryKey(),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastError: text("last_error"),
+  emailsProcessed: integer("emails_processed").default(0),
+  emailsMatched: integer("emails_matched").default(0),
+});
+
+export type OutlookSyncStatus = typeof outlookSyncStatus.$inferSelect;
+
 // Keep backward compatibility - alias Order to Project for now
 export const orders = projects;
 export type Order = Project;

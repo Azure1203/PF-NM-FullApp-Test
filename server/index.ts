@@ -149,6 +149,16 @@ app.use((req, res, next) => {
           setInterval(runGmailSync, GMAIL_SYNC_INTERVAL);
           log(`Gmail order sync scheduled (every 5 minutes)`, 'gmail');
         }, 60000);
+        
+        // Start Outlook sync after 3 minutes, then every 15 minutes
+        // Uses direct function call to bypass authentication
+        import('./outlookScheduler').then(({ startOutlookScheduler }) => {
+          setTimeout(() => {
+            startOutlookScheduler();
+          }, 120000); // Start 2 minutes after Gmail sync starts
+        }).catch(err => {
+          log(`Failed to load Outlook scheduler: ${err}`, 'outlook');
+        });
       }, 60000);
     },
   );
