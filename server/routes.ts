@@ -2467,6 +2467,74 @@ export async function registerRoutes(
     }
   });
 
+  // Diagnostic endpoint for debugging Outlook matching
+  // Returns all order files with their Allmoxy Job # and packing slip status
+  app.get('/api/diagnostic/order-files', isAuthenticated, async (req, res) => {
+    try {
+      const searchNumber = req.query.search as string | undefined;
+      
+      // Get all projects and their files
+      const allProjects = await storage.getProjects();
+      const diagnosticData: Array<{
+        fileId: number;
+        projectId: number;
+        projectName: string;
+        originalFilename: string;
+        poNumber: string | null;
+        allmoxyJobNumber: string | null;
+        allmoxyJobNumberNormalized: string | null;
+        hasPackingSlip: boolean;
+        packingSlipPath: string | null;
+      }> = [];
+      
+      for (const project of allProjects) {
+        const files = await storage.getProjectFiles(project.id);
+        
+        for (const file of files) {
+          // Normalize the Allmoxy Job # for comparison
+          const normalizedJobNumber = file.allmoxyJobNumber 
+            ? file.allmoxyJobNumber.trim().replace(/^0+/, '').toLowerCase()
+            : null;
+          
+          // If search is provided, filter to matching files
+          if (searchNumber) {
+            const normalizedSearch = searchNumber.trim().replace(/^0+/, '').toLowerCase();
+            const matches = 
+              normalizedJobNumber === normalizedSearch ||
+              file.allmoxyJobNumber?.includes(searchNumber) ||
+              file.originalFilename.includes(searchNumber);
+            
+            if (!matches) continue;
+          }
+          
+          diagnosticData.push({
+            fileId: file.id,
+            projectId: project.id,
+            projectName: project.name,
+            originalFilename: file.originalFilename,
+            poNumber: file.poNumber,
+            allmoxyJobNumber: file.allmoxyJobNumber,
+            allmoxyJobNumberNormalized: normalizedJobNumber,
+            hasPackingSlip: !!file.packingSlipPdfPath,
+            packingSlipPath: file.packingSlipPdfPath
+          });
+        }
+      }
+      
+      console.log(`[Diagnostic] Returning ${diagnosticData.length} files (search: ${searchNumber || 'none'})`);
+      
+      res.json({
+        totalFiles: diagnosticData.length,
+        searchQuery: searchNumber || null,
+        files: diagnosticData
+      });
+      
+    } catch (err: any) {
+      console.error('[Diagnostic] Error fetching order files:', err.message);
+      res.status(500).json({ message: 'Failed to fetch diagnostic data', error: err.message });
+    }
+  });
+
   // Admin endpoint to backfill stored calculated values for existing files
   app.post('/api/admin/backfill-file-metrics', isAuthenticated, async (req, res) => {
     try {

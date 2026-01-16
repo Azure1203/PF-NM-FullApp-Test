@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const RED_PRODUCTION_STATUSES = [
   "WAITING FOR BO HARDWARE",
@@ -31,16 +32,45 @@ const RED_PRODUCTION_STATUSES = [
   "CLOSET RODS NOT CUT"
 ];
 
+interface DiagnosticFile {
+  fileId: number;
+  projectId: number;
+  projectName: string;
+  originalFilename: string;
+  poNumber: string | null;
+  allmoxyJobNumber: string | null;
+  allmoxyJobNumberNormalized: string | null;
+  hasPackingSlip: boolean;
+  packingSlipPath: string | null;
+}
+
+interface DiagnosticResponse {
+  totalFiles: number;
+  searchQuery: string | null;
+  files: DiagnosticFile[];
+}
+
 export default function Dashboard() {
   const { data: projects, isLoading } = useOrders();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
   const { user } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [diagnosticOpen, setDiagnosticOpen] = useState(false);
+  const [diagnosticSearch, setDiagnosticSearch] = useState("");
 
   const { data: outlookSyncStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; emailsProcessed: number; emailsMatched: number } | null }>({
     queryKey: ['/api/outlook/sync-status'],
     refetchInterval: 60000
+  });
+
+  const diagnosticQueryUrl = diagnosticSearch 
+    ? `/api/diagnostic/order-files?search=${encodeURIComponent(diagnosticSearch)}`
+    : '/api/diagnostic/order-files';
+  
+  const { data: diagnosticData, isLoading: isDiagnosticLoading, refetch: refetchDiagnostic } = useQuery<DiagnosticResponse>({
+    queryKey: [diagnosticQueryUrl],
+    enabled: diagnosticOpen
   });
 
   const { mutate: fetchOutlookEmails, isPending: isFetchingEmails } = useMutation({
@@ -324,6 +354,113 @@ export default function Dashboard() {
               </div>
             ))
           )}
+        </div>
+
+        {/* Diagnostic Section - for debugging Outlook matching */}
+        <div className="mt-10">
+          <Collapsible open={diagnosticOpen} onOpenChange={setDiagnosticOpen}>
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between text-muted-foreground"
+                data-testid="button-toggle-diagnostic"
+              >
+                <div className="flex items-center gap-2">
+                  <Bug className="w-4 h-4" />
+                  <span className="text-sm">Diagnostic: Order Matching Debug</span>
+                </div>
+                {diagnosticOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <Card className="mt-2 border-dashed">
+                <CardContent className="p-4">
+                  <div className="mb-4">
+                    <p className="text-sm text-muted-foreground mb-2" data-testid="text-diagnostic-description">
+                      Search for an order by Allmoxy Job # to see if it exists in the database and its packing slip status.
+                    </p>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        placeholder="Enter Allmoxy Job # (e.g., 1865)"
+                        value={diagnosticSearch}
+                        onChange={(e) => setDiagnosticSearch(e.target.value)}
+                        className="max-w-xs"
+                        data-testid="input-diagnostic-search"
+                      />
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => refetchDiagnostic()}
+                        disabled={isDiagnosticLoading}
+                        data-testid="button-diagnostic-search"
+                      >
+                        {isDiagnosticLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isDiagnosticLoading ? (
+                    <div className="text-sm text-muted-foreground" data-testid="text-diagnostic-loading">Loading...</div>
+                  ) : diagnosticData ? (
+                    <div>
+                      <p className="text-sm font-medium mb-2" data-testid="text-diagnostic-count">
+                        Found {diagnosticData.totalFiles} files
+                        {diagnosticData.searchQuery && ` matching "${diagnosticData.searchQuery}"`}
+                      </p>
+                      {diagnosticData.files.length === 0 ? (
+                        <p className="text-sm text-amber-600" data-testid="text-diagnostic-no-match">
+                          No files found with that Allmoxy Job #. This is why matching fails - the order doesn't exist in the database with this job number.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm border-collapse" data-testid="table-diagnostic-results">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left p-2" data-testid="th-file-id">File ID</th>
+                                <th className="text-left p-2" data-testid="th-project">Project</th>
+                                <th className="text-left p-2" data-testid="th-filename">Filename</th>
+                                <th className="text-left p-2" data-testid="th-allmoxy-job">Allmoxy Job #</th>
+                                <th className="text-left p-2" data-testid="th-normalized">Normalized</th>
+                                <th className="text-left p-2" data-testid="th-packing-slip">Has Packing Slip</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {diagnosticData.files.map((file) => (
+                                <tr key={file.fileId} className="border-b" data-testid={`row-file-${file.fileId}`}>
+                                  <td className="p-2" data-testid={`text-file-id-${file.fileId}`}>{file.fileId}</td>
+                                  <td className="p-2" data-testid={`text-project-${file.fileId}`}>{file.projectName}</td>
+                                  <td className="p-2 max-w-[200px] truncate" title={file.originalFilename} data-testid={`text-filename-${file.fileId}`}>
+                                    {file.originalFilename}
+                                  </td>
+                                  <td className="p-2 font-mono" data-testid={`text-allmoxy-job-${file.fileId}`}>
+                                    {file.allmoxyJobNumber || <span className="text-muted-foreground italic">empty</span>}
+                                  </td>
+                                  <td className="p-2 font-mono text-muted-foreground" data-testid={`text-normalized-${file.fileId}`}>
+                                    {file.allmoxyJobNumberNormalized || '-'}
+                                  </td>
+                                  <td className="p-2" data-testid={`badge-packing-slip-${file.fileId}`}>
+                                    {file.hasPackingSlip ? (
+                                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Yes</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">No</Badge>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="text-diagnostic-empty">
+                      Open this section to view all order files with their Allmoxy Job # and packing slip status.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
     </div>

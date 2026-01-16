@@ -109,11 +109,17 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
     const allProjects = await db.select().from(projects);
     const allFilesResult = await db.select().from(orderFiles);
     
+    // Helper to normalize order numbers for comparison (trim, remove leading zeros)
+    const normalizeOrderNumber = (num: string): string => {
+      return num.trim().replace(/^0+/, '').toLowerCase();
+    };
+    
     const allFiles = allFilesResult.map(file => ({
       projectId: file.projectId,
       fileId: file.id,
       filename: file.originalFilename || '',
       allmoxyJobNumber: file.allmoxyJobNumber || '',
+      allmoxyJobNumberNormalized: file.allmoxyJobNumber ? normalizeOrderNumber(file.allmoxyJobNumber) : '',
       hasPackingSlip: !!file.packingSlipPdfPath
     }));
     
@@ -145,14 +151,16 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
             continue;
           }
           
-          // Match by Allmoxy Job # first, then fall back to filename matching
-          log(`Looking for order number: "${orderNumber}" (type: ${typeof orderNumber})`, 'outlook-scheduler');
+          // Match by Allmoxy Job # first (using normalized comparison), then fall back to filename matching
+          const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
+          log(`Looking for order number: "${orderNumber}" (normalized: "${normalizedOrderNumber}")`, 'outlook-scheduler');
           
           const matchingFile = allFiles.find(f => {
-            const jobMatch = f.allmoxyJobNumber === orderNumber;
+            // Normalized comparison for job numbers (handles leading zeros, whitespace, case)
+            const jobMatch = f.allmoxyJobNumberNormalized === normalizedOrderNumber;
             const filenameMatch = f.filename.includes(orderNumber);
             if (jobMatch || filenameMatch) {
-              log(`  Potential match: File ${f.fileId} | jobMatch: ${jobMatch} | filenameMatch: ${filenameMatch} | hasPackingSlip: ${f.hasPackingSlip}`, 'outlook-scheduler');
+              log(`  Potential match: File ${f.fileId} | jobMatch: ${jobMatch} (db: "${f.allmoxyJobNumber}" -> "${f.allmoxyJobNumberNormalized}") | filenameMatch: ${filenameMatch} | hasPackingSlip: ${f.hasPackingSlip}`, 'outlook-scheduler');
             }
             return !f.hasPackingSlip && (jobMatch || filenameMatch);
           });
