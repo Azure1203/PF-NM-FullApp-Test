@@ -250,8 +250,8 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
             log(`Matched ${pdfType}: ${email.subject} -> ${matchingFile.filename}`, 'outlook-scheduler');
             matched++;
           } else {
-            log(`No match for order ${orderNumber} (${pdfType}): ${email.subject}`, 'outlook-scheduler');
-            await markMessageProcessed(messageAttachmentKey, email.subject, 'skipped');
+            // Don't mark as processed - leave it for future matching when the order is uploaded
+            log(`No match yet for order ${orderNumber} (${pdfType}): ${email.subject} - will retry later`, 'outlook-scheduler');
           }
         } catch (attachErr: any) {
           log(`Error processing attachment: ${attachErr.message}`, 'outlook-scheduler');
