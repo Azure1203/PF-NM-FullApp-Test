@@ -113,6 +113,7 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
       projectId: file.projectId,
       fileId: file.id,
       filename: file.originalFilename || '',
+      allmoxyJobNumber: file.allmoxyJobNumber || '',
       hasPackingSlip: !!file.packingSlipPdfPath
     }));
     
@@ -138,8 +139,12 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
             continue;
           }
           
+          // Match by Allmoxy Job # first, then fall back to filename matching
           const matchingFile = allFiles.find(f => 
-            f.filename.includes(orderNumber) && !f.hasPackingSlip
+            !f.hasPackingSlip && (
+              f.allmoxyJobNumber === orderNumber ||
+              f.filename.includes(orderNumber)
+            )
           );
           
           if (matchingFile) {
