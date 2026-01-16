@@ -2422,6 +2422,207 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== CUT TO FILE PDF ENDPOINTS ====================
+  
+  // Download Cut To File PDF for a file
+  app.get('/api/files/:fileId/cut-to-file-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.cutToFilePdfPath) {
+        return res.status(404).json({ message: 'No Cut To File PDF found for this file' });
+      }
+      
+      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.cutToFilePdfPath);
+      
+      if (!pdfBuffer) {
+        return res.status(404).json({ message: 'PDF file not found in storage' });
+      }
+      
+      const filename = fileData.file.cutToFilePdfPath.split('/').pop() || 'cut-to-file.pdf';
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+      
+    } catch (err: any) {
+      console.error('[API] Error downloading Cut To File PDF:', err.message);
+      res.status(500).json({ message: 'Failed to download PDF', error: err.message });
+    }
+  });
+
+  // Delete Cut To File PDF for a file
+  app.delete('/api/files/:fileId/cut-to-file-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.cutToFilePdfPath) {
+        return res.status(404).json({ message: 'No Cut To File PDF found for this file' });
+      }
+      
+      const deleted = await objectStorageService.deleteObject(fileData.file.cutToFilePdfPath);
+      if (!deleted) {
+        console.log(`[API] Object storage file not found for ${fileId}, clearing database reference anyway`);
+      }
+      
+      await storage.updateOrderFile(fileId, {
+        cutToFilePdfPath: null
+      });
+      
+      console.log(`[API] Deleted Cut To File PDF for file ${fileId}`);
+      
+      res.json({ message: 'Cut To File PDF deleted successfully' });
+      
+    } catch (err: any) {
+      console.error('[API] Error deleting Cut To File PDF:', err.message);
+      res.status(500).json({ message: 'Failed to delete PDF', error: err.message });
+    }
+  });
+
+  // ==================== ELIAS DOVETAIL PDF ENDPOINTS ====================
+  
+  // Download Elias PF Dovetail Drawers PDF for a file
+  app.get('/api/files/:fileId/elias-dovetail-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.eliasDovetailPdfPath) {
+        return res.status(404).json({ message: 'No Elias Dovetail PDF found for this file' });
+      }
+      
+      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.eliasDovetailPdfPath);
+      
+      if (!pdfBuffer) {
+        return res.status(404).json({ message: 'PDF file not found in storage' });
+      }
+      
+      const filename = fileData.file.eliasDovetailPdfPath.split('/').pop() || 'elias-dovetail.pdf';
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+      
+    } catch (err: any) {
+      console.error('[API] Error downloading Elias Dovetail PDF:', err.message);
+      res.status(500).json({ message: 'Failed to download PDF', error: err.message });
+    }
+  });
+
+  // Delete Elias PF Dovetail Drawers PDF for a file
+  app.delete('/api/files/:fileId/elias-dovetail-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.eliasDovetailPdfPath) {
+        return res.status(404).json({ message: 'No Elias Dovetail PDF found for this file' });
+      }
+      
+      const deleted = await objectStorageService.deleteObject(fileData.file.eliasDovetailPdfPath);
+      if (!deleted) {
+        console.log(`[API] Object storage file not found for ${fileId}, clearing database reference anyway`);
+      }
+      
+      await storage.updateOrderFile(fileId, {
+        eliasDovetailPdfPath: null
+      });
+      
+      console.log(`[API] Deleted Elias Dovetail PDF for file ${fileId}`);
+      
+      res.json({ message: 'Elias Dovetail PDF deleted successfully' });
+      
+    } catch (err: any) {
+      console.error('[API] Error deleting Elias Dovetail PDF:', err.message);
+      res.status(500).json({ message: 'Failed to delete PDF', error: err.message });
+    }
+  });
+
+  // ==================== NETLEY 5 PIECE SHAKER DOOR PDF ENDPOINTS ====================
+  
+  // Download Netley 5 Piece Shaker Door PDF for a file
+  app.get('/api/files/:fileId/netley-5-piece-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.netley5PiecePdfPath) {
+        return res.status(404).json({ message: 'No Netley 5 Piece PDF found for this file' });
+      }
+      
+      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.netley5PiecePdfPath);
+      
+      if (!pdfBuffer) {
+        return res.status(404).json({ message: 'PDF file not found in storage' });
+      }
+      
+      const filename = fileData.file.netley5PiecePdfPath.split('/').pop() || 'netley-5-piece.pdf';
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+      
+    } catch (err: any) {
+      console.error('[API] Error downloading Netley 5 Piece PDF:', err.message);
+      res.status(500).json({ message: 'Failed to download PDF', error: err.message });
+    }
+  });
+
+  // Delete Netley 5 Piece Shaker Door PDF for a file
+  app.delete('/api/files/:fileId/netley-5-piece-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.netley5PiecePdfPath) {
+        return res.status(404).json({ message: 'No Netley 5 Piece PDF found for this file' });
+      }
+      
+      const deleted = await objectStorageService.deleteObject(fileData.file.netley5PiecePdfPath);
+      if (!deleted) {
+        console.log(`[API] Object storage file not found for ${fileId}, clearing database reference anyway`);
+      }
+      
+      await storage.updateOrderFile(fileId, {
+        netley5PiecePdfPath: null
+      });
+      
+      console.log(`[API] Deleted Netley 5 Piece PDF for file ${fileId}`);
+      
+      res.json({ message: 'Netley 5 Piece PDF deleted successfully' });
+      
+    } catch (err: any) {
+      console.error('[API] Error deleting Netley 5 Piece PDF:', err.message);
+      res.status(500).json({ message: 'Failed to delete PDF', error: err.message });
+    }
+  });
+
   // Test Outlook connection
   app.get('/api/outlook/test', isAuthenticated, async (req, res) => {
     try {

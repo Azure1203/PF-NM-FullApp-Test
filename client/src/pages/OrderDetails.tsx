@@ -1383,60 +1383,137 @@ export default function OrderDetails() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3">
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.parts === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
-                  <p className="text-xs text-muted-foreground">Parts Overall</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.dovetails === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-dovetails">{preview.totals.dovetails}</p>
-                  <p className="text-xs text-muted-foreground">Dovetails</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.assembledDrawers === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-assembled">{preview.totals.assembledDrawers}</p>
-                  <p className="text-xs text-muted-foreground">Assembled Drawers</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.fivePieceDoors === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-fivepiece">{preview.totals.fivePieceDoors}</p>
-                  <p className="text-xs text-muted-foreground">5 Piece Shaker</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.glassInserts === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-glass-inserts">{preview.totals.glassInserts}</p>
-                  <p className="text-xs text-muted-foreground">Glass Inserts</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.glassShelves === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-glass-shelves">{preview.totals.glassShelves}</p>
-                  <p className="text-xs text-muted-foreground">Glass Shelves</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.mjDoors === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-mj-doors">{preview.totals.mjDoors}</p>
-                  <p className="text-xs text-muted-foreground">M&J Doors</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.richelieuDoors === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-richelieu">{preview.totals.richelieuDoors}</p>
-                  <p className="text-xs text-muted-foreground">Richelieu Doors</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.doubleThick === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-doublethick">{preview.totals.doubleThick}</p>
-                  <p className="text-xs text-muted-foreground">Double Thick Parts</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.ctsPartsCount === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-cts">{preview.totals.ctsPartsCount}</p>
-                  <p className="text-xs text-muted-foreground">Cut to Size Parts</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.wallRailPieces === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-wallrail">{preview.totals.wallRailPieces}</p>
-                  <p className="text-xs text-muted-foreground">Wall Rail Pieces</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.weightLbs === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
-                  <p className="text-xs text-muted-foreground">lbs</p>
-                </div>
-                <div className={`text-center p-2 rounded-md border-2 ${preview.totals.maxLength === 0 ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' : 'bg-muted/30 border-transparent'}`}>
-                  <p className="text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
-                  <p className="text-xs text-muted-foreground">mm max</p>
-                </div>
-              </div>
+              {(() => {
+                // Helper to get box styling based on count
+                const getBoxStyle = (count: number) => count === 0 
+                  ? 'bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300' 
+                  : 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-500 text-yellow-700 dark:text-yellow-300';
+                
+                // Find files with each PDF type
+                const fileWithPackingSlip = project?.files?.find(f => f.packingSlipPdfPath);
+                const fileWithCutToFile = project?.files?.find(f => f.cutToFilePdfPath);
+                const fileWithEliasDovetail = project?.files?.find(f => f.eliasDovetailPdfPath);
+                const fileWithNetley5Piece = project?.files?.find(f => f.netley5PiecePdfPath);
+                
+                // Download handler
+                const handleDownload = async (fileId: number, pdfType: string) => {
+                  try {
+                    const response = await fetch(`/api/files/${fileId}/${pdfType}`, { credentials: 'include' });
+                    if (!response.ok) throw new Error('Download failed');
+                    const blob = await response.blob();
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+                    const filename = filenameMatch ? filenameMatch[1] : `${pdfType}.pdf`;
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                  } catch (err) {
+                    toast({ title: 'Download failed', variant: 'destructive' });
+                  }
+                };
+                
+                return (
+                  <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3">
+                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.parts)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-parts">{preview.totals.parts}</p>
+                      <p className="text-xs text-muted-foreground">Parts Overall</p>
+                      {fileWithPackingSlip && (
+                        <button 
+                          onClick={() => handleDownload(fileWithPackingSlip.id, 'packing-slip-pdf')}
+                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                          title="Download Netley Packing Slip"
+                          data-testid="button-download-packing-slip"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.dovetails)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-dovetails">{preview.totals.dovetails}</p>
+                      <p className="text-xs text-muted-foreground">Dovetails</p>
+                      {fileWithEliasDovetail && (
+                        <button 
+                          onClick={() => handleDownload(fileWithEliasDovetail.id, 'elias-dovetail-pdf')}
+                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                          title="Download Elias PF Dovetail Drawers"
+                          data-testid="button-download-elias-dovetail"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.assembledDrawers)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-assembled">{preview.totals.assembledDrawers}</p>
+                      <p className="text-xs text-muted-foreground">Assembled Drawers</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.fivePieceDoors)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-fivepiece">{preview.totals.fivePieceDoors}</p>
+                      <p className="text-xs text-muted-foreground">5 Piece Shaker</p>
+                      {fileWithNetley5Piece && (
+                        <button 
+                          onClick={() => handleDownload(fileWithNetley5Piece.id, 'netley-5-piece-pdf')}
+                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                          title="Download Netley 5 Piece Shaker Door"
+                          data-testid="button-download-netley-5-piece"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.glassInserts)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-glass-inserts">{preview.totals.glassInserts}</p>
+                      <p className="text-xs text-muted-foreground">Glass Inserts</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.glassShelves)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-glass-shelves">{preview.totals.glassShelves}</p>
+                      <p className="text-xs text-muted-foreground">Glass Shelves</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.mjDoors)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-mj-doors">{preview.totals.mjDoors}</p>
+                      <p className="text-xs text-muted-foreground">M&J Doors</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.richelieuDoors)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-richelieu">{preview.totals.richelieuDoors}</p>
+                      <p className="text-xs text-muted-foreground">Richelieu Doors</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.doubleThick)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-doublethick">{preview.totals.doubleThick}</p>
+                      <p className="text-xs text-muted-foreground">Double Thick Parts</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 relative ${getBoxStyle(preview.totals.ctsPartsCount)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-cts">{preview.totals.ctsPartsCount}</p>
+                      <p className="text-xs text-muted-foreground">Cut to Size Parts</p>
+                      {fileWithCutToFile && (
+                        <button 
+                          onClick={() => handleDownload(fileWithCutToFile.id, 'cut-to-file-pdf')}
+                          className="absolute top-1 right-1 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                          title="Download Cut To File"
+                          data-testid="button-download-cut-to-file"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.wallRailPieces)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-wallrail">{preview.totals.wallRailPieces}</p>
+                      <p className="text-xs text-muted-foreground">Wall Rail Pieces</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.weightLbs)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-total-weight">{preview.totals.weightLbs}</p>
+                      <p className="text-xs text-muted-foreground">lbs</p>
+                    </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.maxLength)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
+                      <p className="text-xs text-muted-foreground">mm max</p>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
