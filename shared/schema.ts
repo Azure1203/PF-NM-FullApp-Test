@@ -254,6 +254,35 @@ export const outlookSyncStatus = pgTable("outlook_sync_status", {
 
 export type OutlookSyncStatus = typeof outlookSyncStatus.$inferSelect;
 
+// Packing slip checklist items - parsed from Netley Packing Slip PDFs
+export const packingSlipItems = pgTable("packing_slip_items", {
+  id: serial("id").primaryKey(),
+  fileId: integer("file_id").references(() => orderFiles.id, { onDelete: 'cascade' }).notNull(),
+  partCode: text("part_code").notNull(), // e.g. DBX24_14_167, SDBX24_12_6
+  color: text("color"), // e.g. TFL1W, HGFU, TFL2F
+  quantity: integer("quantity").notNull().default(1),
+  height: real("height"), // Dimension in mm
+  width: real("width"), // Dimension in mm
+  length: real("length"), // Dimension in mm (optional)
+  thickness: real("thickness"), // Dimension in mm (optional)
+  description: text("description"), // e.g. "Dovetail Drawer Box", "TFL 5-Piece Shaker"
+  imagePath: text("image_path"), // Path to extracted image in object storage
+  isChecked: boolean("is_checked").default(false).notNull(),
+  checkedAt: timestamp("checked_at"),
+  checkedBy: text("checked_by"),
+  sortOrder: integer("sort_order").default(0), // Order in the original PDF
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPackingSlipItemSchema = createInsertSchema(packingSlipItems).omit({ 
+  id: true, 
+  createdAt: true,
+  checkedAt: true
+});
+
+export type PackingSlipItem = typeof packingSlipItems.$inferSelect;
+export type InsertPackingSlipItem = z.infer<typeof insertPackingSlipItemSchema>;
+
 // Keep backward compatibility - alias Order to Project for now
 export const orders = projects;
 export type Order = Project;
