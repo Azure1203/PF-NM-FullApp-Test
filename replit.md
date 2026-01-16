@@ -49,11 +49,19 @@ Preferred communication style: Simple, everyday language.
 - **Purpose**: Syncing orders as tasks to Asana projects
 - **Token Management**: Access tokens are refreshed dynamically, not cached
 
+### Outlook Integration
+- **Library**: Microsoft Graph API via @microsoft/microsoft-graph-client
+- **Authentication**: OAuth via Replit Connectors
+- **Purpose**: Automatic fetching of Netley packing slip PDFs from "Perfect Fit Allmoxy Emails" folder
+- **Background Polling**: Runs every 15 minutes starting 2 minutes after server start
+- **Deduplication**: Uses processedOutlookEmails table to track processed message IDs
+- **Scheduler**: server/outlookScheduler.ts handles background polling and status tracking
+
 ### Database
 - **PostgreSQL**: Required, connection via DATABASE_URL environment variable
 - **Session Storage**: connect-pg-simple available for session persistence (if needed)
 
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string
-- `REPLIT_CONNECTORS_HOSTNAME`: For Asana OAuth token retrieval
+- `REPLIT_CONNECTORS_HOSTNAME`: For Asana and Outlook OAuth token retrieval
 - `REPL_IDENTITY` or `WEB_REPL_RENEWAL`: For Replit authentication headers
