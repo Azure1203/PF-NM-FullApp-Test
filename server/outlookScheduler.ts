@@ -6,7 +6,7 @@ import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { log } from "./index";
 import { parsePackingSlipPdf } from "./packingSlipParser";
 
-const POLL_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 let isPolling = false;
 let pollIntervalId: NodeJS.Timeout | null = null;
 
