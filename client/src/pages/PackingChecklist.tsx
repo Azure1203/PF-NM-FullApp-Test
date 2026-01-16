@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, CheckCircle, ArrowLeft } from "lucide-react";
+import { Loader2, Package, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface PackingSlipItem {
   id: number;
@@ -45,6 +46,7 @@ interface FileInfo {
 export default function PackingChecklist() {
   const [match, params] = useRoute("/files/:fileId/checklist");
   const fileId = params?.fileId ? parseInt(params.fileId, 10) : null;
+  const { toast } = useToast();
 
   const { data: fileInfo, isLoading: fileLoading } = useQuery<FileInfo>({
     queryKey: [`/api/files/${fileId}`],
@@ -54,6 +56,27 @@ export default function PackingChecklist() {
   const { data, isLoading, error } = useQuery<ChecklistData>({
     queryKey: [`/api/files/${fileId}/checklist`],
     enabled: !!fileId,
+  });
+
+  const reparseMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', `/api/files/${fileId}/reparse-packing-slip`);
+    },
+    onSuccess: async (response) => {
+      const result = await response.json();
+      toast({ 
+        title: 'Packing slip parsed successfully',
+        description: `Created ${result.itemsCreated} checklist items.`
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/files/${fileId}/checklist`] });
+    },
+    onError: (err: any) => {
+      toast({ 
+        title: 'Failed to parse packing slip',
+        description: err.message || 'Unknown error',
+        variant: 'destructive'
+      });
+    }
   });
 
   const toggleMutation = useMutation({
@@ -182,9 +205,26 @@ export default function PackingChecklist() {
           </CardHeader>
           <CardContent className="space-y-3">
             {items.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                No items found in checklist.
-              </p>
+              <div className="text-center py-8 space-y-4">
+                <p className="text-muted-foreground">
+                  No items found in checklist.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  The packing slip PDF may not have been parsed yet. Click below to parse it.
+                </p>
+                <Button
+                  onClick={() => reparseMutation.mutate()}
+                  disabled={reparseMutation.isPending}
+                  data-testid="button-reparse-packing-slip"
+                >
+                  {reparseMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  Parse Packing Slip PDF
+                </Button>
+              </div>
             ) : (
               items.map((item) => (
                 <div 

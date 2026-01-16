@@ -13,6 +13,9 @@ import express from 'express';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
+import { db } from "./db";
+import { packingSlipItems } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2419,6 +2422,65 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[API] Error deleting packing slip PDF:', err.message);
       res.status(500).json({ message: 'Failed to delete PDF', error: err.message });
+    }
+  });
+
+  // Re-parse packing slip PDF to create/recreate checklist items
+  app.post('/api/files/:fileId/reparse-packing-slip', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.packingSlipPdfPath) {
+        return res.status(404).json({ message: 'No packing slip PDF found for this file' });
+      }
+      
+      // Download the PDF from object storage
+      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.packingSlipPdfPath);
+      
+      if (!pdfBuffer) {
+        return res.status(404).json({ message: 'PDF file not found in storage' });
+      }
+      
+      // Parse the PDF
+      const { parsePackingSlipPdf } = await import('./packingSlipParser');
+      const parsed = await parsePackingSlipPdf(pdfBuffer, fileId);
+      
+      // Delete existing items for this file
+      await db.delete(packingSlipItems).where(eq(packingSlipItems.fileId, fileId));
+      
+      // Insert parsed items
+      for (const part of parsed.parts) {
+        await db.insert(packingSlipItems).values({
+          fileId: fileId,
+          partCode: part.partCode,
+          color: part.color,
+          quantity: part.quantity,
+          height: part.height,
+          width: part.width,
+          length: part.length,
+          thickness: part.thickness,
+          description: part.description,
+          imagePath: part.imagePath,
+          isChecked: false,
+          sortOrder: part.sortOrder
+        });
+      }
+      
+      console.log(`[API] Re-parsed packing slip for file ${fileId}: ${parsed.parts.length} items created`);
+      
+      res.json({ 
+        message: 'Packing slip re-parsed successfully',
+        itemsCreated: parsed.parts.length
+      });
+      
+    } catch (err: any) {
+      console.error('[API] Error re-parsing packing slip:', err.message);
+      res.status(500).json({ message: 'Failed to re-parse PDF', error: err.message });
     }
   });
 
