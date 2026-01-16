@@ -2,16 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PDFDocument } from 'pdf-lib';
 import { ObjectStorageService } from './replit_integrations/object_storage';
+import { createRequire } from 'module';
 
-// Dynamic import for pdf-parse to avoid bundler issues with createRequire
-let pdfParse: any = null;
+// Use createRequire to properly import CommonJS pdf-parse module
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 async function getPdfParser() {
-  if (!pdfParse) {
-    const module = await import('pdf-parse');
-    // Handle both CommonJS and ESM exports
-    pdfParse = module.default || module;
-  }
   return pdfParse;
 }
 
