@@ -6,6 +6,7 @@ import {
   ctsPartConfigs,
   pallets,
   palletFileAssignments,
+  processedOutlookEmails,
   type Project,
   type InsertProject,
   type OrderFile,
@@ -20,7 +21,7 @@ import {
   type InsertPalletFileAssignment,
   type BuyoutHardwareOption
 } from "@shared/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Project methods
@@ -65,6 +66,9 @@ export interface IStorage {
   setAssignmentsForPallet(palletId: number, fileIds: number[]): Promise<PalletFileAssignment[]>;
   getAssignment(id: number): Promise<PalletFileAssignment | undefined>;
   updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean, hardwarePackedBy?: string | null): Promise<PalletFileAssignment | undefined>;
+  
+  // Outlook email tracking methods
+  clearProcessedOutlookEmails(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -245,13 +249,17 @@ export class DatabaseStorage implements IStorage {
     // Create new assignments
     if (fileIds.length === 0) return [];
     
-    const assignments = fileIds.map(fileId => ({
-      palletId,
-      fileId,
-      buyoutHardwareStatuses: [] as BuyoutHardwareOption[]
-    }));
+    const results: PalletFileAssignment[] = [];
+    for (const fileId of fileIds) {
+      const [created] = await db.insert(palletFileAssignments).values({
+        palletId,
+        fileId,
+        buyoutHardwareStatuses: [] as BuyoutHardwareOption[]
+      }).returning();
+      results.push(created);
+    }
     
-    return await db.insert(palletFileAssignments).values(assignments).returning();
+    return results;
   }
 
   async getAssignment(id: number): Promise<PalletFileAssignment | undefined> {
@@ -282,6 +290,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(palletFileAssignments.id, id))
       .returning();
     return updated;
+  }
+
+  // Outlook email tracking methods
+  async clearProcessedOutlookEmails(): Promise<number> {
+    const result = await db.delete(processedOutlookEmails).returning();
+    return result.length;
   }
 }
 

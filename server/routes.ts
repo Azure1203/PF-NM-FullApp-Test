@@ -2535,6 +2535,22 @@ export async function registerRoutes(
     }
   });
 
+  // Reset processed Outlook emails - allows reprocessing of emails
+  app.delete('/api/outlook/processed-emails', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[Outlook] Resetting processed email records...');
+      const result = await storage.clearProcessedOutlookEmails();
+      console.log(`[Outlook] Cleared ${result} processed email records`);
+      res.json({ 
+        message: `Cleared ${result} processed email records. Emails will be reprocessed on next fetch.`,
+        cleared: result
+      });
+    } catch (err: any) {
+      console.error('[Outlook] Error clearing processed emails:', err.message);
+      res.status(500).json({ message: 'Failed to clear processed emails', error: err.message });
+    }
+  });
+
   // Admin endpoint to backfill stored calculated values for existing files
   app.post('/api/admin/backfill-file-metrics', isAuthenticated, async (req, res) => {
     try {

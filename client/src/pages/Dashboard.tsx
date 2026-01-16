@@ -73,6 +73,34 @@ export default function Dashboard() {
     enabled: diagnosticOpen
   });
 
+  const { mutate: resetProcessedEmails, isPending: isResettingEmails } = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/outlook/processed-emails', {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to reset processed emails');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/outlook/sync-status'] });
+      toast({
+        title: "Processed emails reset",
+        description: data.message
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to reset processed emails",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   const { mutate: fetchOutlookEmails, isPending: isFetchingEmails } = useMutation({
     mutationFn: async () => {
       const response = await fetch('/api/outlook/process-netley-emails', {
@@ -379,7 +407,7 @@ export default function Dashboard() {
                     <p className="text-sm text-muted-foreground mb-2" data-testid="text-diagnostic-description">
                       Search for an order by Allmoxy Job # to see if it exists in the database and its packing slip status.
                     </p>
-                    <div className="flex gap-2 items-center">
+                    <div className="flex flex-wrap gap-2 items-center">
                       <Input
                         placeholder="Enter Allmoxy Job # (e.g., 1865)"
                         value={diagnosticSearch}
@@ -396,7 +424,19 @@ export default function Dashboard() {
                       >
                         {isDiagnosticLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                       </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => resetProcessedEmails()}
+                        disabled={isResettingEmails}
+                        data-testid="button-reset-processed-emails"
+                      >
+                        {isResettingEmails ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                        Reset Processed Emails
+                      </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-2" data-testid="text-reset-description">
+                      If emails are being skipped as "already processed", click Reset to clear the history and reprocess them.
+                    </p>
                   </div>
 
                   {isDiagnosticLoading ? (
