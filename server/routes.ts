@@ -2387,6 +2387,41 @@ export async function registerRoutes(
     }
   });
 
+  // Delete Netley packing slip PDF for a file
+  app.delete('/api/files/:fileId/packing-slip-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.packingSlipPdfPath) {
+        return res.status(404).json({ message: 'No packing slip PDF found for this file' });
+      }
+      
+      // Delete from object storage (log if file doesn't exist but continue anyway)
+      const deleted = await objectStorageService.deleteObject(fileData.file.packingSlipPdfPath);
+      if (!deleted) {
+        console.log(`[API] Object storage file not found for ${fileId}, clearing database reference anyway`);
+      }
+      
+      // Clear the path in the database
+      await storage.updateOrderFile(fileId, {
+        packingSlipPdfPath: null
+      });
+      
+      console.log(`[API] Deleted packing slip PDF for file ${fileId}`);
+      
+      res.json({ message: 'Packing slip PDF deleted successfully' });
+      
+    } catch (err: any) {
+      console.error('[API] Error deleting packing slip PDF:', err.message);
+      res.status(500).json({ message: 'Failed to delete PDF', error: err.message });
+    }
+  });
+
   // Test Outlook connection
   app.get('/api/outlook/test', isAuthenticated, async (req, res) => {
     try {

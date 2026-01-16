@@ -277,6 +277,31 @@ export class ObjectStorageService {
       return null;
     }
   }
+
+  // Deletes an object from object storage
+  async deleteObject(objectPath: string): Promise<boolean> {
+    try {
+      const privateObjectDir = this.getPrivateObjectDir();
+      const fullPath = `${privateObjectDir}/${objectPath}`;
+      
+      const { bucketName, objectName } = parseObjectPath(fullPath);
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      
+      const [exists] = await file.exists();
+      if (!exists) {
+        console.log(`[ObjectStorage] File does not exist: ${fullPath}`);
+        return false;
+      }
+      
+      await file.delete();
+      console.log(`[ObjectStorage] Deleted: ${fullPath}`);
+      return true;
+    } catch (error) {
+      console.error('[ObjectStorage] Error deleting object:', error);
+      return false;
+    }
+  }
 }
 
 function parseObjectPath(path: string): {

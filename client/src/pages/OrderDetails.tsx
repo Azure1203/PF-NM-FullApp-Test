@@ -267,6 +267,28 @@ export default function OrderDetails() {
     }
   });
 
+  // Mutation for deleting packing slip PDF
+  const { mutate: deletePackingSlipPdf, isPending: isDeletingPackingSlip } = useMutation({
+    mutationFn: async (fileId: number) => {
+      const response = await fetch(`/api/files/${fileId}/packing-slip-pdf`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Delete failed');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      toast({ title: "Packing slip PDF deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to delete PDF", description: error.message, variant: "destructive" });
+    }
+  });
+
   // Mutation for syncing Asana status
   const { mutate: syncAsanaStatus, isPending: isSyncingAsanaStatus } = useMutation({
     mutationFn: async () => {
@@ -2009,18 +2031,37 @@ export default function OrderDetails() {
                               {project.files[selectedFileIndex].packingSlipPdfPath ? 'Replace PDF' : 'Upload PDF'}
                             </Button>
                             {project.files[selectedFileIndex].packingSlipPdfPath && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  const fileId = project.files![selectedFileIndex].id;
-                                  window.open(`/api/files/${fileId}/packing-slip-pdf`, '_blank');
-                                }}
-                                data-testid="button-download-packing-slip"
-                              >
-                                <Download className="w-4 h-4 mr-2" />
-                                Download PDF
-                              </Button>
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const fileId = project.files![selectedFileIndex].id;
+                                    window.open(`/api/files/${fileId}/packing-slip-pdf`, '_blank');
+                                  }}
+                                  data-testid="button-download-packing-slip"
+                                >
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Download PDF
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const fileId = project.files![selectedFileIndex].id;
+                                    deletePackingSlipPdf(fileId);
+                                  }}
+                                  disabled={isDeletingPackingSlip}
+                                  data-testid="button-delete-packing-slip"
+                                >
+                                  {isDeletingPackingSlip ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                  )}
+                                  Delete PDF
+                                </Button>
+                              </>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
