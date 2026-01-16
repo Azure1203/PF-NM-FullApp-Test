@@ -84,17 +84,61 @@ function extractPartsFromText(text: string): PackingSlipPart[] {
   
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
+  // Log first 50 lines for debugging
+  console.log('[PackingSlipParser] === TEXT EXTRACTION DEBUG ===');
+  console.log('[PackingSlipParser] Total lines:', lines.length);
+  console.log('[PackingSlipParser] First 50 lines:');
+  lines.slice(0, 50).forEach((line, idx) => {
+    console.log(`[PackingSlipParser] Line ${idx}: "${line}"`);
+  });
+  
   let currentPart: Partial<PackingSlipPart> | null = null;
   let sortOrder = 0;
   
-  const partCodePattern = /^([A-Z0-9._]+(?:DRWB|DRW|SH|FLAT|BOX|EURO|SHA|DBX|SDBX|HGJ|HGS|LC|RC)[A-Z0-9_]*)$/i;
-  const handlePattern = /^(H\.\d+\.\d+\.\d+)$/;
+  // Expanded part code patterns to match actual Netley Packing Slip format
+  // Matches: DBX24_14_167, SDBX24_12_6, 34MDRWB2, HGJDRWEURO, DRWTFL90SHA, HGSFLAT4, 34LCSHFAR, etc.
+  const partCodePatterns = [
+    // Handle codes like H.111.95.310
+    /^(H\.\d+\.\d+\.\d+)$/,
+    // Drawer box codes: DBX24_14_167, SDBX24_12_6
+    /^(S?DBX\d+[_A-Z0-9]+)$/i,
+    // Codes starting with numbers: 34MDRWB2, 34LCSHFAR, 34HGSHFF
+    /^(\d+[A-Z]+[A-Z0-9_]*)$/i,
+    // Drawer front codes: HGJDRWEURO, HGDRWEURO, DRWTFL90SHA, etc.
+    /^([A-Z]*DRW[A-Z0-9]+)$/i,
+    // Shelf/flat codes: HGSFLAT, HGSFLAT4
+    /^([A-Z]+FLAT\d*)$/i,
+    // Generic pattern for alphanumeric codes with specific keywords
+    /^([A-Z0-9._]+(?:DRWB|DRW|SH|FLAT|BOX|EURO|SHA|DBX|SDBX|HGJ|HGS|LC|RC|SHFF|SHFA|CLEAT|TK|PNLL|PNLR|PNLF|WPNL)[A-Z0-9_]*)$/i,
+    // Catch codes that are purely uppercase alphanumeric with underscores, at least 4 chars
+    /^([A-Z][A-Z0-9_]{3,})$/
+  ];
+  
   const colorPattern = /^(TFL[0-9A-Z]+|HG[A-Z]+|[A-Z]{2,6})$/;
+  
+  const isPartCode = (line: string): boolean => {
+    // Skip known non-part-code lines
+    if (line.match(/^(Order|Page|ID|Qty|Height|Width|Length|Thickness|Edge|Color|Total|INTERNAL|DO NOT|Project)/i)) {
+      return false;
+    }
+    // Skip lines that are just numbers
+    if (line.match(/^\d+$/)) {
+      return false;
+    }
+    // Check against all patterns
+    for (const pattern of partCodePatterns) {
+      if (pattern.test(line)) {
+        console.log(`[PackingSlipParser] Matched part code: "${line}" with pattern ${pattern}`);
+        return true;
+      }
+    }
+    return false;
+  };
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    if (partCodePattern.test(line) || handlePattern.test(line)) {
+    if (isPartCode(line)) {
       if (currentPart && currentPart.partCode) {
         parts.push({
           partCode: currentPart.partCode,
@@ -136,16 +180,37 @@ function extractPartsFromText(text: string): PackingSlipPart[] {
         continue;
       }
       
-      // Match dimension lines: qty height width length [thickness]
-      // Format: "1 3.5 12 24" or "2 4.25 14.5 36 0.75"
-      const dimensionMatch = line.match(/^(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)(?:\s+(\d+(?:\.\d+)?))?/);
+      // Match dimension lines from Netley format
+      // Format: "ID Qty Height Width Length Thickness" where ID is like "2 01" or just a row number
+      // Examples: "2 01    1         167      599.625        340"
+      // Or simpler: "1 167 599.625 340 19"
+      const dimensionMatch = line.match(/^\d+\s+\d*\s*(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)(?:\s+(\d+(?:\.\d+)?))?/);
       if (dimensionMatch) {
-        currentPart.quantity = parseInt(dimensionMatch[1], 10) || currentPart.quantity;
+        const qty = parseInt(dimensionMatch[1], 10);
+        if (qty > 0 && qty < 1000) { // Sanity check for quantity
+          currentPart.quantity = qty;
+        }
         currentPart.height = parseFloat(dimensionMatch[2]) || null;
         currentPart.width = parseFloat(dimensionMatch[3]) || null;
         currentPart.length = parseFloat(dimensionMatch[4]) || null;
         if (dimensionMatch[5]) {
           currentPart.thickness = parseFloat(dimensionMatch[5]) || null;
+        }
+        continue;
+      }
+      
+      // Also try simpler dimension match
+      const simpleDimensionMatch = line.match(/^(\d+)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)(?:\s+(\d+(?:\.\d+)?))?$/);
+      if (simpleDimensionMatch) {
+        const qty = parseInt(simpleDimensionMatch[1], 10);
+        if (qty > 0 && qty < 1000) {
+          currentPart.quantity = qty;
+        }
+        currentPart.height = parseFloat(simpleDimensionMatch[2]) || null;
+        currentPart.width = parseFloat(simpleDimensionMatch[3]) || null;
+        currentPart.length = parseFloat(simpleDimensionMatch[4]) || null;
+        if (simpleDimensionMatch[5]) {
+          currentPart.thickness = parseFloat(simpleDimensionMatch[5]) || null;
         }
         continue;
       }
@@ -161,7 +226,12 @@ function extractPartsFromText(text: string): PackingSlipPart[] {
         /High\s*Gloss/i,
         /TFL/i,
         /Handles/i,
-        /Drawer\s*Fronts/i
+        /Drawer\s*Fronts/i,
+        /Scooped/i,
+        /Flat\s*Packed/i,
+        /Adjustable/i,
+        /Fixed/i,
+        /Radius/i
       ];
       
       for (const pattern of descPatterns) {
@@ -191,6 +261,12 @@ function extractPartsFromText(text: string): PackingSlipPart[] {
       sortOrder: sortOrder
     });
   }
+  
+  console.log('[PackingSlipParser] === EXTRACTION COMPLETE ===');
+  console.log('[PackingSlipParser] Total parts found:', parts.length);
+  parts.slice(0, 10).forEach((part, idx) => {
+    console.log(`[PackingSlipParser] Part ${idx}: ${part.partCode} (qty: ${part.quantity}, color: ${part.color})`);
+  });
   
   return parts;
 }
