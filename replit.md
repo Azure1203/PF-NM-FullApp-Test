@@ -53,7 +53,7 @@ Preferred communication style: Simple, everyday language.
 - **Library**: Microsoft Graph API via @microsoft/microsoft-graph-client
 - **Authentication**: OAuth via Replit Connectors
 - **Purpose**: Automatic fetching of Netley packing slip PDFs from "Perfect Fit Allmoxy Emails" folder
-- **Background Polling**: Runs every 15 minutes starting 2 minutes after server start
+- **Background Polling**: Runs every 10 minutes starting 2 minutes after server start
 - **Deduplication**: Uses processedOutlookEmails table to track processed message IDs
 - **Scheduler**: server/outlookScheduler.ts handles background polling and status tracking
 

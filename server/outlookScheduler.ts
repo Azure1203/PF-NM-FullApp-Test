@@ -5,7 +5,7 @@ import { searchNetleyEmails, downloadEmailAttachment } from "./outlook";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { log } from "./index";
 
-const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const POLL_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 let isPolling = false;
 let pollIntervalId: NodeJS.Timeout | null = null;
 
