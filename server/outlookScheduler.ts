@@ -19,7 +19,7 @@ const PDF_TYPES = {
     suffix: 'Netley Packing Slip'
   },
   cutToFile: {
-    patterns: ['Cut To File', 'Cut to File'],
+    patterns: ['Cut To File', 'Cut to File', 'Cut To Size', 'Cut to Size'],
     dbColumn: 'cutToFilePdfPath',
     suffix: 'Cut To File'
   },
