@@ -168,7 +168,10 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
           if (matchingFile) {
             const pdfBuffer = await downloadEmailAttachment(email.id, attachment.id);
             
-            const sanitizedFilename = `${matchingFile.filename.replace(/\.csv$/i, '').replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_')}_Netley_Packing_Slip.pdf`;
+            // Build filename: {Original CSV Filename} {Allmoxy Job #} - Netley Packing Slip.pdf
+            const baseFilename = matchingFile.filename.replace(/\.csv$/i, '');
+            const jobNumber = matchingFile.allmoxyJobNumber || orderNumber;
+            const sanitizedFilename = `${baseFilename} ${jobNumber} - Netley Packing Slip.pdf`.replace(/[^a-zA-Z0-9\s\-_().]/g, '').replace(/\s+/g, ' ').trim();
             const storagePath = `.private/packing-slips/${sanitizedFilename}`;
             
             await objectStorageService.uploadBuffer(pdfBuffer, storagePath, 'application/pdf');
