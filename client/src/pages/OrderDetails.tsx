@@ -2195,13 +2195,15 @@ export default function OrderDetails() {
                         </div>
                       )}
                       
-                      {/* Packaging Checklist - shown when packing slip PDF is available */}
+                      {/* Packaging Checklist - disabled for now */}
+                      {/* TODO: Re-enable when ready to use packaging checklist feature
                       {project.files?.[selectedFileIndex]?.packingSlipPdfPath && (
                         <PackingSlipChecklist 
                           fileId={project.files[selectedFileIndex].id}
                           fileName={project.files[selectedFileIndex].originalFilename}
                         />
                       )}
+                      */}
                       
                       {/* Packaging Link for this file */}
                       {project.files?.[selectedFileIndex] && (
