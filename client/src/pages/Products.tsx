@@ -47,9 +47,7 @@ interface ProductFormData {
   code: string;
   name: string;
   category: string;
-  length: string;
-  width: string;
-  height: string;
+  weight: string;
   notes: string;
   imagePath: string;
 }
@@ -58,9 +56,7 @@ const emptyFormData: ProductFormData = {
   code: "",
   name: "",
   category: "HARDWARE",
-  length: "",
-  width: "",
-  height: "",
+  weight: "",
   notes: "",
   imagePath: "",
 };
@@ -142,9 +138,7 @@ export default function Products() {
       code: product.code,
       name: product.name || "",
       category: product.category,
-      length: product.length?.toString() || "",
-      width: product.width?.toString() || "",
-      height: product.height?.toString() || "",
+      weight: product.weight?.toString() || "",
       notes: product.notes || "",
       imagePath: product.imagePath || "",
     });
@@ -164,9 +158,7 @@ export default function Products() {
       code: formData.code.trim(),
       name: formData.name.trim() || null,
       category: formData.category,
-      length: formData.length ? parseFloat(formData.length) : null,
-      width: formData.width ? parseFloat(formData.width) : null,
-      height: formData.height ? parseFloat(formData.height) : null,
+      weight: formData.weight ? parseFloat(formData.weight) : null,
       notes: formData.notes.trim() || null,
       imagePath: formData.imagePath || null,
     };
@@ -295,9 +287,9 @@ export default function Products() {
                           {product.category}
                         </Badge>
                       </div>
-                      {(product.length || product.width || product.height) && (
+                      {product.weight && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {[product.length, product.width, product.height].filter(Boolean).join(" x ")} mm
+                          {product.weight} g
                         </p>
                       )}
                     </div>
@@ -410,43 +402,17 @@ export default function Products() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="length">Length (mm)</Label>
-                  <Input
-                    id="length"
-                    type="number"
-                    step="0.01"
-                    data-testid="input-product-length"
-                    placeholder="0"
-                    value={formData.length}
-                    onChange={(e) => setFormData(prev => ({ ...prev, length: e.target.value }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="width">Width (mm)</Label>
-                  <Input
-                    id="width"
-                    type="number"
-                    step="0.01"
-                    data-testid="input-product-width"
-                    placeholder="0"
-                    value={formData.width}
-                    onChange={(e) => setFormData(prev => ({ ...prev, width: e.target.value }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="height">Height (mm)</Label>
-                  <Input
-                    id="height"
-                    type="number"
-                    step="0.01"
-                    data-testid="input-product-height"
-                    placeholder="0"
-                    value={formData.height}
-                    onChange={(e) => setFormData(prev => ({ ...prev, height: e.target.value }))}
-                  />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="weight">Weight (g)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  step="0.01"
+                  data-testid="input-product-weight"
+                  placeholder="0"
+                  value={formData.weight}
+                  onChange={(e) => setFormData(prev => ({ ...prev, weight: e.target.value }))}
+                />
               </div>
 
               <div className="grid gap-2">
