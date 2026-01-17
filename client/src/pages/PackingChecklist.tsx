@@ -9,6 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Package, CheckCircle, ArrowLeft, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+interface ProductInfo {
+  id: number;
+  name: string | null;
+  imagePath: string | null;
+  notes: string | null;
+}
+
 interface PackingSlipItem {
   id: number;
   fileId: number;
@@ -25,6 +32,7 @@ interface PackingSlipItem {
   checkedAt: string | null;
   checkedBy: string | null;
   sortOrder: number;
+  productInfo: ProductInfo | null;
 }
 
 interface ChecklistData {
@@ -249,7 +257,19 @@ export default function PackingChecklist() {
                     data-testid={`checkbox-item-${item.id}`}
                   />
                   
-                  {item.imagePath ? (
+                  {/* Show product database image if available, otherwise packing slip image, otherwise placeholder */}
+                  {item.productInfo?.imagePath ? (
+                    <div className="w-24 h-24 flex-shrink-0 rounded-md overflow-hidden border bg-muted border-primary/20">
+                      <img 
+                        src={item.productInfo.imagePath}
+                        alt={item.partCode}
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : item.imagePath ? (
                     <div className="w-24 h-24 flex-shrink-0 rounded-md overflow-hidden border bg-muted">
                       <img 
                         src={`/api/packing-slip-images/${encodeURIComponent(item.imagePath)}`}
@@ -272,9 +292,15 @@ export default function PackingChecklist() {
                         <p className={`font-mono text-lg font-semibold ${item.isChecked ? 'line-through text-muted-foreground' : ''}`}>
                           {item.partCode}
                         </p>
-                        {item.description && (
+                        {/* Show product name if available from database, otherwise show parsed description */}
+                        {(item.productInfo?.name || item.description) && (
                           <p className={`text-sm mt-1 ${item.isChecked ? 'line-through text-muted-foreground' : 'text-muted-foreground'}`}>
-                            {item.description}
+                            {item.productInfo?.name || item.description}
+                          </p>
+                        )}
+                        {item.productInfo?.notes && (
+                          <p className="text-xs mt-0.5 text-primary/70 italic">
+                            {item.productInfo.notes}
                           </p>
                         )}
                       </div>

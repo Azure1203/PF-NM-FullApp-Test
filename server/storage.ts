@@ -8,6 +8,7 @@ import {
   palletFileAssignments,
   processedOutlookEmails,
   packingSlipItems,
+  products,
   type Project,
   type InsertProject,
   type OrderFile,
@@ -22,9 +23,11 @@ import {
   type InsertPalletFileAssignment,
   type BuyoutHardwareOption,
   type PackingSlipItem,
-  type InsertPackingSlipItem
+  type InsertPackingSlipItem,
+  type Product,
+  type InsertProduct
 } from "@shared/schema";
-import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, inArray, sql, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // Project methods
@@ -77,6 +80,15 @@ export interface IStorage {
   getPackingSlipItems(fileId: number): Promise<PackingSlipItem[]>;
   togglePackingSlipItem(itemId: number, isChecked: boolean, checkedBy?: string): Promise<PackingSlipItem | undefined>;
   getPackingSlipProgress(fileId: number): Promise<{ total: number; checked: number; percentage: number }>;
+  
+  // Product catalog methods
+  getProducts(search?: string, category?: string): Promise<Product[]>;
+  getProduct(id: number): Promise<Product | undefined>;
+  getProductByCode(code: string): Promise<Product | undefined>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: number, updates: Partial<Product>): Promise<Product | undefined>;
+  deleteProduct(id: number): Promise<boolean>;
+  getProductsByCode(codes: string[]): Promise<Product[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -338,6 +350,61 @@ export class DatabaseStorage implements IStorage {
     const percentage = total > 0 ? Math.round((checked / total) * 100) : 0;
     
     return { total, checked, percentage };
+  }
+
+  // Product catalog methods
+  async getProducts(search?: string, category?: string): Promise<Product[]> {
+    let query = db.select().from(products);
+    
+    const conditions = [];
+    if (search) {
+      conditions.push(ilike(products.code, `%${search}%`));
+    }
+    if (category) {
+      conditions.push(eq(products.category, category));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(products).where(and(...conditions)).orderBy(products.code);
+    }
+    return await db.select().from(products).orderBy(products.code);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
+  }
+
+  async getProductByCode(code: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.code, code));
+    return product;
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [created] = await db.insert(products).values(product).returning();
+    return created;
+  }
+
+  async updateProduct(id: number, updates: Partial<Product>): Promise<Product | undefined> {
+    const [updated] = await db.update(products)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteProduct(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(products).where(eq(products.id, id)).returning();
+    return !!deleted;
+  }
+
+  async getProductsByCode(codes: string[]): Promise<Product[]> {
+    if (codes.length === 0) return [];
+    // Normalize codes for comparison (trim and uppercase)
+    const normalizedCodes = codes.map(c => c.trim().toUpperCase());
+    // Use SQL UPPER for case-insensitive matching
+    return await db.select().from(products)
+      .where(sql`UPPER(TRIM(${products.code})) IN (${sql.join(normalizedCodes.map(c => sql`${c}`), sql`, `)})`);
   }
 }
 

@@ -14,7 +14,7 @@ import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_inte
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { db } from "./db";
-import { packingSlipItems } from "@shared/schema";
+import { packingSlipItems, insertProductSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -2717,13 +2717,38 @@ export async function registerRoutes(
     }
   });
 
-  // Get packing slip checklist items for a file
+  // Get packing slip checklist items for a file, enriched with product database info
   app.get('/api/files/:fileId/checklist', isAuthenticated, async (req, res) => {
     try {
       const fileId = Number(req.params.fileId);
       const items = await storage.getPackingSlipItems(fileId);
       const progress = await storage.getPackingSlipProgress(fileId);
-      res.json({ items, progress });
+      
+      // Get unique part codes and look up matching products
+      const partCodes = Array.from(new Set(items.map(item => item.partCode)));
+      const matchingProducts = await storage.getProductsByCode(partCodes);
+      
+      // Create a map for quick lookup
+      const productMap: Record<string, typeof matchingProducts[0]> = {};
+      for (const product of matchingProducts) {
+        productMap[product.code] = product;
+      }
+      
+      // Enrich items with product info (image from product db takes precedence if available)
+      const enrichedItems = items.map(item => {
+        const product = productMap[item.partCode];
+        return {
+          ...item,
+          productInfo: product ? {
+            id: product.id,
+            name: product.name,
+            imagePath: product.imagePath,
+            notes: product.notes
+          } : null
+        };
+      });
+      
+      res.json({ items: enrichedItems, progress, productMatchCount: matchingProducts.length });
     } catch (err: any) {
       console.error('[API] Error getting checklist items:', err.message);
       res.status(500).json({ message: 'Failed to get checklist items', error: err.message });
@@ -2972,6 +2997,151 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error('[Admin] Backfill error:', e);
       res.status(500).json({ message: 'Backfill failed', error: e.message });
+    }
+  });
+
+  // ====== PRODUCT CATALOG ROUTES ======
+  
+  // Get all products with optional search and category filter
+  app.get('/api/products', isAuthenticated, async (req, res) => {
+    try {
+      const search = req.query.search as string | undefined;
+      const category = req.query.category as string | undefined;
+      const products = await storage.getProducts(search, category);
+      res.json(products);
+    } catch (e: any) {
+      console.error('[Products] Error fetching products:', e);
+      res.status(500).json({ message: 'Failed to fetch products', error: e.message });
+    }
+  });
+
+  // Get single product by ID
+  app.get('/api/products/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid product ID' });
+      }
+      const product = await storage.getProduct(id);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      res.json(product);
+    } catch (e: any) {
+      console.error('[Products] Error fetching product:', e);
+      res.status(500).json({ message: 'Failed to fetch product', error: e.message });
+    }
+  });
+
+  // Get product by code
+  app.get('/api/products/by-code/:code', isAuthenticated, async (req, res) => {
+    try {
+      const code = req.params.code;
+      const product = await storage.getProductByCode(code);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      res.json(product);
+    } catch (e: any) {
+      console.error('[Products] Error fetching product by code:', e);
+      res.status(500).json({ message: 'Failed to fetch product', error: e.message });
+    }
+  });
+
+  // Create new product
+  app.post('/api/products', isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertProductSchema.parse(req.body);
+      
+      // Check if product code already exists
+      const existing = await storage.getProductByCode(validatedData.code);
+      if (existing) {
+        return res.status(409).json({ message: 'Product with this code already exists' });
+      }
+      
+      const product = await storage.createProduct(validatedData);
+      console.log(`[Products] Created product: ${product.code}`);
+      res.status(201).json(product);
+    } catch (e: any) {
+      if (e.name === 'ZodError') {
+        return res.status(400).json({ message: 'Invalid product data', errors: e.errors });
+      }
+      console.error('[Products] Error creating product:', e);
+      res.status(500).json({ message: 'Failed to create product', error: e.message });
+    }
+  });
+
+  // Update product
+  app.patch('/api/products/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid product ID' });
+      }
+      
+      // Validate and sanitize update data
+      const { name, category, length, width, height, imagePath, notes } = req.body;
+      const updateData: Record<string, any> = {};
+      
+      if (name !== undefined) updateData.name = typeof name === 'string' ? name.trim() : null;
+      if (category !== undefined && ['HARDWARE', 'COMPONENT'].includes(category)) {
+        updateData.category = category;
+      }
+      if (length !== undefined) updateData.length = length ? parseFloat(length) : null;
+      if (width !== undefined) updateData.width = width ? parseFloat(width) : null;
+      if (height !== undefined) updateData.height = height ? parseFloat(height) : null;
+      if (imagePath !== undefined) updateData.imagePath = typeof imagePath === 'string' ? imagePath : null;
+      if (notes !== undefined) updateData.notes = typeof notes === 'string' ? notes.trim() : null;
+      
+      const product = await storage.updateProduct(id, updateData);
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      console.log(`[Products] Updated product: ${product.code}`);
+      res.json(product);
+    } catch (e: any) {
+      console.error('[Products] Error updating product:', e);
+      res.status(500).json({ message: 'Failed to update product', error: e.message });
+    }
+  });
+
+  // Delete product
+  app.delete('/api/products/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid product ID' });
+      }
+      
+      const deleted = await storage.deleteProduct(id);
+      if (!deleted) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      console.log(`[Products] Deleted product ID: ${id}`);
+      res.json({ message: 'Product deleted' });
+    } catch (e: any) {
+      console.error('[Products] Error deleting product:', e);
+      res.status(500).json({ message: 'Failed to delete product', error: e.message });
+    }
+  });
+
+  // Bulk lookup products by codes (for packaging checklist)
+  app.post('/api/products/bulk-lookup', isAuthenticated, async (req, res) => {
+    try {
+      const { codes } = req.body;
+      if (!Array.isArray(codes)) {
+        return res.status(400).json({ message: 'codes must be an array' });
+      }
+      const products = await storage.getProductsByCode(codes);
+      // Return as a map for easy lookup
+      const productMap: Record<string, typeof products[0]> = {};
+      for (const p of products) {
+        productMap[p.code] = p;
+      }
+      res.json(productMap);
+    } catch (e: any) {
+      console.error('[Products] Error bulk lookup:', e);
+      res.status(500).json({ message: 'Failed to lookup products', error: e.message });
     }
   });
 

@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -202,6 +202,12 @@ export default function Dashboard() {
                   </div>
                 </TooltipContent>
               </Tooltip>
+              <Link href="/products">
+                <Button size="lg" variant="outline" className="gap-2 rounded-xl h-12 px-5" data-testid="button-products">
+                  <Package className="w-5 h-5" />
+                  Products
+                </Button>
+              </Link>
               <Link href="/upload">
                 <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6" data-testid="button-upload-new">
                   <Plus className="w-5 h-5" />

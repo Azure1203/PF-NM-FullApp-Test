@@ -283,6 +283,30 @@ export const insertPackingSlipItemSchema = createInsertSchema(packingSlipItems).
 export type PackingSlipItem = typeof packingSlipItems.$inferSelect;
 export type InsertPackingSlipItem = z.infer<typeof insertPackingSlipItemSchema>;
 
+// Product catalog table - internal product database for packaging checklists
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // e.g. H.111.95.310, DBX24_14_167
+  name: text("name"), // Product name/description
+  category: text("category").notNull().default('HARDWARE'), // HARDWARE or COMPONENT
+  length: real("length"), // Dimension in mm (optional)
+  width: real("width"), // Dimension in mm (optional)
+  height: real("height"), // Dimension in mm (optional)
+  imagePath: text("image_path"), // Object storage path to product image
+  notes: text("notes"), // Additional notes
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true
+});
+
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+
 // Keep backward compatibility - alias Order to Project for now
 export const orders = projects;
 export type Order = Project;
