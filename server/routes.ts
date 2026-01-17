@@ -1804,7 +1804,7 @@ export async function registerRoutes(
           fileName = fileName.slice(0, -4);
         }
         const jobNumber = file.allmoxyJobNumber || 'N/A';
-        taskNotes += `${fileName} - Allmoxy Job #${jobNumber}\n`;
+        taskNotes += `${fileName} - ${jobNumber}\n`;
       }
 
       let newTaskGid: string;
