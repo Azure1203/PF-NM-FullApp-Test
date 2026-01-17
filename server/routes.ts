@@ -2042,68 +2042,46 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'Project not synced to Asana yet' });
       }
       
-      const { tasksApi, sectionsApi } = await getAsanaApiInstances();
+      const { tasksApi } = await getAsanaApiInstances();
       
-      // First, get the task's projects to find PERFECT FIT PRODUCTION
+      // Get the task with memberships to directly get section info (more efficient than iterating sections)
       const taskResponse = await tasksApi.getTask(project.asanaTaskId, { 
-        opt_fields: 'name,projects.name,projects.gid,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
+        opt_fields: 'name,projects.name,projects.gid,memberships.section.name,memberships.project.gid,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
       });
-      
-      console.log('[Asana] Task projects:', JSON.stringify(taskResponse.data.projects, null, 2));
       
       const customFields = taskResponse.data.custom_fields || [];
       const taskProjects = taskResponse.data.projects || [];
+      const memberships = taskResponse.data.memberships || [];
       
       let pfOrderStatus: string | null = null;
       let pfProductionStatus: string[] = [];
       let asanaSection: string | null = null;
       let cienappsJobNumber: string | null = null;
       
-      // Find the PERFECT FIT PRODUCTION project using the global constant
-      let perfectFitProject = taskProjects.find((p: any) => p.gid === ASANA_PERFECT_FIT_PROJECT_GID);
+      console.log('[Asana Sync] Task ID:', project.asanaTaskId);
+      console.log('[Asana Sync] Task projects:', taskProjects.map((p: any) => ({ gid: p.gid, name: p.name })));
+      console.log('[Asana Sync] Task memberships:', JSON.stringify(memberships, null, 2));
       
-      // If not found by GID, try name matching for "PERFECT FIT PRODUCTION"
-      if (!perfectFitProject) {
-        perfectFitProject = taskProjects.find((p: any) => 
+      // Find the section from memberships for PERFECT FIT PRODUCTION project
+      // First try matching by configured GID
+      let perfectFitMembership = memberships.find((m: any) => m.project?.gid === ASANA_PERFECT_FIT_PROJECT_GID);
+      
+      // If not found by GID, try name matching
+      if (!perfectFitMembership) {
+        const perfectFitProject = taskProjects.find((p: any) => 
           p.name?.toUpperCase().includes('PERFECT FIT PRODUCTION')
         );
+        if (perfectFitProject) {
+          perfectFitMembership = memberships.find((m: any) => m.project?.gid === perfectFitProject.gid);
+        }
       }
       
-      console.log('[Asana] Looking for project GID:', ASANA_PERFECT_FIT_PROJECT_GID);
-      console.log('[Asana] Task projects:', taskProjects.map((p: any) => ({ gid: p.gid, name: p.name })));
-      
-      if (perfectFitProject) {
-        try {
-          // Get sections for this project
-          const sectionsResponse = await sectionsApi.getSectionsForProject(perfectFitProject.gid, {});
-          const sections = sectionsResponse.data || [];
-          
-          console.log('[Asana] Project sections:', JSON.stringify(sections, null, 2));
-          
-          // Now get the task's section within this project by checking which section contains the task
-          // We need to check each section to find where this task is
-          for (const section of sections) {
-            try {
-              const sectionTasksResponse = await tasksApi.getTasksForSection(section.gid, {
-                opt_fields: 'gid',
-                limit: 100
-              });
-              const sectionTasks = sectionTasksResponse.data || [];
-              
-              if (sectionTasks.some((t: any) => t.gid === project.asanaTaskId)) {
-                asanaSection = section.name;
-                console.log('[Asana] Found task in section:', asanaSection);
-                break;
-              }
-            } catch (sectionErr) {
-              console.error('[Asana] Error checking section:', section.name, sectionErr);
-            }
-          }
-        } catch (sectionsErr) {
-          console.error('[Asana] Error fetching sections:', sectionsErr);
-        }
+      if (perfectFitMembership && perfectFitMembership.section) {
+        asanaSection = perfectFitMembership.section.name;
+        console.log('[Asana Sync] Found section from membership:', asanaSection);
       } else {
-        console.log('[Asana] No PERFECT FIT project found for task');
+        console.log('[Asana Sync] No section found. Looking for project GID:', ASANA_PERFECT_FIT_PROJECT_GID);
+        console.log('[Asana Sync] Available project GIDs:', taskProjects.map((p: any) => p.gid));
       }
       
       for (const field of customFields) {
@@ -2249,56 +2227,38 @@ export async function registerRoutes(
         return res.json({ message: 'No synced projects to update', updated: 0 });
       }
       
-      const { tasksApi, sectionsApi } = await getAsanaApiInstances();
+      const { tasksApi } = await getAsanaApiInstances();
       let updatedCount = 0;
       
       for (const proj of syncedProjects) {
         try {
+          // Use memberships to get section directly - much more efficient
           const taskResponse = await tasksApi.getTask(proj.asanaTaskId!, { 
-            opt_fields: 'projects.name,projects.gid,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
+            opt_fields: 'projects.name,projects.gid,memberships.section.name,memberships.project.gid,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name' 
           });
           
           const customFields = taskResponse.data.custom_fields || [];
           const taskProjects = taskResponse.data.projects || [];
+          const memberships = taskResponse.data.memberships || [];
           
           let pfOrderStatus: string | null = null;
           let pfProductionStatus: string[] = [];
           let asanaSection: string | null = null;
           
-          // Find the PERFECT FIT PRODUCTION project using the global constant
-          let perfectFitProject = taskProjects.find((p: any) => p.gid === ASANA_PERFECT_FIT_PROJECT_GID);
-          if (!perfectFitProject) {
-            perfectFitProject = taskProjects.find((p: any) => 
+          // Find the section from memberships for PERFECT FIT PRODUCTION project
+          let perfectFitMembership = memberships.find((m: any) => m.project?.gid === ASANA_PERFECT_FIT_PROJECT_GID);
+          
+          if (!perfectFitMembership) {
+            const perfectFitProject = taskProjects.find((p: any) => 
               p.name?.toUpperCase().includes('PERFECT FIT PRODUCTION')
             );
+            if (perfectFitProject) {
+              perfectFitMembership = memberships.find((m: any) => m.project?.gid === perfectFitProject.gid);
+            }
           }
           
-          if (perfectFitProject) {
-            try {
-              // Get sections for this project
-              const sectionsResponse = await sectionsApi.getSectionsForProject(perfectFitProject.gid, {});
-              const sections = sectionsResponse.data || [];
-              
-              // Check each section to find where this task is
-              for (const section of sections) {
-                try {
-                  const sectionTasksResponse = await tasksApi.getTasksForSection(section.gid, {
-                    opt_fields: 'gid',
-                    limit: 100
-                  });
-                  const sectionTasks = sectionTasksResponse.data || [];
-                  
-                  if (sectionTasks.some((t: any) => t.gid === proj.asanaTaskId)) {
-                    asanaSection = section.name;
-                    break;
-                  }
-                } catch (sectionErr) {
-                  // Skip this section on error
-                }
-              }
-            } catch (sectionsErr) {
-              console.error(`[Background Sync] Error fetching sections for project ${proj.id}:`, sectionsErr);
-            }
+          if (perfectFitMembership && perfectFitMembership.section) {
+            asanaSection = perfectFitMembership.section.name;
           }
           
           let cienappsJobNumber: string | null = null;
