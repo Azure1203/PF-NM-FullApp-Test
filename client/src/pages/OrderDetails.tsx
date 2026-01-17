@@ -1884,20 +1884,32 @@ export default function OrderDetails() {
                                             </Link>
                                           )}
                                           
-                                          {/* Packaging Link */}
-                                          <Link href={`/orders/${project.id}#packaging`}>
+                                          {/* Packaging Link - opens the Adobe Acrobat share link saved for this file */}
+                                          {file.packagingLink ? (
                                             <Button
                                               size="sm"
-                                              variant="outline"
+                                              variant="default"
                                               className="text-xs"
+                                              onClick={() => window.open(file.packagingLink!, '_blank')}
                                               data-testid={`button-packaging-${file.id}`}
                                             >
                                               <Package className="w-3 h-3 mr-1" />
                                               Packaging Link, Click Here.
                                             </Button>
-                                          </Link>
+                                          ) : (
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs"
+                                              disabled
+                                              data-testid={`button-packaging-${file.id}`}
+                                            >
+                                              <Package className="w-3 h-3 mr-1" />
+                                              No Packaging Link
+                                            </Button>
+                                          )}
                                           
-                                          {/* Packing Checklist Link */}
+                                          {/* Packing Checklist Link - disabled for now
                                           <Link href={`/files/${file.id}/checklist`}>
                                             <Button
                                               size="sm"
@@ -1909,6 +1921,7 @@ export default function OrderDetails() {
                                               Packing Checklist
                                             </Button>
                                           </Link>
+                                          */}
                                           
                                           {/* Buyout Hardware Status Buttons (Multi-select) */}
                                           {(() => {

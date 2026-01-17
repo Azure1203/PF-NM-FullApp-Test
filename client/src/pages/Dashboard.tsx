@@ -56,6 +56,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "in_production" | "pending" | "synced">("all");
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticSearch, setDiagnosticSearch] = useState("");
 
@@ -131,11 +132,26 @@ export default function Dashboard() {
   });
 
   const filteredProjects = projects?.filter(project => {
+    // Apply search filter
     const term = search.toLowerCase();
-    return (
+    const matchesSearch = (
       project.name?.toLowerCase().includes(term) ||
       project.dealer?.toLowerCase().includes(term)
     );
+    if (!matchesSearch) return false;
+    
+    // Apply status filter
+    switch (statusFilter) {
+      case "in_production":
+        return project.pfOrderStatus === 'ORDER CONFIRMED';
+      case "pending":
+        return project.status === 'pending';
+      case "synced":
+        return project.status === 'synced';
+      case "all":
+      default:
+        return true;
+    }
   }) || [];
 
   return (
@@ -238,6 +254,46 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Filter Buttons */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <Button
+            variant={statusFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("all")}
+            className="rounded-lg"
+            data-testid="filter-all"
+          >
+            All Orders ({projects?.length || 0})
+          </Button>
+          <Button
+            variant={statusFilter === "in_production" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("in_production")}
+            className="rounded-lg"
+            data-testid="filter-in-production"
+          >
+            In Production ({projects?.filter(p => p.pfOrderStatus === 'ORDER CONFIRMED').length || 0})
+          </Button>
+          <Button
+            variant={statusFilter === "pending" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("pending")}
+            className="rounded-lg"
+            data-testid="filter-pending"
+          >
+            Pending Sync ({projects?.filter(p => p.status === 'pending').length || 0})
+          </Button>
+          <Button
+            variant={statusFilter === "synced" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("synced")}
+            className="rounded-lg"
+            data-testid="filter-synced"
+          >
+            Synced to Asana ({projects?.filter(p => p.status === 'synced').length || 0})
+          </Button>
         </div>
 
         {/* Search Bar */}
