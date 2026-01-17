@@ -1,13 +1,9 @@
 import * as Asana from 'asana';
 
-let connectionSettings: any;
-
+// Always fetch a fresh token from Replit connector on each request
+// The connector handles OAuth token refresh automatically
 async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
-  }
-  
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
     : process.env.WEB_REPL_RENEWAL 
@@ -15,14 +11,17 @@ async function getAccessToken() {
     : null;
 
   if (!xReplitToken) {
-    // In development or if not connected, this might fail.
-    // We should handle this gracefully or expect it to be present.
-    // For now, let's log and throw.
-    console.error('X_REPLIT_TOKEN not found for repl/depl');
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+    console.error('[Asana] X_REPLIT_TOKEN not found for repl/depl');
+    throw new Error('Asana authentication not available - please reconnect Asana in the integrations panel');
+  }
+
+  if (!hostname) {
+    console.error('[Asana] REPLIT_CONNECTORS_HOSTNAME not set');
+    throw new Error('Asana connector not configured');
   }
 
   try {
+    console.log('[Asana] Fetching fresh access token from connector...');
     const response = await fetch(
       'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=asana',
       {
@@ -32,19 +31,33 @@ async function getAccessToken() {
         }
       }
     );
+    
+    if (!response.ok) {
+      console.error('[Asana] Connector response not OK:', response.status, response.statusText);
+      throw new Error(`Asana connector returned ${response.status}: ${response.statusText}`);
+    }
+    
     const data = await response.json();
-    connectionSettings = data.items?.[0];
-  } catch (e) {
-    console.error("Failed to fetch Asana connection settings:", e);
-    throw new Error('Failed to fetch Asana connection settings');
+    const connectionSettings = data.items?.[0];
+    
+    if (!connectionSettings) {
+      console.error('[Asana] No connection settings returned from connector');
+      throw new Error('Asana not connected - please connect Asana in the integrations panel');
+    }
+    
+    const accessToken = connectionSettings.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
+    
+    if (!accessToken) {
+      console.error('[Asana] No access token in connection settings');
+      throw new Error('Asana token not found - please reconnect Asana in the integrations panel');
+    }
+    
+    console.log('[Asana] Successfully obtained fresh access token');
+    return accessToken;
+  } catch (e: any) {
+    console.error("[Asana] Failed to fetch connection settings:", e.message);
+    throw new Error('Failed to connect to Asana: ' + e.message);
   }
-
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error('Asana not connected');
-  }
-  return accessToken;
 }
 
 // WARNING: Never cache these API instances.
