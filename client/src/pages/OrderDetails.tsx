@@ -1533,7 +1533,9 @@ export default function OrderDetails() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Archive className="w-5 h-5 text-primary" />
-                  Pallets ({pallets.length})
+                  {pallets.length === 1 && pallets[0].size === 'Courier Package' 
+                    ? 'Courier Package' 
+                    : `Pallets (${pallets.length})`}
                 </CardTitle>
                 <Button 
                   size="sm" 

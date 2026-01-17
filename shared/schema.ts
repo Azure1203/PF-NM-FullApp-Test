@@ -121,6 +121,7 @@ export const PALLET_SIZES = [
   '96" Long',
   '105" Long',
   '110" Long',
+  'Courier Package',
   'Custom'
 ] as const;
 
