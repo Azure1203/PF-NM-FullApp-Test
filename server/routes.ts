@@ -2205,6 +2205,39 @@ export async function registerRoutes(
     }
   });
 
+  // Update/Re-link Asana task ID for an order (protected)
+  app.patch('/api/orders/:id/asana-task', isAuthenticated, async (req, res) => {
+    try {
+      const project = await storage.getProject(Number(req.params.id));
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      
+      const { asanaTaskId } = req.body;
+      
+      if (asanaTaskId !== null && typeof asanaTaskId !== 'string') {
+        return res.status(400).json({ message: 'asanaTaskId must be a string or null' });
+      }
+      
+      // Validate non-empty string if provided
+      if (typeof asanaTaskId === 'string' && asanaTaskId.trim() === '') {
+        return res.status(400).json({ message: 'asanaTaskId cannot be empty' });
+      }
+      
+      // Update the project with the new Asana task ID
+      const updated = await storage.updateProject(project.id, { 
+        asanaTaskId: asanaTaskId || null,
+        status: asanaTaskId ? 'synced' : 'pending'
+      });
+      
+      console.log(`[Asana] Updated task ID for project ${project.id}: ${asanaTaskId}`);
+      res.json(updated);
+    } catch (err: any) {
+      console.error('[Asana] Error updating task ID:', err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // Background sync all synced projects from Asana (called by cron job)
   app.post('/api/sync-all-asana-status', async (req, res) => {
     try {

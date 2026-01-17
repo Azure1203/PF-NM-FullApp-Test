@@ -56,7 +56,10 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "in_production" | "pending" | "synced">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "in_production" | "pending" | "synced" | "shipped">("all");
+  
+  // Sections that count as "In Production"
+  const IN_PRODUCTION_SECTIONS = ["JOB CONFIRMED", "HARDWARE PACKED", "PALLET PACKED", "READY TO SUBMIT", "READY TO LOAD"];
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticSearch, setDiagnosticSearch] = useState("");
 
@@ -140,10 +143,12 @@ export default function Dashboard() {
     );
     if (!matchesSearch) return false;
     
-    // Apply status filter
+    // Apply status filter based on Asana section
     switch (statusFilter) {
       case "in_production":
-        return project.pfOrderStatus === 'ORDER CONFIRMED';
+        return project.asanaSection && IN_PRODUCTION_SECTIONS.includes(project.asanaSection.toUpperCase());
+      case "shipped":
+        return project.asanaSection?.toUpperCase() === 'SHIPPED';
       case "pending":
         return project.status === 'pending';
       case "synced":
@@ -235,10 +240,11 @@ export default function Dashboard() {
         />
 
         {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10">
           {[
             { label: "Total Projects", value: projects?.length || 0, color: "text-blue-600", bg: "bg-blue-50" },
-            { label: "Projects In Production", value: projects?.filter(p => p.pfOrderStatus === 'ORDER CONFIRMED').length || 0, color: "text-purple-600", bg: "bg-purple-50" },
+            { label: "In Production", value: projects?.filter(p => p.asanaSection && IN_PRODUCTION_SECTIONS.includes(p.asanaSection.toUpperCase())).length || 0, color: "text-purple-600", bg: "bg-purple-50" },
+            { label: "Shipped", value: projects?.filter(p => p.asanaSection?.toUpperCase() === 'SHIPPED').length || 0, color: "text-teal-600", bg: "bg-teal-50" },
             { label: "Pending Sync", value: projects?.filter(p => p.status === 'pending').length || 0, color: "text-amber-600", bg: "bg-amber-50" },
             { label: "Synced to Asana", value: projects?.filter(p => p.status === 'synced').length || 0, color: "text-green-600", bg: "bg-green-50" },
           ].map((stat, i) => (
@@ -274,7 +280,16 @@ export default function Dashboard() {
             className="rounded-lg"
             data-testid="filter-in-production"
           >
-            In Production ({projects?.filter(p => p.pfOrderStatus === 'ORDER CONFIRMED').length || 0})
+            In Production ({projects?.filter(p => p.asanaSection && IN_PRODUCTION_SECTIONS.includes(p.asanaSection.toUpperCase())).length || 0})
+          </Button>
+          <Button
+            variant={statusFilter === "shipped" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("shipped")}
+            className="rounded-lg"
+            data-testid="filter-shipped"
+          >
+            Shipped ({projects?.filter(p => p.asanaSection?.toUpperCase() === 'SHIPPED').length || 0})
           </Button>
           <Button
             variant={statusFilter === "pending" ? "default" : "outline"}

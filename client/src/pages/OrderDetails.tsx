@@ -101,6 +101,9 @@ export default function OrderDetails() {
   const [hardwareDialogOpen, setHardwareDialogOpen] = useState(false);
   const [hardwareDialogAssignment, setHardwareDialogAssignment] = useState<AssignmentInfo | null>(null);
   const [hardwarePackedByName, setHardwarePackedByName] = useState('');
+  
+  // Asana re-link state
+  const [relinkAsanaUrl, setRelinkAsanaUrl] = useState('');
 
   // Color mapping for PF PRODUCTION STATUS options
   const statusColorMap: Record<string, 'green' | 'red' | 'yellow'> = {
@@ -303,6 +306,32 @@ export default function OrderDetails() {
       toast({ title: "Failed to sync from Asana", description: error.message, variant: "destructive" });
     }
   });
+
+  // Mutation for re-linking Asana task
+  const { mutate: relinkAsanaTask, isPending: isRelinkingAsana } = useMutation({
+    mutationFn: async (asanaTaskId: string | null) => {
+      return apiRequest('PATCH', `/api/orders/${id}/asana-task`, { asanaTaskId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      setRelinkAsanaUrl('');
+      toast({ title: "Asana task link updated", description: "You can now sync status from Asana" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update Asana link", description: error.message, variant: "destructive" });
+    }
+  });
+
+  // Extract Asana task ID from URL
+  const extractAsanaTaskId = (url: string): string | null => {
+    // Matches patterns like /task/1234567890 at the end of Asana URLs
+    const match = url.match(/\/task\/(\d+)/);
+    if (match) return match[1];
+    // Also try matching just the last segment of numbers
+    const lastSegment = url.match(/\/(\d{10,})(?:\/|$)/);
+    if (lastSegment) return lastSegment[1];
+    return null;
+  };
 
   // Mutation for updating PF PRODUCTION STATUS with optimistic updates
   const { mutate: updateProductionStatus, isPending: isUpdatingProductionStatus } = useMutation({
@@ -857,6 +886,43 @@ export default function OrderDetails() {
             )}
           </div>
         </div>
+        
+        {/* Re-link Asana Task Section */}
+        {project.asanaTaskId && (
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
+            <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+              <strong>Wrong Asana link?</strong> Paste the correct Asana task URL below to re-link this order.
+            </p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Paste Asana task URL (e.g., https://app.asana.com/...)"
+                value={relinkAsanaUrl}
+                onChange={(e) => setRelinkAsanaUrl(e.target.value)}
+                className="flex-1"
+                data-testid="input-relink-asana"
+              />
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => {
+                  const taskId = extractAsanaTaskId(relinkAsanaUrl);
+                  if (taskId) {
+                    relinkAsanaTask(taskId);
+                  } else {
+                    toast({ title: "Invalid Asana URL", description: "Could not extract task ID from URL", variant: "destructive" });
+                  }
+                }}
+                disabled={isRelinkingAsana || !relinkAsanaUrl.trim()}
+                data-testid="button-relink-asana"
+              >
+                {isRelinkingAsana ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              </Button>
+            </div>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1" data-testid="text-current-asana-task">
+              Current task ID: {project.asanaTaskId}
+            </p>
+          </div>
+        )}
 
         <PageHeader 
           title={project.name} 
