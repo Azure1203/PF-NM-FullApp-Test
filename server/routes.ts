@@ -14,7 +14,7 @@ import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_inte
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { db } from "./db";
-import { packingSlipItems, insertProductSchema } from "@shared/schema";
+import { packingSlipItems, insertProductSchema, BuyoutHardwareOption } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -3758,14 +3758,26 @@ export async function registerRoutes(
     }
   });
 
-  // Helper function to recalculate and update BO status for a file
+  // Helper function to recalculate and update BO status for a file and its pallet assignments
   async function recalculateBoStatus(fileId: number) {
     const progress = await storage.getHardwareChecklistProgress(fileId);
-    let boStatus = 'NO BO HARDWARE';
+    let boStatus: 'NO BO HARDWARE' | 'WAITING FOR BO HARDWARE' | 'BO HARDWARE ARRIVED' = 'NO BO HARDWARE';
     if (progress.buyoutItems > 0) {
       boStatus = progress.buyoutArrived === progress.buyoutItems ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
     }
     await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
+    
+    // Also update all pallet file assignments for this file
+    const assignments = await storage.getAssignmentsForFile(fileId);
+    // Map BO status to BuyoutHardwareOption format
+    const buyoutOption: BuyoutHardwareOption = boStatus === 'NO BO HARDWARE' 
+      ? 'NO BUYOUT HARDWARE' 
+      : boStatus;
+    
+    for (const assignment of assignments) {
+      await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
+    }
+    
     return boStatus;
   }
 
