@@ -186,6 +186,59 @@ function extractCTSParts(records: string[][]): Array<{ partNumber: string; descr
   return ctsParts;
 }
 
+// Hardware prefixes that identify hardware items in order CSV
+const HARDWARE_PREFIXES = ['H.', 'M.', 'M-', 'R-', 'R.', 'S.'];
+
+// Extract hardware items from order CSV for building packing checklist
+function extractHardwareFromCSV(records: string[][]): Array<{
+  rowIndex: number;
+  code: string;
+  name: string;
+  quantity: number;
+}> {
+  const hardwareItems: Array<{
+    rowIndex: number;
+    code: string;
+    name: string;
+    quantity: number;
+  }> = [];
+  
+  // Find the data section (starts after "Manuf code" header row)
+  let dataStartIndex = -1;
+  for (let i = 0; i < records.length; i++) {
+    if (records[i][0]?.toLowerCase().includes('manuf')) {
+      dataStartIndex = i + 1;
+      break;
+    }
+  }
+  
+  if (dataStartIndex === -1) return hardwareItems;
+  
+  // Process each data row looking for hardware items
+  for (let i = dataStartIndex; i < records.length; i++) {
+    const row = records[i];
+    const sku = (row[0] || '').trim().toUpperCase();
+    const description = (row[1] || '').trim();
+    const quantity = parseInt(row[2] || '0') || 0;
+    
+    if (!sku || quantity <= 0) continue;
+    
+    // Check if this is a hardware item by prefix
+    const isHardware = HARDWARE_PREFIXES.some(prefix => sku.startsWith(prefix));
+    
+    if (isHardware) {
+      hardwareItems.push({
+        rowIndex: i + 1, // 1-indexed for display
+        code: (row[0] || '').trim(), // Keep original case
+        name: description,
+        quantity
+      });
+    }
+  }
+  
+  return hardwareItems;
+}
+
 // Count parts from actual CSV data rows
 function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[]; wallRailPieces: number } {
   let coreParts = 0;
@@ -4026,6 +4079,115 @@ export async function registerRoutes(
       });
     } catch (e: any) {
       console.error('[Hardware Checklist] Error generating:', e);
+      res.status(500).json({ message: 'Failed to generate hardware checklist', error: e.message });
+    }
+  });
+
+  // Generate hardware checklist from order file's stored CSV (rawContent)
+  app.post('/api/files/:fileId/generate-hardware-from-order', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.fileId);
+      if (isNaN(fileId)) {
+        return res.status(400).json({ message: 'Invalid file ID' });
+      }
+      
+      // Get the order file with its rawContent
+      const orderFile = await storage.getOrderFile(fileId);
+      if (!orderFile) {
+        return res.status(404).json({ message: 'Order file not found' });
+      }
+      
+      if (!orderFile.rawContent) {
+        return res.status(400).json({ message: 'No CSV content stored for this order file' });
+      }
+      
+      // Parse the stored CSV content
+      const records = await parseCSV(orderFile.rawContent);
+      
+      // Extract hardware items using the helper function
+      const hardwareItems = extractHardwareFromCSV(records);
+      
+      if (hardwareItems.length === 0) {
+        return res.status(400).json({ 
+          message: 'No hardware items found in order CSV',
+          totalRows: records.length,
+          hardwareItemsFound: 0
+        });
+      }
+      
+      console.log(`[Hardware Checklist] Found ${hardwareItems.length} hardware items in order file ${fileId}`);
+      
+      // Look up products to determine buyout status and get images
+      const productCodes = hardwareItems.map(item => item.code);
+      const products = await storage.getProductsByCode(productCodes);
+      const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
+      
+      // Build checklist items to insert
+      const itemsToInsert = hardwareItems.map((item, index) => {
+        const product = productMap.get(item.code.toUpperCase());
+        const isBuyout = product?.stockStatus === 'BUYOUT';
+        return {
+          fileId,
+          productId: product?.id || null,
+          productCode: item.code,
+          productName: item.name,
+          quantity: item.quantity,
+          isBuyout,
+          buyoutArrived: false,
+          isPacked: false,
+          packedBy: null,
+          sortOrder: index
+        };
+      });
+      
+      // Use transactional replacement - atomic delete + insert
+      let createdItems: any[];
+      try {
+        createdItems = await storage.replaceHardwareChecklist(fileId, itemsToInsert);
+      } catch (txError: any) {
+        console.error(`[Hardware Checklist] Transaction failed:`, txError);
+        return res.status(400).json({
+          message: 'Database error: failed to save checklist items. No changes were made.',
+          error: txError.message || 'Transaction failed'
+        });
+      }
+      
+      // Calculate BO status
+      const hasBuyout = createdItems.some(item => item.isBuyout);
+      let boStatus = 'NO BO HARDWARE';
+      if (hasBuyout) {
+        boStatus = 'WAITING FOR BO HARDWARE';
+      }
+      
+      // Update the file with the BO status
+      await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
+      
+      // Also update pallet file assignments
+      const buyoutOption: BuyoutHardwareOption = boStatus === 'NO BO HARDWARE' 
+        ? 'NO BUYOUT HARDWARE' 
+        : boStatus as BuyoutHardwareOption;
+      const assignments = await storage.getAssignmentsForFile(fileId);
+      for (const assignment of assignments) {
+        await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
+      }
+      
+      // Count matched vs unmatched products
+      const matchedProducts = createdItems.filter(item => item.productId !== null).length;
+      const unmatchedProducts = createdItems.filter(item => item.productId === null).length;
+      
+      console.log(`[Hardware Checklist] Generated ${createdItems.length} items from order CSV for file ${fileId}, BO status: ${boStatus}, matched: ${matchedProducts}, unmatched: ${unmatchedProducts}`);
+      
+      res.json({ 
+        success: true,
+        items: createdItems, 
+        boStatus,
+        totalItems: createdItems.length,
+        buyoutItems: createdItems.filter(i => i.isBuyout).length,
+        matchedProducts,
+        unmatchedProducts
+      });
+    } catch (e: any) {
+      console.error('[Hardware Checklist] Error generating from order:', e);
       res.status(500).json({ message: 'Failed to generate hardware checklist', error: e.message });
     }
   });
