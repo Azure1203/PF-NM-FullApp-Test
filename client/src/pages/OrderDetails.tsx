@@ -1933,7 +1933,7 @@ export default function OrderDetails() {
                                           </div>
                                         )}
                                         
-                                        {/* CTS Button, Packaging Link, and Buyout Status */}
+                                        {/* CTS Button, Hardware Checklist, Packaging Link, and Buyout Status */}
                                         <div className="flex flex-wrap items-center gap-2">
                                           {/* CTS Parts Button - turns green when all cut */}
                                           {actualFilePreview && (actualFilePreview as any).ctsPartsCount > 0 && (
@@ -1949,10 +1949,26 @@ export default function OrderDetails() {
                                                 data-testid={`button-cts-${file.id}`}
                                               >
                                                 <Scissors className="w-3 h-3 mr-1" />
-                                                CTS Parts To Cut, Click Here.
+                                                CTS Parts, Click Here.
                                               </Button>
                                             </Link>
                                           )}
+                                          
+                                          {/* Hardware Packing Checklist Button */}
+                                          <Link href={`/files/${file.id}/hardware-checklist?palletId=${pallet.id}`}>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-xs bg-purple-100 border-purple-500 text-purple-700 hover:bg-purple-200"
+                                              data-testid={`button-hardware-checklist-${file.id}`}
+                                            >
+                                              <CheckCircle className="w-3 h-3 mr-1" />
+                                              Packaging Checklist
+                                            </Button>
+                                          </Link>
+                                          
+                                          {/* Spacer to push Packaging Link to the right */}
+                                          <div className="flex-1" />
                                           
                                           {/* Packaging Link - opens the Adobe Acrobat share link saved for this file */}
                                           {file.packagingLink ? (
@@ -1978,21 +1994,10 @@ export default function OrderDetails() {
                                               No Packaging Link
                                             </Button>
                                           )}
-                                          
-                                          {/* Packing Checklist Link - disabled for now
-                                          <Link href={`/files/${file.id}/checklist`}>
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              className="text-xs"
-                                              data-testid={`button-checklist-${file.id}`}
-                                            >
-                                              <CheckCircle className="w-3 h-3 mr-1" />
-                                              Packing Checklist
-                                            </Button>
-                                          </Link>
-                                          */}
-                                          
+                                        </div>
+                                        
+                                        {/* Buyout Hardware Status Buttons Row */}
+                                        <div className="flex flex-wrap items-center gap-2">
                                           {/* Buyout Hardware Status Buttons (Multi-select) */}
                                           {(() => {
                                             const assignment = pallet.assignments?.find(a => a.fileId === file.id);

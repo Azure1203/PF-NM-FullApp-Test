@@ -11,6 +11,7 @@ import UploadOrder from "@/pages/UploadOrder";
 import OrderDetails from "@/pages/OrderDetails";
 import CutToSize from "@/pages/CutToSize";
 import PackingChecklist from "@/pages/PackingChecklist";
+import HardwareChecklist from "@/pages/HardwareChecklist";
 import Products from "@/pages/Products";
 import HardwareImport from "@/pages/HardwareImport";
 import NotFound from "@/pages/not-found";
@@ -40,6 +41,7 @@ function AppRouter() {
       <Route path="/orders/:id" component={OrderDetails} />
       <Route path="/files/:fileId/cts" component={CutToSize} />
       <Route path="/files/:fileId/checklist" component={PackingChecklist} />
+      <Route path="/files/:fileId/hardware-checklist" component={HardwareChecklist} />
       <Route component={NotFound} />
     </Switch>
   );
