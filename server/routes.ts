@@ -3148,13 +3148,20 @@ export async function registerRoutes(
       const fileContent = req.file.buffer.toString('utf-8');
       const records = await parseCSV(fileContent);
       
-      // Parse the CSV - columns: A=description, B=supplier, C=code
+      // Detect CSV format - check if column 3 has stock/buyout data
+      const hasStockColumn = records.some(row => {
+        const col3 = (row[3] || '').trim().toLowerCase();
+        return col3 === 'stock' || col3 === 'buyout' || col3 === 'stock / buyout';
+      });
+      
+      // Parse the CSV - columns: A=description, B=supplier, C=code, D=stock/buyout (optional)
       // Skip header rows and section headers (all-caps rows, empty codes)
       const parsedItems: Array<{
         rowNumber: number;
         code: string;
         name: string;
         supplier: string;
+        stockStatus: string | null; // null when not specified in CSV
       }> = [];
       
       let rowNumber = 0;
@@ -3163,24 +3170,36 @@ export async function registerRoutes(
         const description = row[0]?.trim() || '';
         const supplier = row[1]?.trim() || '';
         const code = row[2]?.trim() || '';
+        const stockCol = (row[3] || '').trim().toLowerCase();
         
         // Skip empty rows
         if (!description && !supplier && !code) continue;
         
-        // Skip section headers (all uppercase description with no code)
-        if (!code && description === description.toUpperCase() && description.length > 3) continue;
+        // Skip section headers (all uppercase description with no code and no supplier)
+        if (!code && !supplier && description === description.toUpperCase() && description.length > 3) continue;
         
         // Skip rows without a valid code
         if (!code || code.length < 3) continue;
         
         // Skip header-like rows
-        if (code.toLowerCase().includes('codes') || code.toLowerCase().includes('manu')) continue;
+        if (code.toLowerCase().includes('codes') || code.toLowerCase().includes('manu') || code.toLowerCase() === 'product code') continue;
+        
+        // Determine stock status - only set if CSV has stock column
+        let stockStatus: string | null = null;
+        if (hasStockColumn) {
+          if (stockCol === 'buyout') {
+            stockStatus = 'BUYOUT';
+          } else {
+            stockStatus = 'IN_STOCK'; // default when stock column exists
+          }
+        }
         
         parsedItems.push({
           rowNumber,
           code,
           name: description,
-          supplier
+          supplier,
+          stockStatus
         });
       }
       
@@ -3197,8 +3216,10 @@ export async function registerRoutes(
         code: string;
         name: string;
         supplier: string;
+        stockStatus: string | null;
         existingName: string | null;
         existingSupplier: string | null;
+        existingStockStatus: string | null;
         existingId: number;
       }> = [];
       
@@ -3210,12 +3231,15 @@ export async function registerRoutes(
           // Check if anything changed
           const nameChanged = (item.name || '') !== (existing.name || '');
           const supplierChanged = (item.supplier || '') !== (existing.supplier || '');
+          // Only check stock status change if CSV has stock column
+          const stockStatusChanged = hasStockColumn && item.stockStatus !== (existing.stockStatus || 'IN_STOCK');
           
-          if (nameChanged || supplierChanged) {
+          if (nameChanged || supplierChanged || stockStatusChanged) {
             changedItems.push({
               ...item,
               existingName: existing.name,
               existingSupplier: existing.supplier,
+              existingStockStatus: existing.stockStatus,
               existingId: existing.id
             });
           } else {
@@ -3228,7 +3252,8 @@ export async function registerRoutes(
         totalParsed: parsedItems.length,
         newItems,
         unchangedItems,
-        changedItems
+        changedItems,
+        hasStockColumn
       });
     } catch (e: any) {
       console.error('[Products Import] Error previewing CSV:', e);
@@ -3239,7 +3264,7 @@ export async function registerRoutes(
   // Import new products from CSV (with row numbers for image linking)
   app.post('/api/products/import', isAuthenticated, async (req, res) => {
     try {
-      const { items, stockStatus = 'IN_STOCK' } = req.body;
+      const { items, stockStatus: defaultStockStatus = 'IN_STOCK' } = req.body;
       
       if (!Array.isArray(items)) {
         return res.status(400).json({ message: 'items must be an array' });
@@ -3250,12 +3275,15 @@ export async function registerRoutes(
       
       for (const item of items) {
         try {
+          // Use item's stockStatus if provided, otherwise use the default
+          const itemStockStatus = item.stockStatus || defaultStockStatus;
+          
           const product = await storage.createProduct({
             code: item.code,
             name: item.name || null,
             supplier: item.supplier || null,
             category: 'HARDWARE',
-            stockStatus: stockStatus,
+            stockStatus: itemStockStatus,
             weight: null,
             imagePath: null,
             notes: null,
@@ -3289,11 +3317,18 @@ export async function registerRoutes(
       
       for (const item of items) {
         try {
-          const product = await storage.updateProduct(item.existingId, {
+          const updateData: Record<string, any> = {
             name: item.name || null,
             supplier: item.supplier || null,
             importRowNumber: item.rowNumber || null
-          });
+          };
+          
+          // Only update stockStatus if it was provided in the CSV
+          if (item.stockStatus) {
+            updateData.stockStatus = item.stockStatus;
+          }
+          
+          const product = await storage.updateProduct(item.existingId, updateData);
           if (product) {
             updated.push(product);
           }

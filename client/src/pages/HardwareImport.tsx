@@ -41,11 +41,13 @@ interface ParsedItem {
   code: string;
   name: string;
   supplier: string;
+  stockStatus: string | null;
 }
 
 interface ChangedItem extends ParsedItem {
   existingName: string | null;
   existingSupplier: string | null;
+  existingStockStatus: string | null;
   existingId: number;
 }
 
@@ -54,6 +56,7 @@ interface PreviewResult {
   newItems: ParsedItem[];
   unchangedItems: ParsedItem[];
   changedItems: ChangedItem[];
+  hasStockColumn: boolean;
 }
 
 export default function HardwareImport() {
@@ -317,7 +320,9 @@ export default function HardwareImport() {
               <CardHeader>
                 <CardTitle>Upload Hardware CSV</CardTitle>
                 <CardDescription>
-                  Upload your hardware master list CSV file. Columns: A = Description, B = Supplier, C = Product Code
+                  Upload your hardware master list CSV file. Supported formats:
+                  <br />• Simple: A = Description, B = Supplier, C = Product Code
+                  <br />• Extended: A = Description, B = Supplier, C = Code, D = Stock/Buyout
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -341,18 +346,26 @@ export default function HardwareImport() {
                 </div>
 
                 <div className="flex flex-wrap gap-4 items-center">
-                  <div className="flex items-center gap-2">
-                    <Label>Default Stock Status:</Label>
-                    <Select value={stockStatus} onValueChange={setStockStatus}>
-                      <SelectTrigger className="w-[150px]" data-testid="select-stock-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                        <SelectItem value="BUYOUT">Buyout</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Only show stock status selector when CSV doesn't have stock column */}
+                  {(!preview || !preview.hasStockColumn) && (
+                    <div className="flex items-center gap-2">
+                      <Label>Default Stock Status:</Label>
+                      <Select value={stockStatus} onValueChange={setStockStatus}>
+                        <SelectTrigger className="w-[150px]" data-testid="select-stock-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                          <SelectItem value="BUYOUT">Buyout</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {preview?.hasStockColumn && (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      Stock/Buyout detected from CSV
+                    </Badge>
+                  )}
 
                   <Button 
                     onClick={handlePreview} 
@@ -443,6 +456,7 @@ export default function HardwareImport() {
                               <TableHead>Code</TableHead>
                               <TableHead>Description</TableHead>
                               <TableHead>Supplier</TableHead>
+                              {preview.hasStockColumn && <TableHead>Stock Status</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -452,6 +466,13 @@ export default function HardwareImport() {
                                 <TableCell className="font-mono text-sm">{item.code}</TableCell>
                                 <TableCell className="text-sm truncate max-w-xs">{item.name}</TableCell>
                                 <TableCell className="text-sm">{item.supplier}</TableCell>
+                                {preview.hasStockColumn && (
+                                  <TableCell>
+                                    <Badge variant={item.stockStatus === 'BUYOUT' ? 'secondary' : 'outline'}>
+                                      {item.stockStatus === 'BUYOUT' ? 'Buyout' : 'Stock'}
+                                    </Badge>
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))}
                           </TableBody>
@@ -482,7 +503,7 @@ export default function HardwareImport() {
                         </div>
                       </div>
                       <CardDescription>
-                        Selected items will have their description and supplier updated
+                        Selected items will have their description{preview.hasStockColumn ? ', supplier, and stock status' : ' and supplier'} updated
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -495,6 +516,7 @@ export default function HardwareImport() {
                               <TableHead>Code</TableHead>
                               <TableHead>Current → New Description</TableHead>
                               <TableHead>Current → New Supplier</TableHead>
+                              {preview.hasStockColumn && <TableHead>Stock Status</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -535,6 +557,25 @@ export default function HardwareImport() {
                                     <span className="text-muted-foreground">{item.supplier}</span>
                                   )}
                                 </TableCell>
+                                {preview.hasStockColumn && (
+                                  <TableCell className="text-sm">
+                                    {item.existingStockStatus !== item.stockStatus ? (
+                                      <div className="space-y-1">
+                                        <span className="text-muted-foreground line-through text-xs">
+                                          {item.existingStockStatus === 'BUYOUT' ? 'Buyout' : 'Stock'}
+                                        </span>
+                                        <br />
+                                        <Badge variant={item.stockStatus === 'BUYOUT' ? 'secondary' : 'outline'}>
+                                          {item.stockStatus === 'BUYOUT' ? 'Buyout' : 'Stock'}
+                                        </Badge>
+                                      </div>
+                                    ) : (
+                                      <Badge variant={item.stockStatus === 'BUYOUT' ? 'secondary' : 'outline'}>
+                                        {item.stockStatus === 'BUYOUT' ? 'Buyout' : 'Stock'}
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))}
                           </TableBody>
