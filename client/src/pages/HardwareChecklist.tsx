@@ -359,6 +359,22 @@ export default function HardwareChecklist() {
         )}
 
         <div className="flex flex-col sm:flex-row gap-3 pt-8 border-t mt-8">
+          {items.length > 0 && (
+            <Button 
+              className={`w-full sm:w-auto ${
+                progress.packed === progress.total && progress.total > 0
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : ''
+              }`}
+              variant={progress.packed === progress.total && progress.total > 0 ? 'default' : 'outline'}
+              data-testid="button-complete-checklist"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              {progress.packed === progress.total && progress.total > 0 
+                ? 'All Items Packed!' 
+                : `${progress.packed}/${progress.total} Packed`}
+            </Button>
+          )}
           {fileInfo?.file?.projectId && (
             <Link href={`/orders/${fileInfo.file.projectId}${palletId ? `?scrollToPallet=${palletId}` : ''}`}>
               <Button variant="outline" className="w-full sm:w-auto" data-testid="button-bottom-back-order">
