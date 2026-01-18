@@ -11,8 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Plus, Search, Pencil, Trash2, Loader2, X, Package, 
-  Image as ImageIcon, Upload, ArrowLeft, Save 
+  Plus, Search, Pencil, Trash2, Loader2, Package, 
+  Upload, ArrowLeft, Save 
 } from "lucide-react";
 import {
   Dialog,
@@ -51,7 +51,6 @@ interface ProductFormData {
   stockStatus: string;
   weight: string;
   notes: string;
-  imagePath: string;
   importRowNumber: string;
 }
 
@@ -63,7 +62,6 @@ const emptyFormData: ProductFormData = {
   stockStatus: "IN_STOCK",
   weight: "",
   notes: "",
-  imagePath: "",
   importRowNumber: "",
 };
 
@@ -75,7 +73,6 @@ export default function Products() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState<ProductFormData>(emptyFormData);
-  const [isUploading, setIsUploading] = useState(false);
 
   const queryUrl = `/api/products?search=${encodeURIComponent(search)}${categoryFilter !== "all" ? `&category=${categoryFilter}` : ""}`;
   
@@ -148,7 +145,6 @@ export default function Products() {
       stockStatus: product.stockStatus || "IN_STOCK",
       weight: product.weight?.toString() || "",
       notes: product.notes || "",
-      imagePath: product.imagePath || "",
       importRowNumber: product.importRowNumber?.toString() || "",
     });
     setIsDialogOpen(true);
@@ -171,7 +167,6 @@ export default function Products() {
       stockStatus: formData.stockStatus as any,
       weight: formData.weight ? parseFloat(formData.weight) : null,
       notes: formData.notes.trim() || null,
-      imagePath: formData.imagePath || null,
       importRowNumber: formData.importRowNumber ? parseInt(formData.importRowNumber) : null,
     };
 
@@ -184,36 +179,6 @@ export default function Products() {
       updateProductMutation.mutate({ id: editingProduct.id, data: productData });
     } else {
       createProductMutation.mutate(productData);
-    }
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
-      formDataUpload.append('scope', 'public');
-
-      const response = await fetch('/api/object-storage/upload', {
-        method: 'POST',
-        body: formDataUpload,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to upload image');
-      }
-
-      const result = await response.json();
-      setFormData(prev => ({ ...prev, imagePath: result.url || result.path }));
-      toast({ title: "Image uploaded successfully" });
-    } catch (error: any) {
-      toast({ title: "Failed to upload image", description: error.message, variant: "destructive" });
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -279,53 +244,38 @@ export default function Products() {
             {products.map((product) => (
               <Card key={product.id} className="hover-elevate" data-testid={`card-product-${product.id}`}>
                 <CardContent className="p-4">
-                  <div className="flex gap-4">
-                    <div className="w-20 h-20 flex-shrink-0 bg-muted rounded-md flex items-center justify-center overflow-hidden">
-                      {product.imagePath ? (
-                        <img
-                          src={product.imagePath}
-                          alt={product.code}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-8 w-8 text-muted-foreground" />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-mono text-sm font-medium truncate" data-testid={`text-product-code-${product.id}`}>
+                        {product.code}
+                      </h3>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {product.name || "No description"}
+                      </p>
+                      {product.supplier && (
+                        <p className="text-xs text-muted-foreground">
+                          {product.supplier}
+                        </p>
                       )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="font-mono text-sm font-medium truncate" data-testid={`text-product-code-${product.id}`}>
-                            {product.code}
-                          </h3>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {product.name || "No description"}
-                          </p>
-                          {product.supplier && (
-                            <p className="text-xs text-muted-foreground">
-                              {product.supplier}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-1 items-end">
-                          <Badge variant={product.category === "HARDWARE" ? "secondary" : "outline"}>
-                            {product.category}
-                          </Badge>
-                          <Badge 
-                            variant="outline" 
-                            className={product.stockStatus === "BUYOUT" 
-                              ? "bg-amber-50 text-amber-700 border-amber-200 text-xs" 
-                              : "bg-green-50 text-green-700 border-green-200 text-xs"
-                            }
-                          >
-                            {product.stockStatus === "BUYOUT" ? "Buyout" : "In Stock"}
-                          </Badge>
-                        </div>
-                      </div>
                       {product.weight && (
                         <p className="text-xs text-muted-foreground mt-1">
                           {product.weight} g
                         </p>
                       )}
+                    </div>
+                    <div className="flex flex-col gap-1 items-end flex-shrink-0">
+                      <Badge variant={product.category === "HARDWARE" ? "secondary" : "outline"}>
+                        {product.category}
+                      </Badge>
+                      <Badge 
+                        variant="outline" 
+                        className={product.stockStatus === "BUYOUT" 
+                          ? "bg-amber-50 text-amber-700 border-amber-200 text-xs" 
+                          : "bg-green-50 text-green-700 border-green-200 text-xs"
+                        }
+                      >
+                        {product.stockStatus === "BUYOUT" ? "Buyout" : "In Stock"}
+                      </Badge>
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 mt-4 pt-3 border-t">
@@ -495,44 +445,6 @@ export default function Products() {
                     value={formData.importRowNumber}
                     onChange={(e) => setFormData(prev => ({ ...prev, importRowNumber: e.target.value }))}
                   />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Product Image</Label>
-                <div className="flex gap-3 items-center">
-                  <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {formData.imagePath ? (
-                      <img src={formData.imagePath} alt="Product" className="w-full h-full object-cover" />
-                    ) : (
-                      <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      disabled={isUploading}
-                      data-testid="input-product-image"
-                    />
-                    {isUploading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Uploading...
-                      </div>
-                    )}
-                  </div>
-                  {formData.imagePath && (
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setFormData(prev => ({ ...prev, imagePath: "" }))}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
               </div>
 

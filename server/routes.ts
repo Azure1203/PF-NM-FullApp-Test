@@ -3203,14 +3203,25 @@ export async function registerRoutes(
         });
       }
       
+      // Deduplicate items within the CSV - keep only first occurrence of each code
+      const seenCodes = new Set<string>();
+      const deduplicatedItems = parsedItems.filter(item => {
+        const upperCode = item.code.toUpperCase();
+        if (seenCodes.has(upperCode)) {
+          return false; // Skip duplicate
+        }
+        seenCodes.add(upperCode);
+        return true;
+      });
+      
       // Look up existing products by code
-      const codes = parsedItems.map(item => item.code);
+      const codes = deduplicatedItems.map(item => item.code);
       const existingProducts = await storage.getProductsByCode(codes);
       const existingMap = new Map(existingProducts.map(p => [p.code, p]));
       
       // Categorize items
-      const newItems: typeof parsedItems = [];
-      const unchangedItems: typeof parsedItems = [];
+      const newItems: typeof deduplicatedItems = [];
+      const unchangedItems: typeof deduplicatedItems = [];
       const changedItems: Array<{
         rowNumber: number;
         code: string;
@@ -3223,7 +3234,7 @@ export async function registerRoutes(
         existingId: number;
       }> = [];
       
-      for (const item of parsedItems) {
+      for (const item of deduplicatedItems) {
         const existing = existingMap.get(item.code);
         if (!existing) {
           newItems.push(item);
@@ -3248,8 +3259,11 @@ export async function registerRoutes(
         }
       }
       
+      const duplicatesSkipped = parsedItems.length - deduplicatedItems.length;
       res.json({
         totalParsed: parsedItems.length,
+        uniqueItems: deduplicatedItems.length,
+        duplicatesSkipped,
         newItems,
         unchangedItems,
         changedItems,
@@ -3270,10 +3284,21 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'items must be an array' });
       }
       
+      // Deduplicate items by code (case-insensitive) - keep first occurrence
+      const seenCodes = new Set<string>();
+      const deduplicatedItems = items.filter((item: any) => {
+        const upperCode = (item.code || '').toUpperCase();
+        if (!upperCode || seenCodes.has(upperCode)) {
+          return false;
+        }
+        seenCodes.add(upperCode);
+        return true;
+      });
+      
       const created: any[] = [];
       const errors: any[] = [];
       
-      for (const item of items) {
+      for (const item of deduplicatedItems) {
         try {
           // Use item's stockStatus if provided, otherwise use the default
           const itemStockStatus = item.stockStatus || defaultStockStatus;

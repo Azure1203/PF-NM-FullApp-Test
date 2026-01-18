@@ -53,6 +53,8 @@ interface ChangedItem extends ParsedItem {
 
 interface PreviewResult {
   totalParsed: number;
+  uniqueItems: number;
+  duplicatesSkipped: number;
   newItems: ParsedItem[];
   unchangedItems: ParsedItem[];
   changedItems: ChangedItem[];
@@ -110,7 +112,8 @@ export default function HardwareImport() {
       setPreview(data);
       // Select all changes by default
       setSelectedChanges(new Set(data.changedItems.map(item => item.existingId)));
-      toast({ title: `Parsed ${data.totalParsed} items from CSV` });
+      const dupMsg = data.duplicatesSkipped > 0 ? ` (${data.duplicatesSkipped} duplicates skipped)` : '';
+      toast({ title: `Parsed ${data.uniqueItems} unique items from CSV${dupMsg}` });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to parse CSV", description: error.message, variant: "destructive" });
