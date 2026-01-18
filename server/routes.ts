@@ -3118,6 +3118,131 @@ export async function registerRoutes(
     }
   });
 
+  // Fetch Marathon product images from their website
+  app.post('/api/products/fetch-marathon-images', isAuthenticated, async (req, res) => {
+    try {
+      const { limit = 20 } = req.body; // Process max 20 products per run by default
+      
+      // Get all Marathon products without images
+      const allProducts = await storage.getProducts();
+      const marathonProducts = allProducts
+        .filter(p => p.supplier?.toLowerCase() === 'marathon' && !p.imagePath)
+        .slice(0, limit); // Limit per run to avoid blocking
+      
+      if (marathonProducts.length === 0) {
+        return res.json({ message: 'No Marathon products without images found', updated: 0, errors: [], remaining: 0 });
+      }
+      
+      const totalRemaining = allProducts.filter(p => 
+        p.supplier?.toLowerCase() === 'marathon' && !p.imagePath
+      ).length;
+      
+      console.log(`[Marathon Images] Processing ${marathonProducts.length} of ${totalRemaining} products...`);
+      
+      const updated: string[] = [];
+      const errors: Array<{ code: string; error: string }> = [];
+      let consecutiveErrors = 0;
+      
+      for (const product of marathonProducts) {
+        // Stop if too many consecutive errors (possible rate limiting)
+        if (consecutiveErrors >= 3) {
+          errors.push({ code: product.code, error: 'Stopped: too many consecutive errors (possible rate limit)' });
+          break;
+        }
+        
+        try {
+          // Strip "M-" or "M" prefix from code
+          let marathonCode = product.code;
+          if (marathonCode.startsWith('M-')) {
+            marathonCode = marathonCode.substring(2);
+          } else if (marathonCode.startsWith('M')) {
+            marathonCode = marathonCode.substring(1);
+          }
+          
+          // Fetch the Marathon product page
+          const searchUrl = `https://marathonhardware.com/search?q=${encodeURIComponent(marathonCode)}`;
+          console.log(`[Marathon Images] Fetching: ${searchUrl}`);
+          
+          const response = await fetch(searchUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
+          
+          if (!response.ok) {
+            consecutiveErrors++;
+            errors.push({ code: product.code, error: `HTTP ${response.status}` });
+            // Longer delay on errors
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          
+          const html = await response.text();
+          
+          // Verify this is a product page by checking for the part number
+          const partNumberMatch = html.match(/PART\s*#:\s*([A-Za-z0-9\-]+)/i);
+          if (partNumberMatch) {
+            const pagePartNumber = partNumberMatch[1].toLowerCase().replace(/\s/g, '');
+            const expectedCode = marathonCode.toLowerCase().replace(/\s/g, '');
+            
+            // Verify the page is for the correct product
+            if (!pagePartNumber.includes(expectedCode) && !expectedCode.includes(pagePartNumber)) {
+              errors.push({ code: product.code, error: `Page part# ${partNumberMatch[1]} doesn't match ${marathonCode}` });
+              consecutiveErrors = 0; // This is a valid response, just wrong product
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+          }
+          
+          // Look for product image URL pattern in the HTML
+          const imageMatch = html.match(/https:\/\/marathonhardware[^"']+image-thumb__\d+__productPageSlider[^"'\s]+\.webp/);
+          
+          if (!imageMatch) {
+            // Try alternative pattern for grid images
+            const altMatch = html.match(/https:\/\/marathonhardware[^"']+image-thumb__\d+__itemsGrid[^"'\s]+\.webp/);
+            if (!altMatch) {
+              errors.push({ code: product.code, error: 'No image found on page' });
+              consecutiveErrors = 0;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            const imageUrl = altMatch[0];
+            await storage.updateProduct(product.id, { imagePath: imageUrl });
+            updated.push(product.code);
+            console.log(`[Marathon Images] Updated ${product.code} with image (grid)`);
+          } else {
+            const imageUrl = imageMatch[0];
+            await storage.updateProduct(product.id, { imagePath: imageUrl });
+            updated.push(product.code);
+            console.log(`[Marathon Images] Updated ${product.code} with image`);
+          }
+          
+          consecutiveErrors = 0;
+          // Delay between successful requests (1 second)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+        } catch (e: any) {
+          consecutiveErrors++;
+          errors.push({ code: product.code, error: e.message });
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      const remaining = totalRemaining - updated.length;
+      console.log(`[Marathon Images] Completed: ${updated.length} updated, ${errors.length} errors, ${remaining} remaining`);
+      res.json({ 
+        message: `Updated ${updated.length} products with images`,
+        updated: updated.length,
+        updatedCodes: updated,
+        errors,
+        remaining
+      });
+    } catch (e: any) {
+      console.error('[Marathon Images] Error:', e);
+      res.status(500).json({ message: 'Failed to fetch Marathon images', error: e.message });
+    }
+  });
+
   // Bulk lookup products by codes (for packaging checklist)
   app.post('/api/products/bulk-lookup', isAuthenticated, async (req, res) => {
     try {

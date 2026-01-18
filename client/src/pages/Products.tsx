@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Plus, Search, Pencil, Trash2, Loader2, Package, 
-  Upload, ArrowLeft, Save 
+  Upload, ArrowLeft, Save, ImageDown 
 } from "lucide-react";
 import {
   Dialog,
@@ -129,6 +129,25 @@ export default function Products() {
     },
   });
 
+  const fetchMarathonImagesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/products/fetch-marathon-images');
+      return response.json();
+    },
+    onSuccess: (data: { updated: number; errors: Array<{ code: string; error: string }>; remaining?: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      if (data.updated > 0) {
+        const remainingMsg = data.remaining && data.remaining > 0 ? ` (${data.remaining} remaining - click again to continue)` : '';
+        toast({ title: `Fetched images for ${data.updated} Marathon products${remainingMsg}` });
+      } else {
+        toast({ title: "No new images found", description: data.errors.length > 0 ? `${data.errors.length} errors occurred` : "All products already have images" });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to fetch Marathon images", description: error.message, variant: "destructive" });
+    },
+  });
+
   const openCreateDialog = () => {
     setEditingProduct(null);
     setFormData(emptyFormData);
@@ -227,6 +246,19 @@ export default function Products() {
               Import CSV
             </Button>
           </Link>
+          <Button 
+            variant="outline" 
+            onClick={() => fetchMarathonImagesMutation.mutate()}
+            disabled={fetchMarathonImagesMutation.isPending}
+            data-testid="button-fetch-marathon-images"
+          >
+            {fetchMarathonImagesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <ImageDown className="h-4 w-4 mr-2" />
+            )}
+            Fetch Marathon Images
+          </Button>
           <Button onClick={openCreateDialog} data-testid="button-add-product">
             <Plus className="h-4 w-4 mr-2" />
             Add Product
