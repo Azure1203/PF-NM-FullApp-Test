@@ -3243,6 +3243,231 @@ export async function registerRoutes(
     }
   });
 
+  // Fetch Hafele product images from their website
+  app.post('/api/products/fetch-hafele-images', isAuthenticated, async (req, res) => {
+    try {
+      const { limit = 20 } = req.body;
+      
+      const allProducts = await storage.getProducts();
+      const hafeleProducts = allProducts
+        .filter(p => p.supplier?.toLowerCase() === 'hafele' && !p.imagePath)
+        .slice(0, limit);
+      
+      if (hafeleProducts.length === 0) {
+        return res.json({ message: 'No Hafele products without images found', updated: 0, errors: [], remaining: 0 });
+      }
+      
+      const totalRemaining = allProducts.filter(p => 
+        p.supplier?.toLowerCase() === 'hafele' && !p.imagePath
+      ).length;
+      
+      console.log(`[Hafele Images] Processing ${hafeleProducts.length} of ${totalRemaining} products...`);
+      
+      const updated: string[] = [];
+      const errors: Array<{ code: string; error: string }> = [];
+      let consecutiveErrors = 0;
+      
+      for (const product of hafeleProducts) {
+        if (consecutiveErrors >= 3) {
+          errors.push({ code: product.code, error: 'Stopped: too many consecutive errors (possible rate limit)' });
+          break;
+        }
+        
+        try {
+          // Strip "H-" prefix from code
+          let hafeleCode = product.code;
+          if (hafeleCode.startsWith('H-')) {
+            hafeleCode = hafeleCode.substring(2);
+          } else if (hafeleCode.startsWith('H')) {
+            hafeleCode = hafeleCode.substring(1);
+          }
+          
+          // Fetch the Hafele search page
+          const searchUrl = `https://www.hafele.ca/en/search/?text=${encodeURIComponent(hafeleCode)}`;
+          console.log(`[Hafele Images] Fetching: ${searchUrl}`);
+          
+          const response = await fetch(searchUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.5'
+            }
+          });
+          
+          if (!response.ok) {
+            consecutiveErrors++;
+            errors.push({ code: product.code, error: `HTTP ${response.status}` });
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          
+          const html = await response.text();
+          
+          // Look for product image URL pattern - Hafele uses medias with article numbers
+          // Pattern: /medias/XXXXXXXX-XXXXX-X-XXX.jpg or similar
+          const imageMatch = html.match(/https:\/\/www\.hafele\.ca\/MEDIAS\/[^"'\s]+\.(jpg|jpeg|png|webp)/i) ||
+                            html.match(/src="(\/MEDIAS\/[^"]+\.(jpg|jpeg|png|webp))"/i);
+          
+          if (!imageMatch) {
+            // Try alternate pattern for product images
+            const altMatch = html.match(/"(https:\/\/[^"]+hafele[^"]+\.(jpg|jpeg|png|webp))"/i);
+            if (!altMatch) {
+              errors.push({ code: product.code, error: 'No image found on page' });
+              consecutiveErrors = 0;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            const imageUrl = altMatch[1];
+            await storage.updateProduct(product.id, { imagePath: imageUrl });
+            updated.push(product.code);
+            console.log(`[Hafele Images] Updated ${product.code} with image (alt)`);
+          } else {
+            let imageUrl = imageMatch[1] || imageMatch[0];
+            if (imageUrl.startsWith('/')) {
+              imageUrl = `https://www.hafele.ca${imageUrl}`;
+            }
+            await storage.updateProduct(product.id, { imagePath: imageUrl });
+            updated.push(product.code);
+            console.log(`[Hafele Images] Updated ${product.code} with image`);
+          }
+          
+          consecutiveErrors = 0;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+        } catch (e: any) {
+          consecutiveErrors++;
+          errors.push({ code: product.code, error: e.message });
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      const remaining = totalRemaining - updated.length;
+      console.log(`[Hafele Images] Completed: ${updated.length} updated, ${errors.length} errors, ${remaining} remaining`);
+      res.json({ 
+        message: `Updated ${updated.length} products with images`,
+        updated: updated.length,
+        updatedCodes: updated,
+        errors,
+        remaining
+      });
+    } catch (e: any) {
+      console.error('[Hafele Images] Error:', e);
+      res.status(500).json({ message: 'Failed to fetch Hafele images', error: e.message });
+    }
+  });
+
+  // Fetch Richelieu product images from their website
+  app.post('/api/products/fetch-richelieu-images', isAuthenticated, async (req, res) => {
+    try {
+      const { limit = 20 } = req.body;
+      
+      const allProducts = await storage.getProducts();
+      const richelieuProducts = allProducts
+        .filter(p => p.supplier?.toLowerCase() === 'richelieu' && !p.imagePath)
+        .slice(0, limit);
+      
+      if (richelieuProducts.length === 0) {
+        return res.json({ message: 'No Richelieu products without images found', updated: 0, errors: [], remaining: 0 });
+      }
+      
+      const totalRemaining = allProducts.filter(p => 
+        p.supplier?.toLowerCase() === 'richelieu' && !p.imagePath
+      ).length;
+      
+      console.log(`[Richelieu Images] Processing ${richelieuProducts.length} of ${totalRemaining} products...`);
+      
+      const updated: string[] = [];
+      const errors: Array<{ code: string; error: string }> = [];
+      let consecutiveErrors = 0;
+      
+      for (const product of richelieuProducts) {
+        if (consecutiveErrors >= 3) {
+          errors.push({ code: product.code, error: 'Stopped: too many consecutive errors (possible rate limit)' });
+          break;
+        }
+        
+        try {
+          // Strip "R-" prefix from code
+          let richelieuCode = product.code;
+          if (richelieuCode.startsWith('R-')) {
+            richelieuCode = richelieuCode.substring(2);
+          } else if (richelieuCode.startsWith('R')) {
+            richelieuCode = richelieuCode.substring(1);
+          }
+          
+          // Fetch the Richelieu search page
+          const searchUrl = `https://www.richelieu.com/ca/en/search?q=${encodeURIComponent(richelieuCode)}`;
+          console.log(`[Richelieu Images] Fetching: ${searchUrl}`);
+          
+          const response = await fetch(searchUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.5'
+            }
+          });
+          
+          if (!response.ok) {
+            consecutiveErrors++;
+            errors.push({ code: product.code, error: `HTTP ${response.status}` });
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          
+          const html = await response.text();
+          
+          // Look for product image URL pattern - Richelieu uses /images/ paths
+          const imageMatch = html.match(/https:\/\/[^"'\s]*richelieu[^"'\s]*\/images\/[^"'\s]+\.(jpg|jpeg|png|webp)/i) ||
+                            html.match(/src="(\/images\/[^"]+\.(jpg|jpeg|png|webp))"/i);
+          
+          if (!imageMatch) {
+            // Try alternate pattern for product images
+            const altMatch = html.match(/"(https:\/\/[^"]+\.(jpg|jpeg|png|webp))"/i);
+            if (!altMatch) {
+              errors.push({ code: product.code, error: 'No image found on page' });
+              consecutiveErrors = 0;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
+            }
+            const imageUrl = altMatch[1];
+            await storage.updateProduct(product.id, { imagePath: imageUrl });
+            updated.push(product.code);
+            console.log(`[Richelieu Images] Updated ${product.code} with image (alt)`);
+          } else {
+            let imageUrl = imageMatch[1] || imageMatch[0];
+            if (imageUrl.startsWith('/')) {
+              imageUrl = `https://www.richelieu.com${imageUrl}`;
+            }
+            await storage.updateProduct(product.id, { imagePath: imageUrl });
+            updated.push(product.code);
+            console.log(`[Richelieu Images] Updated ${product.code} with image`);
+          }
+          
+          consecutiveErrors = 0;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+        } catch (e: any) {
+          consecutiveErrors++;
+          errors.push({ code: product.code, error: e.message });
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      const remaining = totalRemaining - updated.length;
+      console.log(`[Richelieu Images] Completed: ${updated.length} updated, ${errors.length} errors, ${remaining} remaining`);
+      res.json({ 
+        message: `Updated ${updated.length} products with images`,
+        updated: updated.length,
+        updatedCodes: updated,
+        errors,
+        remaining
+      });
+    } catch (e: any) {
+      console.error('[Richelieu Images] Error:', e);
+      res.status(500).json({ message: 'Failed to fetch Richelieu images', error: e.message });
+    }
+  });
+
   // Bulk lookup products by codes (for packaging checklist)
   app.post('/api/products/bulk-lookup', isAuthenticated, async (req, res) => {
     try {

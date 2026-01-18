@@ -150,6 +150,44 @@ export default function Products() {
     },
   });
 
+  const fetchHafeleImagesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/products/fetch-hafele-images');
+      return response.json();
+    },
+    onSuccess: (data: { updated: number; errors: Array<{ code: string; error: string }>; remaining?: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      if (data.updated > 0) {
+        const remainingMsg = data.remaining && data.remaining > 0 ? ` (${data.remaining} remaining - click again to continue)` : '';
+        toast({ title: `Fetched images for ${data.updated} Hafele products${remainingMsg}` });
+      } else {
+        toast({ title: "No new Hafele images found", description: data.errors.length > 0 ? `${data.errors.length} errors occurred` : "All products already have images" });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to fetch Hafele images", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const fetchRichelieuImagesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/products/fetch-richelieu-images');
+      return response.json();
+    },
+    onSuccess: (data: { updated: number; errors: Array<{ code: string; error: string }>; remaining?: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      if (data.updated > 0) {
+        const remainingMsg = data.remaining && data.remaining > 0 ? ` (${data.remaining} remaining - click again to continue)` : '';
+        toast({ title: `Fetched images for ${data.updated} Richelieu products${remainingMsg}` });
+      } else {
+        toast({ title: "No new Richelieu images found", description: data.errors.length > 0 ? `${data.errors.length} errors occurred` : "All products already have images" });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to fetch Richelieu images", description: error.message, variant: "destructive" });
+    },
+  });
+
   const openCreateDialog = () => {
     setEditingProduct(null);
     setFormData(emptyFormData);
@@ -250,8 +288,17 @@ export default function Products() {
               Import CSV
             </Button>
           </Link>
+          <Button onClick={openCreateDialog} data-testid="button-add-product">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Product
+          </Button>
+        </div>
+        
+        <div className="flex flex-wrap gap-2 mb-6">
+          <span className="text-sm text-muted-foreground self-center mr-2">Fetch Images:</span>
           <Button 
             variant="outline" 
+            size="sm"
             onClick={() => fetchMarathonImagesMutation.mutate()}
             disabled={fetchMarathonImagesMutation.isPending}
             data-testid="button-fetch-marathon-images"
@@ -261,11 +308,35 @@ export default function Products() {
             ) : (
               <ImageDown className="h-4 w-4 mr-2" />
             )}
-            Fetch Marathon Images
+            Marathon
           </Button>
-          <Button onClick={openCreateDialog} data-testid="button-add-product">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => fetchHafeleImagesMutation.mutate()}
+            disabled={fetchHafeleImagesMutation.isPending}
+            data-testid="button-fetch-hafele-images"
+          >
+            {fetchHafeleImagesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <ImageDown className="h-4 w-4 mr-2" />
+            )}
+            Hafele
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => fetchRichelieuImagesMutation.mutate()}
+            disabled={fetchRichelieuImagesMutation.isPending}
+            data-testid="button-fetch-richelieu-images"
+          >
+            {fetchRichelieuImagesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <ImageDown className="h-4 w-4 mr-2" />
+            )}
+            Richelieu
           </Button>
         </div>
 
