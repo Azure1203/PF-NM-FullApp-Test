@@ -52,6 +52,7 @@ interface ProductFormData {
   weight: string;
   notes: string;
   importRowNumber: string;
+  imagePath: string;
 }
 
 const emptyFormData: ProductFormData = {
@@ -63,6 +64,7 @@ const emptyFormData: ProductFormData = {
   weight: "",
   notes: "",
   importRowNumber: "",
+  imagePath: "",
 };
 
 export default function Products() {
@@ -165,6 +167,7 @@ export default function Products() {
       weight: product.weight?.toString() || "",
       notes: product.notes || "",
       importRowNumber: product.importRowNumber?.toString() || "",
+      imagePath: product.imagePath || "",
     });
     setIsDialogOpen(true);
   };
@@ -187,6 +190,7 @@ export default function Products() {
       weight: formData.weight ? parseFloat(formData.weight) : null,
       notes: formData.notes.trim() || null,
       importRowNumber: formData.importRowNumber ? parseInt(formData.importRowNumber) : null,
+      imagePath: formData.imagePath.trim() || null,
     };
 
     if (!productData.code) {
@@ -478,6 +482,27 @@ export default function Products() {
                     onChange={(e) => setFormData(prev => ({ ...prev, importRowNumber: e.target.value }))}
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="imagePath">Image URL</Label>
+                <Input
+                  id="imagePath"
+                  data-testid="input-product-image-path"
+                  placeholder="https://example.com/image.jpg"
+                  value={formData.imagePath}
+                  onChange={(e) => setFormData(prev => ({ ...prev, imagePath: e.target.value }))}
+                />
+                {formData.imagePath && (
+                  <div className="mt-2">
+                    <img 
+                      src={formData.imagePath} 
+                      alt="Product preview" 
+                      className="max-h-24 rounded border"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-2">
