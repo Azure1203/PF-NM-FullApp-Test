@@ -80,3 +80,21 @@ Preferred communication style: Simple, everyday language.
   - Order cards more compact on mobile with truncated text
   - PageHeader component responsive with smaller text on mobile
 - Products form now uses Weight (grams) instead of Length/Width/Height dimensions
+
+### Hardware Product Management & Packaging Checklist System
+- **Products Schema Extended**: Added stockStatus (IN_STOCK/BUYOUT), supplier, and importRowNumber fields
+- **Hardware CSV Import**: New /hardware-import page to bulk import products from CSV with preview
+  - Shows new/unchanged/changed items before committing changes
+  - Supports batch image linking by row numbers (e.g., "7,8,9" or "32-35")
+- **Hardware Packing Checklist**: New table (hardware_checklist_items) to track order hardware
+  - Links items to product database by code
+  - Tracks quantities, buyout status, buyout arrival, and packing status
+  - Auto-calculates BO status: NO BO HARDWARE / WAITING FOR BO HARDWARE / BO HARDWARE ARRIVED
+- **Order Details Integration**: 
+  - HardwareCsvUploadSection: Upload hardware CSV to generate packing checklist
+  - HardwarePackingChecklist: Shows items with product images, quantities, packed checkboxes, buyout arrival toggles
+- **API Endpoints**:
+  - POST /api/files/:fileId/generate-hardware-checklist - Generate checklist from CSV
+  - GET /api/files/:fileId/hardware-checklist - Get checklist items and progress
+  - POST /api/hardware-checklist/:itemId/toggle-packed - Toggle packed status
+  - POST /api/hardware-checklist/:itemId/toggle-buyout-arrived - Toggle buyout arrival
