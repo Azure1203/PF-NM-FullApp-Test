@@ -3274,9 +3274,11 @@ export async function registerRoutes(
         }
         
         try {
-          // Strip "H-" prefix from code
+          // Strip "H." or "H-" prefix from code (Hafele codes are like H.833.89.128)
           let hafeleCode = product.code;
-          if (hafeleCode.startsWith('H-')) {
+          if (hafeleCode.startsWith('H.')) {
+            hafeleCode = hafeleCode.substring(2);
+          } else if (hafeleCode.startsWith('H-')) {
             hafeleCode = hafeleCode.substring(2);
           } else if (hafeleCode.startsWith('H')) {
             hafeleCode = hafeleCode.substring(1);
