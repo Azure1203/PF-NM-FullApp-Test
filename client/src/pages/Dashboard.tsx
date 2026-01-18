@@ -161,28 +161,28 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-10">
         
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {user && (
               <>
-                <Avatar className="h-9 w-9">
+                <Avatar className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
                   <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
                     {user.firstName?.[0] || user.email?.[0] || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs sm:text-sm text-muted-foreground truncate">
                   Welcome, <span className="font-medium text-slate-700">{user.firstName || user.email}</span>
                 </span>
               </>
             )}
           </div>
           <a href="/api/logout">
-            <Button variant="outline" size="sm" data-testid="button-logout" className="gap-2">
+            <Button variant="outline" size="sm" data-testid="button-logout" className="gap-1 sm:gap-2 shrink-0">
               <LogOut className="w-4 h-4" />
-              Log Out
+              <span className="hidden sm:inline">Log Out</span>
             </Button>
           </a>
         </div>
@@ -191,23 +191,24 @@ export default function Dashboard() {
           title="Perfect Fit Jobs" 
           description="Manage and sync your closet order projects."
           actions={
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
-                    size="lg" 
+                    size="sm" 
                     variant="outline"
-                    className="gap-2 rounded-xl h-12 px-5" 
+                    className="gap-2 rounded-xl" 
                     onClick={() => fetchOutlookEmails()}
                     disabled={isFetchingEmails}
                     data-testid="button-fetch-outlook-emails"
                   >
                     {isFetchingEmails ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Mail className="w-5 h-5" />
+                      <Mail className="w-4 h-4" />
                     )}
-                    Fetch Netley Emails
+                    <span className="hidden sm:inline">Fetch Netley Emails</span>
+                    <span className="sm:hidden">Emails</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -224,15 +225,16 @@ export default function Dashboard() {
                 </TooltipContent>
               </Tooltip>
               <Link href="/products">
-                <Button size="lg" variant="outline" className="gap-2 rounded-xl h-12 px-5" data-testid="button-products">
-                  <Package className="w-5 h-5" />
+                <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-products">
+                  <Package className="w-4 h-4" />
                   Products
                 </Button>
               </Link>
               <Link href="/upload">
-                <Button size="lg" className="btn-primary gap-2 rounded-xl text-md h-12 px-6" data-testid="button-upload-new">
-                  <Plus className="w-5 h-5" />
-                  Upload New Project
+                <Button size="sm" className="btn-primary gap-2 rounded-xl" data-testid="button-upload-new">
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Upload New</span>
+                  <span className="sm:hidden">Upload</span>
                 </Button>
               </Link>
             </div>
@@ -240,7 +242,7 @@ export default function Dashboard() {
         />
 
         {/* Stats Section */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-6 mb-6 sm:mb-10">
           {[
             { label: "Total Projects", value: projects?.length || 0, color: "text-blue-600", bg: "bg-blue-50" },
             { label: "In Production", value: projects?.filter(p => p.asanaSection && IN_PRODUCTION_SECTIONS.includes(p.asanaSection.toUpperCase())).length || 0, color: "text-purple-600", bg: "bg-purple-50" },
@@ -249,13 +251,13 @@ export default function Dashboard() {
             { label: "Synced to Asana", value: projects?.filter(p => p.status === 'synced').length || 0, color: "text-green-600", bg: "bg-green-50" },
           ].map((stat, i) => (
             <Card key={i} className="border-none shadow-sm shadow-slate-100 hover:shadow-md transition-shadow">
-              <CardContent className="p-6 flex items-center justify-between">
+              <CardContent className="p-3 sm:p-6 flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                  <p className="text-3xl font-bold mt-1 text-slate-800">{isLoading ? "-" : stat.value}</p>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">{stat.label}</p>
+                  <p className="text-xl sm:text-3xl font-bold mt-1 text-slate-800">{isLoading ? "-" : stat.value}</p>
                 </div>
-                <div className={`w-12 h-12 rounded-full ${stat.bg} ${stat.color} flex items-center justify-center`}>
-                  <FolderOpen className="w-6 h-6 opacity-80" />
+                <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full ${stat.bg} ${stat.color} flex items-center justify-center shrink-0`}>
+                  <FolderOpen className="w-4 h-4 sm:w-6 sm:h-6 opacity-80" />
                 </div>
               </CardContent>
             </Card>
@@ -263,7 +265,7 @@ export default function Dashboard() {
         </div>
 
         {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4">
           <Button
             variant={statusFilter === "all" ? "default" : "outline"}
             size="sm"
@@ -271,7 +273,7 @@ export default function Dashboard() {
             className="rounded-lg"
             data-testid="filter-all"
           >
-            All Orders ({projects?.length || 0})
+            All ({projects?.length || 0})
           </Button>
           <Button
             variant={statusFilter === "in_production" ? "default" : "outline"}
@@ -280,7 +282,9 @@ export default function Dashboard() {
             className="rounded-lg"
             data-testid="filter-in-production"
           >
-            In Production ({projects?.filter(p => p.asanaSection && IN_PRODUCTION_SECTIONS.includes(p.asanaSection.toUpperCase())).length || 0})
+            <span className="hidden sm:inline">In Production</span>
+            <span className="sm:hidden">Prod</span>
+            {" "}({projects?.filter(p => p.asanaSection && IN_PRODUCTION_SECTIONS.includes(p.asanaSection.toUpperCase())).length || 0})
           </Button>
           <Button
             variant={statusFilter === "shipped" ? "default" : "outline"}
@@ -298,7 +302,7 @@ export default function Dashboard() {
             className="rounded-lg"
             data-testid="filter-pending"
           >
-            Pending Sync ({projects?.filter(p => p.status === 'pending').length || 0})
+            Pending ({projects?.filter(p => p.status === 'pending').length || 0})
           </Button>
           <Button
             variant={statusFilter === "synced" ? "default" : "outline"}
@@ -307,15 +311,15 @@ export default function Dashboard() {
             className="rounded-lg"
             data-testid="filter-synced"
           >
-            Synced to Asana ({projects?.filter(p => p.status === 'synced').length || 0})
+            Synced ({projects?.filter(p => p.status === 'synced').length || 0})
           </Button>
         </div>
 
         {/* Search Bar */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <div className="relative mb-4 sm:mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
-            className="pl-10 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-base"
+            className="pl-10 rounded-xl border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
             placeholder="Search by project name or dealer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -345,39 +349,58 @@ export default function Dashboard() {
             </div>
           ) : (
             filteredProjects.map((project) => (
-              <div key={project.id} className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 relative overflow-hidden group">
+              <div key={project.id} className="bg-white rounded-xl p-3 sm:p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-200 relative overflow-hidden group">
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-transparent group-hover:bg-primary transition-colors" />
                 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <Link href={`/orders/${project.id}`} className="flex items-start gap-4 flex-1">
-                    <div className="w-12 h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
-                      <FolderOpen className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+                  <Link href={`/orders/${project.id}`} className="flex items-start gap-3 sm:gap-4 flex-1">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+                      <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400 group-hover:text-primary transition-colors" />
                     </div>
                     
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg text-slate-800 group-hover:text-primary transition-colors">
-                        <span className="text-muted-foreground font-medium">Project Name:</span> {project.name}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm sm:text-lg text-slate-800 group-hover:text-primary transition-colors truncate">
+                        <span className="text-muted-foreground font-medium hidden sm:inline">Project Name:</span> {project.name}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-1 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-6 gap-y-1 sm:gap-y-2 mt-1 text-xs sm:text-sm text-muted-foreground">
                         <span>Dealer: <span className="font-medium text-slate-700">{project.dealer || "N/A"}</span></span>
-                        <span>Date: {project.createdAt ? format(new Date(project.createdAt), 'PPP') : 'N/A'}</span>
+                        <span className="hidden sm:inline">Date: {project.createdAt ? format(new Date(project.createdAt), 'PPP') : 'N/A'}</span>
                       </div>
                       
                       {/* PF Production Section Status */}
                       {project.asanaSection && (
-                        <div className="mt-2">
+                        <div className="mt-1.5 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
                           <Badge 
                             variant="outline" 
-                            className="bg-blue-50 text-blue-700 border-blue-200 text-sm font-medium"
+                            className="bg-blue-50 text-blue-700 border-blue-200 text-xs sm:text-sm font-medium"
                             data-testid="badge-production-section"
                           >
                             {project.asanaSection}
                           </Badge>
+                          {/* Production Status Badge - derived from section */}
+                          {IN_PRODUCTION_SECTIONS.includes(project.asanaSection.toUpperCase()) && (
+                            <Badge 
+                              variant="outline" 
+                              className="bg-purple-50 text-purple-700 border-purple-200 text-xs sm:text-sm font-semibold"
+                              data-testid="badge-in-production"
+                            >
+                              IN PRODUCTION
+                            </Badge>
+                          )}
+                          {project.asanaSection.toUpperCase() === 'SHIPPED' && (
+                            <Badge 
+                              variant="outline" 
+                              className="bg-teal-50 text-teal-700 border-teal-200 text-xs sm:text-sm font-semibold"
+                              data-testid="badge-shipped"
+                            >
+                              SHIPPED
+                            </Badge>
+                          )}
                         </div>
                       )}
                       
                       {/* Status Badges */}
-                      <div className="flex flex-wrap gap-1.5 mt-2">
+                      <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-1.5 sm:mt-2">
                         {/* CTS Parts Status */}
                         {(project as any).ctsStatus?.hasCTSParts && (
                           (project as any).ctsStatus?.allCtsCut ? (

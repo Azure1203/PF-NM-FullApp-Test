@@ -65,3 +65,18 @@ Preferred communication style: Simple, everyday language.
 - `DATABASE_URL`: PostgreSQL connection string
 - `REPLIT_CONNECTORS_HOSTNAME`: For Asana and Outlook OAuth token retrieval
 - `REPL_IDENTITY` or `WEB_REPL_RENEWAL`: For Replit authentication headers
+
+## Recent Changes
+
+### January 2026
+- Added "IN PRODUCTION" and "SHIPPED" status badges to order cards based on Asana section
+  - Purple badge shows "IN PRODUCTION" for sections: JOB CONFIRMED, HARDWARE PACKED, PALLET PACKED, READY TO SUBMIT, READY TO LOAD
+  - Teal badge shows "SHIPPED" when order is in SHIPPED section
+  - These are display-only badges derived from Asana section data (no sync back to Asana)
+- Improved mobile responsiveness of Dashboard:
+  - Header buttons wrap and use compact text on small screens
+  - Stats grid shows 2 columns on mobile with smaller padding
+  - Filter buttons wrap with shorter labels on mobile
+  - Order cards more compact on mobile with truncated text
+  - PageHeader component responsive with smaller text on mobile
+- Products form now uses Weight (grams) instead of Length/Width/Height dimensions
