@@ -101,6 +101,7 @@ export interface IStorage {
   toggleHardwareItemBuyoutArrived(itemId: number, buyoutArrived: boolean): Promise<HardwareChecklistItem | undefined>;
   deleteHardwareChecklistItems(fileId: number): Promise<void>;
   getHardwareChecklistProgress(fileId: number): Promise<{ total: number; packed: number; buyoutItems: number; buyoutArrived: number }>;
+  replaceHardwareChecklist(fileId: number, items: InsertHardwareChecklistItem[]): Promise<HardwareChecklistItem[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -475,6 +476,22 @@ export class DatabaseStorage implements IStorage {
     const buyoutArrived = items.filter(item => item.isBuyout && item.buyoutArrived).length;
     
     return { total, packed, buyoutItems, buyoutArrived };
+  }
+
+  async replaceHardwareChecklist(fileId: number, items: InsertHardwareChecklistItem[]): Promise<HardwareChecklistItem[]> {
+    // Use transaction to atomically delete + insert all items
+    return await db.transaction(async (tx) => {
+      // Delete existing items
+      await tx.delete(hardwareChecklistItems).where(eq(hardwareChecklistItems.fileId, fileId));
+      
+      // Insert all new items
+      if (items.length === 0) {
+        return [];
+      }
+      
+      const created = await tx.insert(hardwareChecklistItems).values(items).returning();
+      return created;
+    });
   }
 }
 

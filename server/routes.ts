@@ -3842,50 +3842,107 @@ export async function registerRoutes(
       // Parse CSV content
       const records = await parseCSV(csvContent);
       
-      // Extract hardware items (similar to product import parsing)
-      const parsedItems: Array<{
+      // Track all rows for validation
+      interface ParsedRow {
+        rowIndex: number;
         code: string;
         name: string;
         quantity: number;
-      }> = [];
+        rawRow: string[];
+        skipped: boolean;
+        skipReason?: string;
+      }
       
-      for (const row of records) {
+      interface ValidationError {
+        rowIndex: number;
+        code: string;
+        name: string;
+        error: string;
+      }
+      
+      const allRows: ParsedRow[] = [];
+      const validationErrors: ValidationError[] = [];
+      
+      // Parse all rows and track which ones are valid
+      for (let i = 0; i < records.length; i++) {
+        const row = records[i];
         const description = row[0]?.trim() || '';
         const code = row[2]?.trim() || '';
-        const quantityStr = row[6]?.trim() || '1'; // Quantity column
+        const quantityStr = row[6]?.trim() || '1';
         
-        // Skip empty rows, section headers, and rows without codes
-        if (!description && !code) continue;
-        if (!code || code.length < 3) continue;
-        if (code.toLowerCase().includes('codes') || code.toLowerCase().includes('manu')) continue;
-        if (description === description.toUpperCase() && !code) continue;
+        // Determine if this row should be skipped
+        let skipped = false;
+        let skipReason: string | undefined;
         
-        const quantity = parseInt(quantityStr) || 1;
+        if (!description && !code) {
+          skipped = true;
+          skipReason = 'Empty row';
+        } else if (!code || code.length < 3) {
+          skipped = true;
+          skipReason = 'No valid product code';
+        } else if (code.toLowerCase().includes('codes') || code.toLowerCase().includes('manu')) {
+          skipped = true;
+          skipReason = 'Header row';
+        } else if (description === description.toUpperCase() && !code) {
+          skipped = true;
+          skipReason = 'Section header';
+        }
         
-        parsedItems.push({
+        const quantity = parseInt(quantityStr) || 0;
+        if (!skipped && quantity <= 0) {
+          validationErrors.push({
+            rowIndex: i + 1,
+            code,
+            name: description,
+            error: `Invalid quantity: "${quantityStr}"`
+          });
+        }
+        
+        allRows.push({
+          rowIndex: i + 1,
           code,
           name: description,
-          quantity
+          quantity: quantity || 1,
+          rawRow: row,
+          skipped,
+          skipReason
         });
       }
       
-      // Delete existing checklist items for this file
-      await storage.deleteHardwareChecklistItems(fileId);
+      // Build skipped rows info for transparency (used in all responses)
+      const skippedRowsInfo = allRows
+        .filter(r => r.skipped)
+        .map(r => ({
+          rowIndex: r.rowIndex,
+          code: r.code || '(empty)',
+          name: r.name || '(empty)',
+          reason: r.skipReason || 'Unknown'
+        }));
+      
+      // Filter to valid items
+      const validItems = allRows.filter(r => !r.skipped && !validationErrors.some(e => e.rowIndex === r.rowIndex));
+      const expectedCount = validItems.length;
+      
+      if (expectedCount === 0) {
+        return res.status(400).json({ 
+          message: 'No valid hardware items found in CSV',
+          totalRows: records.length,
+          skippedRows: skippedRowsInfo.length,
+          skippedRowsInfo,
+          errors: validationErrors
+        });
+      }
       
       // Look up products to determine buyout status
-      const productCodes = parsedItems.map(item => item.code);
+      const productCodes = validItems.map(item => item.code);
       const products = await storage.getProductsByCode(productCodes);
       const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
       
-      // Create checklist items
-      const createdItems: any[] = [];
-      let sortOrder = 0;
-      
-      for (const item of parsedItems) {
+      // Build checklist items to insert
+      const itemsToInsert = validItems.map((item, index) => {
         const product = productMap.get(item.code.toUpperCase());
         const isBuyout = product?.stockStatus === 'BUYOUT';
-        
-        const created = await storage.createHardwareChecklistItem({
+        return {
           fileId,
           productId: product?.id || null,
           productCode: item.code,
@@ -3895,9 +3952,43 @@ export async function registerRoutes(
           buyoutArrived: false,
           isPacked: false,
           packedBy: null,
-          sortOrder: sortOrder++
+          sortOrder: index
+        };
+      });
+      
+      // Use transactional replacement - atomic delete + insert
+      let createdItems: any[];
+      try {
+        createdItems = await storage.replaceHardwareChecklist(fileId, itemsToInsert);
+      } catch (txError: any) {
+        console.error(`[Hardware Checklist] Transaction failed:`, txError);
+        return res.status(400).json({
+          message: 'Database error: failed to save checklist items. No changes were made.',
+          expectedCount,
+          insertedCount: 0,
+          totalRows: records.length,
+          skippedRows: skippedRowsInfo.length,
+          skippedRowsInfo,
+          errors: [...validationErrors, { rowIndex: 0, code: '', name: '', error: txError.message || 'Transaction failed' }]
         });
-        createdItems.push(created);
+      }
+      
+      // Verify parity: expected vs created
+      const insertedCount = createdItems.length;
+      if (insertedCount !== expectedCount) {
+        // This shouldn't happen with transactional insert, but verify anyway
+        const missingCount = expectedCount - insertedCount;
+        console.error(`[Hardware Checklist] Parity check failed: expected ${expectedCount}, inserted ${insertedCount}`);
+        
+        return res.status(400).json({
+          message: `Unexpected error: ${missingCount} of ${expectedCount} items were not added`,
+          expectedCount,
+          insertedCount,
+          totalRows: records.length,
+          skippedRows: skippedRowsInfo.length,
+          skippedRowsInfo,
+          errors: validationErrors
+        });
       }
       
       // Calculate BO status
@@ -3910,12 +4001,28 @@ export async function registerRoutes(
       // Update the file with the BO status
       await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
       
-      console.log(`[Hardware Checklist] Generated ${createdItems.length} items for file ${fileId}, BO status: ${boStatus}`);
+      // Also update pallet file assignments
+      const buyoutOption: BuyoutHardwareOption = boStatus === 'NO BO HARDWARE' 
+        ? 'NO BUYOUT HARDWARE' 
+        : boStatus as BuyoutHardwareOption;
+      const assignments = await storage.getAssignmentsForFile(fileId);
+      for (const assignment of assignments) {
+        await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
+      }
+      
+      console.log(`[Hardware Checklist] Generated ${createdItems.length} items for file ${fileId}, BO status: ${boStatus}, skipped ${skippedRowsInfo.length} rows`);
       res.json({ 
+        success: true,
         items: createdItems, 
         boStatus,
         totalItems: createdItems.length,
-        buyoutItems: createdItems.filter(i => i.isBuyout).length
+        buyoutItems: createdItems.filter(i => i.isBuyout).length,
+        expectedCount,
+        insertedCount,
+        totalRows: records.length,
+        skippedRows: skippedRowsInfo.length,
+        skippedRowsInfo, // Detailed info about skipped rows
+        errors: [] // Empty means all items were added successfully
       });
     } catch (e: any) {
       console.error('[Hardware Checklist] Error generating:', e);
