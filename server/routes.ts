@@ -189,19 +189,27 @@ function extractCTSParts(records: string[][]): Array<{ partNumber: string; descr
 // Hardware prefixes that identify hardware items in order CSV
 const HARDWARE_PREFIXES = ['H.', 'M.', 'M-', 'R-', 'R.', 'S.'];
 
-// Extract hardware items from order CSV for building packing checklist
-function extractHardwareFromCSV(records: string[][]): Array<{
-  rowIndex: number;
-  code: string;
-  name: string;
-  quantity: number;
-}> {
-  const hardwareItems: Array<{
+interface HardwareExtractionResult {
+  validItems: Array<{
     rowIndex: number;
     code: string;
     name: string;
     quantity: number;
-  }> = [];
+  }>;
+  skippedRows: Array<{
+    rowIndex: number;
+    code: string;
+    name: string;
+    reason: string;
+  }>;
+  totalHardwareRows: number;
+}
+
+// Extract hardware items from order CSV for building packing checklist
+function extractHardwareFromCSV(records: string[][]): HardwareExtractionResult {
+  const validItems: HardwareExtractionResult['validItems'] = [];
+  const skippedRows: HardwareExtractionResult['skippedRows'] = [];
+  let totalHardwareRows = 0;
   
   // Find the data section (starts after "Manuf code" header row)
   let dataStartIndex = -1;
@@ -212,31 +220,61 @@ function extractHardwareFromCSV(records: string[][]): Array<{
     }
   }
   
-  if (dataStartIndex === -1) return hardwareItems;
+  if (dataStartIndex === -1) {
+    // No data section found - add a skip reason for clarity
+    return { 
+      validItems, 
+      skippedRows: [{ rowIndex: 0, code: '', name: '', reason: 'No "Manuf code" header row found - CSV format not recognized' }], 
+      totalHardwareRows 
+    };
+  }
   
   // Process each data row looking for hardware items
   for (let i = dataStartIndex; i < records.length; i++) {
     const row = records[i];
     const sku = (row[0] || '').trim().toUpperCase();
+    const originalCode = (row[0] || '').trim();
     const description = (row[1] || '').trim();
-    const quantity = parseInt(row[2] || '0') || 0;
-    
-    if (!sku || quantity <= 0) continue;
+    const quantityStr = row[2] || '0';
+    const quantity = parseInt(quantityStr) || 0;
     
     // Check if this is a hardware item by prefix
     const isHardware = HARDWARE_PREFIXES.some(prefix => sku.startsWith(prefix));
     
-    if (isHardware) {
-      hardwareItems.push({
-        rowIndex: i + 1, // 1-indexed for display
-        code: (row[0] || '').trim(), // Keep original case
-        name: description,
-        quantity
+    if (!isHardware) continue;
+    
+    totalHardwareRows++;
+    
+    // Validate hardware row
+    if (!sku) {
+      skippedRows.push({
+        rowIndex: i + 1,
+        code: originalCode || '(empty)',
+        name: description || '(empty)',
+        reason: 'Empty product code'
       });
+      continue;
     }
+    
+    if (quantity <= 0) {
+      skippedRows.push({
+        rowIndex: i + 1,
+        code: originalCode,
+        name: description || '(empty)',
+        reason: `Invalid quantity: "${quantityStr}"`
+      });
+      continue;
+    }
+    
+    validItems.push({
+      rowIndex: i + 1,
+      code: originalCode,
+      name: description,
+      quantity
+    });
   }
   
-  return hardwareItems;
+  return { validItems, skippedRows, totalHardwareRows };
 }
 
 // Count parts from actual CSV data rows
@@ -4104,26 +4142,36 @@ export async function registerRoutes(
       // Parse the stored CSV content
       const records = await parseCSV(orderFile.rawContent);
       
-      // Extract hardware items using the helper function
-      const hardwareItems = extractHardwareFromCSV(records);
+      // Extract hardware items using the helper function (includes validation)
+      const { validItems, skippedRows, totalHardwareRows } = extractHardwareFromCSV(records);
       
-      if (hardwareItems.length === 0) {
+      if (validItems.length === 0) {
         return res.status(400).json({ 
-          message: 'No hardware items found in order CSV',
+          message: totalHardwareRows === 0 
+            ? 'No hardware items found in order CSV (items with H., M., R-, S. prefix)'
+            : 'All hardware items failed validation',
           totalRows: records.length,
-          hardwareItemsFound: 0
+          totalHardwareRows,
+          skippedRows: skippedRows.length,
+          skippedRowsInfo: skippedRows,
+          errors: skippedRows.map(r => ({ 
+            rowIndex: r.rowIndex, 
+            code: r.code, 
+            name: r.name, 
+            error: r.reason 
+          }))
         });
       }
       
-      console.log(`[Hardware Checklist] Found ${hardwareItems.length} hardware items in order file ${fileId}`);
+      console.log(`[Hardware Checklist] Found ${validItems.length} valid hardware items (${skippedRows.length} skipped) in order file ${fileId}`);
       
       // Look up products to determine buyout status and get images
-      const productCodes = hardwareItems.map(item => item.code);
+      const productCodes = validItems.map(item => item.code);
       const products = await storage.getProductsByCode(productCodes);
       const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
       
       // Build checklist items to insert
-      const itemsToInsert = hardwareItems.map((item, index) => {
+      const itemsToInsert = validItems.map((item, index) => {
         const product = productMap.get(item.code.toUpperCase());
         const isBuyout = product?.stockStatus === 'BUYOUT';
         return {
@@ -4140,6 +4188,8 @@ export async function registerRoutes(
         };
       });
       
+      const expectedCount = itemsToInsert.length;
+      
       // Use transactional replacement - atomic delete + insert
       let createdItems: any[];
       try {
@@ -4148,7 +4198,30 @@ export async function registerRoutes(
         console.error(`[Hardware Checklist] Transaction failed:`, txError);
         return res.status(400).json({
           message: 'Database error: failed to save checklist items. No changes were made.',
-          error: txError.message || 'Transaction failed'
+          expectedCount,
+          insertedCount: 0,
+          totalRows: records.length,
+          totalHardwareRows,
+          skippedRows: skippedRows.length,
+          skippedRowsInfo: skippedRows,
+          errors: [{ rowIndex: 0, code: '', name: '', error: txError.message || 'Transaction failed' }]
+        });
+      }
+      
+      // Verify parity: expected vs created
+      const insertedCount = createdItems.length;
+      if (insertedCount !== expectedCount) {
+        const missingCount = expectedCount - insertedCount;
+        console.error(`[Hardware Checklist] Parity check failed: expected ${expectedCount}, inserted ${insertedCount}`);
+        return res.status(400).json({
+          message: `Unexpected error: ${missingCount} of ${expectedCount} items were not added`,
+          expectedCount,
+          insertedCount,
+          totalRows: records.length,
+          totalHardwareRows,
+          skippedRows: skippedRows.length,
+          skippedRowsInfo: skippedRows,
+          errors: []
         });
       }
       
@@ -4175,7 +4248,7 @@ export async function registerRoutes(
       const matchedProducts = createdItems.filter(item => item.productId !== null).length;
       const unmatchedProducts = createdItems.filter(item => item.productId === null).length;
       
-      console.log(`[Hardware Checklist] Generated ${createdItems.length} items from order CSV for file ${fileId}, BO status: ${boStatus}, matched: ${matchedProducts}, unmatched: ${unmatchedProducts}`);
+      console.log(`[Hardware Checklist] Generated ${createdItems.length} items from order CSV for file ${fileId}, BO status: ${boStatus}, matched: ${matchedProducts}, unmatched: ${unmatchedProducts}, skipped: ${skippedRows.length}`);
       
       res.json({ 
         success: true,
@@ -4183,8 +4256,15 @@ export async function registerRoutes(
         boStatus,
         totalItems: createdItems.length,
         buyoutItems: createdItems.filter(i => i.isBuyout).length,
+        expectedCount,
+        insertedCount,
+        totalRows: records.length,
+        totalHardwareRows,
+        skippedRows: skippedRows.length,
+        skippedRowsInfo: skippedRows,
         matchedProducts,
-        unmatchedProducts
+        unmatchedProducts,
+        errors: [] // Empty means all valid items were added successfully
       });
     } catch (e: any) {
       console.error('[Hardware Checklist] Error generating from order:', e);

@@ -4,7 +4,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Upload, RefreshCw, Box, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Upload, RefreshCw, Box, AlertTriangle, CheckCircle, XCircle, FileText, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface HardwareCsvUploadSectionProps {
@@ -46,6 +46,8 @@ interface GenerateChecklistResponse {
   skippedRowsInfo?: SkippedRowInfo[];
   errors?: ValidationError[];
   message?: string;
+  matchedProducts?: number;
+  unmatchedProducts?: number;
 }
 
 export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUploadSectionProps) {
@@ -59,6 +61,48 @@ export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUpload
     enabled: fileId > 0,
   });
 
+  // Generate from order's stored CSV content
+  const generateFromOrderMutation = useMutation({
+    mutationFn: async (): Promise<GenerateChecklistResponse> => {
+      const response = await fetch(`/api/files/${fileId}/generate-hardware-from-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.message || 'Failed to generate checklist') as any;
+        error.validationData = data;
+        throw error;
+      }
+      return data;
+    },
+    onSuccess: (data: GenerateChecklistResponse) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
+      setValidationResult(data);
+      const skippedInfo = data.skippedRows && data.skippedRows > 0 
+        ? ` (${data.skippedRows} rows skipped)`
+        : '';
+      const matchInfo = data.unmatchedProducts && data.unmatchedProducts > 0 
+        ? `, ${data.unmatchedProducts} not in database`
+        : '';
+      toast({
+        title: 'Hardware checklist generated',
+        description: `Found ${data.totalItems} hardware items${skippedInfo}${matchInfo}`,
+      });
+    },
+    onError: (error: any) => {
+      const errorData: GenerateChecklistResponse | null = error.validationData || null;
+      setValidationResult(errorData);
+      toast({
+        title: 'Error generating checklist',
+        description: error.message || 'Failed to extract hardware from order',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Generate from uploaded CSV file (legacy/Hafele format)
   const generateChecklistMutation = useMutation({
     mutationFn: async (csvContent: string): Promise<GenerateChecklistResponse> => {
       const response = await fetch(`/api/files/${fileId}/generate-hardware-checklist`, {
@@ -69,7 +113,6 @@ export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUpload
       });
       const data = await response.json();
       if (!response.ok) {
-        // Attach the parsed data to the error for access in onError
         const error = new Error(data.message || 'Failed to generate checklist') as any;
         error.validationData = data;
         throw error;
@@ -93,7 +136,6 @@ export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUpload
       }
     },
     onError: (error: any) => {
-      // Extract validation data from error if available
       const errorData: GenerateChecklistResponse | null = error.validationData || null;
       setValidationResult(errorData);
       toast({
@@ -124,12 +166,13 @@ export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUpload
 
   const hasChecklist = checklistData?.items && checklistData.items.length > 0;
   const hasErrors = validationResult?.errors && validationResult.errors.length > 0;
+  const isGenerating = generateFromOrderMutation.isPending || generateChecklistMutation.isPending || isUploading;
 
   return (
     <div className="mb-4 space-y-2" data-testid="hardware-csv-upload-section">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Box className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">Hardware CSV:</span>
+        <span className="text-sm font-medium text-muted-foreground">Hardware Packing:</span>
         {hasChecklist && (
           <Badge variant="secondary" className="text-xs" data-testid="badge-checklist-count">
             {checklistData.items.length} items
@@ -138,11 +181,31 @@ export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUpload
         {validationResult?.success && !hasErrors && (
           <Badge className="bg-green-600 text-white text-xs" data-testid="badge-validation-success">
             <CheckCircle className="w-3 h-3 mr-1" />
-            All items verified
+            Generated
+          </Badge>
+        )}
+        {validationResult?.unmatchedProducts && validationResult.unmatchedProducts > 0 && (
+          <Badge variant="outline" className="text-xs text-amber-600 border-amber-300" data-testid="badge-unmatched-products">
+            {validationResult.unmatchedProducts} not in database
           </Badge>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          onClick={() => generateFromOrderMutation.mutate()}
+          disabled={isGenerating}
+          data-testid="button-generate-from-order"
+        >
+          {generateFromOrderMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : hasChecklist ? (
+            <RefreshCw className="w-4 h-4 mr-2" />
+          ) : (
+            <Sparkles className="w-4 h-4 mr-2" />
+          )}
+          {hasChecklist ? 'Regenerate' : 'Generate from Order'}
+        </Button>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -155,25 +218,23 @@ export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUpload
           size="sm"
           variant="outline"
           onClick={() => inputRef.current?.click()}
-          disabled={isUploading || generateChecklistMutation.isPending}
+          disabled={isGenerating}
           data-testid="button-upload-hardware-csv"
         >
           {(isUploading || generateChecklistMutation.isPending) ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : hasChecklist ? (
-            <RefreshCw className="w-4 h-4 mr-2" />
           ) : (
             <Upload className="w-4 h-4 mr-2" />
           )}
-          {hasChecklist ? 'Replace CSV' : 'Upload Hardware CSV'}
+          Upload CSV
         </Button>
-        {hasErrors && (
+        {(hasErrors || validationResult) && (
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setValidationResult(null)}
             className="text-muted-foreground"
-            data-testid="button-dismiss-errors"
+            data-testid="button-dismiss-result"
           >
             <XCircle className="w-4 h-4" />
           </Button>
@@ -212,10 +273,37 @@ export function HardwareCsvUploadSection({ fileId, fileName }: HardwareCsvUpload
         </Card>
       )}
       
+      {validationResult?.success && validationResult.skippedRowsInfo && validationResult.skippedRowsInfo.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800" data-testid="card-skipped-rows">
+          <CardHeader className="pb-2 pt-3">
+            <CardTitle className="text-sm flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="w-4 h-4" />
+              {validationResult.skippedRowsInfo.length} Hardware Row{validationResult.skippedRowsInfo.length > 1 ? 's' : ''} Skipped
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 pb-3">
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {validationResult.skippedRowsInfo.slice(0, 5).map((row, idx) => (
+                <div key={idx} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-2" data-testid={`skipped-row-${idx}`}>
+                  <span className="font-mono bg-amber-100 dark:bg-amber-900/30 px-1 rounded">Row {row.rowIndex}</span>
+                  <span className="font-medium">{row.code}</span>
+                  <span className="text-amber-600 dark:text-amber-500">{row.reason}</span>
+                </div>
+              ))}
+              {validationResult.skippedRowsInfo.length > 5 && (
+                <p className="text-xs text-amber-600 dark:text-amber-500 italic">
+                  ... and {validationResult.skippedRowsInfo.length - 5} more skipped
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       <p className="text-xs text-muted-foreground" data-testid="text-upload-help">
         {hasChecklist 
           ? "Hardware checklist generated. Items are matched to the product database." 
-          : "Upload a hardware CSV file to generate a packing checklist. Items will be matched to your product database."}
+          : "Click 'Generate from Order' to extract hardware items from the order CSV automatically."}
       </p>
     </div>
   );
