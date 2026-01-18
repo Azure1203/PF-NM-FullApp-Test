@@ -68,6 +68,8 @@ export const orderFiles = pgTable("order_files", {
   cutToFilePdfPath: text("cut_to_file_pdf_path"), // Path to Cut To File PDF in object storage
   eliasDovetailPdfPath: text("elias_dovetail_pdf_path"), // Path to Elias PF Dovetail Drawers PDF in object storage
   netley5PiecePdfPath: text("netley_5_piece_pdf_path"), // Path to Netley 5 Piece Shaker Door PDF in object storage
+  hardwareCsvPath: text("hardware_csv_path"), // Path to hardware CSV in object storage
+  hardwareBoStatus: text("hardware_bo_status"), // Calculated BO status: 'NO BO HARDWARE', 'WAITING FOR BO HARDWARE', 'BO HARDWARE ARRIVED'
   
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -284,15 +286,22 @@ export const insertPackingSlipItemSchema = createInsertSchema(packingSlipItems).
 export type PackingSlipItem = typeof packingSlipItems.$inferSelect;
 export type InsertPackingSlipItem = z.infer<typeof insertPackingSlipItemSchema>;
 
+// Stock status options for products
+export const STOCK_STATUS_OPTIONS = ['IN_STOCK', 'BUYOUT'] as const;
+export type StockStatus = typeof STOCK_STATUS_OPTIONS[number];
+
 // Product catalog table - internal product database for packaging checklists
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(), // e.g. H.111.95.310, DBX24_14_167
   name: text("name"), // Product name/description
+  supplier: text("supplier"), // Supplier name (Marathon, Hafele, Richelieu)
   category: text("category").notNull().default('HARDWARE'), // HARDWARE or COMPONENT
+  stockStatus: text("stock_status").$type<StockStatus>().default('IN_STOCK'), // IN_STOCK or BUYOUT
   weight: real("weight"), // Weight in grams (optional)
   imagePath: text("image_path"), // Object storage path to product image
   notes: text("notes"), // Additional notes
+  importRowNumber: integer("import_row_number"), // Row number from CSV import for image linking
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -305,6 +314,40 @@ export const insertProductSchema = createInsertSchema(products).omit({
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+
+// Hardware checklist items - items from hardware CSV attached to order files
+export const hardwareChecklistItems = pgTable("hardware_checklist_items", {
+  id: serial("id").primaryKey(),
+  fileId: integer("file_id").references(() => orderFiles.id, { onDelete: 'cascade' }).notNull(),
+  productId: integer("product_id").references(() => products.id, { onDelete: 'set null' }), // Link to product database
+  productCode: text("product_code").notNull(), // The code from the CSV
+  productName: text("product_name"), // Description from CSV (fallback if no product match)
+  quantity: integer("quantity").notNull().default(1),
+  isBuyout: boolean("is_buyout").default(false).notNull(), // Derived from product stockStatus
+  buyoutArrived: boolean("buyout_arrived").default(false).notNull(), // Has the buyout item arrived?
+  isPacked: boolean("is_packed").default(false).notNull(), // Has this item been packed?
+  packedAt: timestamp("packed_at"),
+  packedBy: text("packed_by"),
+  sortOrder: integer("sort_order").default(0), // Order in the original CSV
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHardwareChecklistItemSchema = createInsertSchema(hardwareChecklistItems).omit({ 
+  id: true, 
+  createdAt: true,
+  packedAt: true
+});
+
+export type HardwareChecklistItem = typeof hardwareChecklistItems.$inferSelect;
+export type InsertHardwareChecklistItem = z.infer<typeof insertHardwareChecklistItemSchema>;
+
+// Hardware checklist status for an order file
+export const HARDWARE_BO_STATUS_OPTIONS = [
+  'NO BO HARDWARE',
+  'WAITING FOR BO HARDWARE',
+  'BO HARDWARE ARRIVED',
+] as const;
+export type HardwareBoStatus = typeof HARDWARE_BO_STATUS_OPTIONS[number];
 
 // Keep backward compatibility - alias Order to Project for now
 export const orders = projects;

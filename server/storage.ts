@@ -9,6 +9,7 @@ import {
   processedOutlookEmails,
   packingSlipItems,
   products,
+  hardwareChecklistItems,
   type Project,
   type InsertProject,
   type OrderFile,
@@ -25,7 +26,9 @@ import {
   type PackingSlipItem,
   type InsertPackingSlipItem,
   type Product,
-  type InsertProduct
+  type InsertProduct,
+  type HardwareChecklistItem,
+  type InsertHardwareChecklistItem
 } from "@shared/schema";
 import { eq, desc, and, inArray, sql, ilike } from "drizzle-orm";
 
@@ -89,6 +92,15 @@ export interface IStorage {
   updateProduct(id: number, updates: Partial<Product>): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<boolean>;
   getProductsByCode(codes: string[]): Promise<Product[]>;
+  getProductsByImportRowNumbers(rowNumbers: number[]): Promise<Product[]>;
+  
+  // Hardware checklist methods
+  getHardwareChecklistItems(fileId: number): Promise<HardwareChecklistItem[]>;
+  createHardwareChecklistItem(item: InsertHardwareChecklistItem): Promise<HardwareChecklistItem>;
+  toggleHardwareItemPacked(itemId: number, isPacked: boolean, packedBy?: string): Promise<HardwareChecklistItem | undefined>;
+  toggleHardwareItemBuyoutArrived(itemId: number, buyoutArrived: boolean): Promise<HardwareChecklistItem | undefined>;
+  deleteHardwareChecklistItems(fileId: number): Promise<void>;
+  getHardwareChecklistProgress(fileId: number): Promise<{ total: number; packed: number; buyoutItems: number; buyoutArrived: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -405,6 +417,64 @@ export class DatabaseStorage implements IStorage {
     // Use SQL UPPER for case-insensitive matching
     return await db.select().from(products)
       .where(sql`UPPER(TRIM(${products.code})) IN (${sql.join(normalizedCodes.map(c => sql`${c}`), sql`, `)})`);
+  }
+
+  async getProductsByImportRowNumbers(rowNumbers: number[]): Promise<Product[]> {
+    if (rowNumbers.length === 0) return [];
+    return await db.select().from(products)
+      .where(inArray(products.importRowNumber, rowNumbers));
+  }
+
+  // Hardware checklist methods
+  async getHardwareChecklistItems(fileId: number): Promise<HardwareChecklistItem[]> {
+    return await db.select()
+      .from(hardwareChecklistItems)
+      .where(eq(hardwareChecklistItems.fileId, fileId))
+      .orderBy(hardwareChecklistItems.sortOrder);
+  }
+
+  async createHardwareChecklistItem(item: InsertHardwareChecklistItem): Promise<HardwareChecklistItem> {
+    const [created] = await db.insert(hardwareChecklistItems).values(item).returning();
+    return created;
+  }
+
+  async toggleHardwareItemPacked(itemId: number, isPacked: boolean, packedBy?: string): Promise<HardwareChecklistItem | undefined> {
+    const updateData: { isPacked: boolean; packedAt: Date | null; packedBy: string | null } = {
+      isPacked,
+      packedAt: isPacked ? new Date() : null,
+      packedBy: isPacked && packedBy ? packedBy : null
+    };
+    
+    const [updated] = await db.update(hardwareChecklistItems)
+      .set(updateData)
+      .where(eq(hardwareChecklistItems.id, itemId))
+      .returning();
+    return updated;
+  }
+
+  async toggleHardwareItemBuyoutArrived(itemId: number, buyoutArrived: boolean): Promise<HardwareChecklistItem | undefined> {
+    const [updated] = await db.update(hardwareChecklistItems)
+      .set({ buyoutArrived })
+      .where(eq(hardwareChecklistItems.id, itemId))
+      .returning();
+    return updated;
+  }
+
+  async deleteHardwareChecklistItems(fileId: number): Promise<void> {
+    await db.delete(hardwareChecklistItems).where(eq(hardwareChecklistItems.fileId, fileId));
+  }
+
+  async getHardwareChecklistProgress(fileId: number): Promise<{ total: number; packed: number; buyoutItems: number; buyoutArrived: number }> {
+    const items = await db.select()
+      .from(hardwareChecklistItems)
+      .where(eq(hardwareChecklistItems.fileId, fileId));
+    
+    const total = items.length;
+    const packed = items.filter(item => item.isPacked).length;
+    const buyoutItems = items.filter(item => item.isBuyout).length;
+    const buyoutArrived = items.filter(item => item.isBuyout && item.buyoutArrived).length;
+    
+    return { total, packed, buyoutItems, buyoutArrived };
   }
 }
 

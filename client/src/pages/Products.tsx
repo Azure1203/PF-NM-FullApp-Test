@@ -46,7 +46,9 @@ import type { Product } from "@shared/schema";
 interface ProductFormData {
   code: string;
   name: string;
+  supplier: string;
   category: string;
+  stockStatus: string;
   weight: string;
   notes: string;
   imagePath: string;
@@ -55,7 +57,9 @@ interface ProductFormData {
 const emptyFormData: ProductFormData = {
   code: "",
   name: "",
+  supplier: "",
   category: "HARDWARE",
+  stockStatus: "IN_STOCK",
   weight: "",
   notes: "",
   imagePath: "",
@@ -137,7 +141,9 @@ export default function Products() {
     setFormData({
       code: product.code,
       name: product.name || "",
+      supplier: product.supplier || "",
       category: product.category,
+      stockStatus: product.stockStatus || "IN_STOCK",
       weight: product.weight?.toString() || "",
       notes: product.notes || "",
       imagePath: product.imagePath || "",
@@ -157,7 +163,9 @@ export default function Products() {
     const productData: Partial<Product> = {
       code: formData.code.trim(),
       name: formData.name.trim() || null,
+      supplier: formData.supplier.trim() || null,
       category: formData.category,
+      stockStatus: formData.stockStatus as any,
       weight: formData.weight ? parseFloat(formData.weight) : null,
       notes: formData.notes.trim() || null,
       imagePath: formData.imagePath || null,
@@ -244,6 +252,12 @@ export default function Products() {
               <SelectItem value="COMPONENT">Component</SelectItem>
             </SelectContent>
           </Select>
+          <Link href="/products/import">
+            <Button variant="outline" data-testid="button-import-products">
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+          </Link>
           <Button onClick={openCreateDialog} data-testid="button-add-product">
             <Plus className="h-4 w-4 mr-2" />
             Add Product
@@ -282,10 +296,26 @@ export default function Products() {
                           <p className="text-sm text-muted-foreground truncate">
                             {product.name || "No description"}
                           </p>
+                          {product.supplier && (
+                            <p className="text-xs text-muted-foreground">
+                              {product.supplier}
+                            </p>
+                          )}
                         </div>
-                        <Badge variant={product.category === "HARDWARE" ? "secondary" : "outline"}>
-                          {product.category}
-                        </Badge>
+                        <div className="flex flex-col gap-1 items-end">
+                          <Badge variant={product.category === "HARDWARE" ? "secondary" : "outline"}>
+                            {product.category}
+                          </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className={product.stockStatus === "BUYOUT" 
+                              ? "bg-amber-50 text-amber-700 border-amber-200 text-xs" 
+                              : "bg-green-50 text-green-700 border-green-200 text-xs"
+                            }
+                          >
+                            {product.stockStatus === "BUYOUT" ? "Buyout" : "In Stock"}
+                          </Badge>
+                        </div>
                       </div>
                       {product.weight && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -387,19 +417,55 @@ export default function Products() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="supplier">Supplier</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}
+                  value={formData.supplier}
+                  onValueChange={(v) => setFormData(prev => ({ ...prev, supplier: v }))}
                 >
-                  <SelectTrigger data-testid="select-product-category">
-                    <SelectValue />
+                  <SelectTrigger data-testid="select-product-supplier">
+                    <SelectValue placeholder="Select supplier" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="HARDWARE">Hardware</SelectItem>
-                    <SelectItem value="COMPONENT">Component</SelectItem>
+                    <SelectItem value="Marathon">Marathon</SelectItem>
+                    <SelectItem value="Hafele">Hafele</SelectItem>
+                    <SelectItem value="Richelieu">Richelieu</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}
+                  >
+                    <SelectTrigger data-testid="select-product-category">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="HARDWARE">Hardware</SelectItem>
+                      <SelectItem value="COMPONENT">Component</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="stockStatus">Stock Status</Label>
+                  <Select
+                    value={formData.stockStatus}
+                    onValueChange={(v) => setFormData(prev => ({ ...prev, stockStatus: v }))}
+                  >
+                    <SelectTrigger data-testid="select-product-stock-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                      <SelectItem value="BUYOUT">Buyout</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="grid gap-2">

@@ -28,6 +28,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { api, type ProjectWithFiles, type SyncPreview } from "@shared/routes";
 import { Badge } from "@/components/ui/badge";
 import { PackingSlipChecklist } from "@/components/PackingSlipChecklist";
+import { HardwarePackingChecklist } from "@/components/HardwarePackingChecklist";
+import { HardwareCsvUploadSection } from "@/components/HardwareCsvUploadSection";
 
 const formSchema = insertProjectSchema.pick({
   name: true,
@@ -2276,15 +2278,21 @@ export default function OrderDetails() {
                         </div>
                       )}
                       
-                      {/* Packaging Checklist - disabled for now */}
-                      {/* TODO: Re-enable when ready to use packaging checklist feature
-                      {project.files?.[selectedFileIndex]?.packingSlipPdfPath && (
-                        <PackingSlipChecklist 
+                      {/* Hardware CSV Upload for generating checklist */}
+                      {project.files?.[selectedFileIndex] && (
+                        <HardwareCsvUploadSection 
                           fileId={project.files[selectedFileIndex].id}
                           fileName={project.files[selectedFileIndex].originalFilename}
                         />
                       )}
-                      */}
+                      
+                      {/* Hardware Packing Checklist */}
+                      {project.files?.[selectedFileIndex] && (
+                        <HardwarePackingChecklist 
+                          fileId={project.files[selectedFileIndex].id}
+                          fileName={project.files[selectedFileIndex].originalFilename}
+                        />
+                      )}
                       
                       {/* Packaging Link for this file */}
                       {project.files?.[selectedFileIndex] && (

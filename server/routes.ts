@@ -3138,5 +3138,391 @@ export async function registerRoutes(
     }
   });
 
+  // Parse hardware CSV and return preview (new/changed/unchanged items)
+  app.post('/api/products/import/preview', isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      const fileContent = req.file.buffer.toString('utf-8');
+      const records = await parseCSV(fileContent);
+      
+      // Parse the CSV - columns: A=description, B=supplier, C=code
+      // Skip header rows and section headers (all-caps rows, empty codes)
+      const parsedItems: Array<{
+        rowNumber: number;
+        code: string;
+        name: string;
+        supplier: string;
+      }> = [];
+      
+      let rowNumber = 0;
+      for (const row of records) {
+        rowNumber++;
+        const description = row[0]?.trim() || '';
+        const supplier = row[1]?.trim() || '';
+        const code = row[2]?.trim() || '';
+        
+        // Skip empty rows
+        if (!description && !supplier && !code) continue;
+        
+        // Skip section headers (all uppercase description with no code)
+        if (!code && description === description.toUpperCase() && description.length > 3) continue;
+        
+        // Skip rows without a valid code
+        if (!code || code.length < 3) continue;
+        
+        // Skip header-like rows
+        if (code.toLowerCase().includes('codes') || code.toLowerCase().includes('manu')) continue;
+        
+        parsedItems.push({
+          rowNumber,
+          code,
+          name: description,
+          supplier
+        });
+      }
+      
+      // Look up existing products by code
+      const codes = parsedItems.map(item => item.code);
+      const existingProducts = await storage.getProductsByCode(codes);
+      const existingMap = new Map(existingProducts.map(p => [p.code, p]));
+      
+      // Categorize items
+      const newItems: typeof parsedItems = [];
+      const unchangedItems: typeof parsedItems = [];
+      const changedItems: Array<{
+        rowNumber: number;
+        code: string;
+        name: string;
+        supplier: string;
+        existingName: string | null;
+        existingSupplier: string | null;
+        existingId: number;
+      }> = [];
+      
+      for (const item of parsedItems) {
+        const existing = existingMap.get(item.code);
+        if (!existing) {
+          newItems.push(item);
+        } else {
+          // Check if anything changed
+          const nameChanged = (item.name || '') !== (existing.name || '');
+          const supplierChanged = (item.supplier || '') !== (existing.supplier || '');
+          
+          if (nameChanged || supplierChanged) {
+            changedItems.push({
+              ...item,
+              existingName: existing.name,
+              existingSupplier: existing.supplier,
+              existingId: existing.id
+            });
+          } else {
+            unchangedItems.push(item);
+          }
+        }
+      }
+      
+      res.json({
+        totalParsed: parsedItems.length,
+        newItems,
+        unchangedItems,
+        changedItems
+      });
+    } catch (e: any) {
+      console.error('[Products Import] Error previewing CSV:', e);
+      res.status(500).json({ message: 'Failed to parse CSV', error: e.message });
+    }
+  });
+
+  // Import new products from CSV (with row numbers for image linking)
+  app.post('/api/products/import', isAuthenticated, async (req, res) => {
+    try {
+      const { items, stockStatus = 'IN_STOCK' } = req.body;
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: 'items must be an array' });
+      }
+      
+      const created: any[] = [];
+      const errors: any[] = [];
+      
+      for (const item of items) {
+        try {
+          const product = await storage.createProduct({
+            code: item.code,
+            name: item.name || null,
+            supplier: item.supplier || null,
+            category: 'HARDWARE',
+            stockStatus: stockStatus,
+            weight: null,
+            imagePath: null,
+            notes: null,
+            importRowNumber: item.rowNumber || null
+          });
+          created.push(product);
+        } catch (e: any) {
+          errors.push({ code: item.code, error: e.message });
+        }
+      }
+      
+      console.log(`[Products Import] Created ${created.length} products, ${errors.length} errors`);
+      res.json({ created, errors });
+    } catch (e: any) {
+      console.error('[Products Import] Error importing:', e);
+      res.status(500).json({ message: 'Failed to import products', error: e.message });
+    }
+  });
+
+  // Update existing products with approved changes
+  app.post('/api/products/import/update', isAuthenticated, async (req, res) => {
+    try {
+      const { items } = req.body;
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: 'items must be an array' });
+      }
+      
+      const updated: any[] = [];
+      const errors: any[] = [];
+      
+      for (const item of items) {
+        try {
+          const product = await storage.updateProduct(item.existingId, {
+            name: item.name || null,
+            supplier: item.supplier || null,
+            importRowNumber: item.rowNumber || null
+          });
+          if (product) {
+            updated.push(product);
+          }
+        } catch (e: any) {
+          errors.push({ code: item.code, error: e.message });
+        }
+      }
+      
+      console.log(`[Products Import] Updated ${updated.length} products, ${errors.length} errors`);
+      res.json({ updated, errors });
+    } catch (e: any) {
+      console.error('[Products Import] Error updating:', e);
+      res.status(500).json({ message: 'Failed to update products', error: e.message });
+    }
+  });
+
+  // Hardware checklist API endpoints
+  app.get('/api/files/:fileId/hardware-checklist', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.fileId);
+      if (isNaN(fileId)) {
+        return res.status(400).json({ message: 'Invalid file ID' });
+      }
+      
+      const items = await storage.getHardwareChecklistItems(fileId);
+      const progress = await storage.getHardwareChecklistProgress(fileId);
+      
+      // Get product images for each item
+      const productCodes = items.map(item => item.productCode);
+      const products = await storage.getProductsByCode(productCodes);
+      const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
+      
+      // Enhance items with product images
+      const enhancedItems = items.map(item => {
+        const product = productMap.get(item.productCode.toUpperCase());
+        return {
+          ...item,
+          imagePath: product?.imagePath || null,
+          productStockStatus: product?.stockStatus || null
+        };
+      });
+      
+      res.json({ items: enhancedItems, progress });
+    } catch (e: any) {
+      console.error('[Hardware Checklist] Error fetching:', e);
+      res.status(500).json({ message: 'Failed to fetch hardware checklist', error: e.message });
+    }
+  });
+
+  // Helper function to recalculate and update BO status for a file
+  async function recalculateBoStatus(fileId: number) {
+    const progress = await storage.getHardwareChecklistProgress(fileId);
+    let boStatus = 'NO BO HARDWARE';
+    if (progress.buyoutItems > 0) {
+      boStatus = progress.buyoutArrived === progress.buyoutItems ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
+    }
+    await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
+    return boStatus;
+  }
+
+  app.post('/api/hardware-checklist/:itemId/toggle-packed', isAuthenticated, async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      const { isPacked, packedBy } = req.body;
+      
+      if (isNaN(itemId)) {
+        return res.status(400).json({ message: 'Invalid item ID' });
+      }
+      
+      const updated = await storage.toggleHardwareItemPacked(itemId, isPacked, packedBy);
+      if (!updated) {
+        return res.status(404).json({ message: 'Item not found' });
+      }
+      
+      res.json(updated);
+    } catch (e: any) {
+      console.error('[Hardware Checklist] Error toggling packed:', e);
+      res.status(500).json({ message: 'Failed to toggle packed status', error: e.message });
+    }
+  });
+
+  app.post('/api/hardware-checklist/:itemId/toggle-buyout-arrived', isAuthenticated, async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      const { buyoutArrived } = req.body;
+      
+      if (isNaN(itemId)) {
+        return res.status(400).json({ message: 'Invalid item ID' });
+      }
+      
+      const updated = await storage.toggleHardwareItemBuyoutArrived(itemId, buyoutArrived);
+      if (!updated) {
+        return res.status(404).json({ message: 'Item not found' });
+      }
+      
+      // Recalculate BO status for the file
+      const boStatus = await recalculateBoStatus(updated.fileId);
+      
+      res.json({ ...updated, fileBoStatus: boStatus });
+    } catch (e: any) {
+      console.error('[Hardware Checklist] Error toggling buyout arrived:', e);
+      res.status(500).json({ message: 'Failed to toggle buyout arrived', error: e.message });
+    }
+  });
+
+  // Generate hardware checklist from CSV file
+  app.post('/api/files/:fileId/generate-hardware-checklist', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.fileId);
+      if (isNaN(fileId)) {
+        return res.status(400).json({ message: 'Invalid file ID' });
+      }
+      
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ message: 'CSV content required' });
+      }
+      
+      // Parse CSV content
+      const records = await parseCSV(csvContent);
+      
+      // Extract hardware items (similar to product import parsing)
+      const parsedItems: Array<{
+        code: string;
+        name: string;
+        quantity: number;
+      }> = [];
+      
+      for (const row of records) {
+        const description = row[0]?.trim() || '';
+        const code = row[2]?.trim() || '';
+        const quantityStr = row[6]?.trim() || '1'; // Quantity column
+        
+        // Skip empty rows, section headers, and rows without codes
+        if (!description && !code) continue;
+        if (!code || code.length < 3) continue;
+        if (code.toLowerCase().includes('codes') || code.toLowerCase().includes('manu')) continue;
+        if (description === description.toUpperCase() && !code) continue;
+        
+        const quantity = parseInt(quantityStr) || 1;
+        
+        parsedItems.push({
+          code,
+          name: description,
+          quantity
+        });
+      }
+      
+      // Delete existing checklist items for this file
+      await storage.deleteHardwareChecklistItems(fileId);
+      
+      // Look up products to determine buyout status
+      const productCodes = parsedItems.map(item => item.code);
+      const products = await storage.getProductsByCode(productCodes);
+      const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
+      
+      // Create checklist items
+      const createdItems: any[] = [];
+      let sortOrder = 0;
+      
+      for (const item of parsedItems) {
+        const product = productMap.get(item.code.toUpperCase());
+        const isBuyout = product?.stockStatus === 'BUYOUT';
+        
+        const created = await storage.createHardwareChecklistItem({
+          fileId,
+          productId: product?.id || null,
+          productCode: item.code,
+          productName: item.name,
+          quantity: item.quantity,
+          isBuyout,
+          buyoutArrived: false,
+          isPacked: false,
+          packedBy: null,
+          sortOrder: sortOrder++
+        });
+        createdItems.push(created);
+      }
+      
+      // Calculate BO status
+      const hasBuyout = createdItems.some(item => item.isBuyout);
+      let boStatus = 'NO BO HARDWARE';
+      if (hasBuyout) {
+        boStatus = 'WAITING FOR BO HARDWARE';
+      }
+      
+      // Update the file with the BO status
+      await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
+      
+      console.log(`[Hardware Checklist] Generated ${createdItems.length} items for file ${fileId}, BO status: ${boStatus}`);
+      res.json({ 
+        items: createdItems, 
+        boStatus,
+        totalItems: createdItems.length,
+        buyoutItems: createdItems.filter(i => i.isBuyout).length
+      });
+    } catch (e: any) {
+      console.error('[Hardware Checklist] Error generating:', e);
+      res.status(500).json({ message: 'Failed to generate hardware checklist', error: e.message });
+    }
+  });
+
+  // Link images to products by row numbers
+  app.post('/api/products/link-images', isAuthenticated, async (req, res) => {
+    try {
+      const { imagePath, rowNumbers } = req.body;
+      
+      if (!imagePath || !Array.isArray(rowNumbers)) {
+        return res.status(400).json({ message: 'imagePath and rowNumbers array required' });
+      }
+      
+      // Find products by their import row numbers
+      const products = await storage.getProductsByImportRowNumbers(rowNumbers);
+      
+      const updated: any[] = [];
+      for (const product of products) {
+        const updatedProduct = await storage.updateProduct(product.id, { imagePath });
+        if (updatedProduct) {
+          updated.push(updatedProduct);
+        }
+      }
+      
+      console.log(`[Products] Linked image to ${updated.length} products for rows: ${rowNumbers.join(', ')}`);
+      res.json({ updated });
+    } catch (e: any) {
+      console.error('[Products] Error linking images:', e);
+      res.status(500).json({ message: 'Failed to link images', error: e.message });
+    }
+  });
+
   return httpServer;
 }
