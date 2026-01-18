@@ -362,6 +362,16 @@ export default function Products() {
               <Card key={product.id} className="hover-elevate" data-testid={`card-product-${product.id}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2">
+                    {product.imagePath && (
+                      <div className="flex-shrink-0">
+                        <img 
+                          src={product.imagePath} 
+                          alt={product.code}
+                          className="w-10 h-10 object-cover rounded border"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <h3 className="font-mono text-sm font-medium truncate" data-testid={`text-product-code-${product.id}`}>
                         {product.code}
