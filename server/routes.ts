@@ -3284,11 +3284,14 @@ export async function registerRoutes(
             hafeleCode = hafeleCode.substring(1);
           }
           
-          // Fetch the Hafele search page
-          const searchUrl = `https://www.hafele.ca/en/search/?text=${encodeURIComponent(hafeleCode)}`;
-          console.log(`[Hafele Images] Fetching: ${searchUrl}`);
+          // Remove dots to create the URL article number (801.13.201 -> 80113201)
+          const articleNumber = hafeleCode.replace(/\./g, '');
           
-          const response = await fetch(searchUrl, {
+          // Fetch the Hafele product page directly
+          const productUrl = `https://www.hafele.ca/en/product/-/${articleNumber}/`;
+          console.log(`[Hafele Images] Fetching: ${productUrl}`);
+          
+          const response = await fetch(productUrl, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -3305,14 +3308,14 @@ export async function registerRoutes(
           
           const html = await response.text();
           
-          // Look for product image URL pattern - Hafele uses medias with article numbers
-          // Pattern: /medias/XXXXXXXX-XXXXX-X-XXX.jpg or similar
-          const imageMatch = html.match(/https:\/\/www\.hafele\.ca\/MEDIAS\/[^"'\s]+\.(jpg|jpeg|png|webp)/i) ||
-                            html.match(/src="(\/MEDIAS\/[^"]+\.(jpg|jpeg|png|webp))"/i);
+          // Look for product image URL pattern - Hafele uses INTERSHOP/static path
+          // Pattern: /INTERSHOP/static/WFS/Haefele-HCN-Site/-/Haefele/en_CA/pim/images/default/ppic-XXXXXXXX.jpg
+          const imageMatch = html.match(/https:\/\/www\.hafele\.ca\/INTERSHOP\/static\/[^"'\s]+\/pim\/images\/[^"'\s]+\.(jpg|jpeg|png|webp)/i) ||
+                            html.match(/src="(\/INTERSHOP\/static\/[^"]+\/pim\/images\/[^"]+\.(jpg|jpeg|png|webp))"/i);
           
           if (!imageMatch) {
-            // Try alternate pattern for product images
-            const altMatch = html.match(/"(https:\/\/[^"]+hafele[^"]+\.(jpg|jpeg|png|webp))"/i);
+            // Try alternate pattern - look for any hafele.ca image URL
+            const altMatch = html.match(/"(https:\/\/www\.hafele\.ca\/INTERSHOP\/[^"]+\.(jpg|jpeg|png|webp))"/i);
             if (!altMatch) {
               errors.push({ code: product.code, error: 'No image found on page' });
               consecutiveErrors = 0;
