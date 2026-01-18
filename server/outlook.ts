@@ -192,12 +192,23 @@ async function processMessages(client: Client, messages: any[]): Promise<NetleyE
         (att: any) => att.contentType === 'application/pdf' || att.name?.toLowerCase().endsWith('.pdf')
       );
       
-      const csvAttachments = allAttachments.filter(
-        (att: any) => att.contentType === 'text/csv' || 
-                      att.contentType === 'application/csv' ||
-                      att.contentType === 'application/vnd.ms-excel' ||
-                      att.name?.toLowerCase().endsWith('.csv')
-      );
+      // CSV detection: check content type OR filename extension
+      // Note: CSVs often come as application/octet-stream, so we prioritize filename check
+      const csvAttachments = allAttachments.filter((att: any) => {
+        const name = att.name?.toLowerCase() || '';
+        const contentType = att.contentType?.toLowerCase() || '';
+        const isCsvByName = name.endsWith('.csv');
+        const isCsvByType = contentType === 'text/csv' || 
+                           contentType === 'application/csv' ||
+                           contentType === 'application/vnd.ms-excel' ||
+                           (contentType === 'application/octet-stream' && isCsvByName);
+        
+        if (isCsvByName) {
+          console.log(`[Outlook DEBUG] CSV detected by filename: "${att.name}" (contentType: ${att.contentType})`);
+        }
+        
+        return isCsvByName || isCsvByType;
+      });
       
       const relevantAttachments = [...pdfAttachments, ...csvAttachments];
       
