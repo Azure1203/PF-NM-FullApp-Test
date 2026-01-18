@@ -187,19 +187,29 @@ async function processMessages(client: Client, messages: any[]): Promise<NetleyE
         console.log(`[Outlook DEBUG]   - "${att.name}" (type: ${att.contentType}, size: ${att.size})`);
       }
       
+      // Filter for PDFs and CSVs
       const pdfAttachments = allAttachments.filter(
         (att: any) => att.contentType === 'application/pdf' || att.name?.toLowerCase().endsWith('.pdf')
       );
       
-      console.log(`[Outlook DEBUG] PDF attachments: ${pdfAttachments.length}`);
+      const csvAttachments = allAttachments.filter(
+        (att: any) => att.contentType === 'text/csv' || 
+                      att.contentType === 'application/csv' ||
+                      att.contentType === 'application/vnd.ms-excel' ||
+                      att.name?.toLowerCase().endsWith('.csv')
+      );
       
-      if (pdfAttachments.length > 0) {
+      const relevantAttachments = [...pdfAttachments, ...csvAttachments];
+      
+      console.log(`[Outlook DEBUG] PDF attachments: ${pdfAttachments.length}, CSV attachments: ${csvAttachments.length}`);
+      
+      if (relevantAttachments.length > 0) {
         emailsWithAttachments.push({
           id: message.id,
           subject: message.subject,
           receivedDateTime: message.receivedDateTime,
           from: message.from?.emailAddress?.address || 'Unknown',
-          attachments: pdfAttachments.map((att: any) => ({
+          attachments: relevantAttachments.map((att: any) => ({
             id: att.id,
             name: att.name,
             contentType: att.contentType,

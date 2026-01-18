@@ -98,3 +98,14 @@ Preferred communication style: Simple, everyday language.
   - GET /api/files/:fileId/hardware-checklist - Get checklist items and progress
   - POST /api/hardware-checklist/:itemId/toggle-packed - Toggle packed status
   - POST /api/hardware-checklist/:itemId/toggle-buyout-arrived - Toggle buyout arrival
+
+### Outlook Integration - Automatic Hardware CSV Processing
+- **CSV Attachment Detection**: Outlook scheduler now detects CSV attachments (not just PDFs)
+- **Hardware CSV Matching**: Files with "HARDWARE" in filename are matched to orders by order number
+  - Format: `Test_Import_Order_-_1877_HARDWARE.csv` (order 1877)
+  - CSV format: col0=quantity, col1=code, col5=type (HARDWARE or COMPONENT)
+- **Auto-Generated Checklist**: When hardware CSV is matched:
+  - CSV stored in object storage at `.private/hardware-csvs/`
+  - Checklist items auto-generated with product lookups
+  - Duplicate codes aggregated (quantities summed)
+  - BO status calculated and stored on order file
