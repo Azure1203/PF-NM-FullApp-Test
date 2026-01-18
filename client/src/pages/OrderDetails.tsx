@@ -1958,17 +1958,14 @@ export default function OrderDetails() {
                                           <Link href={`/files/${file.id}/hardware-checklist?palletId=${pallet.id}`}>
                                             <Button
                                               size="sm"
-                                              variant="outline"
-                                              className="text-xs bg-purple-100 border-purple-500 text-purple-700 hover:bg-purple-200"
+                                              variant="secondary"
+                                              className="text-xs"
                                               data-testid={`button-hardware-checklist-${file.id}`}
                                             >
                                               <CheckCircle className="w-3 h-3 mr-1" />
                                               Packaging Checklist
                                             </Button>
                                           </Link>
-                                          
-                                          {/* Spacer to push Packaging Link to the right */}
-                                          <div className="flex-1" />
                                           
                                           {/* Packaging Link - opens the Adobe Acrobat share link saved for this file */}
                                           {file.packagingLink ? (

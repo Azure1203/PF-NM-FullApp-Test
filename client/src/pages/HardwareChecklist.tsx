@@ -51,11 +51,11 @@ export default function HardwareChecklist() {
         </div>
 
         <div className="mb-4">
-          <h1 className="text-2xl font-bold">Hardware Packing Checklist</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold" data-testid="text-hardware-checklist-title">Hardware Packing Checklist</h1>
+          <p className="text-muted-foreground" data-testid="text-hardware-checklist-file">
             {fileInfo?.originalFilename || `File #${fileId}`}
             {fileInfo?.allmoxyJobNumber && (
-              <span className="ml-2 text-primary font-medium">
+              <span className="ml-2 text-primary font-medium" data-testid="text-hardware-checklist-job">
                 (Job #{fileInfo.allmoxyJobNumber})
               </span>
             )}
