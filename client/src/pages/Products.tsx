@@ -458,30 +458,17 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="weight">Weight (g)</Label>
-                  <Input
-                    id="weight"
-                    type="number"
-                    step="0.01"
-                    data-testid="input-product-weight"
-                    placeholder="0"
-                    value={formData.weight}
-                    onChange={(e) => setFormData(prev => ({ ...prev, weight: e.target.value }))}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="importRowNumber">Import Row # (for image linking)</Label>
-                  <Input
-                    id="importRowNumber"
-                    type="number"
-                    data-testid="input-product-import-row"
-                    placeholder="Row number from CSV"
-                    value={formData.importRowNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, importRowNumber: e.target.value }))}
-                  />
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="weight">Weight (g)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  step="0.01"
+                  data-testid="input-product-weight"
+                  placeholder="0"
+                  value={formData.weight}
+                  onChange={(e) => setFormData(prev => ({ ...prev, weight: e.target.value }))}
+                />
               </div>
 
               <div className="grid gap-2">
