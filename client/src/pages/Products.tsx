@@ -41,6 +41,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
+import { useUpload } from "@/hooks/use-upload";
 import type { Product } from "@shared/schema";
 
 interface ProductFormData {
@@ -70,6 +71,15 @@ const emptyFormData: ProductFormData = {
 export default function Products() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { uploadFile, isUploading: isUploadingImage } = useUpload({
+    onSuccess: (response) => {
+      setFormData(prev => ({ ...prev, imagePath: response.objectPath }));
+      toast({ title: "Image uploaded successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to upload image", description: error.message, variant: "destructive" });
+    },
+  });
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -543,11 +553,28 @@ export default function Products() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="imagePath">Image URL</Label>
+                <Label>Product Image</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    data-testid="input-product-image-upload"
+                    disabled={isUploadingImage}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        await uploadFile(file);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  {isUploadingImage && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
                 <Input
                   id="imagePath"
                   data-testid="input-product-image-path"
-                  placeholder="https://example.com/image.jpg"
+                  placeholder="Or paste image URL..."
                   value={formData.imagePath}
                   onChange={(e) => setFormData(prev => ({ ...prev, imagePath: e.target.value }))}
                 />
