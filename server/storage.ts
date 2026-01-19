@@ -30,7 +30,7 @@ import {
   type HardwareChecklistItem,
   type InsertHardwareChecklistItem
 } from "@shared/schema";
-import { eq, desc, and, inArray, sql, ilike } from "drizzle-orm";
+import { eq, desc, and, or, inArray, sql, ilike } from "drizzle-orm";
 
 export interface IStorage {
   // Project methods
@@ -377,7 +377,13 @@ export class DatabaseStorage implements IStorage {
     
     const conditions = [];
     if (search) {
-      conditions.push(ilike(products.code, `%${search}%`));
+      // Search both product code and supplier
+      conditions.push(
+        or(
+          ilike(products.code, `%${search}%`),
+          ilike(products.supplier, `%${search}%`)
+        )
+      );
     }
     if (category) {
       conditions.push(eq(products.category, category));

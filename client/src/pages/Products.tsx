@@ -271,43 +271,50 @@ export default function Products() {
       </div>
       
       <div className="container mx-auto px-4 py-6 max-w-6xl">
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              data-testid="input-product-search"
-              placeholder="Search by product code..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                data-testid="input-product-search"
+                placeholder="Search by code or supplier..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-category-filter">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="HARDWARE">Hardware</SelectItem>
+                <SelectItem value="COMPONENT">Component</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="HARDWARE">Hardware</SelectItem>
-              <SelectItem value="COMPONENT">Component</SelectItem>
-            </SelectContent>
-          </Select>
-          <Link href="/products/import">
-            <Button variant="outline" data-testid="button-import-hardware">
-              <Upload className="h-4 w-4 mr-2" />
-              Import Hardware
+          <div className="flex flex-wrap gap-2">
+            <Link href="/products/import">
+              <Button variant="outline" size="sm" data-testid="button-import-hardware">
+                <Upload className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Import Hardware</span>
+                <span className="sm:hidden">Hardware</span>
+              </Button>
+            </Link>
+            <Link href="/products/import-components">
+              <Button variant="outline" size="sm" data-testid="button-import-components">
+                <Upload className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Import Components</span>
+                <span className="sm:hidden">Components</span>
+              </Button>
+            </Link>
+            <Button onClick={openCreateDialog} size="sm" data-testid="button-add-product">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Product</span>
+              <span className="sm:hidden">Add</span>
             </Button>
-          </Link>
-          <Link href="/products/import-components">
-            <Button variant="outline" data-testid="button-import-components">
-              <Upload className="h-4 w-4 mr-2" />
-              Import Components
-            </Button>
-          </Link>
-          <Button onClick={openCreateDialog} data-testid="button-add-product">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Button>
+          </div>
         </div>
         
         <div className="flex flex-wrap gap-2 mb-6">
