@@ -105,23 +105,31 @@ export default function ComponentImport() {
         errors: 0,
       };
       
+      const BATCH_SIZE = 200;
+      
       if (preview.newItems.length > 0) {
-        const response = await apiRequest('POST', '/api/components/import', {
-          items: preview.newItems,
-        });
-        const data = await response.json();
-        results.created = data.created?.length || 0;
-        results.errors += data.errors?.length || 0;
+        for (let i = 0; i < preview.newItems.length; i += BATCH_SIZE) {
+          const batch = preview.newItems.slice(i, i + BATCH_SIZE);
+          const response = await apiRequest('POST', '/api/components/import', {
+            items: batch,
+          });
+          const data = await response.json();
+          results.created += data.created?.length || 0;
+          results.errors += data.errors?.length || 0;
+        }
       }
       
       const itemsToUpdate = preview.changedItems.filter(item => selectedChanges.has(item.existingId));
       if (itemsToUpdate.length > 0) {
-        const response = await apiRequest('POST', '/api/components/import/update', {
-          items: itemsToUpdate,
-        });
-        const data = await response.json();
-        results.updated = data.updated?.length || 0;
-        results.errors += data.errors?.length || 0;
+        for (let i = 0; i < itemsToUpdate.length; i += BATCH_SIZE) {
+          const batch = itemsToUpdate.slice(i, i + BATCH_SIZE);
+          const response = await apiRequest('POST', '/api/components/import/update', {
+            items: batch,
+          });
+          const data = await response.json();
+          results.updated += data.updated?.length || 0;
+          results.errors += data.errors?.length || 0;
+        }
       }
       
       return results;
