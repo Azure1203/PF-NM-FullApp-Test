@@ -262,6 +262,113 @@ function hasHardwarePrefix(code: string): boolean {
   return HARDWARE_PREFIXES.some(prefix => upperCode.startsWith(prefix));
 }
 
+// Auto-generate hardware checklist for an order file
+// This function is called automatically after CSV upload and can also be triggered manually
+async function generateHardwareChecklistForFile(fileId: number, rawContent: string): Promise<{ success: boolean; itemCount: number; error?: string }> {
+  try {
+    // Parse the CSV content
+    const records = await parseCSV(rawContent);
+    
+    // Extract ALL items from CSV (we'll filter based on products DB)
+    const { items: allItems, invalidRows, headerFound } = extractAllItemsFromCSV(records);
+    
+    if (!headerFound) {
+      console.log(`[Hardware Checklist Auto] File ${fileId}: No "Manuf code" header found`);
+      return { success: false, itemCount: 0, error: 'No header found' };
+    }
+    
+    if (allItems.length === 0) {
+      console.log(`[Hardware Checklist Auto] File ${fileId}: No items found in CSV`);
+      return { success: false, itemCount: 0, error: 'No items in CSV' };
+    }
+    
+    // Look up ALL codes in products database
+    const allCodes = allItems.map(item => item.code);
+    const productsFromDb = await storage.getProductsByCode(allCodes);
+    const productMap = new Map(productsFromDb.map(p => [p.code.toUpperCase(), p]));
+    
+    // Classify each item
+    const hardwareItems: Array<{
+      rowIndex: number;
+      code: string;
+      name: string;
+      quantity: number;
+      product: typeof productsFromDb[0] | null;
+      classification: string;
+    }> = [];
+    
+    for (const item of allItems) {
+      const product = productMap.get(item.code.toUpperCase()) || null;
+      let classification: string;
+      
+      if (product) {
+        classification = product.category === 'HARDWARE' ? 'HARDWARE_IN_DB' : 'COMPONENT_IN_DB';
+      } else {
+        classification = hasHardwarePrefix(item.code) ? 'HARDWARE_PREFIX_NOT_IN_DB' : 'NOT_HARDWARE';
+      }
+      
+      // Only keep hardware items
+      if (classification === 'HARDWARE_IN_DB' || classification === 'HARDWARE_PREFIX_NOT_IN_DB') {
+        hardwareItems.push({ ...item, product, classification });
+      }
+    }
+    
+    if (hardwareItems.length === 0) {
+      console.log(`[Hardware Checklist Auto] File ${fileId}: No hardware items found (${allItems.length} items checked)`);
+      return { success: true, itemCount: 0 }; // Success but no hardware
+    }
+    
+    // Build checklist items to insert
+    const itemsToInsert = hardwareItems.map((item, index) => {
+      const isBuyout = item.product?.stockStatus === 'BUYOUT';
+      const notInDatabase = item.classification === 'HARDWARE_PREFIX_NOT_IN_DB';
+      return {
+        fileId,
+        productId: item.product?.id || null,
+        productCode: item.code,
+        productName: item.name,
+        quantity: item.quantity,
+        isBuyout,
+        buyoutArrived: false,
+        isPacked: false,
+        packedBy: null,
+        sortOrder: index,
+        notInDatabase
+      };
+    });
+    
+    // Insert items
+    const createdItems = await storage.replaceHardwareChecklist(fileId, itemsToInsert);
+    
+    // Calculate and update BO status
+    const buyoutItems = createdItems.filter(i => i.isBuyout);
+    let boStatus = 'NO_BO_HARDWARE';
+    if (buyoutItems.length > 0) {
+      const allBuyoutPacked = buyoutItems.every(i => i.isPacked);
+      boStatus = allBuyoutPacked ? 'BO_HARDWARE_ARRIVED' : 'WAITING_FOR_BO_HARDWARE';
+    }
+    
+    // Update order file with BO status
+    await storage.updateOrderFile(fileId, { buyoutStatus: boStatus });
+    
+    // Update pallet assignments with BO status
+    const buyoutOption = boStatus === 'NO_BO_HARDWARE' ? 'NO BO HARDWARE' 
+      : boStatus === 'WAITING_FOR_BO_HARDWARE' ? 'WAITING FOR BO HARDWARE' 
+      : 'BO HARDWARE ARRIVED';
+    const assignments = await storage.getAssignmentsForFile(fileId);
+    for (const assignment of assignments) {
+      await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
+    }
+    
+    console.log(`[Hardware Checklist Auto] File ${fileId}: Generated ${createdItems.length} items, BO status: ${boStatus}`);
+    return { success: true, itemCount: createdItems.length };
+    
+  } catch (e: any) {
+    console.error(`[Hardware Checklist Auto] File ${fileId}: Error generating:`, e);
+    return { success: false, itemCount: 0, error: e.message };
+  }
+}
+
 // Count parts from actual CSV data rows
 // Now async to cross-reference with products DB for M&J Woodcraft and Richelieu counts
 async function countPartsFromCSV(records: string[][], productsMap?: Map<string, { category: string; supplier: string | null }>): Promise<{ coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[]; wallRailPieces: number }> {
@@ -769,6 +876,10 @@ export async function registerRoutes(
             quantity: ctsPart.quantity,
           });
         }
+        
+        // Auto-generate hardware checklist from order CSV
+        const checklistResult = await generateHardwareChecklistForFile(orderFile.id, pf.content);
+        console.log(`[Upload] Order ${orderFile.id}: Hardware checklist auto-generated - ${checklistResult.itemCount} items`);
       }
 
       res.status(201).json(project);
