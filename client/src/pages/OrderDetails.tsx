@@ -1923,10 +1923,16 @@ export default function OrderDetails() {
                                         {/* Buyout Hardware Status Badge (Read-only, auto-updated from checklist) */}
                                         {(() => {
                                           const assignment = pallet.assignments?.find(a => a.fileId === file.id);
-                                          if (!assignment) return null;
-                                          const statuses = assignment.buyoutHardwareStatuses || [];
-                                          // Show the first (and only) status - auto-set by backend based on checklist
-                                          const currentStatus = statuses[0] || 'NO BUYOUT HARDWARE';
+                                          // Get status from assignment if available, otherwise from file's hardwareBoStatus
+                                          let currentStatus: string;
+                                          if (assignment && assignment.buyoutHardwareStatuses?.length > 0) {
+                                            currentStatus = assignment.buyoutHardwareStatuses[0];
+                                          } else if ((file as any).hardwareBoStatus) {
+                                            // Map file status format to display format
+                                            currentStatus = (file as any).hardwareBoStatus;
+                                          } else {
+                                            currentStatus = 'NO BUYOUT HARDWARE';
+                                          }
                                           
                                           let statusStyle = 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300';
                                           if (currentStatus === 'WAITING FOR BO HARDWARE') {

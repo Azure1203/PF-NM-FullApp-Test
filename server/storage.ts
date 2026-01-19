@@ -288,12 +288,29 @@ export class DatabaseStorage implements IStorage {
     // Create new assignments
     if (fileIds.length === 0) return [];
     
+    // Fetch files to get their hardwareBoStatus so assignments inherit BO status
+    const files = await db.select().from(orderFiles).where(
+      inArray(orderFiles.id, fileIds)
+    );
+    const fileStatusMap = new Map(files.map(f => [f.id, f.hardwareBoStatus]));
+    
     const results: PalletFileAssignment[] = [];
     for (const fileId of fileIds) {
+      // Map file's hardwareBoStatus to BuyoutHardwareOption format
+      const fileBoStatus = fileStatusMap.get(fileId);
+      let buyoutStatus: BuyoutHardwareOption[] = [];
+      if (fileBoStatus === 'WAITING FOR BO HARDWARE') {
+        buyoutStatus = ['WAITING FOR BO HARDWARE'];
+      } else if (fileBoStatus === 'BO HARDWARE ARRIVED') {
+        buyoutStatus = ['BO HARDWARE ARRIVED'];
+      } else if (fileBoStatus === 'NO BO HARDWARE') {
+        buyoutStatus = ['NO BUYOUT HARDWARE'];
+      }
+      
       const [created] = await db.insert(palletFileAssignments).values({
         palletId,
         fileId,
-        buyoutHardwareStatuses: [] as BuyoutHardwareOption[]
+        buyoutHardwareStatuses: buyoutStatus
       }).returning();
       results.push(created);
     }
