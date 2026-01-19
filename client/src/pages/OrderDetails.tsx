@@ -2109,16 +2109,32 @@ export default function OrderDetails() {
                               </p>
                             </div>
                           </div>
-                          {projectFile && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={(e) => { e.stopPropagation(); downloadFile(projectFile); }}
-                              data-testid={`button-download-file-${idx}`}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* BO Status Badge */}
+                            {(() => {
+                              const boStatus = getBoStatusDisplay(null, (projectFile as any)?.hardwareBoStatus);
+                              if (!boStatus) return null;
+                              return (
+                                <div 
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border ${boStatus.style}`}
+                                  data-testid={`status-buyout-file-${idx}`}
+                                >
+                                  <Truck className="w-3 h-3" />
+                                  <span className="hidden sm:inline">{boStatus.label}</span>
+                                </div>
+                              );
+                            })()}
+                            {projectFile && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); downloadFile(projectFile); }}
+                                data-testid={`button-download-file-${idx}`}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
