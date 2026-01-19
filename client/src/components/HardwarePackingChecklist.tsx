@@ -26,6 +26,7 @@ interface HardwareChecklistItem {
   sortOrder: number;
   imagePath: string | null;
   productStockStatus: string | null;
+  notInDatabase?: boolean;
 }
 
 interface HardwareChecklistProgress {
@@ -215,6 +216,15 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
                           }`}
                         >
                           {item.buyoutArrived ? 'BO Arrived' : 'BO Waiting'}
+                        </Badge>
+                      )}
+                      {item.notInDatabase && (
+                        <Badge 
+                          variant="secondary" 
+                          className="text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 gap-1"
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          Not in DB
                         </Badge>
                       )}
                     </div>

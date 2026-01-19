@@ -99,6 +99,33 @@ Preferred communication style: Simple, everyday language.
   - POST /api/hardware-checklist/:itemId/toggle-packed - Toggle packed status
   - POST /api/hardware-checklist/:itemId/toggle-buyout-arrived - Toggle buyout arrival
 
+### Database-First Hardware Checklist Generation
+- **Cross-Reference Approach**: Hardware checklist generation now cross-references ALL CSV items against the products database
+- **Classification Logic**:
+  - Items with category=HARDWARE in DB → added to checklist
+  - Items NOT in DB but with hardware prefix (H., M-, R-, S.) → added with `notInDatabase=true` warning flag
+  - Items with category=COMPONENT in DB → skipped (not hardware)
+  - Items NOT in DB and no hardware prefix → skipped (not recognizable as hardware)
+- **UI Warning Badges**: Hardware checklist shows "Not in DB" badge (red) for items not yet in the product database
+- **Schema Update**: Added `notInDatabase` boolean field to `hardware_checklist_items` table
+
+### Component Import System
+- **New Import Page**: `/products/import-components` for importing component products (doors, drawer boxes, etc.)
+- **CSV Format**: A=name, B=code, C=supplier (different from hardware CSV)
+- **Category Assignment**: All imported components automatically get category=COMPONENT, stockStatus=IN_STOCK
+- **Zod Validation**: Component import endpoints validate request data with Zod schemas
+- **API Endpoints**:
+  - POST /api/components/import/preview - Parse CSV and compare with existing products
+  - POST /api/components/import - Import new component products
+  - POST /api/components/import/update - Update existing products to COMPONENT category
+
+### M&J Woodcraft and Richelieu Door Counts
+- **Database-Driven Counts**: `countPartsFromCSV` is now async and cross-references products DB
+- **Supplier-Based Matching**: 
+  - M&J doors counted when product has category=COMPONENT AND supplier contains 'MJ Woodcraft' or 'M&J Woodcraft'
+  - Richelieu doors counted when product has category=COMPONENT AND supplier contains 'Richelieu'
+- **No More Keyword Matching**: Replaced hardcoded keyword arrays with database lookups
+
 ### Outlook Integration - Automatic Hardware CSV Processing
 - **CSV Attachment Detection**: Outlook scheduler now detects CSV attachments (not just PDFs)
 - **Hardware CSV Matching**: Files with "HARDWARE" in filename are matched to orders by order number

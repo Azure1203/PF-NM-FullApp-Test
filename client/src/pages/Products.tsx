@@ -293,9 +293,15 @@ export default function Products() {
             </SelectContent>
           </Select>
           <Link href="/products/import">
-            <Button variant="outline" data-testid="button-import-products">
+            <Button variant="outline" data-testid="button-import-hardware">
               <Upload className="h-4 w-4 mr-2" />
-              Import CSV
+              Import Hardware
+            </Button>
+          </Link>
+          <Link href="/products/import-components">
+            <Button variant="outline" data-testid="button-import-components">
+              <Upload className="h-4 w-4 mr-2" />
+              Import Components
             </Button>
           </Link>
           <Button onClick={openCreateDialog} data-testid="button-add-product">

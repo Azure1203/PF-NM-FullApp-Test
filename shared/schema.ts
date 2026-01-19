@@ -329,6 +329,7 @@ export const hardwareChecklistItems = pgTable("hardware_checklist_items", {
   packedAt: timestamp("packed_at"),
   packedBy: text("packed_by"),
   sortOrder: integer("sort_order").default(0), // Order in the original CSV
+  notInDatabase: boolean("not_in_database").default(false).notNull(), // Item has hardware prefix but isn't in products DB
   createdAt: timestamp("created_at").defaultNow(),
 });
 

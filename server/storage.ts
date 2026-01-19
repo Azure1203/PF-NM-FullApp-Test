@@ -42,6 +42,7 @@ export interface IStorage {
   
   // Order file methods
   getProjectFiles(projectId: number): Promise<OrderFile[]>;
+  getOrderFile(fileId: number): Promise<OrderFile | undefined>;
   getFileWithProject(fileId: number): Promise<{ file: OrderFile; projectName: string } | undefined>;
   createOrderFile(file: InsertOrderFile): Promise<OrderFile>;
   updateOrderFile(id: number, updates: Partial<OrderFile>): Promise<OrderFile | undefined>;
@@ -138,6 +139,11 @@ export class DatabaseStorage implements IStorage {
   // Order file methods
   async getProjectFiles(projectId: number): Promise<OrderFile[]> {
     return await db.select().from(orderFiles).where(eq(orderFiles.projectId, projectId)).orderBy(orderFiles.id);
+  }
+
+  async getOrderFile(fileId: number): Promise<OrderFile | undefined> {
+    const [file] = await db.select().from(orderFiles).where(eq(orderFiles.id, fileId));
+    return file;
   }
 
   async getFileWithProject(fileId: number): Promise<{ file: OrderFile; projectName: string } | undefined> {

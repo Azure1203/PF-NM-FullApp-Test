@@ -186,30 +186,29 @@ function extractCTSParts(records: string[][]): Array<{ partNumber: string; descr
   return ctsParts;
 }
 
-// Hardware prefixes that identify hardware items in order CSV
+// Hardware prefixes that identify hardware items in order CSV (fallback for items not in DB)
 const HARDWARE_PREFIXES = ['H.', 'M.', 'M-', 'R-', 'R.', 'S.'];
 
-interface HardwareExtractionResult {
-  validItems: Array<{
+interface CsvItemExtractionResult {
+  items: Array<{
     rowIndex: number;
     code: string;
     name: string;
     quantity: number;
   }>;
-  skippedRows: Array<{
+  invalidRows: Array<{
     rowIndex: number;
     code: string;
     name: string;
     reason: string;
   }>;
-  totalHardwareRows: number;
+  headerFound: boolean;
 }
 
-// Extract hardware items from order CSV for building packing checklist
-function extractHardwareFromCSV(records: string[][]): HardwareExtractionResult {
-  const validItems: HardwareExtractionResult['validItems'] = [];
-  const skippedRows: HardwareExtractionResult['skippedRows'] = [];
-  let totalHardwareRows = 0;
+// Extract ALL items from order CSV (not just hardware - we'll filter later based on product DB)
+function extractAllItemsFromCSV(records: string[][]): CsvItemExtractionResult {
+  const items: CsvItemExtractionResult['items'] = [];
+  const invalidRows: CsvItemExtractionResult['invalidRows'] = [];
   
   // Find the data section (starts after "Manuf code" header row)
   let dataStartIndex = -1;
@@ -221,43 +220,23 @@ function extractHardwareFromCSV(records: string[][]): HardwareExtractionResult {
   }
   
   if (dataStartIndex === -1) {
-    // No data section found - add a skip reason for clarity
-    return { 
-      validItems, 
-      skippedRows: [{ rowIndex: 0, code: '', name: '', reason: 'No "Manuf code" header row found - CSV format not recognized' }], 
-      totalHardwareRows 
-    };
+    return { items, invalidRows, headerFound: false };
   }
   
-  // Process each data row looking for hardware items
+  // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
     const row = records[i];
-    const sku = (row[0] || '').trim().toUpperCase();
     const originalCode = (row[0] || '').trim();
     const description = (row[1] || '').trim();
     const quantityStr = row[2] || '0';
     const quantity = parseInt(quantityStr) || 0;
     
-    // Check if this is a hardware item by prefix
-    const isHardware = HARDWARE_PREFIXES.some(prefix => sku.startsWith(prefix));
+    // Skip empty rows
+    if (!originalCode) continue;
     
-    if (!isHardware) continue;
-    
-    totalHardwareRows++;
-    
-    // Validate hardware row
-    if (!sku) {
-      skippedRows.push({
-        rowIndex: i + 1,
-        code: originalCode || '(empty)',
-        name: description || '(empty)',
-        reason: 'Empty product code'
-      });
-      continue;
-    }
-    
+    // Validate quantity
     if (quantity <= 0) {
-      skippedRows.push({
+      invalidRows.push({
         rowIndex: i + 1,
         code: originalCode,
         name: description || '(empty)',
@@ -266,7 +245,7 @@ function extractHardwareFromCSV(records: string[][]): HardwareExtractionResult {
       continue;
     }
     
-    validItems.push({
+    items.push({
       rowIndex: i + 1,
       code: originalCode,
       name: description,
@@ -274,11 +253,18 @@ function extractHardwareFromCSV(records: string[][]): HardwareExtractionResult {
     });
   }
   
-  return { validItems, skippedRows, totalHardwareRows };
+  return { items, invalidRows, headerFound: true };
+}
+
+// Check if a code looks like hardware based on prefix (fallback for items not in DB)
+function hasHardwarePrefix(code: string): boolean {
+  const upperCode = code.trim().toUpperCase();
+  return HARDWARE_PREFIXES.some(prefix => upperCode.startsWith(prefix));
 }
 
 // Count parts from actual CSV data rows
-function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[]; wallRailPieces: number } {
+// Now async to cross-reference with products DB for M&J Woodcraft and Richelieu counts
+async function countPartsFromCSV(records: string[][], productsMap?: Map<string, { category: string; supplier: string | null }>): Promise<{ coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[]; wallRailPieces: number }> {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
@@ -313,6 +299,23 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
 
   if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts: [], wallRailPieces };
 
+  // If productsMap not provided, fetch products from database
+  // Collect all codes first so we can batch lookup
+  if (!productsMap) {
+    const allCodes: string[] = [];
+    for (let i = dataStartIndex; i < records.length; i++) {
+      const sku = (records[i][0] || '').trim();
+      if (sku) allCodes.push(sku);
+    }
+    
+    // Lookup all products at once
+    const productsFromDb = await storage.getProductsByCode(allCodes);
+    productsMap = new Map(productsFromDb.map(p => [
+      p.code.toUpperCase(), 
+      { category: p.category, supplier: p.supplier }
+    ]));
+  }
+
   // Process each data row
   for (let i = dataStartIndex; i < records.length; i++) {
     const row = records[i];
@@ -330,6 +333,21 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     if (sku.startsWith('H.') || sku.startsWith('M.') || sku.startsWith('M-') || 
         sku.startsWith('R-') || sku.startsWith('R.') || sku.startsWith('S.')) {
       continue;
+    }
+
+    // Check product database for COMPONENT items with specific suppliers
+    // M&J Woodcraft and Richelieu counts are now based on products DB
+    const productInfo = productsMap.get(sku);
+    if (productInfo && productInfo.category === 'COMPONENT') {
+      const supplier = (productInfo.supplier || '').toUpperCase();
+      if (supplier.includes('MJ WOODCRAFT') || supplier.includes('M&J WOODCRAFT')) {
+        hasMJDoors = true;
+        mjDoorsCount += quantity;
+      }
+      if (supplier.includes('RICHELIEU')) {
+        hasRichelieuDoors = true;
+        richelieuDoorsCount += quantity;
+      }
     }
 
     // MDRW parts (drawer parts)
@@ -373,18 +391,6 @@ function countPartsFromCSV(records: string[][]): { coreParts: number; dovetails:
     if (GLASS_SHELF_KEYWORDS.some(keyword => sku.includes(keyword))) {
       hasGlassParts = true;
       glassShelves += quantity;
-    }
-
-    // Check for M&J doors and count them
-    if (MJ_DOOR_KEYWORDS.some(keyword => sku.includes(keyword))) {
-      hasMJDoors = true;
-      mjDoorsCount += quantity;
-    }
-
-    // Check for Richelieu doors and count them
-    if (RICHELIEU_DOOR_KEYWORDS.some(keyword => sku.includes(keyword))) {
-      hasRichelieuDoors = true;
-      richelieuDoorsCount += quantity;
     }
 
     // Track max part height (column 3 is Height)
@@ -725,8 +731,8 @@ export async function registerRoutes(
 
       // Create order files linked to the project with calculated values
       for (const pf of parsedFiles) {
-        // Calculate part counts from CSV data
-        const partCounts = countPartsFromCSV(pf.records);
+        // Calculate part counts from CSV data (async to cross-reference products DB)
+        const partCounts = await countPartsFromCSV(pf.records);
         
         const orderFile = await storage.createOrderFile({
           projectId: project.id,
@@ -2786,7 +2792,7 @@ export async function registerRoutes(
       
       const { ObjectStorageService } = await import('./replit_integrations/object_storage');
       const objectStorage = new ObjectStorageService();
-      const imageBuffer = await objectStorage.downloadFile(fullPath);
+      const imageBuffer = await objectStorage.downloadBuffer(fullPath);
       
       if (!imageBuffer) {
         return res.status(404).json({ message: 'Image not found' });
@@ -3047,7 +3053,7 @@ export async function registerRoutes(
         for (const file of files) {
           if (file.rawContent) {
             const records = await parseCSV(file.rawContent);
-            const counts = countPartsFromCSV(records);
+            const counts = await countPartsFromCSV(records);
             
             // Update file with calculated values
             await storage.updateOrderFile(file.id, {
@@ -3816,6 +3822,259 @@ export async function registerRoutes(
     }
   });
 
+  // ====== COMPONENT IMPORT ROUTES ======
+  // Parse component CSV and return preview (new/changed/unchanged items)
+  // Component CSV format: A=name, B=code, C=supplier (no stock column - always IN_STOCK)
+  app.post('/api/components/import/preview', isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      const fileContent = req.file.buffer.toString('utf-8');
+      const records = await parseCSV(fileContent);
+      
+      // Parse the CSV - columns: A=name, B=code, C=supplier
+      const parsedItems: Array<{
+        rowNumber: number;
+        code: string;
+        name: string;
+        supplier: string;
+      }> = [];
+      
+      let rowNumber = 0;
+      for (const row of records) {
+        rowNumber++;
+        const name = row[0]?.trim() || '';
+        const code = row[1]?.trim() || '';
+        const supplier = row[2]?.trim() || '';
+        
+        // Skip empty rows
+        if (!name && !code && !supplier) continue;
+        
+        // Skip header-like rows
+        if (code.toLowerCase().includes('code') || code.toLowerCase() === 'product code' || 
+            code.toLowerCase() === 'item code' || name.toLowerCase() === 'name' ||
+            name.toLowerCase() === 'description' || name.toLowerCase() === 'product name') continue;
+        
+        // Skip section headers (all uppercase name with no code)
+        if (!code && name === name.toUpperCase() && name.length > 3) continue;
+        
+        // Skip rows without a valid code
+        if (!code || code.length < 2) continue;
+        
+        parsedItems.push({
+          rowNumber,
+          code,
+          name,
+          supplier
+        });
+      }
+      
+      // Deduplicate items within the CSV - keep only first occurrence of each code
+      const seenCodes = new Set<string>();
+      const deduplicatedItems = parsedItems.filter(item => {
+        const upperCode = item.code.toUpperCase();
+        if (seenCodes.has(upperCode)) {
+          return false; // Skip duplicate
+        }
+        seenCodes.add(upperCode);
+        return true;
+      });
+      
+      // Look up existing products by code (case-insensitive)
+      const codes = deduplicatedItems.map(item => item.code);
+      const existingProducts = await storage.getProductsByCode(codes);
+      const existingMap = new Map(existingProducts.map(p => [p.code.toUpperCase(), p]));
+      
+      // Categorize items
+      const newItems: typeof deduplicatedItems = [];
+      const unchangedItems: typeof deduplicatedItems = [];
+      const changedItems: Array<{
+        rowNumber: number;
+        code: string;
+        name: string;
+        supplier: string;
+        existingName: string | null;
+        existingSupplier: string | null;
+        existingCategory: string | null;
+        existingId: number;
+      }> = [];
+      
+      for (const item of deduplicatedItems) {
+        const existing = existingMap.get(item.code.toUpperCase());
+        if (!existing) {
+          newItems.push(item);
+        } else {
+          // Check if anything changed
+          const nameChanged = (item.name || '') !== (existing.name || '');
+          const supplierChanged = (item.supplier || '') !== (existing.supplier || '');
+          // Also check if category needs to change from HARDWARE to COMPONENT
+          const categoryChanged = existing.category !== 'COMPONENT';
+          
+          if (nameChanged || supplierChanged || categoryChanged) {
+            changedItems.push({
+              ...item,
+              existingName: existing.name,
+              existingSupplier: existing.supplier,
+              existingCategory: existing.category,
+              existingId: existing.id
+            });
+          } else {
+            unchangedItems.push(item);
+          }
+        }
+      }
+      
+      const duplicatesSkipped = parsedItems.length - deduplicatedItems.length;
+      res.json({
+        totalParsed: parsedItems.length,
+        uniqueItems: deduplicatedItems.length,
+        duplicatesSkipped,
+        newItems,
+        unchangedItems,
+        changedItems
+      });
+    } catch (e: any) {
+      console.error('[Components Import] Error previewing CSV:', e);
+      res.status(500).json({ message: 'Failed to parse CSV', error: e.message });
+    }
+  });
+
+  // Validation schema for component import items
+  const componentImportItemSchema = z.object({
+    code: z.string().min(2, 'Product code must be at least 2 characters'),
+    name: z.string().optional().nullable(),
+    supplier: z.string().optional().nullable(),
+    rowNumber: z.number().optional().nullable()
+  });
+
+  // Import new components from CSV
+  app.post('/api/components/import', isAuthenticated, async (req, res) => {
+    try {
+      const { items } = req.body;
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: 'items must be an array' });
+      }
+      
+      // Validate items
+      const validItems: z.infer<typeof componentImportItemSchema>[] = [];
+      const validationErrors: any[] = [];
+      
+      for (const item of items) {
+        const result = componentImportItemSchema.safeParse(item);
+        if (result.success) {
+          validItems.push(result.data);
+        } else {
+          validationErrors.push({ 
+            code: item?.code || 'unknown', 
+            error: result.error.errors.map(e => e.message).join(', ') 
+          });
+        }
+      }
+      
+      // Deduplicate items by code (case-insensitive) - keep first occurrence
+      const seenCodes = new Set<string>();
+      const deduplicatedItems = validItems.filter((item) => {
+        const upperCode = item.code.toUpperCase();
+        if (seenCodes.has(upperCode)) {
+          return false;
+        }
+        seenCodes.add(upperCode);
+        return true;
+      });
+      
+      const created: any[] = [];
+      const errors: any[] = [];
+      
+      for (const item of deduplicatedItems) {
+        try {
+          const product = await storage.createProduct({
+            code: item.code,
+            name: item.name || null,
+            supplier: item.supplier || null,
+            category: 'COMPONENT',  // Components always have COMPONENT category
+            stockStatus: 'IN_STOCK', // Components always IN_STOCK (no buyout tracking)
+            weight: null,
+            imagePath: null,
+            notes: null,
+            importRowNumber: item.rowNumber || null
+          });
+          created.push(product);
+        } catch (e: any) {
+          errors.push({ code: item.code, error: e.message });
+        }
+      }
+      
+      // Include validation errors in the response
+      const allErrors = [...validationErrors, ...errors];
+      console.log(`[Components Import] Created ${created.length} components, ${allErrors.length} errors`);
+      res.json({ created, errors: allErrors });
+    } catch (e: any) {
+      console.error('[Components Import] Error importing:', e);
+      res.status(500).json({ message: 'Failed to import components', error: e.message });
+    }
+  });
+
+  // Validation schema for component update items
+  const componentUpdateItemSchema = z.object({
+    code: z.string().min(2, 'Product code must be at least 2 characters'),
+    existingId: z.number().positive('Invalid product ID'),
+    name: z.string().optional().nullable(),
+    supplier: z.string().optional().nullable(),
+    rowNumber: z.number().optional().nullable()
+  });
+
+  // Update existing products with approved component changes
+  app.post('/api/components/import/update', isAuthenticated, async (req, res) => {
+    try {
+      const { items } = req.body;
+      
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: 'items must be an array' });
+      }
+      
+      const updated: any[] = [];
+      const errors: any[] = [];
+      
+      for (const item of items) {
+        // Validate each item
+        const validation = componentUpdateItemSchema.safeParse(item);
+        if (!validation.success) {
+          errors.push({ 
+            code: item?.code || 'unknown', 
+            error: validation.error.errors.map(e => e.message).join(', ') 
+          });
+          continue;
+        }
+        
+        const validItem = validation.data;
+        try {
+          const updateData: Record<string, any> = {
+            name: validItem.name || null,
+            supplier: validItem.supplier || null,
+            category: 'COMPONENT', // Always set to COMPONENT
+            importRowNumber: validItem.rowNumber || null
+          };
+          
+          const product = await storage.updateProduct(validItem.existingId, updateData);
+          if (product) {
+            updated.push(product);
+          }
+        } catch (e: any) {
+          errors.push({ code: validItem.code, error: e.message });
+        }
+      }
+      
+      console.log(`[Components Import] Updated ${updated.length} products to COMPONENT, ${errors.length} errors`);
+      res.json({ updated, errors });
+    } catch (e: any) {
+      console.error('[Components Import] Error updating:', e);
+      res.status(500).json({ message: 'Failed to update components', error: e.message });
+    }
+  });
+
   // Hardware checklist API endpoints
   app.get('/api/files/:fileId/hardware-checklist', isAuthenticated, async (req, res) => {
     try {
@@ -4122,6 +4381,9 @@ export async function registerRoutes(
   });
 
   // Generate hardware checklist from order file's stored CSV (rawContent)
+  // New logic: cross-reference ALL CSV items against products database
+  // Add if: category=HARDWARE OR (not in DB AND has hardware prefix)
+  // Skip if: category=COMPONENT OR (not in DB AND no hardware prefix)
   app.post('/api/files/:fileId/generate-hardware-from-order', isAuthenticated, async (req, res) => {
     try {
       const fileId = parseInt(req.params.fileId);
@@ -4142,41 +4404,99 @@ export async function registerRoutes(
       // Parse the stored CSV content
       const records = await parseCSV(orderFile.rawContent);
       
-      // Extract hardware items using the helper function (includes validation)
-      const { validItems, skippedRows, totalHardwareRows } = extractHardwareFromCSV(records);
+      // Extract ALL items from CSV (we'll filter based on products DB)
+      const { items: allItems, invalidRows, headerFound } = extractAllItemsFromCSV(records);
       
-      if (validItems.length === 0) {
+      if (!headerFound) {
         return res.status(400).json({ 
-          message: totalHardwareRows === 0 
-            ? 'No hardware items found in order CSV (items with H., M., R-, S. prefix)'
-            : 'All hardware items failed validation',
+          message: 'No "Manuf code" header row found - CSV format not recognized',
           totalRows: records.length,
-          totalHardwareRows,
-          skippedRows: skippedRows.length,
-          skippedRowsInfo: skippedRows,
-          errors: skippedRows.map(r => ({ 
-            rowIndex: r.rowIndex, 
-            code: r.code, 
-            name: r.name, 
-            error: r.reason 
-          }))
+          errors: [{ rowIndex: 0, code: '', name: '', error: 'Header row not found' }]
         });
       }
       
-      console.log(`[Hardware Checklist] Found ${validItems.length} valid hardware items (${skippedRows.length} skipped) in order file ${fileId}`);
+      if (allItems.length === 0 && invalidRows.length === 0) {
+        return res.status(400).json({ 
+          message: 'No items found in CSV data section',
+          totalRows: records.length,
+          errors: []
+        });
+      }
       
-      // Look up products to determine buyout status and get images
-      const productCodes = validItems.map(item => item.code);
-      const products = await storage.getProductsByCode(productCodes);
-      const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
+      console.log(`[Hardware Checklist] Extracted ${allItems.length} valid items, ${invalidRows.length} invalid rows from order file ${fileId}`);
+      
+      // Look up ALL codes in products database
+      const allCodes = allItems.map(item => item.code);
+      const productsFromDb = await storage.getProductsByCode(allCodes);
+      const productMap = new Map(productsFromDb.map(p => [p.code.toUpperCase(), p]));
+      
+      // Classify each item
+      interface ClassifiedItem {
+        rowIndex: number;
+        code: string;
+        name: string;
+        quantity: number;
+        product: typeof productsFromDb[0] | null;
+        classification: 'HARDWARE_IN_DB' | 'COMPONENT_IN_DB' | 'HARDWARE_PREFIX_NOT_IN_DB' | 'NOT_HARDWARE';
+      }
+      
+      const classifiedItems: ClassifiedItem[] = allItems.map(item => {
+        const product = productMap.get(item.code.toUpperCase()) || null;
+        let classification: ClassifiedItem['classification'];
+        
+        if (product) {
+          // Item exists in database
+          classification = product.category === 'HARDWARE' ? 'HARDWARE_IN_DB' : 'COMPONENT_IN_DB';
+        } else {
+          // Item not in database - check if it has hardware prefix
+          classification = hasHardwarePrefix(item.code) ? 'HARDWARE_PREFIX_NOT_IN_DB' : 'NOT_HARDWARE';
+        }
+        
+        return { ...item, product, classification };
+      });
+      
+      // Filter: keep HARDWARE_IN_DB and HARDWARE_PREFIX_NOT_IN_DB
+      const hardwareItems = classifiedItems.filter(
+        item => item.classification === 'HARDWARE_IN_DB' || item.classification === 'HARDWARE_PREFIX_NOT_IN_DB'
+      );
+      
+      // Track skipped items for reporting
+      const skippedItems = classifiedItems.filter(
+        item => item.classification === 'COMPONENT_IN_DB' || item.classification === 'NOT_HARDWARE'
+      );
+      
+      const skippedRowsInfo = [
+        ...invalidRows.map(r => ({ rowIndex: r.rowIndex, code: r.code, name: r.name, reason: r.reason })),
+        ...skippedItems.map(item => ({
+          rowIndex: item.rowIndex,
+          code: item.code,
+          name: item.name,
+          reason: item.classification === 'COMPONENT_IN_DB' 
+            ? 'Classified as COMPONENT in product database' 
+            : 'Not a hardware item (no hardware prefix and not in database)'
+        }))
+      ];
+      
+      if (hardwareItems.length === 0) {
+        return res.status(400).json({ 
+          message: 'No hardware items found in order CSV',
+          totalRows: records.length,
+          totalItems: allItems.length,
+          skippedRows: skippedRowsInfo.length,
+          skippedRowsInfo,
+          errors: []
+        });
+      }
+      
+      console.log(`[Hardware Checklist] Found ${hardwareItems.length} hardware items (${skippedItems.length} skipped as non-hardware) in order file ${fileId}`);
       
       // Build checklist items to insert
-      const itemsToInsert = validItems.map((item, index) => {
-        const product = productMap.get(item.code.toUpperCase());
-        const isBuyout = product?.stockStatus === 'BUYOUT';
+      const itemsToInsert = hardwareItems.map((item, index) => {
+        const isBuyout = item.product?.stockStatus === 'BUYOUT';
+        const notInDatabase = item.classification === 'HARDWARE_PREFIX_NOT_IN_DB';
         return {
           fileId,
-          productId: product?.id || null,
+          productId: item.product?.id || null,
           productCode: item.code,
           productName: item.name,
           quantity: item.quantity,
@@ -4184,7 +4504,8 @@ export async function registerRoutes(
           buyoutArrived: false,
           isPacked: false,
           packedBy: null,
-          sortOrder: index
+          sortOrder: index,
+          notInDatabase
         };
       });
       
@@ -4201,9 +4522,8 @@ export async function registerRoutes(
           expectedCount,
           insertedCount: 0,
           totalRows: records.length,
-          totalHardwareRows,
-          skippedRows: skippedRows.length,
-          skippedRowsInfo: skippedRows,
+          skippedRows: skippedRowsInfo.length,
+          skippedRowsInfo,
           errors: [{ rowIndex: 0, code: '', name: '', error: txError.message || 'Transaction failed' }]
         });
       }
@@ -4218,9 +4538,8 @@ export async function registerRoutes(
           expectedCount,
           insertedCount,
           totalRows: records.length,
-          totalHardwareRows,
-          skippedRows: skippedRows.length,
-          skippedRowsInfo: skippedRows,
+          skippedRows: skippedRowsInfo.length,
+          skippedRowsInfo,
           errors: []
         });
       }
@@ -4245,25 +4564,24 @@ export async function registerRoutes(
       }
       
       // Count matched vs unmatched products
-      const matchedProducts = createdItems.filter(item => item.productId !== null).length;
-      const unmatchedProducts = createdItems.filter(item => item.productId === null).length;
+      const matchedProducts = createdItems.filter((item: any) => item.productId !== null && !item.notInDatabase).length;
+      const notInDatabaseCount = createdItems.filter((item: any) => item.notInDatabase).length;
       
-      console.log(`[Hardware Checklist] Generated ${createdItems.length} items from order CSV for file ${fileId}, BO status: ${boStatus}, matched: ${matchedProducts}, unmatched: ${unmatchedProducts}, skipped: ${skippedRows.length}`);
+      console.log(`[Hardware Checklist] Generated ${createdItems.length} items from order CSV for file ${fileId}, BO status: ${boStatus}, matched: ${matchedProducts}, not in DB: ${notInDatabaseCount}, skipped: ${skippedRowsInfo.length}`);
       
       res.json({ 
         success: true,
         items: createdItems, 
         boStatus,
         totalItems: createdItems.length,
-        buyoutItems: createdItems.filter(i => i.isBuyout).length,
+        buyoutItems: createdItems.filter((i: any) => i.isBuyout).length,
         expectedCount,
         insertedCount,
         totalRows: records.length,
-        totalHardwareRows,
-        skippedRows: skippedRows.length,
-        skippedRowsInfo: skippedRows,
+        skippedRows: skippedRowsInfo.length,
+        skippedRowsInfo,
         matchedProducts,
-        unmatchedProducts,
+        notInDatabaseCount,
         errors: [] // Empty means all valid items were added successfully
       });
     } catch (e: any) {
