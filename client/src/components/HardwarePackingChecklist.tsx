@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Loader2, Package, CheckCircle, AlertCircle, Box, Truck, Clock } from "lucide-react";
+import { Loader2, Package, CheckCircle, AlertCircle, Box } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
@@ -66,21 +65,6 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
     },
   });
 
-  const toggleBuyoutArrivedMutation = useMutation({
-    mutationFn: async ({ itemId, buyoutArrived }: { itemId: number; buyoutArrived: boolean }) => {
-      return await apiRequest('POST', `/api/hardware-checklist/${itemId}/toggle-buyout-arrived`, { buyoutArrived });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
 
   if (isLoading) {
     return (
@@ -103,37 +87,8 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
   const progressPercent = progress.total > 0 ? (progress.packed / progress.total) * 100 : 0;
   const allPacked = progress.packed === progress.total;
   
-  // Calculate BO status
-  let boStatus: 'NO BO HARDWARE' | 'WAITING FOR BO HARDWARE' | 'BO HARDWARE ARRIVED' = 'NO BO HARDWARE';
-  if (progress.buyoutItems > 0) {
-    boStatus = progress.buyoutArrived === progress.buyoutItems ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
-  }
-
-  const getBoStatusBadge = () => {
-    switch (boStatus) {
-      case 'NO BO HARDWARE':
-        return (
-          <Badge variant="outline" className="gap-1">
-            <CheckCircle className="w-3 h-3" />
-            No BO Hardware
-          </Badge>
-        );
-      case 'WAITING FOR BO HARDWARE':
-        return (
-          <Badge variant="secondary" className="gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-            <Clock className="w-3 h-3" />
-            Waiting for BO Hardware ({progress.buyoutArrived}/{progress.buyoutItems})
-          </Badge>
-        );
-      case 'BO HARDWARE ARRIVED':
-        return (
-          <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-            <Truck className="w-3 h-3" />
-            BO Hardware Arrived
-          </Badge>
-        );
-    }
-  };
+  // Count buyout items for display
+  const buyoutCount = progress.buyoutItems;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -141,13 +96,17 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
         <CollapsibleTrigger asChild>
           <CardHeader className="pb-2 cursor-pointer hover-elevate">
             <CardTitle className="flex items-center justify-between gap-2 text-base">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Box className="w-4 h-4 text-primary" />
                 Hardware Packing Checklist
                 <Badge variant={allPacked ? 'default' : 'secondary'} className="ml-2">
                   {progress.packed}/{progress.total}
                 </Badge>
-                {getBoStatusBadge()}
+                {buyoutCount > 0 && (
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                    {buyoutCount} Buyout
+                  </Badge>
+                )}
               </div>
               {isOpen ? (
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -175,9 +134,7 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
                   className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
                     item.isPacked 
                       ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-                      : item.isBuyout && !item.buyoutArrived
-                        ? 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'
-                        : 'hover-elevate'
+                      : 'hover-elevate'
                   }`}
                   data-testid={`hardware-item-${item.id}`}
                 >
@@ -209,13 +166,9 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
                       {item.isBuyout && (
                         <Badge 
                           variant="secondary" 
-                          className={`text-xs ${
-                            item.buyoutArrived 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
-                          }`}
+                          className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
                         >
-                          {item.buyoutArrived ? 'BO Arrived' : 'BO Waiting'}
+                          BUYOUT
                         </Badge>
                       )}
                       {item.notInDatabase && (
@@ -235,50 +188,25 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    {item.isBuyout && (
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id={`buyout-arrived-${item.id}`}
-                          checked={item.buyoutArrived}
-                          onCheckedChange={(checked) => {
-                            toggleBuyoutArrivedMutation.mutate({
-                              itemId: item.id,
-                              buyoutArrived: !!checked,
-                            });
-                          }}
-                          disabled={toggleBuyoutArrivedMutation.isPending}
-                          data-testid={`checkbox-buyout-arrived-${item.id}`}
-                        />
-                        <label
-                          htmlFor={`buyout-arrived-${item.id}`}
-                          className="text-xs text-muted-foreground cursor-pointer"
-                        >
-                          Arrived
-                        </label>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`packed-${item.id}`}
-                        checked={item.isPacked}
-                        onCheckedChange={(checked) => {
-                          togglePackedMutation.mutate({
-                            itemId: item.id,
-                            isPacked: !!checked,
-                          });
-                        }}
-                        disabled={togglePackedMutation.isPending || (item.isBuyout && !item.buyoutArrived)}
-                        data-testid={`checkbox-packed-${item.id}`}
-                      />
-                      <label
-                        htmlFor={`packed-${item.id}`}
-                        className="text-xs text-muted-foreground cursor-pointer"
-                      >
-                        Packed
-                      </label>
-                    </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Checkbox
+                      id={`packed-${item.id}`}
+                      checked={item.isPacked}
+                      onCheckedChange={(checked) => {
+                        togglePackedMutation.mutate({
+                          itemId: item.id,
+                          isPacked: !!checked,
+                        });
+                      }}
+                      disabled={togglePackedMutation.isPending}
+                      data-testid={`checkbox-packed-${item.id}`}
+                    />
+                    <label
+                      htmlFor={`packed-${item.id}`}
+                      className="text-xs text-muted-foreground cursor-pointer"
+                    >
+                      Packed
+                    </label>
                   </div>
                 </div>
               ))}
