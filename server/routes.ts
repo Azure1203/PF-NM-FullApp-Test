@@ -262,6 +262,90 @@ function hasHardwarePrefix(code: string): boolean {
   return HARDWARE_PREFIXES.some(prefix => upperCode.startsWith(prefix));
 }
 
+// Helper function to update project's pfProductionStatus based on all files' BO statuses
+// This is at module level so it can be called from generateHardwareChecklistForFile
+async function updateProjectBoProductionStatus(projectId: number) {
+  const project = await storage.getProject(projectId);
+  if (!project) return;
+  
+  const files = await storage.getProjectFiles(projectId);
+  
+  // Analyze BO status across all files
+  const fileBoStatuses = files.map(f => f.hardwareBoStatus).filter(Boolean) as string[];
+  const hasWaitingForBo = fileBoStatuses.some(s => s === 'WAITING FOR BO HARDWARE');
+  const hasBoHardware = fileBoStatuses.some(s => s === 'WAITING FOR BO HARDWARE' || s === 'BO HARDWARE ARRIVED');
+  const allBoArrived = hasBoHardware && fileBoStatuses.every(s => s === 'NO BO HARDWARE' || s === 'BO HARDWARE ARRIVED');
+  
+  // Get current production statuses
+  const currentStatuses = project.pfProductionStatus || [];
+  let newStatuses = [...currentStatuses];
+  
+  // Remove existing BO-related statuses first
+  newStatuses = newStatuses.filter(s => s !== 'WAITING FOR BO HARDWARE' && s !== 'BO HARDWARE ARRIVED');
+  
+  // Add the appropriate BO status based on file statuses
+  if (hasWaitingForBo) {
+    // At least one file is waiting for BO hardware
+    newStatuses.push('WAITING FOR BO HARDWARE');
+  } else if (allBoArrived && hasBoHardware) {
+    // All files that had BO hardware now have it arrived
+    newStatuses.push('BO HARDWARE ARRIVED');
+  }
+  // If no files have BO hardware (all 'NO BO HARDWARE'), don't add any BO status
+  
+  // Update project if statuses changed
+  const statusesChanged = 
+    newStatuses.length !== currentStatuses.length || 
+    newStatuses.some(s => !currentStatuses.includes(s)) ||
+    currentStatuses.some(s => !newStatuses.includes(s));
+  
+  if (statusesChanged) {
+    await storage.updateProject(projectId, { pfProductionStatus: newStatuses });
+    console.log(`[BO Status] Updated project ${projectId} pfProductionStatus:`, newStatuses);
+    
+    // Sync to Asana if project is linked
+    if (project.asanaTaskId) {
+      try {
+        const { tasksApi, projectsApi } = await getAsanaApiInstances();
+        const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
+        
+        // Get custom field settings to find PF PRODUCTION STATUS field
+        const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
+          opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
+        });
+        
+        const customFieldSettings = projectDetails.data.custom_field_settings || [];
+        
+        for (const setting of customFieldSettings) {
+          const field = setting.custom_field;
+          const name = field.name?.toUpperCase().trim();
+          
+          if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
+            // Map selected status names to their GIDs
+            const selectedGids = newStatuses.map((statusName: string) => {
+              const option = field.enum_options.find((o: any) => o.name === statusName);
+              return option?.gid;
+            }).filter(Boolean);
+            
+            // Update the task's custom field
+            await tasksApi.updateTask({ 
+              data: { 
+                custom_fields: { [field.gid]: selectedGids }
+              } 
+            }, project.asanaTaskId, {});
+            
+            console.log(`[BO Status] Synced pfProductionStatus to Asana task ${project.asanaTaskId}:`, newStatuses);
+            break;
+          }
+        }
+      } catch (asanaErr: any) {
+        console.error("[BO Status] Failed to sync to Asana:", asanaErr.response?.body || asanaErr);
+        // Don't fail - local update succeeded
+      }
+    }
+  }
+}
+
 // Auto-generate hardware checklist for an order file
 // This function is called automatically after CSV upload and can also be triggered manually
 async function generateHardwareChecklistForFile(fileId: number, rawContent: string): Promise<{ success: boolean; itemCount: number; error?: string }> {
@@ -358,6 +442,12 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
     const assignments = await storage.getAssignmentsForFile(fileId);
     for (const assignment of assignments) {
       await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
+    }
+    
+    // Update project-level pfProductionStatus based on all files' BO statuses
+    const orderFile = await storage.getOrderFile(fileId);
+    if (orderFile) {
+      await updateProjectBoProductionStatus(orderFile.projectId);
     }
     
     console.log(`[Hardware Checklist Auto] File ${fileId}: Generated ${createdItems.length} items, BO status: ${boStatus}`);
@@ -4243,6 +4333,12 @@ export async function registerRoutes(
       await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
     }
     
+    // Also update the project's pfProductionStatus based on aggregated BO status across all files
+    const file = await storage.getOrderFile(fileId);
+    if (file) {
+      await updateProjectBoProductionStatus(file.projectId);
+    }
+    
     return boStatus;
   }
 
@@ -4478,6 +4574,12 @@ export async function registerRoutes(
         await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
       }
       
+      // Update project-level pfProductionStatus based on all files' BO statuses
+      const orderFile = await storage.getOrderFile(fileId);
+      if (orderFile) {
+        await updateProjectBoProductionStatus(orderFile.projectId);
+      }
+      
       console.log(`[Hardware Checklist] Generated ${createdItems.length} items for file ${fileId}, BO status: ${boStatus}, skipped ${skippedRowsInfo.length} rows`);
       res.json({ 
         success: true,
@@ -4680,6 +4782,9 @@ export async function registerRoutes(
       for (const assignment of assignments) {
         await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
       }
+      
+      // Update project-level pfProductionStatus based on all files' BO statuses
+      await updateProjectBoProductionStatus(orderFile.projectId);
       
       // Count matched vs unmatched products
       const matchedProducts = createdItems.filter((item: any) => item.productId !== null && !item.notInDatabase).length;
