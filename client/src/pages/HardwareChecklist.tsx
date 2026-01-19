@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Package, Loader2, CheckCircle, Home, Truck, Clock, Box } from "lucide-react";
+import { ArrowLeft, Package, Loader2, CheckCircle, Home, Box } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface HardwareChecklistItem {
@@ -102,35 +102,6 @@ export default function HardwareChecklist() {
     }
   });
 
-  const { mutate: toggleBuyoutArrived } = useMutation({
-    mutationFn: async ({ itemId, buyoutArrived }: { itemId: number; buyoutArrived: boolean }) => {
-      return apiRequest('POST', `/api/hardware-checklist/${itemId}/toggle-buyout-arrived`, { buyoutArrived });
-    },
-    onMutate: async ({ itemId, buyoutArrived }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
-      const previousData = queryClient.getQueryData<{ items: HardwareChecklistItem[]; progress: HardwareChecklistProgress }>(['/api/files', fileId, 'hardware-checklist']);
-      if (previousData) {
-        const updatedItems = previousData.items.map(item =>
-          item.id === itemId ? { ...item, buyoutArrived } : item
-        );
-        const buyoutArrivedCount = updatedItems.filter(i => i.isBuyout && i.buyoutArrived).length;
-        queryClient.setQueryData(['/api/files', fileId, 'hardware-checklist'], {
-          items: updatedItems,
-          progress: { ...previousData.progress, buyoutArrived: buyoutArrivedCount }
-        });
-      }
-      return { previousData };
-    },
-    onError: (error: Error, _, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(['/api/files', fileId, 'hardware-checklist'], context.previousData);
-      }
-      toast({ title: "Failed to update", description: error.message, variant: "destructive" });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
-    }
-  });
 
   if (isLoading) {
     return (
@@ -145,10 +116,7 @@ export default function HardwareChecklist() {
   const progressPercent = progress.total > 0 ? (progress.packed / progress.total) * 100 : 0;
   const allPacked = progress.packed === progress.total && progress.total > 0;
 
-  let boStatus: 'NO_BO' | 'WAITING' | 'ARRIVED' = 'NO_BO';
-  if (progress.buyoutItems > 0) {
-    boStatus = progress.buyoutArrived === progress.buyoutItems ? 'ARRIVED' : 'WAITING';
-  }
+  const buyoutCount = progress.buyoutItems;
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
@@ -213,22 +181,9 @@ export default function HardwareChecklist() {
                       <Badge variant={allPacked ? 'default' : 'secondary'} className={allPacked ? 'bg-green-500' : ''} data-testid="badge-progress">
                         {progress.packed}/{progress.total} Packed
                       </Badge>
-                      {boStatus === 'NO_BO' && (
-                        <Badge variant="outline" className="gap-1" data-testid="badge-bo-status">
-                          <CheckCircle className="w-3 h-3" />
-                          No BO Hardware
-                        </Badge>
-                      )}
-                      {boStatus === 'WAITING' && (
-                        <Badge variant="secondary" className="gap-1 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" data-testid="badge-bo-status">
-                          <Clock className="w-3 h-3" />
-                          Waiting for BO ({progress.buyoutArrived}/{progress.buyoutItems})
-                        </Badge>
-                      )}
-                      {boStatus === 'ARRIVED' && (
-                        <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" data-testid="badge-bo-status">
-                          <Truck className="w-3 h-3" />
-                          BO Hardware Arrived
+                      {buyoutCount > 0 && (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700" data-testid="badge-buyout-count">
+                          {buyoutCount} Buyout
                         </Badge>
                       )}
                     </div>
@@ -259,9 +214,7 @@ export default function HardwareChecklist() {
                 className={`border-none shadow-md transition-colors ${
                   item.isPacked 
                     ? 'bg-green-50 dark:bg-green-950/20 border-2 border-green-400' 
-                    : item.isBuyout && !item.buyoutArrived
-                      ? 'bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-400'
-                      : ''
+                    : ''
                 }`} 
                 data-testid={`hardware-item-${item.id}`}
               >
@@ -271,7 +224,6 @@ export default function HardwareChecklist() {
                       <Checkbox
                         checked={item.isPacked}
                         onCheckedChange={(checked) => togglePacked({ itemId: item.id, isPacked: !!checked })}
-                        disabled={item.isBuyout && !item.buyoutArrived}
                         className="w-8 h-8 border-2 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                         data-testid={`checkbox-packed-${item.id}`}
                       />
@@ -298,8 +250,10 @@ export default function HardwareChecklist() {
                       <Package className="w-5 h-5 text-muted-foreground" />
                       <div>
                         <p className="text-lg font-semibold" data-testid={`text-stock-status-${item.id}`}>
-                          {item.productStockStatus === 'BUYOUT' ? (
-                            <span className="text-amber-600">Buyout Item</span>
+                          {item.isBuyout ? (
+                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                              BUYOUT
+                            </Badge>
                           ) : (
                             <span className="text-green-600">In Stock</span>
                           )}
@@ -307,27 +261,6 @@ export default function HardwareChecklist() {
                         <p className="text-xs text-muted-foreground" data-testid={`text-stock-label-${item.id}`}>Stock Status</p>
                       </div>
                     </div>
-                    
-                    {item.isBuyout && (
-                      <div className="flex items-center gap-3">
-                        <Truck className="w-5 h-5 text-muted-foreground" />
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            id={`buyout-${item.id}`}
-                            checked={item.buyoutArrived}
-                            onCheckedChange={(checked) => toggleBuyoutArrived({ itemId: item.id, buyoutArrived: !!checked })}
-                            data-testid={`checkbox-buyout-arrived-${item.id}`}
-                          />
-                          <label htmlFor={`buyout-${item.id}`} className="text-sm cursor-pointer">
-                            {item.buyoutArrived ? (
-                              <span className="text-green-600 font-medium">BO Arrived</span>
-                            ) : (
-                              <span className="text-amber-600">Waiting for BO</span>
-                            )}
-                          </label>
-                        </div>
-                      </div>
-                    )}
 
                     {item.imagePath && (
                       <div className="flex items-center gap-3">
