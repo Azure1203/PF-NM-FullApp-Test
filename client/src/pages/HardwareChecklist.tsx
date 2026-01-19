@@ -155,10 +155,10 @@ export default function HardwareChecklist() {
               <div className="flex items-center gap-3">
                 <Box className="w-6 h-6 text-primary" />
                 <div>
+                  <p className="text-xs text-muted-foreground" data-testid="text-order-name">Order Name: {fileInfo.file?.poNumber || fileInfo.file?.originalFilename || 'N/A'}</p>
                   {fileInfo.file?.allmoxyJobNumber && (
                     <p className="text-sm text-primary font-medium" data-testid="text-job-number">Allmoxy Job #{fileInfo.file.allmoxyJobNumber}</p>
                   )}
-                  <p className="text-xs text-muted-foreground" data-testid="text-order-name">Order Name: {fileInfo.file?.poNumber || fileInfo.file?.originalFilename || 'N/A'}</p>
                   <p className="text-xs text-muted-foreground" data-testid="text-project-name">Project: {fileInfo.projectName}</p>
                 </div>
               </div>
