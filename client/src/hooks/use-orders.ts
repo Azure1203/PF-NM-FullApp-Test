@@ -16,6 +16,7 @@ export function useOrders() {
       if (!res.ok) throw new Error("Failed to fetch orders");
       return api.orders.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 60000,
   });
 }
 
@@ -31,6 +32,7 @@ export function useOrder(id: number) {
       return api.orders.get.responses[200].parse(await res.json());
     },
     enabled: !!id,
+    refetchInterval: 60000,
   });
 }
 

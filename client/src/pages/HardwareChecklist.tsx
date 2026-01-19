@@ -57,6 +57,7 @@ export default function HardwareChecklist() {
   const { data: fileInfo } = useQuery<FileInfo>({
     queryKey: ['/api/files', fileId],
     enabled: !!fileId && fileId > 0,
+    refetchInterval: 60000,
   });
 
   if (!match || !fileId || fileId <= 0) {
@@ -70,6 +71,7 @@ export default function HardwareChecklist() {
   const { data, isLoading } = useQuery<{ items: HardwareChecklistItem[]; progress: HardwareChecklistProgress }>({
     queryKey: ['/api/files', fileId, 'hardware-checklist'],
     enabled: !!fileId && fileId > 0,
+    refetchInterval: 60000,
   });
 
   const { mutate: togglePacked } = useMutation({

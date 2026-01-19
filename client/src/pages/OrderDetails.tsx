@@ -411,6 +411,7 @@ export default function OrderDetails() {
   const { data: preview, isLoading: isLoadingPreview } = useQuery<SyncPreview>({
     queryKey: ['/api/orders', id, 'preview'],
     enabled: !!id && id > 0,
+    refetchInterval: 60000,
   });
   
   // ==================== PALLET QUERIES AND MUTATIONS ====================
@@ -419,6 +420,7 @@ export default function OrderDetails() {
   const { data: pallets = [], isLoading: isLoadingPallets } = useQuery<PalletWithFiles[]>({
     queryKey: ['/api/orders', id, 'pallets'],
     enabled: !!id && id > 0,
+    refetchInterval: 60000,
   });
   
   const palletsQueryKey = ['/api/orders', id, 'pallets'];
@@ -655,6 +657,7 @@ export default function OrderDetails() {
     queryKey: ['/api/files', selectedFileId, 'cts-status'],
     enabled: !!selectedFileId && selectedFileId > 0,
     staleTime: 0,
+    refetchInterval: 60000,
   });
 
   // Auto-select first file when preview loads

@@ -99,8 +99,8 @@ app.use((req, res, next) => {
     () => {
       log(`serving on port ${port}`);
       
-      // Background sync job: Sync Asana statuses every 15 minutes
-      const SYNC_INTERVAL = 15 * 60 * 1000; // 15 minutes in milliseconds
+      // Background sync job: Sync Asana statuses every 5 minutes
+      const SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
       
       const runBackgroundSync = async () => {
         try {
@@ -120,9 +120,9 @@ app.use((req, res, next) => {
       // Run initial sync after 1 minute (to let server fully initialize)
       setTimeout(() => {
         runBackgroundSync();
-        // Then run every 15 minutes
+        // Then run every 5 minutes
         setInterval(runBackgroundSync, SYNC_INTERVAL);
-        log(`Background Asana sync scheduled (every 15 minutes)`, 'sync');
+        log(`Background Asana sync scheduled (every 5 minutes)`, 'sync');
         
         // Start Outlook sync after 2 minutes, then every 15 minutes
         // Uses direct function call to bypass authentication
