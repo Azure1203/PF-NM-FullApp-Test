@@ -38,9 +38,10 @@ interface HardwareChecklistProgress {
 interface HardwarePackingChecklistProps {
   fileId: number;
   fileName: string;
+  projectId?: number;
 }
 
-export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingChecklistProps) {
+export function HardwarePackingChecklist({ fileId, fileName, projectId }: HardwarePackingChecklistProps) {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(true);
 
@@ -55,6 +56,10 @@ export function HardwarePackingChecklist({ fileId, fileName }: HardwarePackingCh
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
+      // Also invalidate pallets query so BO status updates in order details
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/orders', projectId, 'pallets'] });
+      }
     },
     onError: (error: Error) => {
       toast({

@@ -99,6 +99,10 @@ export default function HardwareChecklist() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
+      // Also invalidate pallets query so BO status updates in order details
+      if (fileInfo?.file?.projectId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/orders', fileInfo.file.projectId, 'pallets'] });
+      }
     }
   });
 

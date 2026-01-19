@@ -340,21 +340,21 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
     // Insert items
     const createdItems = await storage.replaceHardwareChecklist(fileId, itemsToInsert);
     
-    // Calculate and update BO status
+    // Calculate and update BO status (using same logic as recalculateBoStatus)
     const buyoutItems = createdItems.filter(i => i.isBuyout);
-    let boStatus = 'NO_BO_HARDWARE';
+    const buyoutPacked = buyoutItems.filter(i => i.isPacked).length;
+    
+    let boStatus: 'NO BO HARDWARE' | 'WAITING FOR BO HARDWARE' | 'BO HARDWARE ARRIVED' = 'NO BO HARDWARE';
     if (buyoutItems.length > 0) {
-      const allBuyoutPacked = buyoutItems.every(i => i.isPacked);
-      boStatus = allBuyoutPacked ? 'BO_HARDWARE_ARRIVED' : 'WAITING_FOR_BO_HARDWARE';
+      boStatus = buyoutPacked === buyoutItems.length ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
     }
     
-    // Update order file with BO status
-    await storage.updateOrderFile(fileId, { buyoutStatus: boStatus });
+    // Update order file with BO status (using hardwareBoStatus field)
+    await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
     
     // Update pallet assignments with BO status
-    const buyoutOption = boStatus === 'NO_BO_HARDWARE' ? 'NO BO HARDWARE' 
-      : boStatus === 'WAITING_FOR_BO_HARDWARE' ? 'WAITING FOR BO HARDWARE' 
-      : 'BO HARDWARE ARRIVED';
+    // Map to BuyoutHardwareOption format (NO BO HARDWARE -> NO BUYOUT HARDWARE)
+    const buyoutOption = boStatus === 'NO BO HARDWARE' ? 'NO BUYOUT HARDWARE' : boStatus;
     const assignments = await storage.getAssignmentsForFile(fileId);
     for (const assignment of assignments) {
       await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
