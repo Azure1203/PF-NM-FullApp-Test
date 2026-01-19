@@ -491,16 +491,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async replaceHardwareChecklist(fileId: number, items: InsertHardwareChecklistItem[]): Promise<HardwareChecklistItem[]> {
+    // GUARD: If no items provided, don't delete existing items - just return empty array
+    // This prevents accidental data loss when parsing yields 0 items
+    if (items.length === 0) {
+      console.log(`[Hardware Checklist] replaceHardwareChecklist called with 0 items for file ${fileId} - skipping to preserve existing data`);
+      return [];
+    }
+    
     // Use transaction to atomically delete + insert all items
     return await db.transaction(async (tx) => {
       // Delete existing items
       await tx.delete(hardwareChecklistItems).where(eq(hardwareChecklistItems.fileId, fileId));
       
       // Insert all new items
-      if (items.length === 0) {
-        return [];
-      }
-      
       const created = await tx.insert(hardwareChecklistItems).values(items).returning();
       return created;
     });
