@@ -269,7 +269,7 @@ export default function HardwareChecklist() {
 
                     {item.imagePath && (
                       <div className="flex items-center gap-3">
-                        <div className="w-24 h-24 rounded border overflow-hidden bg-white flex-shrink-0" data-testid={`container-image-${item.id}`}>
+                        <div className="w-[7.5rem] h-[7.5rem] rounded border overflow-hidden bg-white flex-shrink-0" data-testid={`container-image-${item.id}`}>
                           <img
                             src={item.imagePath}
                             alt={item.productCode}
