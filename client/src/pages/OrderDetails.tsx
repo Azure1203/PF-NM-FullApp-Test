@@ -3,7 +3,7 @@ import { useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { insertProjectSchema, PALLET_SIZES, type PalletSize, type PalletPackagingStatus, type PalletPackagingMetric, defaultPackagingStatus, BUYOUT_HARDWARE_OPTIONS, type BuyoutHardwareOption } from "@shared/schema";
+import { insertProjectSchema, PALLET_SIZES, type PalletSize, type PalletPackagingStatus, type PalletPackagingMetric, defaultPackagingStatus, type BuyoutHardwareOption } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -525,77 +525,6 @@ export default function OrderDetails() {
     setHardwareDialogOpen(false);
     setHardwareDialogAssignment(null);
     setHardwarePackedByName('');
-  };
-
-  // Update buyout hardware statuses mutation with optimistic updates (multi-select)
-  const { mutate: updateBuyoutStatuses } = useMutation({
-    mutationFn: async ({ assignmentId, buyoutHardwareStatuses }: { assignmentId: number; buyoutHardwareStatuses: BuyoutHardwareOption[] }) => {
-      return apiRequest('PATCH', `/api/assignments/${assignmentId}/buyout-statuses`, { buyoutHardwareStatuses });
-    },
-    onMutate: async ({ assignmentId, buyoutHardwareStatuses }) => {
-      await queryClient.cancelQueries({ queryKey: palletsQueryKey });
-      const previousPallets = queryClient.getQueryData<PalletWithFiles[]>(palletsQueryKey);
-      
-      queryClient.setQueryData<PalletWithFiles[]>(palletsQueryKey, (old) => {
-        if (!old) return old;
-        return old.map(pallet => {
-          const hasAssignment = pallet.assignments?.some(a => a.id === assignmentId);
-          if (!hasAssignment) return pallet;
-          return {
-            ...pallet,
-            assignments: pallet.assignments.map(a => 
-              a.id === assignmentId ? { ...a, buyoutHardwareStatuses } : a
-            )
-          };
-        });
-      });
-      
-      return { previousPallets };
-    },
-    onError: (error: Error, _variables, context) => {
-      if (context?.previousPallets) {
-        queryClient.setQueryData(palletsQueryKey, context.previousPallets);
-      }
-      toast({ title: "Failed to update buyout status", description: error.message, variant: "destructive" });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: palletsQueryKey });
-      // Also invalidate order query to refresh pfProductionStatus which is updated by the backend
-      queryClient.invalidateQueries({ queryKey: orderQueryKey });
-    }
-  });
-
-  // Toggle a specific buyout status option (mutually exclusive)
-  const toggleBuyoutStatus = (assignment: AssignmentInfo, option: BuyoutHardwareOption) => {
-    const currentStatuses = assignment.buyoutHardwareStatuses || [];
-    let newStatuses: BuyoutHardwareOption[];
-    
-    if (currentStatuses.includes(option)) {
-      // Remove the option (deselect)
-      newStatuses = currentStatuses.filter(s => s !== option);
-    } else {
-      // Select this option and deselect the others (mutually exclusive)
-      newStatuses = [option];
-    }
-    
-    updateBuyoutStatuses({ assignmentId: assignment.id, buyoutHardwareStatuses: newStatuses });
-  };
-
-  // Get buyout button styling based on whether it's selected and the option type
-  const getBuyoutOptionStyle = (isSelected: boolean, option: BuyoutHardwareOption) => {
-    if (!isSelected) {
-      return 'bg-muted hover:bg-muted/80 text-muted-foreground border border-muted-foreground/20';
-    }
-    switch (option) {
-      case 'BO HARDWARE ARRIVED':
-        return 'bg-green-600 hover:bg-green-700 text-white';
-      case 'WAITING FOR BO HARDWARE':
-        return 'bg-red-600 hover:bg-red-700 text-white';
-      case 'NO BUYOUT HARDWARE':
-        return 'bg-blue-600 hover:bg-blue-700 text-white';
-      default:
-        return 'bg-muted hover:bg-muted/80 text-muted-foreground';
-    }
   };
 
   // Pallet dialog helpers
@@ -1991,34 +1920,31 @@ export default function OrderDetails() {
                                           )}
                                         </div>
                                         
-                                        {/* Buyout Hardware Status Buttons Row */}
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          {/* Buyout Hardware Status Buttons (Multi-select) */}
-                                          {(() => {
-                                            const assignment = pallet.assignments?.find(a => a.fileId === file.id);
-                                            if (!assignment) return null;
-                                            const statuses = assignment.buyoutHardwareStatuses || [];
-                                            return (
-                                              <div className="flex flex-wrap gap-1">
-                                                {BUYOUT_HARDWARE_OPTIONS.map((option) => {
-                                                  const isSelected = statuses.includes(option);
-                                                  return (
-                                                    <Button
-                                                      key={option}
-                                                      size="sm"
-                                                      onClick={() => toggleBuyoutStatus(assignment, option)}
-                                                      className={`text-xs ${getBuyoutOptionStyle(isSelected, option)}`}
-                                                      data-testid={`button-buyout-${option.replace(/\s+/g, '-').toLowerCase()}-${file.id}`}
-                                                    >
-                                                      <Truck className="w-3 h-3 mr-1" />
-                                                      {option}
-                                                    </Button>
-                                                  );
-                                                })}
-                                              </div>
-                                            );
-                                          })()}
-                                        </div>
+                                        {/* Buyout Hardware Status Badge (Read-only, auto-updated from checklist) */}
+                                        {(() => {
+                                          const assignment = pallet.assignments?.find(a => a.fileId === file.id);
+                                          if (!assignment) return null;
+                                          const statuses = assignment.buyoutHardwareStatuses || [];
+                                          // Show the first (and only) status - auto-set by backend based on checklist
+                                          const currentStatus = statuses[0] || 'NO BUYOUT HARDWARE';
+                                          
+                                          let statusStyle = 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300';
+                                          if (currentStatus === 'WAITING FOR BO HARDWARE') {
+                                            statusStyle = 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300';
+                                          } else if (currentStatus === 'BO HARDWARE ARRIVED') {
+                                            statusStyle = 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300';
+                                          }
+                                          
+                                          return (
+                                            <div 
+                                              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border ${statusStyle}`}
+                                              data-testid={`status-buyout-${file.id}`}
+                                            >
+                                              <Truck className="w-3 h-3" />
+                                              {currentStatus}
+                                            </div>
+                                          );
+                                        })()}
                                         
                                         {/* Per-Order Hardware Packaged Button */}
                                         {(() => {

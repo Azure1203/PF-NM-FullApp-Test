@@ -4109,11 +4109,15 @@ export async function registerRoutes(
   });
 
   // Helper function to recalculate and update BO status for a file and its pallet assignments
+  // Status is based on whether buyout items are PACKED (checked off), not arrival status
   async function recalculateBoStatus(fileId: number) {
-    const progress = await storage.getHardwareChecklistProgress(fileId);
+    const items = await storage.getHardwareChecklistItems(fileId);
+    const buyoutItems = items.filter(item => item.isBuyout);
+    const buyoutPacked = buyoutItems.filter(item => item.isPacked).length;
+    
     let boStatus: 'NO BO HARDWARE' | 'WAITING FOR BO HARDWARE' | 'BO HARDWARE ARRIVED' = 'NO BO HARDWARE';
-    if (progress.buyoutItems > 0) {
-      boStatus = progress.buyoutArrived === progress.buyoutItems ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
+    if (buyoutItems.length > 0) {
+      boStatus = buyoutPacked === buyoutItems.length ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
     }
     await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
     
@@ -4145,7 +4149,10 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Item not found' });
       }
       
-      res.json(updated);
+      // Recalculate BO status for the file when packing status changes
+      const boStatus = await recalculateBoStatus(updated.fileId);
+      
+      res.json({ ...updated, fileBoStatus: boStatus });
     } catch (e: any) {
       console.error('[Hardware Checklist] Error toggling packed:', e);
       res.status(500).json({ message: 'Failed to toggle packed status', error: e.message });
