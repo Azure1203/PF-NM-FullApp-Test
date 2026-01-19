@@ -166,6 +166,47 @@ export default function OrderDetails() {
     }
   };
 
+  // Helper function to get BO status display info from either assignment or file status
+  const getBoStatusDisplay = (
+    assignmentStatuses: string[] | null | undefined,
+    fileHardwareBoStatus: string | null | undefined
+  ): { label: string; style: string } | null => {
+    // First try assignment statuses
+    let status = assignmentStatuses?.[0];
+    
+    // Fall back to file's hardwareBoStatus if no assignment status
+    if (!status && fileHardwareBoStatus) {
+      status = fileHardwareBoStatus;
+    }
+    
+    // Only show badge if we have an explicit status
+    if (!status) return null;
+    
+    // Normalize and get display info
+    if (status === 'WAITING FOR BO HARDWARE') {
+      return {
+        label: 'WAITING FOR BO HARDWARE',
+        style: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300'
+      };
+    } else if (status === 'BO HARDWARE ARRIVED') {
+      return {
+        label: 'BO HARDWARE ARRIVED',
+        style: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300'
+      };
+    } else if (status === 'NO BO HARDWARE' || status === 'NO BUYOUT HARDWARE') {
+      return {
+        label: 'NO BUYOUT HARDWARE',
+        style: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
+      };
+    }
+    
+    // Unknown status - show as-is with default styling
+    return {
+      label: status,
+      style: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
+    };
+  };
+
   // All PF PRODUCTION STATUS options
   const productionStatusOptions = [
     "EVERYTHING PACKAGED", "HARDWARE PACKED", "CLOSET RODS NOT CUT",
@@ -1923,31 +1964,19 @@ export default function OrderDetails() {
                                         {/* Buyout Hardware Status Badge (Read-only, auto-updated from checklist) */}
                                         {(() => {
                                           const assignment = pallet.assignments?.find(a => a.fileId === file.id);
-                                          // Get status from assignment if available, otherwise from file's hardwareBoStatus
-                                          let currentStatus: string;
-                                          if (assignment && assignment.buyoutHardwareStatuses?.length > 0) {
-                                            currentStatus = assignment.buyoutHardwareStatuses[0];
-                                          } else if ((file as any).hardwareBoStatus) {
-                                            // Map file status format to display format
-                                            currentStatus = (file as any).hardwareBoStatus;
-                                          } else {
-                                            currentStatus = 'NO BUYOUT HARDWARE';
-                                          }
-                                          
-                                          let statusStyle = 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300';
-                                          if (currentStatus === 'WAITING FOR BO HARDWARE') {
-                                            statusStyle = 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300';
-                                          } else if (currentStatus === 'BO HARDWARE ARRIVED') {
-                                            statusStyle = 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300';
-                                          }
+                                          const boStatus = getBoStatusDisplay(
+                                            assignment?.buyoutHardwareStatuses,
+                                            (file as any).hardwareBoStatus
+                                          );
+                                          if (!boStatus) return null;
                                           
                                           return (
                                             <div 
-                                              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border ${statusStyle}`}
+                                              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border ${boStatus.style}`}
                                               data-testid={`status-buyout-${file.id}`}
                                             >
                                               <Truck className="w-3 h-3" />
-                                              {currentStatus}
+                                              {boStatus.label}
                                             </div>
                                           );
                                         })()}
@@ -1993,13 +2022,30 @@ export default function OrderDetails() {
                         <AlertTriangle className="w-4 h-4" />
                         <span className="font-medium text-sm">Unassigned Files ({unassignedFiles.length})</span>
                       </div>
-                      <div className="space-y-1">
-                        {unassignedFiles.map((file) => (
-                          <div key={file.id} className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <FileText className="w-3 h-3" />
-                            <span className="truncate">{file.originalFilename}</span>
-                          </div>
-                        ))}
+                      <div className="space-y-2">
+                        {unassignedFiles.map((file) => {
+                          // Use the same helper function as assigned files
+                          const boStatus = getBoStatusDisplay(null, (file as any).hardwareBoStatus);
+                          
+                          return (
+                            <div key={file.id} className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-3 h-3" />
+                                <span className="truncate">{file.originalFilename}</span>
+                              </div>
+                              {/* BO Status Badge - same styling as assigned files */}
+                              {boStatus && (
+                                <div 
+                                  className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border ${boStatus.style}`}
+                                  data-testid={`status-buyout-unassigned-${file.id}`}
+                                >
+                                  <Truck className="w-3 h-3" />
+                                  {boStatus.label}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
