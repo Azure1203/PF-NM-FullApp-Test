@@ -56,9 +56,10 @@ export function HardwarePackingChecklist({ fileId, fileName, projectId }: Hardwa
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
-      // Also invalidate pallets query so BO status updates in order details
+      // Invalidate both pallets and order queries so BO status updates in order details
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ['/api/orders', projectId, 'pallets'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/orders', projectId] });
       }
     },
     onError: (error: Error) => {

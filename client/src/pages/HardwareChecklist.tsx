@@ -99,9 +99,10 @@ export default function HardwareChecklist() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/files', fileId, 'hardware-checklist'] });
-      // Also invalidate pallets query so BO status updates in order details
+      // Invalidate both pallets and order queries so BO status updates in order details
       if (fileInfo?.file?.projectId) {
         queryClient.invalidateQueries({ queryKey: ['/api/orders', fileInfo.file.projectId, 'pallets'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/orders', fileInfo.file.projectId] });
       }
     }
   });
@@ -268,7 +269,7 @@ export default function HardwareChecklist() {
 
                     {item.imagePath && (
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded border overflow-hidden bg-white" data-testid={`container-image-${item.id}`}>
+                        <div className="w-24 h-24 rounded border overflow-hidden bg-white flex-shrink-0" data-testid={`container-image-${item.id}`}>
                           <img
                             src={item.imagePath}
                             alt={item.productCode}
