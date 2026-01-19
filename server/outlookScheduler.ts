@@ -1,11 +1,10 @@
 import { db } from "./db";
-import { processedOutlookEmails, outlookSyncStatus, orderFiles, projects, packingSlipItems, hardwareChecklistItems, products } from "@shared/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { processedOutlookEmails, outlookSyncStatus, orderFiles, projects, packingSlipItems } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { searchNetleyEmails, downloadEmailAttachment } from "./outlook";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { log } from "./index";
 import { parsePackingSlipPdf } from "./packingSlipParser";
-import { parse as parseCSV } from "csv-parse/sync";
 
 const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 let isPolling = false;
@@ -49,90 +48,6 @@ function identifyPdfType(attachmentName: string): PdfType | null {
   return null;
 }
 
-// Hardware CSV detection - requires "HARDWARE" in filename per vendor convention
-// Example: Test_Import_Order_-_1877_HARDWARE.csv
-function isHardwareCsv(attachmentName: string): boolean {
-  const lowerName = attachmentName.toLowerCase();
-  return lowerName.endsWith('.csv') && lowerName.includes('hardware');
-}
-
-// Track failed hardware CSV processing attempts to avoid infinite retry loops
-const hardwareCsvFailures = new Map<string, number>();
-const MAX_HARDWARE_CSV_RETRIES = 3;
-
-async function generateHardwareChecklistFromCsv(csvContent: string, fileId: number): Promise<{ itemCount: number; boStatus: string }> {
-  const records = parseCSV(csvContent, { relax_column_count: true }) as string[][];
-  
-  // Use a map to aggregate quantities for duplicate codes
-  const itemMap = new Map<string, { code: string; name: string; quantity: number }>();
-  
-  for (const row of records) {
-    if (row.length < 2) continue;
-    
-    const quantityStr = row[0]?.trim() || '';
-    const code = row[1]?.trim() || '';
-    const type = row[5]?.trim() || '';
-    
-    const quantity = parseInt(quantityStr) || 0;
-    if (quantity <= 0) continue;
-    if (!code || code.length < 3) continue;
-    if (type.toUpperCase() !== 'HARDWARE') continue;
-    
-    const upperCode = code.toUpperCase();
-    const existing = itemMap.get(upperCode);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      itemMap.set(upperCode, {
-        code,
-        name: code,
-        quantity
-      });
-    }
-  }
-  
-  const parsedItems = Array.from(itemMap.values());
-  
-  if (parsedItems.length === 0) {
-    return { itemCount: 0, boStatus: 'NO BO HARDWARE' };
-  }
-  
-  await db.delete(hardwareChecklistItems).where(eq(hardwareChecklistItems.fileId, fileId));
-  
-  const productCodes = parsedItems.map(item => item.code.toUpperCase());
-  const productResults = await db.select().from(products).where(inArray(products.code, productCodes));
-  const productMap = new Map(productResults.map(p => [p.code.toUpperCase(), p]));
-  
-  let sortOrder = 0;
-  let hasBuyout = false;
-  
-  for (const item of parsedItems) {
-    const product = productMap.get(item.code.toUpperCase());
-    const isBuyout = product?.stockStatus === 'BUYOUT';
-    if (isBuyout) hasBuyout = true;
-    
-    await db.insert(hardwareChecklistItems).values({
-      fileId,
-      productId: product?.id || null,
-      productCode: item.code,
-      productName: item.name,
-      quantity: item.quantity,
-      isBuyout,
-      buyoutArrived: false,
-      isPacked: false,
-      packedBy: null,
-      sortOrder: sortOrder++
-    });
-  }
-  
-  const boStatus = hasBuyout ? 'WAITING FOR BO HARDWARE' : 'NO BO HARDWARE';
-  
-  await db.update(orderFiles)
-    .set({ hardwareBoStatus: boStatus })
-    .where(eq(orderFiles.id, fileId));
-  
-  return { itemCount: parsedItems.length, boStatus };
-}
 
 async function isMessageProcessed(messageId: string): Promise<boolean> {
   const existing = await db
@@ -243,7 +158,6 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
       filename: file.originalFilename || '',
       allmoxyJobNumber: file.allmoxyJobNumber || '',
       allmoxyJobNumberNormalized: file.allmoxyJobNumber ? normalizeOrderNumber(file.allmoxyJobNumber) : '',
-      hasHardwareCsv: !!file.hardwareCsvPath,
       hasPdfs: {
         packingSlip: !!file.packingSlipPdfPath,
         cutToFile: !!file.cutToFilePdfPath,
@@ -271,94 +185,6 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
         processed++;
         
         try {
-          // Check if this is a hardware CSV first
-          if (isHardwareCsv(attachment.name)) {
-            log(`Identified hardware CSV: ${attachment.name}`, 'outlook-scheduler');
-            
-            // Check retry count for this attachment
-            const retryCount = hardwareCsvFailures.get(messageAttachmentKey) || 0;
-            if (retryCount >= MAX_HARDWARE_CSV_RETRIES) {
-              log(`Hardware CSV exceeded max retries (${MAX_HARDWARE_CSV_RETRIES}), skipping: ${attachment.name}`, 'outlook-scheduler');
-              await markMessageProcessed(messageAttachmentKey, email.subject, 'failed');
-              continue;
-            }
-            
-            const attachmentMatch = attachment.name.match(/(\d{3,6})/);
-            const subjectMatch = email.subject.match(/(\d{3,6})/);
-            const orderNumber = attachmentMatch?.[1] || subjectMatch?.[1];
-            
-            if (!orderNumber) {
-              log(`No order number found in hardware CSV: ${attachment.name}`, 'outlook-scheduler');
-              await markMessageProcessed(messageAttachmentKey, email.subject, 'skipped');
-              continue;
-            }
-            
-            const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
-            log(`Looking for order number: "${orderNumber}" (normalized: "${normalizedOrderNumber}") for hardware CSV`, 'outlook-scheduler');
-            
-            const matchingFile = allFiles.find(f => {
-              const jobMatch = f.allmoxyJobNumberNormalized === normalizedOrderNumber;
-              const filenameMatch = f.filename.includes(orderNumber);
-              if (jobMatch || filenameMatch) {
-                log(`  Potential match: File ${f.fileId} | jobMatch: ${jobMatch} | filenameMatch: ${filenameMatch} | hasHardwareCsv: ${f.hasHardwareCsv}`, 'outlook-scheduler');
-              }
-              return !f.hasHardwareCsv && (jobMatch || filenameMatch);
-            });
-            
-            if (matchingFile) {
-              const csvBuffer = await downloadEmailAttachment(email.id, attachment.id);
-              const csvContent = csvBuffer.toString('utf-8');
-              
-              // Generate the hardware checklist first - only proceed if successful
-              try {
-                const result = await generateHardwareChecklistFromCsv(csvContent, matchingFile.fileId);
-                
-                if (result.itemCount === 0) {
-                  log(`Hardware CSV has no valid hardware items: ${attachment.name}`, 'outlook-scheduler');
-                  // Increment retry count
-                  hardwareCsvFailures.set(messageAttachmentKey, (hardwareCsvFailures.get(messageAttachmentKey) || 0) + 1);
-                  continue;
-                }
-                
-                // Clear retry count on success
-                hardwareCsvFailures.delete(messageAttachmentKey);
-                
-                log(`Generated ${result.itemCount} hardware checklist items, BO status: ${result.boStatus}`, 'outlook-scheduler');
-                
-                // Store the CSV in object storage only after successful parsing
-                const baseFilename = matchingFile.filename.replace(/\.csv$/i, '');
-                const jobNumber = matchingFile.allmoxyJobNumber || orderNumber;
-                const sanitizedFilename = `${baseFilename} ${jobNumber} - Hardware.csv`.replace(/[^a-zA-Z0-9\s\-_().]/g, '').replace(/\s+/g, ' ').trim();
-                const storagePath = `.private/hardware-csvs/${sanitizedFilename}`;
-                
-                await objectStorageService.uploadBuffer(csvBuffer, storagePath, 'text/csv');
-                
-                // Update the file with the hardware CSV path
-                await db.update(orderFiles)
-                  .set({ hardwareCsvPath: storagePath })
-                  .where(eq(orderFiles.id, matchingFile.fileId));
-                
-                await markMessageProcessed(messageAttachmentKey, email.subject, 'processed', matchingFile.fileId);
-                
-                // Update local cache
-                const fileInCache = allFiles.find(f => f.fileId === matchingFile.fileId);
-                if (fileInCache) {
-                  fileInCache.hasHardwareCsv = true;
-                }
-                
-                log(`Matched hardware CSV: ${email.subject} -> ${matchingFile.filename}`, 'outlook-scheduler');
-                matched++;
-              } catch (parseErr: any) {
-                log(`Error generating hardware checklist: ${parseErr.message} - will retry later`, 'outlook-scheduler');
-                // Increment retry count
-                hardwareCsvFailures.set(messageAttachmentKey, (hardwareCsvFailures.get(messageAttachmentKey) || 0) + 1);
-              }
-            } else {
-              log(`No match yet for order ${orderNumber} (hardware CSV): ${email.subject} - will retry later`, 'outlook-scheduler');
-            }
-            continue;
-          }
-          
           // Identify what type of PDF this attachment is
           const pdfType = identifyPdfType(attachment.name);
           if (!pdfType) {
