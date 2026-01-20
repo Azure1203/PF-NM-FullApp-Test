@@ -495,7 +495,6 @@ export default function Products() {
                   placeholder="e.g. H.111.95.310"
                   value={formData.code}
                   onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                  disabled={!!editingProduct}
                 />
               </div>
               
