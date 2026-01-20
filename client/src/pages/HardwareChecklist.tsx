@@ -26,6 +26,7 @@ interface HardwareChecklistItem {
   sortOrder: number;
   imagePath: string | null;
   productStockStatus: string | null;
+  ctsCutLength?: number;
 }
 
 interface HardwareChecklistProgress {
@@ -248,6 +249,15 @@ export default function HardwareChecklist() {
                         x{item.quantity}
                       </div>
                       <div className="text-sm text-muted-foreground">{item.isPacked ? 'Packed' : 'Quantity'}</div>
+                      {item.ctsCutLength !== undefined && (
+                        <Badge 
+                          variant="outline" 
+                          className="mt-1 bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                          data-testid={`badge-cts-length-${item.id}`}
+                        >
+                          Cut: {Number(item.ctsCutLength).toFixed(1)} mm
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

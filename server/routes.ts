@@ -4311,13 +4311,23 @@ export async function registerRoutes(
       const products = await storage.getProductsByCode(productCodes);
       const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
       
-      // Enhance items with product images
+      // Get CTS parts for this file to add cut lengths
+      const ctsParts = await storage.getCtsPartsForFile(fileId);
+      const ctsLengthMap: Record<string, number> = {};
+      for (const ctsPart of ctsParts) {
+        ctsLengthMap[ctsPart.partNumber.toUpperCase()] = ctsPart.cutLength;
+      }
+      
+      // Enhance items with product images and CTS cut lengths
       const enhancedItems = items.map(item => {
         const product = productMap.get(item.productCode.toUpperCase());
+        const isCts = item.productCode.toUpperCase().includes('.CTS');
+        const ctsCutLength = isCts ? ctsLengthMap[item.productCode.toUpperCase()] : undefined;
         return {
           ...item,
           imagePath: product?.imagePath || null,
-          productStockStatus: product?.stockStatus || null
+          productStockStatus: product?.stockStatus || null,
+          ctsCutLength
         };
       });
       
