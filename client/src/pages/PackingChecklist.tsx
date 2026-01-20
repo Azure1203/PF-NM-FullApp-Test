@@ -33,6 +33,7 @@ interface PackingSlipItem {
   checkedBy: string | null;
   sortOrder: number;
   productInfo: ProductInfo | null;
+  ctsCutLength?: number;
 }
 
 interface ChecklistData {
@@ -304,12 +305,22 @@ export default function PackingChecklist() {
                           </p>
                         )}
                       </div>
-                      <Badge 
-                        variant={item.isChecked ? "outline" : "default"} 
-                        className="flex-shrink-0 text-base px-3"
-                      >
-                        Qty: {item.quantity}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge 
+                          variant={item.isChecked ? "outline" : "default"} 
+                          className="flex-shrink-0 text-base px-3"
+                        >
+                          Qty: {item.quantity}
+                        </Badge>
+                        {item.ctsCutLength !== undefined && (
+                          <Badge 
+                            variant="secondary" 
+                            className="flex-shrink-0 text-sm px-2 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                          >
+                            Cut: {Number(item.ctsCutLength).toFixed(1)} mm
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="flex flex-wrap gap-2 mt-3">

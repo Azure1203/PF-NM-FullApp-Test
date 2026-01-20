@@ -136,3 +136,14 @@ Preferred communication style: Simple, everyday language.
   - Checklist items auto-generated with product lookups
   - Duplicate codes aggregated (quantities summed)
   - BO status calculated and stored on order file
+
+### CTS Cut Length on Packing Checklist
+- **API Enhancement**: `/api/files/:fileId/checklist` now includes `ctsCutLength` for CTS parts
+- **UI Display**: Packing Checklist page shows amber "Cut: X.X mm" badge for items with .CTS suffix
+- **Data Source**: Cut lengths pulled from cts_parts table by matching partNumber
+
+### Data Fix Scripts
+- **script/fix-drawer-slide-skus.sql**: One-time script to fix drawer slide SKU codes
+  - Removes extra dash: M-105-DS10-XXX → M-105-DS10XXX
+  - Updates both products and hardware_checklist_items tables
+  - Run manually in production database

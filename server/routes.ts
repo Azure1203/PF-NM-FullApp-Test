@@ -3025,11 +3025,23 @@ export async function registerRoutes(
         productMap[product.code] = product;
       }
       
+      // Get CTS parts for this file to add cut lengths
+      const ctsParts = await storage.getCtsPartsForFile(fileId);
+      const ctsLengthMap: Record<string, number> = {};
+      for (const ctsPart of ctsParts) {
+        ctsLengthMap[ctsPart.partNumber] = ctsPart.cutLength;
+      }
+      
       // Enrich items with product info (image from product db takes precedence if available)
+      // Also add CTS cut length for items with .CTS suffix
       const enrichedItems = items.map(item => {
         const product = productMap[item.partCode];
+        const isCts = item.partCode.includes('.CTS');
+        const ctsCutLength = isCts ? ctsLengthMap[item.partCode] : undefined;
+        
         return {
           ...item,
+          ctsCutLength,
           productInfo: product ? {
             id: product.id,
             name: product.name,
