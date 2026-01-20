@@ -3383,18 +3383,25 @@ export async function registerRoutes(
       }
       
       // Validate and sanitize update data
-      const { name, category, length, width, height, imagePath, notes } = req.body;
+      const { code, name, supplier, category, stockStatus, length, width, height, weight, imagePath, notes, importRowNumber } = req.body;
       const updateData: Record<string, any> = {};
       
+      if (code !== undefined) updateData.code = typeof code === 'string' ? code.trim() : null;
       if (name !== undefined) updateData.name = typeof name === 'string' ? name.trim() : null;
+      if (supplier !== undefined) updateData.supplier = typeof supplier === 'string' ? supplier.trim() : null;
       if (category !== undefined && ['HARDWARE', 'COMPONENT'].includes(category)) {
         updateData.category = category;
+      }
+      if (stockStatus !== undefined && ['IN_STOCK', 'BUYOUT'].includes(stockStatus)) {
+        updateData.stockStatus = stockStatus;
       }
       if (length !== undefined) updateData.length = length ? parseFloat(length) : null;
       if (width !== undefined) updateData.width = width ? parseFloat(width) : null;
       if (height !== undefined) updateData.height = height ? parseFloat(height) : null;
+      if (weight !== undefined) updateData.weight = weight ? parseFloat(weight) : null;
       if (imagePath !== undefined) updateData.imagePath = typeof imagePath === 'string' ? imagePath : null;
       if (notes !== undefined) updateData.notes = typeof notes === 'string' ? notes.trim() : null;
+      if (importRowNumber !== undefined) updateData.importRowNumber = importRowNumber ? parseInt(importRowNumber) : null;
       
       const product = await storage.updateProduct(id, updateData);
       if (!product) {
