@@ -412,13 +412,14 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
     const itemsToInsert = hardwareItems.map((item, index) => {
       const isBuyout = item.product?.stockStatus === 'BUYOUT';
       const notInDatabase = item.classification === 'HARDWARE_PREFIX_NOT_IN_DB';
+      const isCts = item.code.toUpperCase().includes('.CTS');
       return {
         fileId,
         productId: item.product?.id || null,
         productCode: item.code,
         productName: item.name,
         quantity: item.quantity,
-        cutLength: item.cutLength, // Store CTS cut length directly on checklist item
+        cutLength: isCts ? item.cutLength : null, // Only store cutLength for CTS parts
         isBuyout,
         buyoutArrived: false,
         isPacked: false,
@@ -4684,6 +4685,7 @@ export async function registerRoutes(
         code: string;
         name: string;
         quantity: number;
+        cutLength: number | null;
         product: typeof productsFromDb[0] | null;
         classification: 'HARDWARE_IN_DB' | 'COMPONENT_IN_DB' | 'HARDWARE_PREFIX_NOT_IN_DB' | 'NOT_HARDWARE';
       }
@@ -4742,12 +4744,14 @@ export async function registerRoutes(
       const itemsToInsert = hardwareItems.map((item, index) => {
         const isBuyout = item.product?.stockStatus === 'BUYOUT';
         const notInDatabase = item.classification === 'HARDWARE_PREFIX_NOT_IN_DB';
+        const isCts = item.code.toUpperCase().includes('.CTS');
         return {
           fileId,
           productId: item.product?.id || null,
           productCode: item.code,
           productName: item.name,
           quantity: item.quantity,
+          cutLength: isCts ? item.cutLength : null, // Only store cutLength for CTS parts
           isBuyout,
           buyoutArrived: false,
           isPacked: false,
