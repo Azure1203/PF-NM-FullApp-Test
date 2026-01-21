@@ -45,6 +45,7 @@ export default function AdminUsers() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
 
@@ -61,7 +62,7 @@ export default function AdminUsers() {
   });
 
   const addUserMutation = useMutation({
-    mutationFn: async (data: { username: string; displayName?: string }) => {
+    mutationFn: async (data: { email?: string; username?: string; displayName?: string }) => {
       const res = await apiRequest('POST', '/api/admin/allowed-users', data);
       return res.json();
     },
@@ -69,6 +70,7 @@ export default function AdminUsers() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/allowed-users'] });
       toast({ title: "User added to allowed list" });
       setIsDialogOpen(false);
+      setEmail("");
       setUsername("");
       setDisplayName("");
     },
@@ -100,12 +102,13 @@ export default function AdminUsers() {
   });
 
   const handleAddUser = () => {
-    if (!username.trim()) {
-      toast({ title: "Username is required", variant: "destructive" });
+    if (!email.trim() && !username.trim()) {
+      toast({ title: "Email or username is required", variant: "destructive" });
       return;
     }
     addUserMutation.mutate({ 
-      username: username.trim(), 
+      email: email.trim() || undefined,
+      username: username.trim() || undefined, 
       displayName: displayName.trim() || undefined 
     });
   };
@@ -167,6 +170,7 @@ export default function AdminUsers() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Email</TableHead>
                     <TableHead>Username</TableHead>
                     <TableHead>Display Name</TableHead>
                     <TableHead>Added By</TableHead>
@@ -178,7 +182,10 @@ export default function AdminUsers() {
                   {allowedUsers.map((allowedUser) => (
                     <TableRow key={allowedUser.id} data-testid={`row-user-${allowedUser.id}`}>
                       <TableCell className="font-medium">
-                        {allowedUser.username}
+                        {allowedUser.email || "-"}
+                      </TableCell>
+                      <TableCell>
+                        {allowedUser.username || "-"}
                       </TableCell>
                       <TableCell>
                         {allowedUser.displayName || "-"}
@@ -204,7 +211,7 @@ export default function AdminUsers() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remove User Access?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to remove <strong>{allowedUser.username}</strong> from the allowed users list? 
+                                Are you sure you want to remove <strong>{allowedUser.email || allowedUser.username}</strong> from the allowed users list? 
                                 They will no longer be able to access the application.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
@@ -251,12 +258,23 @@ export default function AdminUsers() {
           <DialogHeader>
             <DialogTitle>Add Allowed User</DialogTitle>
             <DialogDescription>
-              Add a Replit username to grant them access to this application.
+              Add a user by email or Replit username to grant them access. At least one is required.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Replit Username *</Label>
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter email address"
+                data-testid="input-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="username">Replit Username</Label>
               <Input
                 id="username"
                 value={username}

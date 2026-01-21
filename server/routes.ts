@@ -4877,28 +4877,41 @@ export async function registerRoutes(
   // Add a new allowed user
   app.post('/api/admin/allowed-users', isAuthenticated, async (req, res) => {
     try {
-      const { username, displayName } = req.body;
+      const { email, username, displayName } = req.body;
       
-      if (!username || typeof username !== 'string') {
-        return res.status(400).json({ message: 'Username is required' });
+      // Require at least email or username
+      const hasEmail = email && typeof email === 'string' && email.trim();
+      const hasUsername = username && typeof username === 'string' && username.trim();
+      
+      if (!hasEmail && !hasUsername) {
+        return res.status(400).json({ message: 'Email or username is required' });
       }
 
-      // Check if user already exists
-      const existing = await storage.getAllowedUserByUsername(username.trim());
-      if (existing) {
-        return res.status(409).json({ message: 'User already exists in allowed list' });
+      // Check if user already exists by email or username
+      if (hasEmail) {
+        const existingByEmail = await storage.getAllowedUserByEmail(email.trim());
+        if (existingByEmail) {
+          return res.status(409).json({ message: 'Email already exists in allowed list' });
+        }
+      }
+      if (hasUsername) {
+        const existingByUsername = await storage.getAllowedUserByUsername(username.trim());
+        if (existingByUsername) {
+          return res.status(409).json({ message: 'Username already exists in allowed list' });
+        }
       }
 
       // Get current user info from session for addedBy
-      const currentUser = (req as any).user?.username || 'unknown';
+      const currentUser = (req as any).user?.email || (req as any).user?.username || 'unknown';
       
       const user = await storage.createAllowedUser({
-        username: username.trim(),
+        email: hasEmail ? email.trim() : null,
+        username: hasUsername ? username.trim() : null,
         displayName: displayName?.trim() || null,
         addedBy: currentUser
       });
       
-      console.log(`[Admin] Added allowed user: ${username} by ${currentUser}`);
+      console.log(`[Admin] Added allowed user: ${email || username} by ${currentUser}`);
       res.json(user);
     } catch (e: any) {
       console.error('[Admin] Error adding allowed user:', e);
@@ -4920,7 +4933,7 @@ export async function registerRoutes(
       }
 
       const deleted = await storage.deleteAllowedUser(id);
-      console.log(`[Admin] Removed allowed user: ${user.username}`);
+      console.log(`[Admin] Removed allowed user: ${user.email || user.username}`);
       res.json({ success: deleted });
     } catch (e: any) {
       console.error('[Admin] Error deleting allowed user:', e);

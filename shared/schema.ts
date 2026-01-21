@@ -359,7 +359,8 @@ export type OrderStatus = ProjectStatus;
 // Allowed users table - whitelist of users who can access the app
 export const allowedUsers = pgTable("allowed_users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(), // Replit username
+  username: text("username").unique(), // Replit username (optional)
+  email: text("email").unique(), // Email address (optional)
   displayName: text("display_name"), // Optional display name
   addedBy: text("added_by"), // Who added this user
   createdAt: timestamp("created_at").defaultNow(),

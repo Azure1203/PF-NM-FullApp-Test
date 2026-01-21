@@ -112,9 +112,10 @@ export interface IStorage {
   getAllowedUsers(): Promise<AllowedUser[]>;
   getAllowedUser(id: number): Promise<AllowedUser | undefined>;
   getAllowedUserByUsername(username: string): Promise<AllowedUser | undefined>;
+  getAllowedUserByEmail(email: string): Promise<AllowedUser | undefined>;
   createAllowedUser(user: InsertAllowedUser): Promise<AllowedUser>;
   deleteAllowedUser(id: number): Promise<boolean>;
-  isUserAllowed(username: string): Promise<boolean>;
+  isUserAllowed(username: string, email?: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -575,6 +576,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getAllowedUserByEmail(email: string): Promise<AllowedUser | undefined> {
+    const [user] = await db.select().from(allowedUsers).where(eq(allowedUsers.email, email));
+    return user;
+  }
+
   async createAllowedUser(user: InsertAllowedUser): Promise<AllowedUser> {
     const [created] = await db.insert(allowedUsers).values(user).returning();
     return created;
@@ -585,9 +591,18 @@ export class DatabaseStorage implements IStorage {
     return !!deleted;
   }
 
-  async isUserAllowed(username: string): Promise<boolean> {
-    const user = await this.getAllowedUserByUsername(username);
-    return !!user;
+  async isUserAllowed(username: string, email?: string): Promise<boolean> {
+    // Check if username matches
+    if (username) {
+      const userByUsername = await this.getAllowedUserByUsername(username);
+      if (userByUsername) return true;
+    }
+    // Check if email matches
+    if (email) {
+      const userByEmail = await this.getAllowedUserByEmail(email);
+      if (userByEmail) return true;
+    }
+    return false;
   }
 }
 
