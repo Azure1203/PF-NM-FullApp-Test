@@ -224,18 +224,11 @@ async function printLabelRaw(printerName: string, labelXml: string): Promise<voi
   // Fix DYMO Connect XML parsing bug - self-closing tags need explicit closing
   const fixedLabelXml = fixDymoXml(labelXml);
   
-  const printParamsXml = `<?xml version="1.0" encoding="utf-8"?>
-<LabelWriterPrintParams>
-  <Copies>1</Copies>
-  <PrintQuality>BarcodeAndGraphics</PrintQuality>
-  <JobTitle>PerfectFit Label</JobTitle>
-</LabelWriterPrintParams>`;
+  // Log the XML being sent for debugging
+  console.log('[Dymo] Sending label XML:', fixedLabelXml.substring(0, 500) + '...');
   
-  const formData = new URLSearchParams();
-  formData.append('printerName', printerName);
-  formData.append('printParamsXml', printParamsXml);
-  formData.append('labelXml', fixedLabelXml);
-  formData.append('labelSetXml', '');
+  // Build request body exactly like dymojs library does (empty printParamsXml)
+  const body = `printerName=${encodeURIComponent(printerName)}&printParamsXml=&labelXml=${encodeURIComponent(fixedLabelXml)}&labelSetXml=`;
 
   const response = await fetch(`${baseUrl}/DYMO/DLS/Printing/PrintLabel`, {
     method: 'POST',
@@ -243,11 +236,12 @@ async function printLabelRaw(printerName: string, labelXml: string): Promise<voi
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: formData.toString(),
+    body: body,
   });
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('[Dymo] Print failed. Full label XML:', fixedLabelXml);
     throw new Error(`Print failed: ${errorText || response.statusText}`);
   }
 }
