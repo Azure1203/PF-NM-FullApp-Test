@@ -221,6 +221,9 @@ async function findPrinterByModel(modelPattern: RegExp): Promise<DymoPrinterInfo
 async function printLabelRaw(printerName: string, labelXml: string): Promise<void> {
   const baseUrl = await discoverDymoService();
   
+  // Fix DYMO Connect XML parsing bug - self-closing tags need explicit closing
+  const fixedLabelXml = fixDymoXml(labelXml);
+  
   const printParamsXml = `<?xml version="1.0" encoding="utf-8"?>
 <LabelWriterPrintParams>
   <Copies>1</Copies>
@@ -231,7 +234,7 @@ async function printLabelRaw(printerName: string, labelXml: string): Promise<voi
   const formData = new URLSearchParams();
   formData.append('printerName', printerName);
   formData.append('printParamsXml', printParamsXml);
-  formData.append('labelXml', labelXml);
+  formData.append('labelXml', fixedLabelXml);
   formData.append('labelSetXml', '');
 
   const response = await fetch(`${baseUrl}/DYMO/DLS/Printing/PrintLabel`, {
@@ -257,6 +260,20 @@ function escapeXml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+}
+
+// Fix XML for DYMO Connect bug - self-closing Color/Font tags cause errors
+// DYMO Connect requires explicit closing tags with at least a space inside
+function fixDymoXml(xml: string): string {
+  // Fix Color elements (ForeColor, BackColor)
+  xml = xml.replace(/<((?:Fore|Back)?Color)([^>]*?)\/>/g, '<$1$2> </$1>');
+  // Fix Font elements
+  xml = xml.replace(/<Font([^>]*?)\/>/g, '<Font$1></Font>');
+  // Fix RoundRectangle (might be needed too)
+  xml = xml.replace(/<RoundRectangle([^>]*?)\/>/g, '<RoundRectangle$1></RoundRectangle>');
+  // Fix Bounds
+  xml = xml.replace(/<Bounds([^>]*?)\/>/g, '<Bounds$1></Bounds>');
+  return xml;
 }
 
 // Label XML templates - using simplified format from dymojs example
