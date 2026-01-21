@@ -195,6 +195,7 @@ interface CsvItemExtractionResult {
     code: string;
     name: string;
     quantity: number;
+    cutLength: number | null; // Length column (column 5) - used for CTS parts
   }>;
   invalidRows: Array<{
     rowIndex: number;
@@ -224,12 +225,15 @@ function extractAllItemsFromCSV(records: string[][]): CsvItemExtractionResult {
   }
   
   // Process each data row
+  // CSV columns: 0=Manuf code, 1=Color/Description, 2=Quantity, 3=Height, 4=Width, 5=Length
   for (let i = dataStartIndex; i < records.length; i++) {
     const row = records[i];
     const originalCode = (row[0] || '').trim();
     const description = (row[1] || '').trim();
     const quantityStr = row[2] || '0';
     const quantity = parseInt(quantityStr) || 0;
+    const lengthStr = (row[5] || '').trim();
+    const cutLength = lengthStr ? parseFloat(lengthStr) : null;
     
     // Skip empty rows
     if (!originalCode) continue;
@@ -249,7 +253,8 @@ function extractAllItemsFromCSV(records: string[][]): CsvItemExtractionResult {
       rowIndex: i + 1,
       code: originalCode,
       name: description,
-      quantity
+      quantity,
+      cutLength: cutLength && !isNaN(cutLength) ? cutLength : null
     });
   }
   
