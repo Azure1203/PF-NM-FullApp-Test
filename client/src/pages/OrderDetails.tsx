@@ -288,59 +288,6 @@ export default function OrderDetails() {
     }
   });
 
-  // Ref for packing slip PDF file input
-  const packingSlipInputRef = useRef<HTMLInputElement>(null);
-
-  // Mutation for uploading packing slip PDF
-  const { mutate: uploadPackingSlipPdf, isPending: isUploadingPackingSlip } = useMutation({
-    mutationFn: async ({ fileId, file }: { fileId: number; file: File }) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await fetch(`/api/files/${fileId}/packing-slip-pdf`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Upload failed');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: orderQueryKey });
-      toast({ title: "Packing slip PDF uploaded" });
-      if (packingSlipInputRef.current) {
-        packingSlipInputRef.current.value = '';
-      }
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to upload PDF", description: error.message, variant: "destructive" });
-    }
-  });
-
-  // Mutation for deleting packing slip PDF
-  const { mutate: deletePackingSlipPdf, isPending: isDeletingPackingSlip } = useMutation({
-    mutationFn: async (fileId: number) => {
-      const response = await fetch(`/api/files/${fileId}/packing-slip-pdf`, {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Delete failed');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: orderQueryKey });
-      toast({ title: "Packing slip PDF deleted" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to delete PDF", description: error.message, variant: "destructive" });
-    }
-  });
-
   // Mutation for syncing Asana status
   const { mutate: syncAsanaStatus, isPending: isSyncingAsanaStatus } = useMutation({
     mutationFn: async () => {
@@ -1978,20 +1925,6 @@ export default function OrderDetails() {
                                                 
                                                 return (
                                                   <>
-                                                    {/* Packing Slip PDF - based on Parts Overall count */}
-                                                    {file.packingSlipPdfPath && (
-                                                      <Button
-                                                        size="lg"
-                                                        variant="outline"
-                                                        onClick={() => handlePdfDownload(file.id, 'packing-slip-pdf')}
-                                                        className={`border-2 ${getPdfButtonStyle(actualFilePreview.coreParts)}`}
-                                                        data-testid={`button-download-packing-slip-${file.id}`}
-                                                      >
-                                                        <Download className="w-5 h-5 mr-2" />
-                                                        Packing Slip ({actualFilePreview.coreParts})
-                                                      </Button>
-                                                    )}
-                                                    
                                                     {/* Dovetail PDF - based on Dovetails count */}
                                                     {file.eliasDovetailPdfPath && (
                                                       <Button
@@ -2334,80 +2267,6 @@ export default function OrderDetails() {
                               <X className="w-4 h-4" />
                             </Button>
                           )}
-                        </div>
-                      )}
-                      
-                      {/* Packing Slip PDF Upload/Download */}
-                      {project.files?.[selectedFileIndex] && (
-                        <div className="mb-4 space-y-2" data-testid="file-packing-slip-section">
-                          <span className="text-sm font-medium text-muted-foreground">Netley Packing Slip PDF:</span>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <input
-                              type="file"
-                              accept=".pdf,application/pdf"
-                              ref={packingSlipInputRef}
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file && project.files?.[selectedFileIndex]) {
-                                  uploadPackingSlipPdf({ fileId: project.files[selectedFileIndex].id, file });
-                                }
-                              }}
-                              data-testid="input-packing-slip-upload"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => packingSlipInputRef.current?.click()}
-                              disabled={isUploadingPackingSlip}
-                              data-testid="button-upload-packing-slip"
-                            >
-                              {isUploadingPackingSlip ? (
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              ) : (
-                                <Upload className="w-4 h-4 mr-2" />
-                              )}
-                              {project.files[selectedFileIndex].packingSlipPdfPath ? 'Replace PDF' : 'Upload PDF'}
-                            </Button>
-                            {project.files[selectedFileIndex].packingSlipPdfPath && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const fileId = project.files![selectedFileIndex].id;
-                                    window.open(`/api/files/${fileId}/packing-slip-pdf`, '_blank');
-                                  }}
-                                  data-testid="button-download-packing-slip"
-                                >
-                                  <Download className="w-4 h-4 mr-2" />
-                                  Download PDF
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const fileId = project.files![selectedFileIndex].id;
-                                    deletePackingSlipPdf(fileId);
-                                  }}
-                                  disabled={isDeletingPackingSlip}
-                                  data-testid="button-delete-packing-slip"
-                                >
-                                  {isDeletingPackingSlip ? (
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-4 h-4 mr-2" />
-                                  )}
-                                  Delete PDF
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {project.files[selectedFileIndex].packingSlipPdfPath 
-                              ? "PDF uploaded. Download it, upload to Adobe Acrobat Document Cloud, and paste the share link below." 
-                              : "Upload the Netley Packing Slip PDF you received via email."}
-                          </p>
                         </div>
                       )}
                       

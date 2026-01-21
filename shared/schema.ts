@@ -64,7 +64,6 @@ export const orderFiles = pgTable("order_files", {
   notes: text("notes"), // User notes for this file
   allmoxyJobNumber: text("allmoxy_job_number"), // ALLMOXY JOB # for this file
   packagingLink: text("packaging_link"), // Link to Adobe Acrobat packaging document
-  packingSlipPdfPath: text("packing_slip_pdf_path"), // Path to Netley packing slip PDF in object storage
   cutToFilePdfPath: text("cut_to_file_pdf_path"), // Path to Cut To File PDF in object storage
   eliasDovetailPdfPath: text("elias_dovetail_pdf_path"), // Path to Elias PF Dovetail Drawers PDF in object storage
   netley5PiecePdfPath: text("netley_5_piece_pdf_path"), // Path to Netley 5 Piece Shaker Door PDF in object storage

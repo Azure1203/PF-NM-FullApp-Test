@@ -144,7 +144,7 @@ export default function PackingChecklist() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-4">
         <p className="text-muted-foreground">No checklist available for this file.</p>
-        <p className="text-sm text-muted-foreground">This file may not have a Netley Packing Slip PDF attached.</p>
+        <p className="text-sm text-muted-foreground">This file may not have a packing checklist generated yet.</p>
         {fileInfo && (
           <Link href={`/orders/${fileInfo.projectId}`}>
             <Button variant="outline">
@@ -219,7 +219,7 @@ export default function PackingChecklist() {
                   No items found in checklist.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  The packing slip PDF may not have been parsed yet. Click below to parse it.
+                  The checklist may not have been generated yet. Click below to regenerate from CSV.
                 </p>
                 <Button
                   onClick={() => reparseMutation.mutate()}
@@ -231,7 +231,7 @@ export default function PackingChecklist() {
                   ) : (
                     <RefreshCw className="w-4 h-4 mr-2" />
                   )}
-                  Parse Packing Slip PDF
+                  Regenerate Checklist
                 </Button>
               </div>
             ) : (

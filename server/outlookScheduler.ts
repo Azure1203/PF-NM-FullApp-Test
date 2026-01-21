@@ -1,10 +1,9 @@
 import { db } from "./db";
-import { processedOutlookEmails, outlookSyncStatus, orderFiles, projects, packingSlipItems } from "@shared/schema";
+import { processedOutlookEmails, outlookSyncStatus, orderFiles, projects } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { searchNetleyEmails, downloadEmailAttachment } from "./outlook";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { log } from "./index";
-import { parsePackingSlipPdf } from "./packingSlipParser";
 
 const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 let isPolling = false;
@@ -12,13 +11,8 @@ let pollIntervalId: NodeJS.Timeout | null = null;
 
 const objectStorageService = new ObjectStorageService();
 
-// PDF type definitions for matching attachments
+// PDF type definitions for matching attachments (no packing slip - checklist comes from CSV)
 const PDF_TYPES = {
-  packingSlip: {
-    patterns: ['Netley Packing Slip', 'Packing Slip'],
-    dbColumn: 'packingSlipPdfPath',
-    suffix: 'Netley Packing Slip'
-  },
   cutToFile: {
     patterns: ['Cut To File', 'Cut to File', 'Cut To Size', 'Cut to Size'],
     dbColumn: 'cutToFilePdfPath',
@@ -159,7 +153,6 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
       allmoxyJobNumber: file.allmoxyJobNumber || '',
       allmoxyJobNumberNormalized: file.allmoxyJobNumber ? normalizeOrderNumber(file.allmoxyJobNumber) : '',
       hasPdfs: {
-        packingSlip: !!file.packingSlipPdfPath,
         cutToFile: !!file.cutToFilePdfPath,
         eliasDovetail: !!file.eliasDovetailPdfPath,
         netley5Piece: !!file.netley5PiecePdfPath
@@ -240,38 +233,6 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
             await db.update(orderFiles)
               .set(updateData)
               .where(eq(orderFiles.id, matchingFile.fileId));
-            
-            // If this is a packing slip, parse it and create checklist items
-            if (pdfType === 'packingSlip') {
-              try {
-                log(`Parsing packing slip for checklist items...`, 'outlook-scheduler');
-                const parsed = await parsePackingSlipPdf(pdfBuffer, matchingFile.fileId);
-                
-                // Delete any existing items for this file (in case of re-processing)
-                await db.delete(packingSlipItems).where(eq(packingSlipItems.fileId, matchingFile.fileId));
-                
-                // Insert parsed items
-                for (const part of parsed.parts) {
-                  await db.insert(packingSlipItems).values({
-                    fileId: matchingFile.fileId,
-                    partCode: part.partCode,
-                    color: part.color,
-                    quantity: part.quantity,
-                    height: part.height,
-                    width: part.width,
-                    length: part.length,
-                    thickness: part.thickness,
-                    description: part.description,
-                    imagePath: part.imagePath,
-                    isChecked: false,
-                    sortOrder: part.sortOrder
-                  });
-                }
-                log(`Created ${parsed.parts.length} checklist items for file ${matchingFile.fileId}`, 'outlook-scheduler');
-              } catch (parseErr: any) {
-                log(`Error parsing packing slip: ${parseErr.message}`, 'outlook-scheduler');
-              }
-            }
             
             await markMessageProcessed(messageAttachmentKey, email.subject, 'processed', matchingFile.fileId);
             

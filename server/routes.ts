@@ -2667,125 +2667,6 @@ export async function registerRoutes(
   });
 
 
-  // Download Netley packing slip PDF for a file
-  app.get('/api/files/:fileId/packing-slip-pdf', isAuthenticated, async (req, res) => {
-    try {
-      const fileId = Number(req.params.fileId);
-      const fileData = await storage.getFileWithProject(fileId);
-      
-      if (!fileData) {
-        return res.status(404).json({ message: 'File not found' });
-      }
-      
-      if (!fileData.file.packingSlipPdfPath) {
-        return res.status(404).json({ message: 'No packing slip PDF found for this file' });
-      }
-      
-      // Download from object storage
-      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.packingSlipPdfPath);
-      
-      if (!pdfBuffer) {
-        return res.status(404).json({ message: 'PDF file not found in storage' });
-      }
-      
-      // Extract filename from path
-      const filename = fileData.file.packingSlipPdfPath.split('/').pop() || 'packing-slip.pdf';
-      
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(pdfBuffer);
-      
-    } catch (err: any) {
-      console.error('[API] Error downloading packing slip PDF:', err.message);
-      res.status(500).json({ message: 'Failed to download PDF', error: err.message });
-    }
-  });
-
-  // Upload Netley packing slip PDF for a file (manual upload)
-  app.post('/api/files/:fileId/packing-slip-pdf', isAuthenticated, upload.single('file'), async (req, res) => {
-    try {
-      const fileId = Number(req.params.fileId);
-      const fileData = await storage.getFileWithProject(fileId);
-      
-      if (!fileData) {
-        return res.status(404).json({ message: 'File not found' });
-      }
-      
-      if (!req.file) {
-        return res.status(400).json({ message: 'No PDF file provided' });
-      }
-      
-      // Validate it's a PDF
-      if (req.file.mimetype !== 'application/pdf') {
-        return res.status(400).json({ message: 'File must be a PDF' });
-      }
-      
-      // Create a sanitized filename from the original filename and order name
-      const orderName = fileData.file.originalFilename?.replace(/\.csv$/i, '') || `order-${fileId}`;
-      const originalName = req.file.originalname.replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_');
-      const sanitizedFilename = `${orderName.replace(/[^a-zA-Z0-9\s\-_.]/g, '').replace(/\s+/g, '_')}_${originalName}`;
-      
-      // Store in object storage under .private directory
-      const storagePath = `.private/packing-slips/${sanitizedFilename}`;
-      await objectStorageService.uploadBuffer(
-        req.file.buffer,
-        storagePath,
-        'application/pdf'
-      );
-      
-      // Update the order file with the PDF path
-      await storage.updateOrderFile(fileId, {
-        packingSlipPdfPath: storagePath
-      });
-      
-      console.log(`[API] Uploaded packing slip PDF "${sanitizedFilename}" for file ${fileId}`);
-      
-      res.json({ 
-        message: 'Packing slip PDF uploaded successfully',
-        path: storagePath
-      });
-      
-    } catch (err: any) {
-      console.error('[API] Error uploading packing slip PDF:', err.message);
-      res.status(500).json({ message: 'Failed to upload PDF', error: err.message });
-    }
-  });
-
-  // Delete Netley packing slip PDF for a file
-  app.delete('/api/files/:fileId/packing-slip-pdf', isAuthenticated, async (req, res) => {
-    try {
-      const fileId = Number(req.params.fileId);
-      const fileData = await storage.getFileWithProject(fileId);
-      
-      if (!fileData) {
-        return res.status(404).json({ message: 'File not found' });
-      }
-      
-      if (!fileData.file.packingSlipPdfPath) {
-        return res.status(404).json({ message: 'No packing slip PDF found for this file' });
-      }
-      
-      // Delete from object storage (log if file doesn't exist but continue anyway)
-      const deleted = await objectStorageService.deleteObject(fileData.file.packingSlipPdfPath);
-      if (!deleted) {
-        console.log(`[API] Object storage file not found for ${fileId}, clearing database reference anyway`);
-      }
-      
-      // Clear the path in the database
-      await storage.updateOrderFile(fileId, {
-        packingSlipPdfPath: null
-      });
-      
-      console.log(`[API] Deleted packing slip PDF for file ${fileId}`);
-      
-      res.json({ message: 'Packing slip PDF deleted successfully' });
-      
-    } catch (err: any) {
-      console.error('[API] Error deleting packing slip PDF:', err.message);
-      res.status(500).json({ message: 'Failed to delete PDF', error: err.message });
-    }
-  });
-
   // Regenerate packing slip checklist from stored CSV content
   app.post('/api/files/:fileId/reparse-packing-slip', isAuthenticated, async (req, res) => {
     try {
@@ -3225,8 +3106,6 @@ export async function registerRoutes(
         poNumber: string | null;
         allmoxyJobNumber: string | null;
         allmoxyJobNumberNormalized: string | null;
-        hasPackingSlip: boolean;
-        packingSlipPath: string | null;
       }> = [];
       
       for (const project of allProjects) {
@@ -3256,9 +3135,7 @@ export async function registerRoutes(
             originalFilename: file.originalFilename,
             poNumber: file.poNumber,
             allmoxyJobNumber: file.allmoxyJobNumber,
-            allmoxyJobNumberNormalized: normalizedJobNumber,
-            hasPackingSlip: !!file.packingSlipPdfPath,
-            packingSlipPath: file.packingSlipPdfPath
+            allmoxyJobNumberNormalized: normalizedJobNumber
           });
         }
       }
