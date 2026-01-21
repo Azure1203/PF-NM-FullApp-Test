@@ -95,8 +95,9 @@ export function getDymoPort(): number | null {
   return loadedPort || getUserConfiguredPort();
 }
 
-// Try to load the DYMO framework from a specific port
-function tryLoadFramework(port: number): Promise<boolean> {
+// Try to load the DYMO framework from a specific port and host
+// Uses localhost (not 127.0.0.1) as browsers treat localhost specially
+function tryLoadFrameworkUrl(url: string, description: string): Promise<boolean> {
   return new Promise((resolve) => {
     const script = document.createElement('script');
     const timeoutId = setTimeout(() => {
@@ -107,7 +108,7 @@ function tryLoadFramework(port: number): Promise<boolean> {
     script.onload = () => {
       clearTimeout(timeoutId);
       if (window.dymo?.connect?.framework) {
-        console.log(`[Dymo] Framework loaded from port ${port}`);
+        console.log(`[Dymo] Framework loaded from ${description}`);
         resolve(true);
       } else {
         script.remove();
@@ -121,41 +122,41 @@ function tryLoadFramework(port: number): Promise<boolean> {
       resolve(false);
     };
 
-    // Try HTTPS first, then HTTP
-    script.src = `https://127.0.0.1:${port}/DYMO/DLS/Printing/Host/Dymo.Connect.Framework.js`;
+    script.src = url;
     document.head.appendChild(script);
   });
 }
 
-// Try HTTP if HTTPS fails
-function tryLoadFrameworkHttp(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    const timeoutId = setTimeout(() => {
-      script.remove();
-      resolve(false);
-    }, 3000);
-
-    script.onload = () => {
-      clearTimeout(timeoutId);
-      if (window.dymo?.connect?.framework) {
-        console.log(`[Dymo] Framework loaded from port ${port} (HTTP)`);
-        resolve(true);
-      } else {
-        script.remove();
-        resolve(false);
-      }
-    };
-
-    script.onerror = () => {
-      clearTimeout(timeoutId);
-      script.remove();
-      resolve(false);
-    };
-
-    script.src = `http://127.0.0.1:${port}/DYMO/DLS/Printing/Host/Dymo.Connect.Framework.js`;
-    document.head.appendChild(script);
-  });
+// Try all URL variations for a given port
+// Order: HTTP localhost, HTTPS localhost, HTTP 127.0.0.1, HTTPS 127.0.0.1
+async function tryLoadFrameworkPort(port: number): Promise<boolean> {
+  const frameworkPath = '/DYMO/DLS/Printing/Host/Dymo.Connect.Framework.js';
+  
+  // Try HTTP localhost first (browsers have special exceptions for localhost HTTP)
+  console.log(`[Dymo] Trying http://localhost:${port}...`);
+  if (await tryLoadFrameworkUrl(`http://localhost:${port}${frameworkPath}`, `localhost:${port} (HTTP)`)) {
+    return true;
+  }
+  
+  // Try HTTPS localhost
+  console.log(`[Dymo] Trying https://localhost:${port}...`);
+  if (await tryLoadFrameworkUrl(`https://localhost:${port}${frameworkPath}`, `localhost:${port} (HTTPS)`)) {
+    return true;
+  }
+  
+  // Try HTTP 127.0.0.1 as fallback
+  console.log(`[Dymo] Trying http://127.0.0.1:${port}...`);
+  if (await tryLoadFrameworkUrl(`http://127.0.0.1:${port}${frameworkPath}`, `127.0.0.1:${port} (HTTP)`)) {
+    return true;
+  }
+  
+  // Try HTTPS 127.0.0.1 as last resort
+  console.log(`[Dymo] Trying https://127.0.0.1:${port}...`);
+  if (await tryLoadFrameworkUrl(`https://127.0.0.1:${port}${frameworkPath}`, `127.0.0.1:${port} (HTTPS)`)) {
+    return true;
+  }
+  
+  return false;
 }
 
 // Load the DYMO framework by discovering the port
@@ -175,7 +176,7 @@ async function loadDymoFramework(): Promise<void> {
     const userPort = getUserConfiguredPort();
     if (userPort) {
       console.log(`[Dymo] Trying user-configured port ${userPort}...`);
-      if (await tryLoadFramework(userPort) || await tryLoadFrameworkHttp(userPort)) {
+      if (await tryLoadFrameworkPort(userPort)) {
         loadedPort = userPort;
         frameworkLoaded = true;
         await window.dymo!.connect!.framework!.init();
@@ -185,8 +186,7 @@ async function loadDymoFramework(): Promise<void> {
 
     // Try each port in sequence
     for (const port of DYMO_PORTS) {
-      console.log(`[Dymo] Trying port ${port}...`);
-      if (await tryLoadFramework(port) || await tryLoadFrameworkHttp(port)) {
+      if (await tryLoadFrameworkPort(port)) {
         loadedPort = port;
         frameworkLoaded = true;
         await window.dymo!.connect!.framework!.init();
@@ -199,9 +199,10 @@ async function loadDymoFramework(): Promise<void> {
     
     const triedPorts = userPort ? [userPort, ...DYMO_PORTS] : DYMO_PORTS;
     throw new Error(
-      `DYMO Connect not found. Tried ports: ${triedPorts.slice(0, 10).join(', ')}... ` +
-      `Please ensure DYMO Connect for Desktop is installed and running. ` +
-      `If DYMO Connect is on a different port, use setDymoPort(PORT) in browser console.`
+      `DYMO Connect not found. Browser security is blocking access to localhost. ` +
+      `Tried ports: ${triedPorts.slice(0, 5).join(', ')}... ` +
+      `This is a browser limitation when accessing localhost from HTTPS sites. ` +
+      `Please ensure DYMO Connect for Desktop is installed and running.`
     );
   })();
 
