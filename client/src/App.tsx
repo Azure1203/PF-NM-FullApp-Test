@@ -4,7 +4,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldX } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import Dashboard from "@/pages/Dashboard";
 import UploadOrder from "@/pages/UploadOrder";
@@ -19,8 +21,31 @@ import AdminUsers from "@/pages/AdminUsers";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 
+function AccessDenied({ onLogout }: { onLogout: () => void }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <Card className="max-w-md w-full">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+            <ShieldX className="w-8 h-8 text-destructive" />
+          </div>
+          <CardTitle className="text-2xl">Access Denied</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <p className="text-muted-foreground">
+            Your account is not on the allowed users list. Please contact an administrator to request access.
+          </p>
+          <Button onClick={onLogout} variant="outline" className="w-full" data-testid="button-logout-denied">
+            Sign Out
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function AppRouter() {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, isNotAllowed, logout } = useAuth();
 
   if (isLoading) {
     return (
@@ -28,6 +53,10 @@ function AppRouter() {
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (isNotAllowed) {
+    return <AccessDenied onLogout={logout} />;
   }
 
   if (!isAuthenticated) {

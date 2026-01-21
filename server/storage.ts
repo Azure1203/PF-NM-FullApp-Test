@@ -116,6 +116,7 @@ export interface IStorage {
   createAllowedUser(user: InsertAllowedUser): Promise<AllowedUser>;
   deleteAllowedUser(id: number): Promise<boolean>;
   isUserAllowed(username: string, email?: string): Promise<boolean>;
+  isWhitelistEmpty(): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -603,6 +604,11 @@ export class DatabaseStorage implements IStorage {
       if (userByEmail) return true;
     }
     return false;
+  }
+
+  async isWhitelistEmpty(): Promise<boolean> {
+    const users = await db.select().from(allowedUsers).limit(1);
+    return users.length === 0;
   }
 }
 

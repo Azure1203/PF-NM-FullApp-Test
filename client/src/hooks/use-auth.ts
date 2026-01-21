@@ -1,20 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@shared/models/auth";
 
-async function fetchUser(): Promise<User | null> {
+type AuthResult = { user: User | null; notAllowed?: boolean };
+
+async function fetchUser(): Promise<AuthResult> {
   const response = await fetch("/api/auth/user", {
     credentials: "include",
   });
 
   if (response.status === 401) {
-    return null;
+    return { user: null };
+  }
+
+  if (response.status === 403) {
+    // User is authenticated but not on the whitelist
+    return { user: null, notAllowed: true };
   }
 
   if (!response.ok) {
     throw new Error(`${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const user = await response.json();
+  return { user };
 }
 
 async function logout(): Promise<void> {
@@ -23,7 +31,7 @@ async function logout(): Promise<void> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data, isLoading } = useQuery<AuthResult>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
     retry: false,
@@ -33,14 +41,15 @@ export function useAuth() {
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: () => {
-      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.setQueryData(["/api/auth/user"], { user: null });
     },
   });
 
   return {
-    user,
+    user: data?.user ?? null,
     isLoading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!data?.user,
+    isNotAllowed: data?.notAllowed ?? false,
     logout: logoutMutation.mutate,
     isLoggingOut: logoutMutation.isPending,
   };
