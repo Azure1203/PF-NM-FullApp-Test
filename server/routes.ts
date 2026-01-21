@@ -278,19 +278,31 @@ function hasHardwarePrefix(code: string): boolean {
 // Helper function to update project's pfProductionStatus based on all files' BO statuses
 // This is at module level so it can be called from generateHardwareChecklistForFile
 async function updateProjectBoProductionStatus(projectId: number) {
+  console.log(`[BO Sync] updateProjectBoProductionStatus called for projectId: ${projectId}`);
+  
   const project = await storage.getProject(projectId);
-  if (!project) return;
+  if (!project) {
+    console.log(`[BO Sync] WARNING: Project ${projectId} not found`);
+    return;
+  }
   
   const files = await storage.getProjectFiles(projectId);
+  console.log(`[BO Sync] Project ${projectId} has ${files.length} files`);
   
   // Analyze BO status across all files
   const fileBoStatuses = files.map(f => f.hardwareBoStatus).filter(Boolean) as string[];
+  console.log(`[BO Sync] File BO statuses:`, fileBoStatuses);
+  
   const hasWaitingForBo = fileBoStatuses.some(s => s === 'WAITING FOR BO HARDWARE');
   const hasBoHardware = fileBoStatuses.some(s => s === 'WAITING FOR BO HARDWARE' || s === 'BO HARDWARE ARRIVED');
   const allBoArrived = hasBoHardware && fileBoStatuses.every(s => s === 'NO BO HARDWARE' || s === 'BO HARDWARE ARRIVED');
   
+  console.log(`[BO Sync] Analysis: hasWaitingForBo=${hasWaitingForBo}, hasBoHardware=${hasBoHardware}, allBoArrived=${allBoArrived}`);
+  
   // Get current production statuses
   const currentStatuses = project.pfProductionStatus || [];
+  console.log(`[BO Sync] Current pfProductionStatus:`, currentStatuses);
+  
   let newStatuses = [...currentStatuses];
   
   // Remove existing BO-related statuses first
@@ -306,11 +318,15 @@ async function updateProjectBoProductionStatus(projectId: number) {
   }
   // If no files have BO hardware (all 'NO BO HARDWARE'), don't add any BO status
   
+  console.log(`[BO Sync] New pfProductionStatus will be:`, newStatuses);
+  
   // Update project if statuses changed
   const statusesChanged = 
     newStatuses.length !== currentStatuses.length || 
     newStatuses.some(s => !currentStatuses.includes(s)) ||
     currentStatuses.some(s => !newStatuses.includes(s));
+  
+  console.log(`[BO Sync] Status changed: ${statusesChanged}`);
   
   if (statusesChanged) {
     await storage.updateProject(projectId, { pfProductionStatus: newStatuses });
@@ -4252,15 +4268,23 @@ export async function registerRoutes(
   // Helper function to recalculate and update BO status for a file and its pallet assignments
   // Status is based on whether buyout items are PACKED (checked off), not arrival status
   async function recalculateBoStatus(fileId: number) {
+    console.log(`[BO Sync] recalculateBoStatus called for fileId: ${fileId}`);
+    
     const items = await storage.getHardwareChecklistItems(fileId);
     const buyoutItems = items.filter(item => item.isBuyout);
     const buyoutPacked = buyoutItems.filter(item => item.isPacked).length;
+    
+    console.log(`[BO Sync] File ${fileId}: ${buyoutItems.length} buyout items, ${buyoutPacked} packed`);
     
     let boStatus: 'NO BO HARDWARE' | 'WAITING FOR BO HARDWARE' | 'BO HARDWARE ARRIVED' = 'NO BO HARDWARE';
     if (buyoutItems.length > 0) {
       boStatus = buyoutPacked === buyoutItems.length ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
     }
+    
+    console.log(`[BO Sync] Calculated boStatus for file ${fileId}: ${boStatus}`);
+    
     await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
+    console.log(`[BO Sync] Updated file ${fileId} hardwareBoStatus to: ${boStatus}`);
     
     // Also update all pallet file assignments for this file
     const assignments = await storage.getAssignmentsForFile(fileId);
@@ -4269,6 +4293,7 @@ export async function registerRoutes(
       ? 'NO BUYOUT HARDWARE' 
       : boStatus;
     
+    console.log(`[BO Sync] Updating ${assignments.length} pallet assignments to: ${buyoutOption}`);
     for (const assignment of assignments) {
       await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
     }
@@ -4276,7 +4301,10 @@ export async function registerRoutes(
     // Also update the project's pfProductionStatus based on aggregated BO status across all files
     const file = await storage.getOrderFile(fileId);
     if (file) {
+      console.log(`[BO Sync] Calling updateProjectBoProductionStatus for project ${file.projectId}`);
       await updateProjectBoProductionStatus(file.projectId);
+    } else {
+      console.log(`[BO Sync] WARNING: Could not find file ${fileId} to update project status`);
     }
     
     return boStatus;
