@@ -355,3 +355,20 @@ export const orders = projects;
 export type Order = Project;
 export type InsertOrder = InsertProject;
 export type OrderStatus = ProjectStatus;
+
+// Allowed users table - whitelist of users who can access the app
+export const allowedUsers = pgTable("allowed_users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(), // Replit username
+  displayName: text("display_name"), // Optional display name
+  addedBy: text("added_by"), // Who added this user
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAllowedUserSchema = createInsertSchema(allowedUsers).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export type AllowedUser = typeof allowedUsers.$inferSelect;
+export type InsertAllowedUser = z.infer<typeof insertAllowedUserSchema>;

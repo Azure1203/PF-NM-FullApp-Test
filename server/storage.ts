@@ -10,6 +10,7 @@ import {
   packingSlipItems,
   products,
   hardwareChecklistItems,
+  allowedUsers,
   type Project,
   type InsertProject,
   type OrderFile,
@@ -28,7 +29,9 @@ import {
   type Product,
   type InsertProduct,
   type HardwareChecklistItem,
-  type InsertHardwareChecklistItem
+  type InsertHardwareChecklistItem,
+  type AllowedUser,
+  type InsertAllowedUser
 } from "@shared/schema";
 import { eq, desc, and, or, inArray, sql, ilike } from "drizzle-orm";
 
@@ -103,6 +106,14 @@ export interface IStorage {
   deleteHardwareChecklistItems(fileId: number): Promise<void>;
   getHardwareChecklistProgress(fileId: number): Promise<{ total: number; packed: number; buyoutItems: number; buyoutArrived: number }>;
   replaceHardwareChecklist(fileId: number, items: InsertHardwareChecklistItem[]): Promise<HardwareChecklistItem[]>;
+  
+  // Allowed users methods
+  getAllowedUsers(): Promise<AllowedUser[]>;
+  getAllowedUser(id: number): Promise<AllowedUser | undefined>;
+  getAllowedUserByUsername(username: string): Promise<AllowedUser | undefined>;
+  createAllowedUser(user: InsertAllowedUser): Promise<AllowedUser>;
+  deleteAllowedUser(id: number): Promise<boolean>;
+  isUserAllowed(username: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -524,6 +535,36 @@ export class DatabaseStorage implements IStorage {
       const created = await tx.insert(hardwareChecklistItems).values(items).returning();
       return created;
     });
+  }
+
+  // Allowed users methods
+  async getAllowedUsers(): Promise<AllowedUser[]> {
+    return await db.select().from(allowedUsers).orderBy(desc(allowedUsers.createdAt));
+  }
+
+  async getAllowedUser(id: number): Promise<AllowedUser | undefined> {
+    const [user] = await db.select().from(allowedUsers).where(eq(allowedUsers.id, id));
+    return user;
+  }
+
+  async getAllowedUserByUsername(username: string): Promise<AllowedUser | undefined> {
+    const [user] = await db.select().from(allowedUsers).where(eq(allowedUsers.username, username));
+    return user;
+  }
+
+  async createAllowedUser(user: InsertAllowedUser): Promise<AllowedUser> {
+    const [created] = await db.insert(allowedUsers).values(user).returning();
+    return created;
+  }
+
+  async deleteAllowedUser(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(allowedUsers).where(eq(allowedUsers.id, id)).returning();
+    return !!deleted;
+  }
+
+  async isUserAllowed(username: string): Promise<boolean> {
+    const user = await this.getAllowedUserByUsername(username);
+    return !!user;
   }
 }
 
