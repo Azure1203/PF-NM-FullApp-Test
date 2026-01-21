@@ -4333,6 +4333,12 @@ export async function registerRoutes(
       // Recalculate BO status for the file when packing status changes
       const boStatus = await recalculateBoStatus(updated.fileId);
       
+      // Also update project-level aggregated BO status for consistency
+      const orderFile = await storage.getOrderFile(updated.fileId);
+      if (orderFile) {
+        await updateProjectBoProductionStatus(orderFile.projectId);
+      }
+      
       res.json({ ...updated, fileBoStatus: boStatus });
     } catch (e: any) {
       console.error('[Hardware Checklist] Error toggling packed:', e);
@@ -4356,6 +4362,13 @@ export async function registerRoutes(
       
       // Recalculate BO status for the file
       const boStatus = await recalculateBoStatus(updated.fileId);
+      
+      // Also update project-level aggregated BO status
+      const orderFile = await storage.getOrderFile(updated.fileId);
+      if (orderFile) {
+        console.log(`[Hardware Checklist] Syncing project ${orderFile.projectId} BO status after buyout toggle`);
+        await updateProjectBoProductionStatus(orderFile.projectId);
+      }
       
       res.json({ ...updated, fileBoStatus: boStatus });
     } catch (e: any) {
