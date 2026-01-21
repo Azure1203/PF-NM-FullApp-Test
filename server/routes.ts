@@ -481,6 +481,7 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
     // Update project-level pfProductionStatus based on all files' BO statuses
     const orderFile = await storage.getOrderFile(fileId);
     if (orderFile) {
+      console.log(`[Hardware Checklist Auto] File ${fileId}: Calling updateProjectBoProductionStatus for project ${orderFile.projectId}`);
       await updateProjectBoProductionStatus(orderFile.projectId);
     }
     
@@ -1057,6 +1058,11 @@ export async function registerRoutes(
         const packingSlipResult = await generatePackingSlipChecklistForFile(orderFile.id, pf.content);
         console.log(`[Upload] Order ${orderFile.id}: Packing slip checklist auto-generated - ${packingSlipResult.itemCount} items`);
       }
+
+      // After ALL files are processed, update project's aggregated BO status
+      // This ensures all file.hardwareBoStatus values are saved before aggregation
+      console.log(`[Upload] Updating project ${project.id} aggregated BO status after all files processed`);
+      await updateProjectBoProductionStatus(project.id);
 
       res.status(201).json(project);
 
