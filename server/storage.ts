@@ -494,11 +494,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async toggleHardwareItemPacked(itemId: number, isPacked: boolean, packedBy?: string): Promise<HardwareChecklistItem | undefined> {
-    const updateData: { isPacked: boolean; packedAt: Date | null; packedBy: string | null } = {
+    // First get the item to check if it's a buyout item
+    const [existingItem] = await db.select().from(hardwareChecklistItems).where(eq(hardwareChecklistItems.id, itemId));
+    if (!existingItem) return undefined;
+    
+    const updateData: { isPacked: boolean; packedAt: Date | null; packedBy: string | null; buyoutArrived?: boolean } = {
       isPacked,
       packedAt: isPacked ? new Date() : null,
       packedBy: isPacked && packedBy ? packedBy : null
     };
+    
+    // If packing a buyout item, automatically mark it as arrived (can't pack what hasn't arrived)
+    if (isPacked && existingItem.isBuyout) {
+      updateData.buyoutArrived = true;
+    }
     
     const [updated] = await db.update(hardwareChecklistItems)
       .set(updateData)
