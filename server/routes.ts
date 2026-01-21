@@ -1009,10 +1009,27 @@ export async function registerRoutes(
 
       const project = await storage.createProject(projectData);
 
+      // Aggregate counts for auto-derived production statuses
+      let totalDovetails = 0;
+      let totalFivePiece = 0;
+      let totalAssembledDrawers = 0;
+      let hasDoubleThick = false;
+      let hasGlassParts = false;
+      let hasGlassShelves = false;
+      let hasCTSParts = false;
+      
       // Create order files linked to the project with calculated values
       for (const pf of parsedFiles) {
         // Calculate part counts from CSV data (async to cross-reference products DB)
         const partCounts = await countPartsFromCSV(pf.records);
+        
+        // Aggregate for auto-derived statuses (reuse already-computed counts)
+        totalDovetails += partCounts.dovetails;
+        totalFivePiece += partCounts.fivePiece;
+        totalAssembledDrawers += partCounts.assembledDrawers;
+        if (partCounts.hasDoubleThick) hasDoubleThick = true;
+        if (partCounts.hasGlassParts) hasGlassParts = true;
+        if (partCounts.glassShelves > 0) hasGlassShelves = true;
         
         const orderFile = await storage.createOrderFile({
           projectId: project.id,
@@ -1040,6 +1057,7 @@ export async function registerRoutes(
         
         // Extract and save CTS parts for this file
         const ctsParts = extractCTSParts(pf.records);
+        if (ctsParts.length > 0) hasCTSParts = true;
         for (const ctsPart of ctsParts) {
           await storage.createCtsPart({
             fileId: orderFile.id,
@@ -1058,13 +1076,34 @@ export async function registerRoutes(
         const packingSlipResult = await generatePackingSlipChecklistForFile(orderFile.id, pf.content);
         console.log(`[Upload] Order ${orderFile.id}: Packing slip checklist auto-generated - ${packingSlipResult.itemCount} items`);
       }
-
-      // After ALL files are processed, update project's aggregated BO status
-      // This ensures all file.hardwareBoStatus values are saved before aggregation
+      
+      // Compute auto-enabled production statuses based on order content
+      const autoStatuses = computeAutoProductionStatuses({
+        hasCTSParts,
+        hasFivePiece: totalFivePiece > 0,
+        hasDoubleThick,
+        hasDovetails: totalDovetails > 0,
+        hasAssembledDrawers: totalAssembledDrawers > 0,
+        hasGlassParts,
+        hasGlassShelves
+      });
+      
+      console.log(`[Upload] Auto-derived production statuses for project ${project.id}:`, autoStatuses);
+      
+      // Set the auto-derived statuses on the project
+      if (autoStatuses.length > 0) {
+        await storage.updateProject(project.id, { pfProductionStatus: autoStatuses });
+        console.log(`[Upload] Set pfProductionStatus for project ${project.id}:`, autoStatuses);
+      }
+      
+      // After setting auto statuses, update project's aggregated BO status
+      // This will merge BO status with the auto-derived statuses
       console.log(`[Upload] Updating project ${project.id} aggregated BO status after all files processed`);
       await updateProjectBoProductionStatus(project.id);
-
-      res.status(201).json(project);
+      
+      // Return the updated project with all statuses
+      const updatedProject = await storage.getProject(project.id);
+      res.status(201).json(updatedProject || project);
 
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -2257,9 +2296,6 @@ export async function registerRoutes(
         newTaskGid = task.data.gid;
       }
 
-      // Variable to hold auto statuses for database update
-      let autoStatusesForDb: string[] = [];
-      
       // Get pallets for packaging cost calculation
       const projectPallets = await storage.getPalletsForProject(project.id);
       const palletCount = projectPallets.length;
@@ -2357,26 +2393,19 @@ export async function registerRoutes(
           }
         }
         
-        // Compute auto-enabled production statuses based on order content
-        const autoStatuses = computeAutoProductionStatuses({
-          hasCTSParts,
-          hasFivePiece: totalFivePiece > 0,
-          hasDoubleThick,
-          hasDovetails: totalDovetails > 0,
-          hasAssembledDrawers: totalAssembledDrawers > 0,
-          hasGlassParts,
-          hasGlassShelves
-        });
+        // Use already-saved pfProductionStatus from project (set during import)
+        // This includes auto-derived statuses AND BO statuses from hardware checklist
+        const statusesToSync = project.pfProductionStatus || [];
         
-        // Set PF PRODUCTION STATUS if there are auto statuses to set
-        if (autoStatuses.length > 0) {
+        // Set PF PRODUCTION STATUS using existing project statuses
+        if (statusesToSync.length > 0) {
           for (const setting of customFieldSettings) {
             const field = setting.custom_field;
             const name = field.name?.toUpperCase().trim();
             
             if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
               // Map status names to their GIDs
-              const selectedGids = autoStatuses
+              const selectedGids = statusesToSync
                 .map((statusName: string) => {
                   const option = field.enum_options.find((o: any) => 
                     o.name?.toUpperCase().trim() === statusName.toUpperCase().trim()
@@ -2387,7 +2416,7 @@ export async function registerRoutes(
               
               if (selectedGids.length > 0) {
                 customFields[field.gid] = selectedGids;
-                console.log('[Asana] Auto-enabling production statuses:', autoStatuses);
+                console.log('[Asana] Syncing production statuses from project:', statusesToSync);
               }
               break;
             }
@@ -2399,17 +2428,14 @@ export async function registerRoutes(
         if (Object.keys(customFields).length > 0) {
           await tasksApi.updateTask({ data: { custom_fields: customFields } }, newTaskGid, {});
         }
-        // Store auto statuses for database update
-        autoStatusesForDb = autoStatuses;
       } catch (e) {
         console.error("Error updating custom fields:", e);
       }
 
-      // Update project status in our database (including auto-enabled production statuses)
+      // Update project status in our database (keep existing pfProductionStatus, just mark as synced)
       const updatedProject = await storage.updateProject(project.id, {
         asanaTaskId: newTaskGid,
-        status: 'synced',
-        pfProductionStatus: autoStatusesForDb
+        status: 'synced'
       });
 
       res.json(updatedProject);
