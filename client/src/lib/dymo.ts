@@ -18,74 +18,15 @@ export async function imageToBase64(imageUrl: string): Promise<string> {
   });
 }
 
-// Cached state
+// Fixed DYMO Connect port (configured on all computers)
+const DYMO_PORT = 41951;
+
+// Cached base URL after successful connection
 let discoveredBaseUrl: string | null = null;
-let discoveryInProgress = false;
-let discoveryPromise: Promise<string | null> | null = null;
-
-// LocalStorage key for user-configured port
-const DYMO_PORT_STORAGE_KEY = 'dymo_connect_port';
-
-// Ports to try for DYMO Connect Web Service
-const DYMO_PORTS = [
-  41951, 41952, 41953, 41954, 41955, 41956, 41957, 41958, 41959, 41960,
-  41961, 41962, 41963, 41964, 41965, 41966, 41967, 41968, 41969, 41970
-];
-
-// Get user-configured port from localStorage (if set)
-function getUserConfiguredPort(): number | null {
-  try {
-    const stored = localStorage.getItem(DYMO_PORT_STORAGE_KEY);
-    if (stored) {
-      const port = parseInt(stored, 10);
-      if (!isNaN(port) && port > 0 && port < 65536) {
-        return port;
-      }
-    }
-  } catch {
-    // localStorage not available
-  }
-  return null;
-}
-
-// Allow users to set a custom DYMO Connect port
-export function setDymoPort(port: number): void {
-  try {
-    localStorage.setItem(DYMO_PORT_STORAGE_KEY, port.toString());
-    discoveredBaseUrl = null;
-    discoveryPromise = null;
-    console.log(`[Dymo] Port set to ${port}. Next print will use this port.`);
-  } catch {
-    // localStorage not available
-  }
-}
-
-// Clear custom port setting
-export function clearDymoPort(): void {
-  try {
-    localStorage.removeItem(DYMO_PORT_STORAGE_KEY);
-    discoveredBaseUrl = null;
-    discoveryPromise = null;
-    console.log('[Dymo] Custom port cleared. Will auto-discover on next print.');
-  } catch {
-    // localStorage not available
-  }
-}
 
 // Get current DYMO Connect port (for display)
-export function getDymoPort(): number | null {
-  if (discoveredBaseUrl) {
-    const match = discoveredBaseUrl.match(/:(\d+)$/);
-    if (match) return parseInt(match[1], 10);
-  }
-  return getUserConfiguredPort();
-}
-
-// Expose functions to browser console for debugging
-if (typeof window !== 'undefined') {
-  (window as any).setDymoPort = setDymoPort;
-  (window as any).clearDymoPort = clearDymoPort;
-  (window as any).getDymoPort = getDymoPort;
+export function getDymoPort(): number {
+  return DYMO_PORT;
 }
 
 // Try to connect to DYMO service at a specific URL
@@ -105,66 +46,32 @@ async function tryConnectUrl(baseUrl: string): Promise<boolean> {
   return false;
 }
 
-// Discover the DYMO Connect service URL
+// Connect to the DYMO Connect service using fixed port
 async function discoverDymoService(): Promise<string> {
   if (discoveredBaseUrl) {
     return discoveredBaseUrl;
   }
 
-  if (discoveryInProgress && discoveryPromise) {
-    const result = await discoveryPromise;
-    if (result) return result;
-    throw new Error('DYMO Connect discovery failed');
+  // Try HTTPS first (preferred), then HTTP as fallback
+  const urls = [
+    `https://localhost:${DYMO_PORT}`,
+    `http://localhost:${DYMO_PORT}`,
+    `https://127.0.0.1:${DYMO_PORT}`,
+    `http://127.0.0.1:${DYMO_PORT}`
+  ];
+
+  for (const url of urls) {
+    console.log(`[Dymo] Trying ${url}...`);
+    if (await tryConnectUrl(url)) {
+      console.log(`[Dymo] Connected to ${url}`);
+      discoveredBaseUrl = url;
+      return url;
+    }
   }
 
-  discoveryInProgress = true;
-
-  discoveryPromise = (async (): Promise<string | null> => {
-    // Try user-configured port first
-    const userPort = getUserConfiguredPort();
-    if (userPort) {
-      const urls = [
-        `https://localhost:${userPort}`,
-        `http://localhost:${userPort}`,
-        `https://127.0.0.1:${userPort}`,
-        `http://127.0.0.1:${userPort}`
-      ];
-      for (const url of urls) {
-        console.log(`[Dymo] Trying ${url}...`);
-        if (await tryConnectUrl(url)) {
-          console.log(`[Dymo] Connected to ${url}`);
-          discoveredBaseUrl = url;
-          return url;
-        }
-      }
-    }
-
-    // Try default ports - HTTPS localhost first since user confirmed it works
-    for (const port of DYMO_PORTS) {
-      const url = `https://localhost:${port}`;
-      console.log(`[Dymo] Trying ${url}...`);
-      if (await tryConnectUrl(url)) {
-        console.log(`[Dymo] Connected to ${url}`);
-        discoveredBaseUrl = url;
-        return url;
-      }
-    }
-
-    discoveryInProgress = false;
-    return null;
-  })();
-
-  const result = await discoveryPromise;
-  discoveryInProgress = false;
-
-  if (!result) {
-    throw new Error(
-      'DYMO Connect not found. Please ensure DYMO Connect for Desktop is installed and running. ' +
-      'If using a custom port, run setDymoPort(PORT) in browser console.'
-    );
-  }
-
-  return result;
+  throw new Error(
+    `DYMO Connect not found on port ${DYMO_PORT}. Please ensure DYMO Connect for Desktop is installed and running.`
+  );
 }
 
 // Public interface types
