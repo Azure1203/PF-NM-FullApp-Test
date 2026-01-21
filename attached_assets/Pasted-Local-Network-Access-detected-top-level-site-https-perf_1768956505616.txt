@@ -1,0 +1,13 @@
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected. (Reason: CORS request did not succeed). Status code: (null).
+Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected. (Reason: CORS request did not succeed). Status code: (null).
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+Print error: Error: DYMO Connect not found. Tried ports: 41951, 41952, 41953, 41954, 41955, 41956, 41957, 41958, 41959, 41960... Please ensure DYMO Connect for Desktop is installed and running. If DYMO Connect is on a different port, use setDymoPort() in browser console.
+    W4 https://perfectfitorders.com/assets/index-07L2imrj.js:69
+index-07L2imrj.js:601:1331
+Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected. (Reason: CORS request did not succeed). Status code: (null).
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected. (Reason: CORS request did not succeed). Status code: (null).
+Print error: Error: DYMO Connect not found. Tried ports: 41951, 41952, 41953, 41954, 41955, 41956, 41957, 41958, 41959, 41960... Please ensure DYMO Connect for Desktop is installed and running. If DYMO Connect is on a different port, use setDymoPort() in browser console.
+    W4 https://perfectfitorders.com/assets/index-07L2imrj.js:69
