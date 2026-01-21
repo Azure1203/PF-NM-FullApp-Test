@@ -3034,18 +3034,39 @@ export async function registerRoutes(
       }
       
       // Get CTS parts for this file to add cut lengths
+      // Expand cts_parts by quantity so each unit has its own length entry
       const ctsParts = await storage.getCtsPartsForFile(fileId);
-      const ctsLengthMap: Record<string, number> = {};
+      const ctsExpandedLengths: Record<string, number[]> = {};
       for (const ctsPart of ctsParts) {
-        ctsLengthMap[ctsPart.partNumber] = ctsPart.cutLength;
+        if (!ctsExpandedLengths[ctsPart.partNumber]) {
+          ctsExpandedLengths[ctsPart.partNumber] = [];
+        }
+        // Add the length once for each quantity unit
+        for (let i = 0; i < ctsPart.quantity; i++) {
+          ctsExpandedLengths[ctsPart.partNumber].push(ctsPart.cutLength);
+        }
       }
       
+      // Track which CTS lengths have been assigned to packing slip items
+      const ctsAssignmentIndex: Record<string, number> = {};
+      
       // Enrich items with product info (image from product db takes precedence if available)
-      // Also add CTS cut length for items with .CTS suffix
+      // Also add CTS cut length for items with .CTS suffix - matching by order within same partCode
+      // Each packing slip item consumes one cut length entry
       const enrichedItems = items.map(item => {
         const product = productMap[item.partCode];
         const isCts = item.partCode.includes('.CTS');
-        const ctsCutLength = isCts ? ctsLengthMap[item.partCode] : undefined;
+        let ctsCutLength: number | undefined;
+        
+        if (isCts && ctsExpandedLengths[item.partCode]) {
+          // Get the next available cut length for this partCode
+          const currentIndex = ctsAssignmentIndex[item.partCode] || 0;
+          const lengths = ctsExpandedLengths[item.partCode];
+          if (currentIndex < lengths.length) {
+            ctsCutLength = lengths[currentIndex];
+            ctsAssignmentIndex[item.partCode] = currentIndex + 1;
+          }
+        }
         
         return {
           ...item,
