@@ -803,7 +803,8 @@ export default function OrderDetails() {
       const result = await printProjectLabel(
         project?.name || '',
         project?.orderId || '',
-        project?.cienappsJobNumber || ''
+        project?.cienappsJobNumber || '',
+        pfcLogo
       );
       if (result.success) {
         toast({ title: 'Label printed', description: 'Project label sent to Dymo 450' });
@@ -861,7 +862,8 @@ export default function OrderDetails() {
         orderName,
         allmoxyJobNumber || '',
         project?.orderId || '',
-        project?.cienappsJobNumber || ''
+        project?.cienappsJobNumber || '',
+        pfcLogo
       );
       if (result.success) {
         toast({ title: 'Label printed', description: 'Order label sent to Dymo 450' });

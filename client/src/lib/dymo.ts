@@ -277,15 +277,62 @@ function createProjectLabelXml(data: {
   orderNumber: string;
   customerName: string;
   date: string;
+  logoBase64?: string;
 }): string {
+  const logoSection = data.logoBase64 ? `
+  <ObjectInfo>
+    <ImageObject>
+      <Name>Logo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${data.logoBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="100" Y="80" Width="2860" Height="500"/>
+  </ObjectInfo>` : '';
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>LargeShipping</Id>
-  <PaperName>30256 Shipping</PaperName>
+  <Id>Shipping</Id>
+  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="3331" Height="5715" Rx="270" Ry="270"/>
-  </DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"/>
+  </DrawCommands>${logoSection}
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectNameLabel</Name>
+      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Bottom</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>PROJECT NAME</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="8" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="620" Width="2860" Height="200"/>
+  </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>ProjectName</Name>
@@ -296,7 +343,7 @@ function createProjectLabelXml(data: {
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
@@ -310,7 +357,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="100" Width="5040" Height="800"/>
+    <Bounds X="100" Y="820" Width="2860" Height="600"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -330,13 +377,13 @@ function createProjectLabelXml(data: {
         <Element>
           <String>Order #${escapeXml(data.orderNumber)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="950" Width="5040" Height="600"/>
+    <Bounds X="100" Y="1450" Width="2860" Height="450"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -362,7 +409,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="1600" Width="5040" Height="500"/>
+    <Bounds X="100" Y="1950" Width="2860" Height="400"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -388,7 +435,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="2150" Width="5040" Height="400"/>
+    <Bounds X="100" Y="2400" Width="2860" Height="350"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -398,15 +445,36 @@ function createOrderLabelXml(data: {
   customerName: string;
   itemCount: string;
   description: string;
+  logoBase64?: string;
 }): string {
+  const logoSection = data.logoBase64 ? `
+  <ObjectInfo>
+    <ImageObject>
+      <Name>Logo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${data.logoBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="100" Y="80" Width="2860" Height="500"/>
+  </ObjectInfo>` : '';
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>LargeShipping</Id>
-  <PaperName>30256 Shipping</PaperName>
+  <Id>Shipping</Id>
+  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="3331" Height="5715" Rx="270" Ry="270"/>
-  </DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"/>
+  </DrawCommands>${logoSection}
   <ObjectInfo>
     <TextObject>
       <Name>OrderNumber</Name>
@@ -431,7 +499,33 @@ function createOrderLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="100" Width="5040" Height="800"/>
+    <Bounds X="100" Y="620" Width="2860" Height="550"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>CustomerNameLabel</Name>
+      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Bottom</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>PROJECT</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="8" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="1200" Width="2860" Height="200"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -443,7 +537,7 @@ function createOrderLabelXml(data: {
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
@@ -457,7 +551,7 @@ function createOrderLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="950" Width="5040" Height="600"/>
+    <Bounds X="100" Y="1400" Width="2860" Height="450"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -483,7 +577,7 @@ function createOrderLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="1600" Width="5040" Height="500"/>
+    <Bounds X="100" Y="1900" Width="2860" Height="350"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -509,7 +603,7 @@ function createOrderLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="336" Y="2150" Width="5040" Height="400"/>
+    <Bounds X="100" Y="2300" Width="2860" Height="400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -794,7 +888,8 @@ function createPalletLabelXml(data: {
 export async function printProjectLabel(
   projectName: string,
   orderId: string,
-  cienappsJobNumber: string
+  cienappsJobNumber: string,
+  logoUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const printer = await findPrinterByModel(/450|LabelWriter/i);
@@ -802,12 +897,23 @@ export async function printProjectLabel(
       return { success: false, error: 'No Dymo 450 printer found. Please connect a Dymo LabelWriter 450.' };
     }
 
+    let logoBase64: string | undefined;
+    if (logoUrl) {
+      try {
+        logoBase64 = await imageToBase64(logoUrl);
+        console.log('[Dymo] Logo loaded for project label');
+      } catch (err) {
+        console.warn('[Dymo] Could not load logo:', err);
+      }
+    }
+
     const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
     const labelXml = createProjectLabelXml({
       projectName: projectName,
       orderNumber: orderId,
       customerName: cienappsJobNumber ? `Job #${cienappsJobNumber}` : '',
-      date: today
+      date: today,
+      logoBase64
     });
 
     await printLabelRaw(printer.name, labelXml);
@@ -825,7 +931,8 @@ export async function printOrderLabel(
   orderName: string,
   allmoxyJobNumber: string,
   orderId: string,
-  cienappsJobNumber: string
+  cienappsJobNumber: string,
+  logoUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const printer = await findPrinterByModel(/450|LabelWriter/i);
@@ -833,11 +940,22 @@ export async function printOrderLabel(
       return { success: false, error: 'No Dymo 450 printer found. Please connect a Dymo LabelWriter 450.' };
     }
 
+    let logoBase64: string | undefined;
+    if (logoUrl) {
+      try {
+        logoBase64 = await imageToBase64(logoUrl);
+        console.log('[Dymo] Logo loaded for order label');
+      } catch (err) {
+        console.warn('[Dymo] Could not load logo:', err);
+      }
+    }
+
     const labelXml = createOrderLabelXml({
       orderNumber: orderId,
       customerName: projectName,
       itemCount: allmoxyJobNumber ? `Allmoxy: ${allmoxyJobNumber}` : '',
-      description: orderName + (cienappsJobNumber ? ` (Job #${cienappsJobNumber})` : '')
+      description: orderName + (cienappsJobNumber ? ` (Job #${cienappsJobNumber})` : ''),
+      logoBase64
     });
 
     await printLabelRaw(printer.name, labelXml);
