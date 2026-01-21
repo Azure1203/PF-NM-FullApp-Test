@@ -1,0 +1,190 @@
+Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content. node.js:418:1
+[Dymo] Trying https://localhost:41951... index-D_WtOcid.js:69:38470
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/70”, initiator “https://perfectfitorders.com/orders/70”, accessing target “https://localhost:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 70
+[Dymo] Connected to https://localhost:41951 index-D_WtOcid.js:69:38526
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/70”, initiator “https://perfectfitorders.com/orders/70”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 70
+[Dymo] Sending label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Portrait</PaperOrientation>
+  <Id>LargeShipping</Id>
+  <PaperName>1744907 4 x 6</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Bl... index-D_WtOcid.js:69:39646
+XHR
+POST
+https://localhost:41951/DYMO/DLS/Printing/PrintLabel
+[HTTP/1.1 400 Bad Request 5ms]
+
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/70”, initiator “https://perfectfitorders.com/orders/70”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 70
+[Dymo] Print failed. Full label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Portrait</PaperOrientation>
+  <Id>LargeShipping</Id>
+  <PaperName>1744907 4 x 6</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Right</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1/20/2026</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="3500" Y="200" Width="2060" Height="400"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>M Mejia (Mejia Primary Closet)</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="36" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="800" Width="5360" Height="1000"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Dealer</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>KBF by Audi Contractor</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="2000" Width="5360" Height="600"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Phone</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>703-777-9474</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="2700" Width="5360" Height="500"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>OrderId</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Order #1709</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="3400" Width="5360" Height="700"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>PalletInfo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Pallet 1 of 1</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="48" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="4400" Width="5360" Height="1200"></Bounds>
+  </ObjectInfo>
+</DieCutLabel> index-D_WtOcid.js:69:40008
+[Dymo] Print error: Print failed: Error printing label. Exception: Invalid label file: The 'DieCutLabel' element is not declared.
