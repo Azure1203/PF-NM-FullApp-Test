@@ -137,10 +137,17 @@ Preferred communication style: Simple, everyday language.
   - Duplicate codes aggregated (quantities summed)
   - BO status calculated and stored on order file
 
+### Packing Slip Checklist from CSV (No PDF Parsing)
+- **CSV-Based Data**: Packing checklist items are generated from the order CSV file during import
+- **Data Source**: All checklist data comes from CSV columns: code (0), description (1), quantity (2), height (3), width (4), length (5)
+- **CTS Parts**: CTS cut length stored directly on packing slip items from CSV length column
+- **No PDF Parsing**: Removed all packing slip PDF parsing code - packingSlipParser.ts deleted
+- **Regenerate Button**: PackingChecklist page can regenerate items from stored CSV content
+
 ### CTS Cut Length on Packing Checklist
 - **API Enhancement**: `/api/files/:fileId/checklist` now includes `ctsCutLength` for CTS parts
 - **UI Display**: Packing Checklist page shows amber "Cut: X.X mm" badge for items with .CTS suffix
-- **Data Source**: Cut lengths pulled from cts_parts table by matching partNumber
+- **Data Source**: Cut lengths stored directly on packing slip items from CSV import
 
 ### Data Fix Scripts
 - **script/fix-drawer-slide-skus.sql**: One-time script to fix drawer slide SKU codes
