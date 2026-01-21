@@ -750,8 +750,7 @@ export default function OrderDetails() {
       const result = await printProjectLabel(
         project?.name || '',
         project?.orderId || '',
-        project?.cienappsJobNumber || '',
-        pfcLogo
+        project?.cienappsJobNumber || ''
       );
       if (result.success) {
         toast({ title: 'Label printed', description: 'Project label sent to Dymo 450' });

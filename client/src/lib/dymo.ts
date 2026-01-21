@@ -275,30 +275,9 @@ function fixDymoXml(xml: string): string {
 function createProjectLabelXml(data: {
   projectName: string;
   orderNumber: string;
-  customerName: string;
+  cienappsNumber: string;
   date: string;
-  logoBase64?: string;
 }): string {
-  const logoSection = data.logoBase64 ? `
-  <ObjectInfo>
-    <ImageObject>
-      <Name>Logo</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <Image>${data.logoBase64}</Image>
-      <ScaleMode>Uniform</ScaleMode>
-      <BorderWidth>0</BorderWidth>
-      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-    </ImageObject>
-    <Bounds X="100" Y="80" Width="2860" Height="500"/>
-  </ObjectInfo>` : '';
-
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
@@ -306,33 +285,7 @@ function createProjectLabelXml(data: {
   <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"/>
-  </DrawCommands>${logoSection}
-  <ObjectInfo>
-    <TextObject>
-      <Name>ProjectNameLabel</Name>
-      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Bottom</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>PROJECT NAME</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="8" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="100" Y="620" Width="2860" Height="200"/>
-  </ObjectInfo>
+  </DrawCommands>
   <ObjectInfo>
     <TextObject>
       <Name>ProjectName</Name>
@@ -343,7 +296,7 @@ function createProjectLabelXml(data: {
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
@@ -357,7 +310,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="820" Width="2860" Height="600"/>
+    <Bounds X="100" Y="200" Width="2860" Height="700"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -375,7 +328,7 @@ function createProjectLabelXml(data: {
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String>Order #${escapeXml(data.orderNumber)}</String>
+          <String>${escapeXml(data.orderNumber)}</String>
           <Attributes>
             <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
@@ -383,11 +336,11 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="1450" Width="2860" Height="450"/>
+    <Bounds X="100" Y="950" Width="2860" Height="500"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
-      <Name>CustomerName</Name>
+      <Name>CienappsNumber</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
       <LinkedObjectName></LinkedObjectName>
@@ -401,7 +354,7 @@ function createProjectLabelXml(data: {
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String>${escapeXml(data.customerName)}</String>
+          <String>${escapeXml(data.cienappsNumber)}</String>
           <Attributes>
             <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
@@ -409,7 +362,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="1950" Width="2860" Height="400"/>
+    <Bounds X="100" Y="1500" Width="2860" Height="450"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -435,7 +388,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="2400" Width="2860" Height="350"/>
+    <Bounds X="100" Y="2000" Width="2860" Height="350"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -888,32 +841,26 @@ function createPalletLabelXml(data: {
 export async function printProjectLabel(
   projectName: string,
   orderId: string,
-  cienappsJobNumber: string,
-  logoUrl?: string
+  cienappsJobNumber: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const printer = await findPrinterByModel(/450|LabelWriter/i);
+    // Match standard 450 but exclude XL models
+    const printers = await getPrinters();
+    const printer = printers.find(p => 
+      p.isConnected && 
+      /450|LabelWriter/i.test(p.modelName) && 
+      !/4XL|XL/i.test(p.modelName)
+    );
     if (!printer) {
-      return { success: false, error: 'No Dymo 450 printer found. Please connect a Dymo LabelWriter 450.' };
-    }
-
-    let logoBase64: string | undefined;
-    if (logoUrl) {
-      try {
-        logoBase64 = await imageToBase64(logoUrl);
-        console.log('[Dymo] Logo loaded for project label');
-      } catch (err) {
-        console.warn('[Dymo] Could not load logo:', err);
-      }
+      return { success: false, error: 'No Dymo LabelWriter 450 printer found. Please connect a standard Dymo LabelWriter 450 (not 4XL).' };
     }
 
     const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
     const labelXml = createProjectLabelXml({
       projectName: projectName,
       orderNumber: orderId,
-      customerName: cienappsJobNumber ? `Job #${cienappsJobNumber}` : '',
-      date: today,
-      logoBase64
+      cienappsNumber: cienappsJobNumber || '',
+      date: today
     });
 
     await printLabelRaw(printer.name, labelXml);
@@ -935,9 +882,15 @@ export async function printOrderLabel(
   logoUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const printer = await findPrinterByModel(/450|LabelWriter/i);
+    // Match standard 450 but exclude XL models
+    const printers = await getPrinters();
+    const printer = printers.find(p => 
+      p.isConnected && 
+      /450|LabelWriter/i.test(p.modelName) && 
+      !/4XL|XL/i.test(p.modelName)
+    );
     if (!printer) {
-      return { success: false, error: 'No Dymo 450 printer found. Please connect a Dymo LabelWriter 450.' };
+      return { success: false, error: 'No Dymo LabelWriter 450 printer found. Please connect a standard Dymo LabelWriter 450 (not 4XL).' };
     }
 
     let logoBase64: string | undefined;
