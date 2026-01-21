@@ -382,6 +382,7 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
       code: string;
       name: string;
       quantity: number;
+      cutLength: number | null;
       product: typeof productsFromDb[0] | null;
       classification: string;
     }> = [];
@@ -417,6 +418,7 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
         productCode: item.code,
         productName: item.name,
         quantity: item.quantity,
+        cutLength: item.cutLength, // Store CTS cut length directly on checklist item
         isBuyout,
         buyoutArrived: false,
         isPacked: false,

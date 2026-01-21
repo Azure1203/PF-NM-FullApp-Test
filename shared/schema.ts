@@ -323,6 +323,7 @@ export const hardwareChecklistItems = pgTable("hardware_checklist_items", {
   productCode: text("product_code").notNull(), // The code from the CSV
   productName: text("product_name"), // Description from CSV (fallback if no product match)
   quantity: integer("quantity").notNull().default(1),
+  cutLength: real("cut_length"), // Cut-to-size length in mm (for CTS parts)
   isBuyout: boolean("is_buyout").default(false).notNull(), // Derived from product stockStatus
   buyoutArrived: boolean("buyout_arrived").default(false).notNull(), // Has the buyout item arrived?
   isPacked: boolean("is_packed").default(false).notNull(), // Has this item been packed?
