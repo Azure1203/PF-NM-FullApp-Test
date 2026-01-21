@@ -195,7 +195,9 @@ interface CsvItemExtractionResult {
     code: string;
     name: string;
     quantity: number;
-    cutLength: number | null; // Length column (column 5) - used for CTS parts
+    height: number | null; // Height column (column 3)
+    width: number | null; // Width column (column 4)
+    length: number | null; // Length column (column 5) - used for CTS parts cutLength
   }>;
   invalidRows: Array<{
     rowIndex: number;
@@ -232,8 +234,12 @@ function extractAllItemsFromCSV(records: string[][]): CsvItemExtractionResult {
     const description = (row[1] || '').trim();
     const quantityStr = row[2] || '0';
     const quantity = parseInt(quantityStr) || 0;
+    const heightStr = (row[3] || '').trim();
+    const widthStr = (row[4] || '').trim();
     const lengthStr = (row[5] || '').trim();
-    const cutLength = lengthStr ? parseFloat(lengthStr) : null;
+    const height = heightStr ? parseFloat(heightStr) : null;
+    const width = widthStr ? parseFloat(widthStr) : null;
+    const length = lengthStr ? parseFloat(lengthStr) : null;
     
     // Skip empty rows
     if (!originalCode) continue;
@@ -254,7 +260,9 @@ function extractAllItemsFromCSV(records: string[][]): CsvItemExtractionResult {
       code: originalCode,
       name: description,
       quantity,
-      cutLength: cutLength && !isNaN(cutLength) ? cutLength : null
+      height: height && !isNaN(height) ? height : null,
+      width: width && !isNaN(width) ? width : null,
+      length: length && !isNaN(length) ? length : null
     });
   }
   
@@ -382,7 +390,9 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
       code: string;
       name: string;
       quantity: number;
-      cutLength: number | null;
+      height: number | null;
+      width: number | null;
+      length: number | null;
       product: typeof productsFromDb[0] | null;
       classification: string;
     }> = [];
@@ -419,7 +429,7 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
         productCode: item.code,
         productName: item.name,
         quantity: item.quantity,
-        cutLength: isCts ? item.cutLength : null, // Only store cutLength for CTS parts
+        cutLength: isCts ? item.length : null, // Only store cutLength for CTS parts
         isBuyout,
         buyoutArrived: false,
         isPacked: false,
@@ -463,6 +473,54 @@ async function generateHardwareChecklistForFile(fileId: number, rawContent: stri
     
   } catch (e: any) {
     console.error(`[Hardware Checklist Auto] File ${fileId}: Error generating:`, e);
+    return { success: false, itemCount: 0, error: e.message };
+  }
+}
+
+// Generate packing slip checklist items from order CSV
+// This creates a checklist item for every item in the CSV (not just hardware)
+async function generatePackingSlipChecklistForFile(fileId: number, rawContent: string): Promise<{ success: boolean; itemCount: number; error?: string }> {
+  try {
+    // Parse the CSV content
+    const records = await parseCSV(rawContent);
+    
+    // Extract ALL items from CSV
+    const { items: allItems, headerFound } = extractAllItemsFromCSV(records);
+    
+    if (!headerFound) {
+      console.log(`[Packing Slip Checklist] File ${fileId}: No "Manuf code" header found`);
+      return { success: false, itemCount: 0, error: 'No header found' };
+    }
+    
+    if (allItems.length === 0) {
+      console.log(`[Packing Slip Checklist] File ${fileId}: No items found in CSV`);
+      return { success: false, itemCount: 0, error: 'No items in CSV' };
+    }
+    
+    // Build packing slip checklist items from all CSV items
+    const itemsToInsert = allItems.map((item, index) => ({
+      fileId,
+      partCode: item.code,
+      color: null, // Color could be parsed from description if needed
+      quantity: item.quantity,
+      height: item.height,
+      width: item.width,
+      length: item.length, // This is the CTS cut length for CTS parts
+      thickness: null,
+      description: item.name,
+      imagePath: null,
+      isChecked: false,
+      sortOrder: index
+    }));
+    
+    // Replace existing items with new ones
+    const createdItems = await storage.replacePackingSlipItems(fileId, itemsToInsert);
+    
+    console.log(`[Packing Slip Checklist] File ${fileId}: Generated ${createdItems.length} items from CSV`);
+    return { success: true, itemCount: createdItems.length };
+    
+  } catch (e: any) {
+    console.error(`[Packing Slip Checklist] File ${fileId}: Error generating:`, e);
     return { success: false, itemCount: 0, error: e.message };
   }
 }
@@ -978,6 +1036,10 @@ export async function registerRoutes(
         // Auto-generate hardware checklist from order CSV
         const checklistResult = await generateHardwareChecklistForFile(orderFile.id, pf.content);
         console.log(`[Upload] Order ${orderFile.id}: Hardware checklist auto-generated - ${checklistResult.itemCount} items`);
+        
+        // Auto-generate packing slip checklist from order CSV (all items, not just hardware)
+        const packingSlipResult = await generatePackingSlipChecklistForFile(orderFile.id, pf.content);
+        console.log(`[Upload] Order ${orderFile.id}: Packing slip checklist auto-generated - ${packingSlipResult.itemCount} items`);
       }
 
       res.status(201).json(project);
@@ -2724,57 +2786,35 @@ export async function registerRoutes(
     }
   });
 
-  // Re-parse packing slip PDF to create/recreate checklist items
+  // Regenerate packing slip checklist from stored CSV content
   app.post('/api/files/:fileId/reparse-packing-slip', isAuthenticated, async (req, res) => {
     try {
       const fileId = Number(req.params.fileId);
-      const fileData = await storage.getFileWithProject(fileId);
+      const orderFile = await storage.getOrderFile(fileId);
       
-      if (!fileData) {
-        return res.status(404).json({ message: 'File not found' });
+      if (!orderFile) {
+        return res.status(404).json({ message: 'Order file not found' });
       }
       
-      if (!fileData.file.packingSlipPdfPath) {
-        return res.status(404).json({ message: 'No packing slip PDF found for this file' });
+      if (!orderFile.rawContent) {
+        return res.status(400).json({ message: 'No CSV content stored for this order' });
       }
       
-      // Download the PDF from object storage
-      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.packingSlipPdfPath);
+      // Regenerate packing slip checklist from stored CSV
+      const result = await generatePackingSlipChecklistForFile(fileId, orderFile.rawContent);
       
-      if (!pdfBuffer) {
-        return res.status(404).json({ message: 'PDF file not found in storage' });
-      }
-      
-      // Parse the PDF
-      const { parsePackingSlipPdf } = await import('./packingSlipParser');
-      const parsed = await parsePackingSlipPdf(pdfBuffer, fileId);
-      
-      // Delete existing items for this file
-      await db.delete(packingSlipItems).where(eq(packingSlipItems.fileId, fileId));
-      
-      // Insert parsed items
-      for (const part of parsed.parts) {
-        await db.insert(packingSlipItems).values({
-          fileId: fileId,
-          partCode: part.partCode,
-          color: part.color,
-          quantity: part.quantity,
-          height: part.height,
-          width: part.width,
-          length: part.length,
-          thickness: part.thickness,
-          description: part.description,
-          imagePath: part.imagePath,
-          isChecked: false,
-          sortOrder: part.sortOrder
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: result.error || 'Failed to regenerate checklist',
+          itemsCreated: 0
         });
       }
       
-      console.log(`[API] Re-parsed packing slip for file ${fileId}: ${parsed.parts.length} items created`);
+      console.log(`[API] Regenerated packing slip checklist for file ${fileId}: ${result.itemCount} items created from CSV`);
       
       res.json({ 
-        message: 'Packing slip re-parsed successfully',
-        itemsCreated: parsed.parts.length
+        message: 'Packing slip checklist regenerated from CSV successfully',
+        itemsCreated: result.itemCount
       });
       
     } catch (err: any) {
@@ -3033,40 +3073,13 @@ export async function registerRoutes(
         productMap[product.code] = product;
       }
       
-      // Get CTS parts for this file to add cut lengths
-      // Expand cts_parts by quantity so each unit has its own length entry
-      const ctsParts = await storage.getCtsPartsForFile(fileId);
-      const ctsExpandedLengths: Record<string, number[]> = {};
-      for (const ctsPart of ctsParts) {
-        if (!ctsExpandedLengths[ctsPart.partNumber]) {
-          ctsExpandedLengths[ctsPart.partNumber] = [];
-        }
-        // Add the length once for each quantity unit
-        for (let i = 0; i < ctsPart.quantity; i++) {
-          ctsExpandedLengths[ctsPart.partNumber].push(ctsPart.cutLength);
-        }
-      }
-      
-      // Track which CTS lengths have been assigned to packing slip items
-      const ctsAssignmentIndex: Record<string, number> = {};
-      
       // Enrich items with product info (image from product db takes precedence if available)
-      // Also add CTS cut length for items with .CTS suffix - matching by order within same partCode
-      // Each packing slip item consumes one cut length entry
+      // CTS cut length is now stored directly on the item.length field from CSV import
       const enrichedItems = items.map(item => {
         const product = productMap[item.partCode];
         const isCts = item.partCode.includes('.CTS');
-        let ctsCutLength: number | undefined;
-        
-        if (isCts && ctsExpandedLengths[item.partCode]) {
-          // Get the next available cut length for this partCode
-          const currentIndex = ctsAssignmentIndex[item.partCode] || 0;
-          const lengths = ctsExpandedLengths[item.partCode];
-          if (currentIndex < lengths.length) {
-            ctsCutLength = lengths[currentIndex];
-            ctsAssignmentIndex[item.partCode] = currentIndex + 1;
-          }
-        }
+        // Use stored length for CTS parts - this is populated from CSV import
+        const ctsCutLength = isCts && item.length ? item.length : undefined;
         
         return {
           ...item,
@@ -4706,7 +4719,9 @@ export async function registerRoutes(
         code: string;
         name: string;
         quantity: number;
-        cutLength: number | null;
+        height: number | null;
+        width: number | null;
+        length: number | null;
         product: typeof productsFromDb[0] | null;
         classification: 'HARDWARE_IN_DB' | 'COMPONENT_IN_DB' | 'HARDWARE_PREFIX_NOT_IN_DB' | 'NOT_HARDWARE';
       }
@@ -4772,7 +4787,7 @@ export async function registerRoutes(
           productCode: item.code,
           productName: item.name,
           quantity: item.quantity,
-          cutLength: isCts ? item.cutLength : null, // Only store cutLength for CTS parts
+          cutLength: isCts ? item.length : null, // Only store cutLength for CTS parts
           isBuyout,
           buyoutArrived: false,
           isPacked: false,

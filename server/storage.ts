@@ -87,6 +87,7 @@ export interface IStorage {
   getPackingSlipItems(fileId: number): Promise<PackingSlipItem[]>;
   togglePackingSlipItem(itemId: number, isChecked: boolean, checkedBy?: string): Promise<PackingSlipItem | undefined>;
   getPackingSlipProgress(fileId: number): Promise<{ total: number; checked: number; percentage: number }>;
+  replacePackingSlipItems(fileId: number, items: InsertPackingSlipItem[]): Promise<PackingSlipItem[]>;
   
   // Product catalog methods
   getProducts(search?: string, category?: string): Promise<Product[]>;
@@ -397,6 +398,19 @@ export class DatabaseStorage implements IStorage {
     const percentage = total > 0 ? Math.round((checked / total) * 100) : 0;
     
     return { total, checked, percentage };
+  }
+
+  async replacePackingSlipItems(fileId: number, items: InsertPackingSlipItem[]): Promise<PackingSlipItem[]> {
+    // Delete existing items for this file
+    await db.delete(packingSlipItems).where(eq(packingSlipItems.fileId, fileId));
+    
+    if (items.length === 0) {
+      return [];
+    }
+    
+    // Insert new items
+    const createdItems = await db.insert(packingSlipItems).values(items).returning();
+    return createdItems;
   }
 
   // Product catalog methods
