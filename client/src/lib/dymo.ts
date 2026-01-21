@@ -2,6 +2,23 @@
 // Uses DYMO Connect REST API directly via fetch
 // Supports Dymo 450 (30323 labels) and Dymo 4XL (1744907 labels)
 
+// Convert an image URL to base64 for embedding in labels
+export async function imageToBase64(imageUrl: string): Promise<string> {
+  const response = await fetch(imageUrl);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      // Remove the data URL prefix to get just the base64 data
+      const base64 = dataUrl.split(',')[1] || '';
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 // Cached state
 let discoveredBaseUrl: string | null = null;
 let discoveryInProgress = false;
