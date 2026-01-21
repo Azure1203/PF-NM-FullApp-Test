@@ -787,22 +787,49 @@ export async function printLabel(
 }
 
 // Convenience functions for specific label types
-export async function printProjectLabel(data: {
-  projectName: string;
-  orderNumber: string;
-  customerName: string;
-  date: string;
-}): Promise<void> {
-  return printLabel('project', data);
+// printProjectLabel(projectName, orderId, cienappsJobNumber)
+// Returns { success: boolean, error?: string }
+export async function printProjectLabel(
+  projectName: string,
+  orderId: string,
+  cienappsJobNumber: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+    await printLabel('project', {
+      projectName: projectName,
+      orderNumber: orderId,
+      customerName: cienappsJobNumber ? `Job #${cienappsJobNumber}` : '',
+      date: today
+    });
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
 }
 
-export async function printOrderLabel(data: {
-  orderNumber: string;
-  customerName: string;
-  itemCount: string;
-  description: string;
-}): Promise<void> {
-  return printLabel('order', data);
+// printOrderLabel(projectName, orderName, allmoxyJobNumber, orderId, cienappsJobNumber)
+// Returns { success: boolean, error?: string }
+export async function printOrderLabel(
+  projectName: string,
+  orderName: string,
+  allmoxyJobNumber: string,
+  orderId: string,
+  cienappsJobNumber: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await printLabel('order', {
+      orderNumber: orderId,
+      customerName: projectName,
+      itemCount: allmoxyJobNumber ? `Allmoxy: ${allmoxyJobNumber}` : '',
+      description: orderName + (cienappsJobNumber ? ` (Job #${cienappsJobNumber})` : '')
+    });
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { success: false, error: message };
+  }
 }
 
 export async function printPalletLabel(data: {
@@ -818,38 +845,42 @@ export async function printPalletLabel(data: {
 }
 
 // Print multiple pallet labels (used by OrderDetails page)
+// Parameters match the call from OrderDetails.tsx:
+// printPalletLabels(date, projectName, dealer, phone, orderId, palletCount, logoBase64)
 export async function printPalletLabels(
   date: string,
   projectName: string,
   dealer: string,
-  orderNumber: string,
-  palletsInfo: Array<{ palletIndex: number; boxCount: number }>
-): Promise<{ success: boolean; printed: number; errors: string[] }> {
+  phone: string,
+  orderId: string,
+  palletCount: number,
+  _logoBase64?: string // Logo is embedded in label XML, not used separately
+): Promise<{ success: boolean; printed: number; error?: string }> {
   const errors: string[] = [];
   let printed = 0;
 
-  for (const pallet of palletsInfo) {
+  for (let i = 1; i <= palletCount; i++) {
     try {
       await printPalletLabel({
-        palletNumber: pallet.palletIndex.toString(),
-        orderNumber: orderNumber,
+        palletNumber: `${i} of ${palletCount}`,
+        orderNumber: orderId,
         customerName: dealer,
-        destination: projectName,
-        contents: `${pallet.boxCount} boxes`,
+        destination: `${projectName}${phone ? ` - ${phone}` : ''}`,
+        contents: '',
         weight: '',
         date: date
       });
       printed++;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Pallet ${pallet.palletIndex}: ${message}`);
+      errors.push(`Pallet ${i}: ${message}`);
     }
   }
 
   return {
     success: errors.length === 0,
     printed,
-    errors
+    error: errors.length > 0 ? errors.join('; ') : undefined
   };
 }
 

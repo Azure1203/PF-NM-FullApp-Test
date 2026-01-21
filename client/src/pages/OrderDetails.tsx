@@ -811,7 +811,8 @@ export default function OrderDetails() {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: 'Print failed', description: 'Could not connect to Dymo printer', variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'Could not connect to Dymo printer';
+      toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setIsPrintingProjectLabel(false);
     }
@@ -845,7 +846,8 @@ export default function OrderDetails() {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: 'Print failed', description: 'Could not connect to Dymo printer', variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'Could not connect to Dymo printer';
+      toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setIsPrintingPalletLabels(false);
     }
@@ -868,7 +870,8 @@ export default function OrderDetails() {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: 'Print failed', description: 'Could not connect to Dymo printer', variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'Could not connect to Dymo printer';
+      toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setPrintingOrderLabelFileId(null);
     }
