@@ -1469,7 +1469,34 @@ export default function OrderDetails() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Sync to Asana to manage production status</p>
+                    <div className="space-y-2">
+                      {/* Show BO status badges even before Asana sync - these are derived from hardware checklist */}
+                      {(() => {
+                        const boStatuses = (project.pfProductionStatus || []).filter(s => 
+                          s === 'WAITING FOR BO HARDWARE' || s === 'BO HARDWARE ARRIVED'
+                        );
+                        if (boStatuses.length > 0) {
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              {boStatuses.map((status) => (
+                                <Badge 
+                                  key={status}
+                                  className={status === 'WAITING FOR BO HARDWARE' 
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                                    : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  }
+                                  data-testid={`badge-bo-status-${status.toLowerCase().replace(/\s+/g, '-')}`}
+                                >
+                                  {status}
+                                </Badge>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      <p className="text-sm text-muted-foreground">Sync to Asana to manage full production status</p>
+                    </div>
                   )}
                 </div>
               </CardContent>

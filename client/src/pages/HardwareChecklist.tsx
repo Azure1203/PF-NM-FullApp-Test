@@ -105,7 +105,8 @@ export default function HardwareChecklist() {
       // Invalidate both pallets and order queries so BO status updates in order details
       if (fileInfo?.file?.projectId) {
         queryClient.invalidateQueries({ queryKey: ['/api/orders', fileInfo.file.projectId, 'pallets'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/orders', fileInfo.file.projectId] });
+        // Use the correct query key format that matches useOrder hook: ['/api/orders/:id', id]
+        queryClient.invalidateQueries({ queryKey: ['/api/orders/:id', fileInfo.file.projectId] });
       }
     }
   });
