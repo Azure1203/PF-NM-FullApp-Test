@@ -1,13 +1,49 @@
 // Dymo Label Printing Utility
-// Uses direct REST API calls to DYMO Connect Web Service
+// Dynamically loads the official DYMO Connect Framework from the local service
+// This approach bypasses CORS issues by loading the script from the DYMO service itself
 // Supports Dymo 450 (30323 labels) and Dymo 4XL (1744907 labels)
 
-// Cached connection info for DYMO Connect
-let cachedPort: number | null = null;
-let cachedProtocol: 'https' | 'http' = 'https';
+// TypeScript declarations for the DYMO Connect Framework
+declare global {
+  interface Window {
+    dymo?: {
+      connect?: {
+        framework?: DymoFramework;
+      };
+    };
+  }
+}
+
+interface DymoFramework {
+  init: () => Promise<void>;
+  getPrinters: () => Promise<DymoPrinter[]>;
+  printLabel: (printerName: string, printParamsXml: string, labelXml: string, labelSetXml: string) => Promise<void>;
+  createLabelWriterPrintParamsXml: (params: { copies?: number; jobTitle?: string; flowDirection?: string; printQuality?: string; twinTurboRoll?: string }) => string;
+}
+
+interface DymoPrinter {
+  name: string;
+  modelName: string;
+  isConnected: boolean;
+  isLocal: boolean;
+  isTwinTurbo: boolean;
+}
+
+// Cached state
+let frameworkLoaded = false;
+let frameworkLoading = false;
+let loadedPort: number | null = null;
+let loadPromise: Promise<void> | null = null;
 
 // LocalStorage key for user-configured port
 const DYMO_PORT_STORAGE_KEY = 'dymo_connect_port';
+
+// Ports to try for DYMO Connect Web Service
+const DYMO_PORTS = [
+  41951, 41952, 41953, 41954, 41955, 41956, 41957, 41958, 41959, 41960,
+  41961, 41962, 41963, 41964, 41965, 41966, 41967, 41968, 41969, 41970,
+  8080, 8443, 9100, 9200
+];
 
 // Get user-configured port from localStorage (if set)
 function getUserConfiguredPort(): number | null {
@@ -29,7 +65,12 @@ function getUserConfiguredPort(): number | null {
 export function setDymoPort(port: number): void {
   try {
     localStorage.setItem(DYMO_PORT_STORAGE_KEY, port.toString());
-    cachedPort = null; // Clear cache to force rediscovery
+    // Reset framework state to force reload from new port
+    frameworkLoaded = false;
+    frameworkLoading = false;
+    loadedPort = null;
+    loadPromise = null;
+    console.log(`[Dymo] Port set to ${port}. Next print will use this port.`);
   } catch {
     // localStorage not available
   }
@@ -39,7 +80,11 @@ export function setDymoPort(port: number): void {
 export function clearDymoPort(): void {
   try {
     localStorage.removeItem(DYMO_PORT_STORAGE_KEY);
-    cachedPort = null;
+    frameworkLoaded = false;
+    frameworkLoading = false;
+    loadedPort = null;
+    loadPromise = null;
+    console.log('[Dymo] Custom port cleared. Will auto-discover on next print.');
   } catch {
     // localStorage not available
   }
@@ -47,213 +92,629 @@ export function clearDymoPort(): void {
 
 // Get current DYMO Connect port (for display)
 export function getDymoPort(): number | null {
-  return cachedPort || getUserConfiguredPort();
+  return loadedPort || getUserConfiguredPort();
 }
 
-// Ports to try for DYMO Connect Web Service (expanded range)
-const DYMO_PORTS = [
-  41951, 41952, 41953, 41954, 41955, 41956, 41957, 41958, 41959, 41960,
-  41961, 41962, 41963, 41964, 41965, 41966, 41967, 41968, 41969, 41970,
-  // Also try some other common ports that DYMO might use
-  8080, 8443, 9100, 9200
-];
+// Try to load the DYMO framework from a specific port
+function tryLoadFramework(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    const timeoutId = setTimeout(() => {
+      script.remove();
+      resolve(false);
+    }, 3000);
 
-// Try to connect to a specific port with both HTTPS and HTTP
-async function tryPort(port: number): Promise<{ port: number; protocol: 'https' | 'http' } | null> {
-  const protocols: ('https' | 'http')[] = ['https', 'http'];
-  
-  for (const protocol of protocols) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1000);
-      
-      const response = await fetch(`${protocol}://127.0.0.1:${port}/DYMO/DLS/Printing/StatusConnected`, {
-        method: 'GET',
-        mode: 'cors',
-        signal: controller.signal,
-      });
-      
+    script.onload = () => {
       clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        return { port, protocol };
+      if (window.dymo?.connect?.framework) {
+        console.log(`[Dymo] Framework loaded from port ${port}`);
+        resolve(true);
+      } else {
+        script.remove();
+        resolve(false);
       }
-    } catch {
-      // Protocol/port combination not available
-    }
-  }
-  
-  return null;
-}
+    };
 
-// Discover which port DYMO Connect is running on
-async function discoverDymoPort(): Promise<number> {
-  // Check cached connection first
-  if (cachedPort !== null) {
-    try {
-      const response = await fetch(`${cachedProtocol}://127.0.0.1:${cachedPort}/DYMO/DLS/Printing/StatusConnected`, {
-        method: 'GET',
-        mode: 'cors',
-      });
-      if (response.ok) {
-        return cachedPort;
-      }
-    } catch {
-      // Port no longer valid, discover again
-      cachedPort = null;
-    }
-  }
+    script.onerror = () => {
+      clearTimeout(timeoutId);
+      script.remove();
+      resolve(false);
+    };
 
-  // Try user-configured port first (if set)
-  const userPort = getUserConfiguredPort();
-  if (userPort) {
-    const result = await tryPort(userPort);
-    if (result) {
-      cachedPort = result.port;
-      cachedProtocol = result.protocol;
-      console.log(`[Dymo] Found DYMO Connect on user-configured port ${result.protocol}://127.0.0.1:${result.port}`);
-      return result.port;
-    }
-  }
-
-  // Try ports in parallel batches for faster discovery
-  const batchSize = 5;
-  for (let i = 0; i < DYMO_PORTS.length; i += batchSize) {
-    const batch = DYMO_PORTS.slice(i, i + batchSize);
-    const results = await Promise.all(batch.map(port => tryPort(port)));
-    
-    for (const result of results) {
-      if (result) {
-        cachedPort = result.port;
-        cachedProtocol = result.protocol;
-        console.log(`[Dymo] Found DYMO Connect on ${result.protocol}://127.0.0.1:${result.port}`);
-        return result.port;
-      }
-    }
-  }
-  
-  const triedPorts = userPort ? [userPort, ...DYMO_PORTS] : DYMO_PORTS;
-  throw new Error(`DYMO Connect not found. Tried ports: ${triedPorts.slice(0, 10).join(', ')}... Please ensure DYMO Connect for Desktop is installed and running. If DYMO Connect is on a different port, use setDymoPort() in browser console.`);
-}
-
-// Get the base URL for DYMO Connect
-async function getDymoBaseUrl(): Promise<string> {
-  const port = await discoverDymoPort();
-  return `${cachedProtocol}://127.0.0.1:${port}`;
-}
-
-// Get available printers from DYMO Connect
-export async function getPrinters(): Promise<{ name: string; isConnected: boolean; modelName: string }[]> {
-  const baseUrl = await getDymoBaseUrl();
-  
-  const response = await fetch(`${baseUrl}/DYMO/DLS/Printing/GetPrinters`, {
-    method: 'GET',
-    mode: 'cors',
+    // Try HTTPS first, then HTTP
+    script.src = `https://127.0.0.1:${port}/DYMO/DLS/Printing/Host/Dymo.Connect.Framework.js`;
+    document.head.appendChild(script);
   });
-  
-  if (!response.ok) {
-    throw new Error('Failed to get printers from DYMO Connect');
-  }
-  
-  const text = await response.text();
-  
-  // Parse the XML response - try multiple possible node names for resilience
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, 'application/xml');
-  
-  // Try various printer node names that DYMO might use
-  const printerNodeNames = ['LabelWriterPrinter', 'Printer', 'TapePrinter', 'LabelPrinter'];
-  let printerElements: Element[] = [];
-  
-  for (const nodeName of printerNodeNames) {
-    const elements = doc.querySelectorAll(nodeName);
-    if (elements.length > 0) {
-      printerElements = [...printerElements, ...Array.from(elements)];
-    }
-  }
-  
-  // If no specific printer nodes found, try to find any element with Name and IsConnected children
-  if (printerElements.length === 0) {
-    const allElements = doc.querySelectorAll('*');
-    allElements.forEach(el => {
-      if (el.querySelector('Name') && el.querySelector('IsConnected')) {
-        printerElements.push(el);
-      }
-    });
-  }
-  
-  const printers: { name: string; isConnected: boolean; modelName: string }[] = [];
-  const seenNames = new Set<string>();
-  
-  printerElements.forEach((printer) => {
-    const name = printer.querySelector('Name')?.textContent || '';
-    if (!name || seenNames.has(name)) return;
-    seenNames.add(name);
-    
-    const modelName = printer.querySelector('ModelName')?.textContent || 
-                      printer.querySelector('Model')?.textContent || name;
-    const isConnectedText = printer.querySelector('IsConnected')?.textContent || 
-                            printer.querySelector('Connected')?.textContent || 'False';
-    const isConnected = isConnectedText.toLowerCase() === 'true';
-    
-    printers.push({ name, isConnected, modelName });
-  });
-  
-  return printers;
 }
 
-// Find a specific printer type
-export async function findPrinter(printerType: '450' | '4XL'): Promise<string | null> {
-  const printers = await getPrinters();
-  
-  for (const printer of printers) {
-    if (!printer.isConnected) continue;
-    
-    const nameLower = printer.name.toLowerCase();
-    const modelLower = printer.modelName.toLowerCase();
-    
-    if (printerType === '4XL') {
-      if (nameLower.includes('4xl') || modelLower.includes('4xl') || 
-          nameLower.includes('5xl') || modelLower.includes('5xl')) {
-        return printer.name;
+// Try HTTP if HTTPS fails
+function tryLoadFrameworkHttp(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    const timeoutId = setTimeout(() => {
+      script.remove();
+      resolve(false);
+    }, 3000);
+
+    script.onload = () => {
+      clearTimeout(timeoutId);
+      if (window.dymo?.connect?.framework) {
+        console.log(`[Dymo] Framework loaded from port ${port} (HTTP)`);
+        resolve(true);
+      } else {
+        script.remove();
+        resolve(false);
       }
-    } else if (printerType === '450') {
-      // Match 450 but not 4XL/5XL
-      if ((nameLower.includes('450') || modelLower.includes('450') ||
-           nameLower.includes('labelwriter') || modelLower.includes('labelwriter')) &&
-          !nameLower.includes('4xl') && !modelLower.includes('4xl') &&
-          !nameLower.includes('5xl') && !modelLower.includes('5xl')) {
-        return printer.name;
+    };
+
+    script.onerror = () => {
+      clearTimeout(timeoutId);
+      script.remove();
+      resolve(false);
+    };
+
+    script.src = `http://127.0.0.1:${port}/DYMO/DLS/Printing/Host/Dymo.Connect.Framework.js`;
+    document.head.appendChild(script);
+  });
+}
+
+// Load the DYMO framework by discovering the port
+async function loadDymoFramework(): Promise<void> {
+  if (frameworkLoaded && window.dymo?.connect?.framework) {
+    return;
+  }
+
+  if (frameworkLoading && loadPromise) {
+    return loadPromise;
+  }
+
+  frameworkLoading = true;
+
+  loadPromise = (async () => {
+    // Try user-configured port first
+    const userPort = getUserConfiguredPort();
+    if (userPort) {
+      console.log(`[Dymo] Trying user-configured port ${userPort}...`);
+      if (await tryLoadFramework(userPort) || await tryLoadFrameworkHttp(userPort)) {
+        loadedPort = userPort;
+        frameworkLoaded = true;
+        await window.dymo!.connect!.framework!.init();
+        return;
       }
     }
-  }
-  
-  return null;
+
+    // Try each port in sequence
+    for (const port of DYMO_PORTS) {
+      console.log(`[Dymo] Trying port ${port}...`);
+      if (await tryLoadFramework(port) || await tryLoadFrameworkHttp(port)) {
+        loadedPort = port;
+        frameworkLoaded = true;
+        await window.dymo!.connect!.framework!.init();
+        return;
+      }
+    }
+
+    frameworkLoading = false;
+    loadPromise = null;
+    
+    const triedPorts = userPort ? [userPort, ...DYMO_PORTS] : DYMO_PORTS;
+    throw new Error(
+      `DYMO Connect not found. Tried ports: ${triedPorts.slice(0, 10).join(', ')}... ` +
+      `Please ensure DYMO Connect for Desktop is installed and running. ` +
+      `If DYMO Connect is on a different port, use setDymoPort(PORT) in browser console.`
+    );
+  })();
+
+  return loadPromise;
 }
 
-// Print label via DYMO Connect REST API
-async function printLabelXml(printerName: string, labelXml: string): Promise<void> {
-  const baseUrl = await getDymoBaseUrl();
-  
-  // Prepare the print request
-  const printParams = `printerName=${encodeURIComponent(printerName)}&printParamsXml=&labelXml=${encodeURIComponent(labelXml)}&labelSetXml=`;
-  
-  const response = await fetch(`${baseUrl}/DYMO/DLS/Printing/PrintLabel`, {
-    method: 'POST',
-    mode: 'cors',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: printParams,
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Print failed: ${errorText}`);
-  }
+// Public interface types
+export interface DymoPrinterInfo {
+  name: string;
+  modelName: string;
+  isConnected: boolean;
+  isLocal: boolean;
+  isTwinTurbo: boolean;
 }
 
-// Escape XML special characters
+// Get list of available printers
+export async function getPrinters(): Promise<DymoPrinterInfo[]> {
+  await loadDymoFramework();
+  
+  const framework = window.dymo?.connect?.framework;
+  if (!framework) {
+    throw new Error('DYMO framework not loaded');
+  }
+
+  const printers = await framework.getPrinters();
+  return printers.filter(p => p.isConnected);
+}
+
+// Label types
+export type LabelType = 'project' | 'order' | 'pallet';
+
+// Get the appropriate printer for a label type
+export function getPrinterForLabelType(printers: DymoPrinterInfo[], labelType: LabelType): DymoPrinterInfo | null {
+  // Dymo 450 for project and order labels (30323 labels)
+  // Dymo 4XL for pallet labels (1744907 labels)
+  
+  if (labelType === 'pallet') {
+    // Look for 4XL printer
+    const xl = printers.find(p => p.modelName.includes('4XL') || p.name.includes('4XL'));
+    if (xl) return xl;
+  }
+  
+  // Look for LabelWriter 450 or similar for project/order labels
+  const lw450 = printers.find(p => 
+    (p.modelName.includes('450') || p.name.includes('450')) && 
+    !p.modelName.includes('4XL') && !p.name.includes('4XL')
+  );
+  if (lw450) return lw450;
+  
+  // Fall back to any connected printer
+  return printers[0] || null;
+}
+
+// Generate label XML for different label types
+function generateLabelXml(labelType: LabelType, data: Record<string, string>): string {
+  if (labelType === 'project') {
+    return generateProjectLabelXml(data);
+  } else if (labelType === 'order') {
+    return generateOrderLabelXml(data);
+  } else if (labelType === 'pallet') {
+    return generatePalletLabelXml(data);
+  }
+  throw new Error(`Unknown label type: ${labelType}`);
+}
+
+// Project label XML (30323 - Address labels for Dymo 450)
+function generateProjectLabelXml(data: Record<string, string>): string {
+  const projectName = escapeXml(data.projectName || '');
+  const orderNumber = escapeXml(data.orderNumber || '');
+  const customerName = escapeXml(data.customerName || '');
+  const date = escapeXml(data.date || '');
+  
+  return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Address</Id>
+  <PaperName>30323 Shipping</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5040" Rx="270" Ry="270"/>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${projectName}</String>
+          <Attributes>
+            <Font Family="Arial" Size="14" Bold="True" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="100" Width="4640" Height="600"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>OrderNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Order #${orderNumber}</String>
+          <Attributes>
+            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="700" Width="4640" Height="500"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>CustomerName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${customerName}</String>
+          <Attributes>
+            <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="1200" Width="4640" Height="400"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${date}</String>
+          <Attributes>
+            <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="1600" Width="4640" Height="400"/>
+  </ObjectInfo>
+</DieCutLabel>`;
+}
+
+// Order label XML (30323 - Address labels for Dymo 450)
+function generateOrderLabelXml(data: Record<string, string>): string {
+  const orderNumber = escapeXml(data.orderNumber || '');
+  const customerName = escapeXml(data.customerName || '');
+  const itemCount = escapeXml(data.itemCount || '');
+  const description = escapeXml(data.description || '');
+  
+  return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Address</Id>
+  <PaperName>30323 Shipping</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5040" Rx="270" Ry="270"/>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>OrderNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>ORDER #${orderNumber}</String>
+          <Attributes>
+            <Font Family="Arial" Size="16" Bold="True" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="100" Width="4640" Height="700"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>CustomerName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${customerName}</String>
+          <Attributes>
+            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="800" Width="4640" Height="500"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ItemCount</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Items: ${itemCount}</String>
+          <Attributes>
+            <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="1300" Width="4640" Height="400"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Description</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${description}</String>
+          <Attributes>
+            <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="1700" Width="4640" Height="400"/>
+  </ObjectInfo>
+</DieCutLabel>`;
+}
+
+// Pallet label XML (1744907 - 4x6 Shipping labels for Dymo 4XL)
+function generatePalletLabelXml(data: Record<string, string>): string {
+  const palletNumber = escapeXml(data.palletNumber || '');
+  const orderNumber = escapeXml(data.orderNumber || '');
+  const customerName = escapeXml(data.customerName || '');
+  const destination = escapeXml(data.destination || '');
+  const contents = escapeXml(data.contents || '');
+  const weight = escapeXml(data.weight || '');
+  const date = escapeXml(data.date || '');
+  
+  return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Portrait</PaperOrientation>
+  <Id>Shipping</Id>
+  <PaperName>1744907 4 x 6 in</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>PalletNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>PALLET ${palletNumber}</String>
+          <Attributes>
+            <Font Family="Arial" Size="24" Bold="True" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="200" Width="5360" Height="1000"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>OrderNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Order #${orderNumber}</String>
+          <Attributes>
+            <Font Family="Arial" Size="14" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="1300" Width="5360" Height="600"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>CustomerName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${customerName}</String>
+          <Attributes>
+            <Font Family="Arial" Size="14" Bold="True" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="1900" Width="5360" Height="600"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Destination</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>${destination}</String>
+          <Attributes>
+            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="2500" Width="5360" Height="800"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Contents</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Contents: ${contents}</String>
+          <Attributes>
+            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="3300" Width="5360" Height="1200"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Weight</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Weight: ${weight}</String>
+          <Attributes>
+            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="4500" Width="5360" Height="500"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Left</HorizontalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
+      <TextFitMode>ShrinkToFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>Date: ${date}</String>
+          <Attributes>
+            <Font Family="Arial" Size="10" Bold="False" Italic="False" Underline="False" Strikethrough="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="5000" Width="5360" Height="400"/>
+  </ObjectInfo>
+</DieCutLabel>`;
+}
+
+// Helper to escape XML special characters
 function escapeXml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -263,665 +724,136 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-// Label XML template for 30323 (2-1/8" x 4") - Project and Order labels
-function create30323LabelXml(lines: { label: string; value: string }[]): string {
-  const textObjects = lines.map((line, index) => {
-    const yPos = 150 + (index * 300);
-    return `
-      <TextObject>
-        <Name>Line${index + 1}</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Left</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">${line.label}: ${escapeXml(line.value)}</String>
-            <Attributes>
-              <Font Family="Arial" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>${yPos}</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2800</Width>
-            <Height>280</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>`;
-  }).join('');
-
-  return `<?xml version="1.0" encoding="utf-8"?>
-<DesktopLabel Version="1">
-  <DYMOLabel Version="3">
-    <Description>30323 Shipping Label</Description>
-    <Orientation>Landscape</Orientation>
-    <LabelName>30323 Shipping</LabelName>
-    <InitialLength>0</InitialLength>
-    <BorderStyle>SolidLine</BorderStyle>
-    <DYMORect>
-      <DYMOPoint>
-        <X>0</X>
-        <Y>0</Y>
-      </DYMOPoint>
-      <Size>
-        <Width>3060</Width>
-        <Height>1530</Height>
-      </Size>
-    </DYMORect>
-    <BorderColor>
-      <SolidColorBrush>
-        <Color Alpha="255" Red="0" Green="0" Blue="0" />
-      </SolidColorBrush>
-    </BorderColor>
-    <BorderThickness>1</BorderThickness>
-    <Show_Border>False</Show_Border>
-    <ObjectInfo>
-      ${textObjects}
-    </ObjectInfo>
-  </DYMOLabel>
-</DesktopLabel>`;
-}
-
-// Label XML template for 1744907 (4" x 6") - Pallet labels with logo
-function create1744907LabelXml(
-  date: string,
-  projectName: string,
-  dealerName: string,
-  phone: string,
-  orderId: string,
-  palletNumber: number,
-  totalPallets: number,
-  logoBase64: string
-): string {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<DesktopLabel Version="1">
-  <DYMOLabel Version="3">
-    <Description>1744907 4x6 Shipping Label</Description>
-    <Orientation>Portrait</Orientation>
-    <LabelName>1744907 Extra Large</LabelName>
-    <InitialLength>0</InitialLength>
-    <BorderStyle>SolidLine</BorderStyle>
-    <DYMORect>
-      <DYMOPoint>
-        <X>0</X>
-        <Y>0</Y>
-      </DYMOPoint>
-      <Size>
-        <Width>2880</Width>
-        <Height>4320</Height>
-      </Size>
-    </DYMORect>
-    <BorderColor>
-      <SolidColorBrush>
-        <Color Alpha="255" Red="0" Green="0" Blue="0" />
-      </SolidColorBrush>
-    </BorderColor>
-    <BorderThickness>1</BorderThickness>
-    <Show_Border>False</Show_Border>
-    <ObjectInfo>
-      <!-- Date (top left) -->
-      <TextObject>
-        <Name>Date</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Left</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">${escapeXml(date)}</String>
-            <Attributes>
-              <Font Family="Arial" Size="10" Bold="True" Italic="True" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>80</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>800</Width>
-            <Height>200</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <!-- Logo (top right) -->
-      <ImageObject>
-        <Name>Logo</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <Image>${logoBase64}</Image>
-        <ScaleMode>Uniform</ScaleMode>
-        <BorderWidth>0</BorderWidth>
-        <BorderColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <HorizontalAlignment>Right</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>1800</X>
-            <Y>50</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>1000</Width>
-            <Height>300</Height>
-          </Size>
-        </ObjectLayout>
-      </ImageObject>
-      
-      <!-- Job Info Header -->
-      <TextObject>
-        <Name>JobInfoHeader</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">Job Info:</String>
-            <Attributes>
-              <Font Family="Arial" Size="16" Bold="True" Italic="True" Underline="True" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>450</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>300</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <!-- PO (Project Name) -->
-      <TextObject>
-        <Name>PO</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">PO:</String>
-            <Attributes>
-              <Font Family="Arial" Size="10" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>780</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>180</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <TextObject>
-        <Name>POValue</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">${escapeXml(projectName)}</String>
-            <Attributes>
-              <Font Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>980</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>200</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <!-- Dealer Name -->
-      <TextObject>
-        <Name>DealerLabel</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">DEALER NAME:</String>
-            <Attributes>
-              <Font Family="Arial" Size="10" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>1200</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>180</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <TextObject>
-        <Name>DealerValue</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">${escapeXml(dealerName)}</String>
-            <Attributes>
-              <Font Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>1400</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>200</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <!-- Phone -->
-      <TextObject>
-        <Name>PhoneLabel</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">PHONE:</String>
-            <Attributes>
-              <Font Family="Arial" Size="10" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>1620</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>180</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <TextObject>
-        <Name>PhoneValue</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">${escapeXml(phone)}</String>
-            <Attributes>
-              <Font Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>1820</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>200</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <!-- Order ID -->
-      <TextObject>
-        <Name>OrderIdLabel</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">ORDER ID:</String>
-            <Attributes>
-              <Font Family="Arial" Size="10" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>2040</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>180</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <TextObject>
-        <Name>OrderIdValue</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">${escapeXml(orderId)}</String>
-            <Attributes>
-              <Font Family="Arial" Size="11" Bold="False" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>2240</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>200</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <!-- PALLET Header -->
-      <TextObject>
-        <Name>PalletHeader</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">PALLET</String>
-            <Attributes>
-              <Font Family="Arial" Size="28" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>2700</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>500</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-      
-      <!-- Pallet Number -->
-      <TextObject>
-        <Name>PalletNumber</Name>
-        <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-        <BackColor Alpha="0" Red="255" Green="255" Blue="255" />
-        <LinkedObjectName></LinkedObjectName>
-        <Rotation>Rotation0</Rotation>
-        <IsMirrored>False</IsMirrored>
-        <IsVariable>False</IsVariable>
-        <HorizontalAlignment>Center</HorizontalAlignment>
-        <VerticalAlignment>Top</VerticalAlignment>
-        <TextFitMode>AlwaysFit</TextFitMode>
-        <UseFullFontHeight>True</UseFullFontHeight>
-        <Verticalized>False</Verticalized>
-        <StyledText>
-          <Element>
-            <String xml:space="preserve">${palletNumber} OF ${totalPallets}</String>
-            <Attributes>
-              <Font Family="Arial" Size="36" Bold="True" Italic="False" Underline="False" Strikeout="False" />
-              <ForeColor Alpha="255" Red="0" Green="0" Blue="0" />
-            </Attributes>
-          </Element>
-        </StyledText>
-        <ObjectLayout>
-          <DYMOPoint>
-            <X>100</X>
-            <Y>3300</Y>
-          </DYMOPoint>
-          <Size>
-            <Width>2680</Width>
-            <Height>800</Height>
-          </Size>
-        </ObjectLayout>
-      </TextObject>
-    </ObjectInfo>
-  </DYMOLabel>
-</DesktopLabel>`;
-}
-
-// Print Project Label (30323)
-export async function printProjectLabel(
-  projectName: string,
-  orderId: string,
-  cienappsJobNumber: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const printerName = await findPrinter('450');
-    if (!printerName) {
-      return { success: false, error: 'Dymo 450 printer not found. Make sure a Dymo LabelWriter is connected and DYMO Connect is running.' };
-    }
-    
-    const labelXml = create30323LabelXml([
-      { label: 'Project Name', value: projectName },
-      { label: 'Order ID', value: orderId || '—' },
-      { label: 'Cienapps Job #', value: cienappsJobNumber || '—' }
-    ]);
-    
-    await printLabelXml(printerName, labelXml);
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Print error:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Print failed' };
+// Print a label
+export async function printLabel(
+  labelType: LabelType,
+  data: Record<string, string>,
+  printerName?: string
+): Promise<void> {
+  await loadDymoFramework();
+  
+  const framework = window.dymo?.connect?.framework;
+  if (!framework) {
+    throw new Error('DYMO framework not loaded');
   }
-}
 
-// Print Order Label (30323)
-export async function printOrderLabel(
-  projectName: string,
-  orderName: string,
-  allmoxyJobNumber: string,
-  orderId: string,
-  cienappsJobNumber: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const printerName = await findPrinter('450');
-    if (!printerName) {
-      return { success: false, error: 'Dymo 450 printer not found. Make sure a Dymo LabelWriter is connected and DYMO Connect is running.' };
-    }
-    
-    const labelXml = create30323LabelXml([
-      { label: 'Project Name', value: projectName },
-      { label: 'Order Name', value: orderName },
-      { label: 'Allmoxy Job #', value: allmoxyJobNumber || '—' },
-      { label: 'Order ID', value: orderId || '—' },
-      { label: 'Cienapps Job #', value: cienappsJobNumber || '—' }
-    ]);
-    
-    await printLabelXml(printerName, labelXml);
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Print error:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Print failed' };
+  // Get printers and select appropriate one
+  const printers = await framework.getPrinters();
+  const connectedPrinters = printers.filter(p => p.isConnected);
+  
+  if (connectedPrinters.length === 0) {
+    throw new Error('No connected DYMO printers found');
   }
+
+  let selectedPrinter: DymoPrinter;
+  if (printerName) {
+    const found = connectedPrinters.find(p => p.name === printerName);
+    if (!found) {
+      throw new Error(`Printer "${printerName}" not found or not connected`);
+    }
+    selectedPrinter = found;
+  } else {
+    // Auto-select based on label type
+    const printerInfo = getPrinterForLabelType(
+      connectedPrinters.map(p => ({
+        name: p.name,
+        modelName: p.modelName,
+        isConnected: p.isConnected,
+        isLocal: p.isLocal,
+        isTwinTurbo: p.isTwinTurbo
+      })),
+      labelType
+    );
+    if (!printerInfo) {
+      throw new Error('No suitable printer found for this label type');
+    }
+    selectedPrinter = connectedPrinters.find(p => p.name === printerInfo.name)!;
+  }
+
+  // Generate label XML
+  const labelXml = generateLabelXml(labelType, data);
+  
+  // Create print parameters
+  const printParamsXml = framework.createLabelWriterPrintParamsXml({
+    copies: 1,
+    jobTitle: `${labelType} label`,
+    printQuality: 'BarcodeAndGraphics'
+  });
+
+  // Print the label
+  await framework.printLabel(selectedPrinter.name, printParamsXml, labelXml, '');
+  
+  console.log(`[Dymo] Printed ${labelType} label on ${selectedPrinter.name}`);
 }
 
-// Print all Pallet Labels (1744907)
+// Convenience functions for specific label types
+export async function printProjectLabel(data: {
+  projectName: string;
+  orderNumber: string;
+  customerName: string;
+  date: string;
+}): Promise<void> {
+  return printLabel('project', data);
+}
+
+export async function printOrderLabel(data: {
+  orderNumber: string;
+  customerName: string;
+  itemCount: string;
+  description: string;
+}): Promise<void> {
+  return printLabel('order', data);
+}
+
+export async function printPalletLabel(data: {
+  palletNumber: string;
+  orderNumber: string;
+  customerName: string;
+  destination: string;
+  contents: string;
+  weight: string;
+  date: string;
+}): Promise<void> {
+  return printLabel('pallet', data);
+}
+
+// Print multiple pallet labels (used by OrderDetails page)
 export async function printPalletLabels(
   date: string,
   projectName: string,
-  dealerName: string,
-  phone: string,
-  orderId: string,
-  totalPallets: number,
-  logoBase64: string
-): Promise<{ success: boolean; error?: string; printed?: number }> {
-  try {
-    const printerName = await findPrinter('4XL');
-    if (!printerName) {
-      return { success: false, error: 'Dymo 4XL printer not found. Make sure a Dymo 4XL/5XL is connected and DYMO Connect is running.' };
+  dealer: string,
+  orderNumber: string,
+  palletsInfo: Array<{ palletIndex: number; boxCount: number }>
+): Promise<{ success: boolean; printed: number; errors: string[] }> {
+  const errors: string[] = [];
+  let printed = 0;
+
+  for (const pallet of palletsInfo) {
+    try {
+      await printPalletLabel({
+        palletNumber: pallet.palletIndex.toString(),
+        orderNumber: orderNumber,
+        customerName: dealer,
+        destination: projectName,
+        contents: `${pallet.boxCount} boxes`,
+        weight: '',
+        date: date
+      });
+      printed++;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Pallet ${pallet.palletIndex}: ${message}`);
     }
-    
-    // Print each pallet label in sequence
-    for (let i = 1; i <= totalPallets; i++) {
-      const labelXml = create1744907LabelXml(
-        date,
-        projectName,
-        dealerName,
-        phone,
-        orderId,
-        i,
-        totalPallets,
-        logoBase64
-      );
-      
-      await printLabelXml(printerName, labelXml);
-      
-      // Small delay between prints to avoid overwhelming the printer
-      if (i < totalPallets) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    return { success: true, printed: totalPallets };
-  } catch (error) {
-    console.error('Print error:', error);
-    return { success: false, error: error instanceof Error ? error.message : 'Print failed' };
   }
+
+  return {
+    success: errors.length === 0,
+    printed,
+    errors
+  };
 }
 
-// Convert image URL to base64 for embedding in labels
+// Convert an image URL to base64 (for embedding logos in labels)
 export async function imageToBase64(imageUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
