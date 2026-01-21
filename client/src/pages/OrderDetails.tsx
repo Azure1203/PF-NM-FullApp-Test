@@ -16,7 +16,9 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer } from "lucide-react";
+import { printProjectLabel, printOrderLabel, printPalletLabels, imageToBase64 } from "@/lib/dymo";
+import pfcLogo from "@assets/logo-perfect-fit-closets-7_1768954555746.jpg";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -104,6 +106,11 @@ export default function OrderDetails() {
   
   // Asana re-link state
   const [relinkAsanaUrl, setRelinkAsanaUrl] = useState('');
+  
+  // Label printing state
+  const [isPrintingProjectLabel, setIsPrintingProjectLabel] = useState(false);
+  const [isPrintingPalletLabels, setIsPrintingPalletLabels] = useState(false);
+  const [printingOrderLabelFileId, setPrintingOrderLabelFileId] = useState<number | null>(null);
 
   // Color mapping for PF PRODUCTION STATUS options
   const statusColorMap: Record<string, 'green' | 'red' | 'yellow'> = {
@@ -789,6 +796,84 @@ export default function OrderDetails() {
     document.body.removeChild(a);
   };
 
+  // Print Project Label handler
+  const handlePrintProjectLabel = async () => {
+    setIsPrintingProjectLabel(true);
+    try {
+      const result = await printProjectLabel(
+        project?.name || '',
+        project?.orderId || '',
+        project?.cienappsJobNumber || ''
+      );
+      if (result.success) {
+        toast({ title: 'Label printed', description: 'Project label sent to Dymo 450' });
+      } else {
+        toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Print failed', description: 'Could not connect to Dymo printer', variant: 'destructive' });
+    } finally {
+      setIsPrintingProjectLabel(false);
+    }
+  };
+
+  // Print Pallet Labels handler
+  const handlePrintPalletLabels = async () => {
+    if (!project || !pallets || pallets.length === 0) {
+      toast({ title: 'No pallets', description: 'Add pallets before printing labels', variant: 'destructive' });
+      return;
+    }
+    
+    setIsPrintingPalletLabels(true);
+    try {
+      const logoBase64 = await imageToBase64(pfcLogo);
+      const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+      
+      const result = await printPalletLabels(
+        today,
+        project.name,
+        project.dealer || '',
+        project.phone || '',
+        project.orderId || '',
+        pallets.length,
+        logoBase64
+      );
+      
+      if (result.success) {
+        toast({ title: 'Labels printed', description: `${result.printed} pallet label(s) sent to Dymo 4XL` });
+      } else {
+        toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Print failed', description: 'Could not connect to Dymo printer', variant: 'destructive' });
+    } finally {
+      setIsPrintingPalletLabels(false);
+    }
+  };
+
+  // Print Order Label handler
+  const handlePrintOrderLabel = async (fileId: number, orderName: string, allmoxyJobNumber: string) => {
+    setPrintingOrderLabelFileId(fileId);
+    try {
+      const result = await printOrderLabel(
+        project?.name || '',
+        orderName,
+        allmoxyJobNumber || '',
+        project?.orderId || '',
+        project?.cienappsJobNumber || ''
+      );
+      if (result.success) {
+        toast({ title: 'Label printed', description: 'Order label sent to Dymo 450' });
+      } else {
+        toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Print failed', description: 'Could not connect to Dymo printer', variant: 'destructive' });
+    } finally {
+      setPrintingOrderLabelFileId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50/50">
@@ -1007,8 +1092,36 @@ export default function OrderDetails() {
             </div>
           }
           actions={
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
               <StatusBadge status={project.status as any} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrintProjectLabel}
+                disabled={isPrintingProjectLabel}
+                data-testid="button-print-project-label"
+              >
+                {isPrintingProjectLabel ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                ) : (
+                  <Printer className="w-4 h-4 mr-1" />
+                )}
+                Project Label
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrintPalletLabels}
+                disabled={isPrintingPalletLabels || !pallets || pallets.length === 0}
+                data-testid="button-print-pallet-labels"
+              >
+                {isPrintingPalletLabels ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                ) : (
+                  <Printer className="w-4 h-4 mr-1" />
+                )}
+                Pallet Labels
+              </Button>
               <Button 
                 onClick={handleSync}
                 disabled={isSyncing || isUpdating}
@@ -1734,8 +1847,27 @@ export default function OrderDetails() {
                                         className="bg-muted/20 rounded-lg p-3 space-y-3"
                                       >
                                         <div className="flex items-start justify-between gap-2">
-                                          <div>
-                                            <p className="font-medium text-sm">{actualFilePreview?.name || file.originalFilename}</p>
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                              <p className="font-medium text-sm">{actualFilePreview?.name || file.originalFilename}</p>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handlePrintOrderLabel(
+                                                  file.id,
+                                                  actualFilePreview?.name || file.originalFilename,
+                                                  file.allmoxyJobNumber || ''
+                                                )}
+                                                disabled={printingOrderLabelFileId === file.id}
+                                                data-testid={`button-print-order-label-${file.id}`}
+                                              >
+                                                {printingOrderLabelFileId === file.id ? (
+                                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                  <Printer className="w-3 h-3" />
+                                                )}
+                                              </Button>
+                                            </div>
                                             {file.allmoxyJobNumber && (
                                               <p className="text-xs text-primary font-medium">Allmoxy Job #{file.allmoxyJobNumber}</p>
                                             )}
