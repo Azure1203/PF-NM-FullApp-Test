@@ -4318,23 +4318,15 @@ export async function registerRoutes(
       const products = await storage.getProductsByCode(productCodes);
       const productMap = new Map(products.map(p => [p.code.toUpperCase(), p]));
       
-      // Get CTS parts for this file to add cut lengths
-      const ctsParts = await storage.getCtsPartsForFile(fileId);
-      const ctsLengthMap: Record<string, number> = {};
-      for (const ctsPart of ctsParts) {
-        ctsLengthMap[ctsPart.partNumber.toUpperCase()] = ctsPart.cutLength;
-      }
-      
-      // Enhance items with product images and CTS cut lengths
+      // Enhance items with product images
+      // CTS cut lengths are now stored directly on checklist items (item.cutLength)
       const enhancedItems = items.map(item => {
         const product = productMap.get(item.productCode.toUpperCase());
-        const isCts = item.productCode.toUpperCase().includes('.CTS');
-        const ctsCutLength = isCts ? ctsLengthMap[item.productCode.toUpperCase()] : undefined;
         return {
           ...item,
           imagePath: product?.imagePath || null,
           productStockStatus: product?.stockStatus || null,
-          ctsCutLength
+          ctsCutLength: item.cutLength // Use stored cutLength directly
         };
       });
       
