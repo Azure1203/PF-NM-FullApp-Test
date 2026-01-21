@@ -10,7 +10,6 @@ export async function imageToBase64(imageUrl: string): Promise<string> {
     const reader = new FileReader();
     reader.onloadend = () => {
       const dataUrl = reader.result as string;
-      // Remove the data URL prefix to get just the base64 data
       const base64 = dataUrl.split(',')[1] || '';
       resolve(base64);
     };
@@ -108,12 +107,10 @@ async function tryConnectUrl(baseUrl: string): Promise<boolean> {
 
 // Discover the DYMO Connect service URL
 async function discoverDymoService(): Promise<string> {
-  // Return cached URL if available
   if (discoveredBaseUrl) {
     return discoveredBaseUrl;
   }
 
-  // Wait for in-progress discovery
   if (discoveryInProgress && discoveryPromise) {
     const result = await discoveryPromise;
     if (result) return result;
@@ -142,9 +139,8 @@ async function discoverDymoService(): Promise<string> {
       }
     }
 
-    // Try default ports
+    // Try default ports - HTTPS localhost first since user confirmed it works
     for (const port of DYMO_PORTS) {
-      // Only try HTTPS localhost since user confirmed that works
       const url = `https://localhost:${port}`;
       console.log(`[Dymo] Trying ${url}...`);
       if (await tryConnectUrl(url)) {
@@ -195,7 +191,6 @@ export async function getPrinters(): Promise<DymoPrinterInfo[]> {
 
   const xmlText = await response.text();
   
-  // Parse the XML response
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlText, 'text/xml');
   const printerElements = doc.querySelectorAll('LabelWriterPrinter');
@@ -222,24 +217,16 @@ async function findPrinterByModel(modelPattern: RegExp): Promise<DymoPrinterInfo
   return printers.find(p => p.isConnected && modelPattern.test(p.modelName)) || null;
 }
 
-// Create print parameters XML
-function createPrintParamsXml(options: {
-  copies?: number;
-  printQuality?: string;
-}): string {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<LabelWriterPrintParams>
-  <Copies>${options.copies || 1}</Copies>
-  <PrintQuality>${options.printQuality || 'BarcodeAndGraphics'}</PrintQuality>
-  <JobTitle>PerfectFit Label</JobTitle>
-</LabelWriterPrintParams>`;
-}
-
-// Print a label
-async function printLabelRaw(printerName: string, labelXml: string, copies: number = 1): Promise<void> {
+// Print a label using the REST API
+async function printLabelRaw(printerName: string, labelXml: string): Promise<void> {
   const baseUrl = await discoverDymoService();
   
-  const printParamsXml = createPrintParamsXml({ copies, printQuality: 'BarcodeAndGraphics' });
+  const printParamsXml = `<?xml version="1.0" encoding="utf-8"?>
+<LabelWriterPrintParams>
+  <Copies>1</Copies>
+  <PrintQuality>BarcodeAndGraphics</PrintQuality>
+  <JobTitle>PerfectFit Label</JobTitle>
+</LabelWriterPrintParams>`;
   
   const formData = new URLSearchParams();
   formData.append('printerName', printerName);
@@ -262,9 +249,18 @@ async function printLabelRaw(printerName: string, labelXml: string, copies: numb
   }
 }
 
-// Label templates
+// Escape XML special characters
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
-// Project Label (Dymo 450, 30323 - 2-1/8" x 4")
+// Label XML templates - using simplified format from dymojs example
+
 function createProjectLabelXml(data: {
   projectName: string;
   orderNumber: string;
@@ -274,128 +270,118 @@ function createProjectLabelXml(data: {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Address</Id>
-  <IsOutlined>false</IsOutlined>
-  <PaperName>30323 Shipping</PaperName>
+  <Id>LargeShipping</Id>
+  <PaperName>30256 Shipping</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="3060" Height="6120" Rx="270" Ry="270"/>
+    <RoundRectangle X="0" Y="0" Width="3331" Height="5715" Rx="270" Ry="270"/>
   </DrawCommands>
   <ObjectInfo>
     <TextObject>
       <Name>ProjectName</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.projectName)}</String>
+          <String>${escapeXml(data.projectName)}</String>
           <Attributes>
-            <Font Family="Arial" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="150" Width="5458" Height="720"/>
+    <Bounds X="336" Y="100" Width="5040" Height="800"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>OrderNumber</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">Order #${escapeXml(data.orderNumber)}</String>
+          <String>Order #${escapeXml(data.orderNumber)}</String>
           <Attributes>
-            <Font Family="Arial" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="900" Width="5458" Height="540"/>
+    <Bounds X="336" Y="950" Width="5040" Height="600"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>CustomerName</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.customerName)}</String>
+          <String>${escapeXml(data.customerName)}</String>
           <Attributes>
-            <Font Family="Arial" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="1500" Width="5458" Height="450"/>
+    <Bounds X="336" Y="1600" Width="5040" Height="500"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>Date</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.date)}</String>
+          <String>${escapeXml(data.date)}</String>
           <Attributes>
-            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="2100" Width="5458" Height="360"/>
+    <Bounds X="336" Y="2150" Width="5040" Height="400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
 
-// Order Label (Dymo 450, 30323 - 2-1/8" x 4")
 function createOrderLabelXml(data: {
   orderNumber: string;
   customerName: string;
@@ -405,128 +391,118 @@ function createOrderLabelXml(data: {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Address</Id>
-  <IsOutlined>false</IsOutlined>
-  <PaperName>30323 Shipping</PaperName>
+  <Id>LargeShipping</Id>
+  <PaperName>30256 Shipping</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="3060" Height="6120" Rx="270" Ry="270"/>
+    <RoundRectangle X="0" Y="0" Width="3331" Height="5715" Rx="270" Ry="270"/>
   </DrawCommands>
   <ObjectInfo>
     <TextObject>
       <Name>OrderNumber</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">Order #${escapeXml(data.orderNumber)}</String>
+          <String>Order #${escapeXml(data.orderNumber)}</String>
           <Attributes>
-            <Font Family="Arial" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="150" Width="5458" Height="720"/>
+    <Bounds X="336" Y="100" Width="5040" Height="800"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>CustomerName</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.customerName)}</String>
+          <String>${escapeXml(data.customerName)}</String>
           <Attributes>
-            <Font Family="Arial" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="900" Width="5458" Height="540"/>
+    <Bounds X="336" Y="950" Width="5040" Height="600"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>ItemCount</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.itemCount)}</String>
+          <String>${escapeXml(data.itemCount)}</String>
           <Attributes>
-            <Font Family="Arial" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="1500" Width="5458" Height="450"/>
+    <Bounds X="336" Y="1600" Width="5040" Height="500"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>Description</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.description)}</String>
+          <String>${escapeXml(data.description)}</String>
           <Attributes>
-            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="331" Y="2100" Width="5458" Height="360"/>
+    <Bounds X="336" Y="2150" Width="5040" Height="400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
 
-// Pallet Label (Dymo 4XL, 1744907 - 4" x 6")
 function createPalletLabelXml(data: {
   date: string;
   projectName: string;
@@ -535,60 +511,35 @@ function createPalletLabelXml(data: {
   orderId: string;
   palletNumber: string;
   totalPallets: string;
-  logoBase64?: string;
 }): string {
-  const logoSection = data.logoBase64 ? `
-  <ObjectInfo>
-    <ImageObject>
-      <Name>Logo</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <Image>${data.logoBase64}</Image>
-      <ScaleMode>Uniform</ScaleMode>
-      <BorderWidth>0</BorderWidth>
-      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
-    </ImageObject>
-    <Bounds X="200" Y="200" Width="2000" Height="1200"/>
-  </ObjectInfo>` : '';
-
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Portrait</PaperOrientation>
-  <Id>Shipping</Id>
-  <IsOutlined>false</IsOutlined>
-  <PaperName>1744907 4x6 Shipping</PaperName>
+  <Id>LargeShipping</Id>
+  <PaperName>1744907 4 x 6</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
   </DrawCommands>
-  ${logoSection}
   <ObjectInfo>
     <TextObject>
       <Name>Date</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Right</HorizontalAlignment>
       <VerticalAlignment>Top</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.date)}</String>
+          <String>${escapeXml(data.date)}</String>
           <Attributes>
-            <Font Family="Arial" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
@@ -600,158 +551,136 @@ function createPalletLabelXml(data: {
       <Name>ProjectName</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.projectName)}</String>
+          <String>${escapeXml(data.projectName)}</String>
           <Attributes>
-            <Font Family="Arial" Size="36" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="36" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="1600" Width="5360" Height="900"/>
+    <Bounds X="200" Y="800" Width="5360" Height="1000"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>Dealer</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.dealer)}</String>
+          <String>${escapeXml(data.dealer)}</String>
           <Attributes>
-            <Font Family="Arial" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="2600" Width="5360" Height="600"/>
+    <Bounds X="200" Y="2000" Width="5360" Height="600"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>Phone</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">${escapeXml(data.phone)}</String>
+          <String>${escapeXml(data.phone)}</String>
           <Attributes>
-            <Font Family="Arial" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="3300" Width="5360" Height="500"/>
+    <Bounds X="200" Y="2700" Width="5360" Height="500"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>OrderId</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">Order #${escapeXml(data.orderId)}</String>
+          <String>Order #${escapeXml(data.orderId)}</String>
           <Attributes>
-            <Font Family="Arial" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="4000" Width="5360" Height="700"/>
+    <Bounds X="200" Y="3400" Width="5360" Height="700"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>PalletInfo</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName/>
+      <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <GroupID>-1</GroupID>
-      <IsOutlined>False</IsOutlined>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>ShrinkToFit</TextFitMode>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String xml:space="preserve">Pallet ${escapeXml(data.palletNumber)} of ${escapeXml(data.totalPallets)}</String>
+          <String>Pallet ${escapeXml(data.palletNumber)} of ${escapeXml(data.totalPallets)}</String>
           <Attributes>
-            <Font Family="Arial" Size="48" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0" HueScale="100"/>
+            <Font Family="Helvetica" Size="48" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="5000" Width="5360" Height="1200"/>
+    <Bounds X="200" Y="4400" Width="5360" Height="1200"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
 
-// Escape XML special characters
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
 // Public print functions
 
-// printProjectLabel(projectName, orderId, cienappsJobNumber)
-// Returns { success: boolean, error?: string }
 export async function printProjectLabel(
   projectName: string,
   orderId: string,
@@ -781,8 +710,6 @@ export async function printProjectLabel(
   }
 }
 
-// printOrderLabel(projectName, orderName, allmoxyJobNumber, orderId, cienappsJobNumber)
-// Returns { success: boolean, error?: string }
 export async function printOrderLabel(
   projectName: string,
   orderName: string,
@@ -813,9 +740,6 @@ export async function printOrderLabel(
   }
 }
 
-// Print multiple pallet labels (used by OrderDetails page)
-// Parameters match the call from OrderDetails.tsx:
-// printPalletLabels(date, projectName, dealer, phone, orderId, palletCount, logoBase64)
 export async function printPalletLabels(
   date: string,
   projectName: string,
@@ -823,7 +747,7 @@ export async function printPalletLabels(
   phone: string,
   orderId: string,
   palletCount: number,
-  logoBase64?: string
+  _logoBase64?: string
 ): Promise<{ success: boolean; printed: number; error?: string }> {
   try {
     const printer = await findPrinterByModel(/4XL|XL/i);
@@ -840,8 +764,7 @@ export async function printPalletLabels(
         phone,
         orderId,
         palletNumber: String(i),
-        totalPallets: String(palletCount),
-        logoBase64
+        totalPallets: String(palletCount)
       });
 
       await printLabelRaw(printer.name, labelXml);
