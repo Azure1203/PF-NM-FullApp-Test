@@ -1,0 +1,17 @@
+[Dymo] Trying https://localhost:41951... index-D6KrvPOR.js:69:38470
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://localhost:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+[Dymo] Connected to https://localhost:41951 index-D6KrvPOR.js:69:38526
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+[Dymo] Print error: Print failed: Error printing label. Exception: Invalid label file: The 'DieCutLabel' element is not declared. index-D6KrvPOR.js:462:1567
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+[Dymo] Print error: Print failed: Error printing label. Exception: Invalid label file: The 'DieCutLabel' element is not declared. index-D6KrvPOR.js:462:1567
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+XHR
+POST
+https://localhost:41951/DYMO/DLS/Printing/PrintLabel
+[HTTP/1.1 400 Bad Request 3ms]
+
+Local Network Access detected: top-level site “https://perfectfitorders.com/”, initiator “https://perfectfitorders.com/”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) perfectfitorders.com
+[Dymo] Print error: Print failed: Error printing label. Exception: Invalid label file: The 'DieCutLabel' element is not declared.
