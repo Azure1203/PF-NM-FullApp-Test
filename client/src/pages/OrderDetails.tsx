@@ -1446,58 +1446,27 @@ export default function OrderDetails() {
                 {/* PF PRODUCTION STATUS */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">PF PRODUCTION STATUS</label>
-                  {project.status === 'synced' ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                      {productionStatusOptions.map((option) => {
-                        const isChecked = (project.pfProductionStatus || []).includes(option);
-                        return (
-                          <div 
-                            key={option} 
-                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${getStatusColor(option, isChecked)}`}
-                            onClick={() => handleProductionStatusToggle(option, !isChecked)}
-                            data-testid={`checkbox-status-${option.toLowerCase().replace(/\s+/g, '-')}`}
-                          >
-                            <Checkbox
-                              checked={isChecked}
-                              onCheckedChange={(checked) => handleProductionStatusToggle(option, checked as boolean)}
-                              disabled={isUpdatingProductionStatus}
-                              className={getCheckboxColor(option, isChecked)}
-                            />
-                            <span className="text-xs leading-tight">{option}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {/* Show BO status badges even before Asana sync - these are derived from hardware checklist */}
-                      {(() => {
-                        const boStatuses = (project.pfProductionStatus || []).filter(s => 
-                          s === 'WAITING FOR BO HARDWARE' || s === 'BO HARDWARE ARRIVED'
-                        );
-                        if (boStatuses.length > 0) {
-                          return (
-                            <div className="flex flex-wrap gap-2">
-                              {boStatuses.map((status) => (
-                                <Badge 
-                                  key={status}
-                                  className={status === 'WAITING FOR BO HARDWARE' 
-                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
-                                    : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  }
-                                  data-testid={`badge-bo-status-${status.toLowerCase().replace(/\s+/g, '-')}`}
-                                >
-                                  {status}
-                                </Badge>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                      <p className="text-sm text-muted-foreground">Sync to Asana to manage full production status</p>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {productionStatusOptions.map((option) => {
+                      const isChecked = (project.pfProductionStatus || []).includes(option);
+                      return (
+                        <div 
+                          key={option} 
+                          className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${getStatusColor(option, isChecked)}`}
+                          onClick={() => handleProductionStatusToggle(option, !isChecked)}
+                          data-testid={`checkbox-status-${option.toLowerCase().replace(/\s+/g, '-')}`}
+                        >
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={(checked) => handleProductionStatusToggle(option, checked as boolean)}
+                            disabled={isUpdatingProductionStatus}
+                            className={getCheckboxColor(option, isChecked)}
+                          />
+                          <span className="text-xs leading-tight">{option}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </CardContent>
             </CollapsibleContent>
