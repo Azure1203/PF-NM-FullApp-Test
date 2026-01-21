@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -228,6 +228,12 @@ export default function Dashboard() {
                 <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-products">
                   <Package className="w-4 h-4" />
                   Products
+                </Button>
+              </Link>
+              <Link href="/admin/users">
+                <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-admin-users">
+                  <Shield className="w-4 h-4" />
+                  <span className="hidden sm:inline">Users</span>
                 </Button>
               </Link>
               <Link href="/upload">

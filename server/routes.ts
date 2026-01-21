@@ -4870,5 +4870,86 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================
+  // Allowed Users Management Endpoints
+  // ============================================
+
+  // Get all allowed users
+  app.get('/api/admin/allowed-users', isAuthenticated, async (req, res) => {
+    try {
+      const users = await storage.getAllowedUsers();
+      res.json(users);
+    } catch (e: any) {
+      console.error('[Admin] Error getting allowed users:', e);
+      res.status(500).json({ message: 'Failed to get allowed users', error: e.message });
+    }
+  });
+
+  // Add a new allowed user
+  app.post('/api/admin/allowed-users', isAuthenticated, async (req, res) => {
+    try {
+      const { username, displayName } = req.body;
+      
+      if (!username || typeof username !== 'string') {
+        return res.status(400).json({ message: 'Username is required' });
+      }
+
+      // Check if user already exists
+      const existing = await storage.getAllowedUserByUsername(username.trim());
+      if (existing) {
+        return res.status(409).json({ message: 'User already exists in allowed list' });
+      }
+
+      // Get current user info from session for addedBy
+      const currentUser = (req as any).user?.username || 'unknown';
+      
+      const user = await storage.createAllowedUser({
+        username: username.trim(),
+        displayName: displayName?.trim() || null,
+        addedBy: currentUser
+      });
+      
+      console.log(`[Admin] Added allowed user: ${username} by ${currentUser}`);
+      res.json(user);
+    } catch (e: any) {
+      console.error('[Admin] Error adding allowed user:', e);
+      res.status(500).json({ message: 'Failed to add allowed user', error: e.message });
+    }
+  });
+
+  // Delete an allowed user
+  app.delete('/api/admin/allowed-users/:id', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid user ID' });
+      }
+
+      const user = await storage.getAllowedUser(id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const deleted = await storage.deleteAllowedUser(id);
+      console.log(`[Admin] Removed allowed user: ${user.username}`);
+      res.json({ success: deleted });
+    } catch (e: any) {
+      console.error('[Admin] Error deleting allowed user:', e);
+      res.status(500).json({ message: 'Failed to delete allowed user', error: e.message });
+    }
+  });
+
+  // Check if a specific user is allowed (for authorization checks)
+  app.get('/api/admin/check-allowed/:username', async (req, res) => {
+    try {
+      const username = req.params.username;
+      const isAllowed = await storage.isUserAllowed(username);
+      res.json({ username, isAllowed });
+    } catch (e: any) {
+      console.error('[Admin] Error checking if user is allowed:', e);
+      res.status(500).json({ message: 'Failed to check user', error: e.message });
+    }
+  });
+
   return httpServer;
 }
