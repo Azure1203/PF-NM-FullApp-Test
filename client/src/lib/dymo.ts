@@ -259,8 +259,8 @@ function escapeXml(str: string): string {
 // Fix XML for DYMO Connect bug - self-closing Color/Font tags cause errors
 // DYMO Connect requires explicit closing tags with at least a space inside
 function fixDymoXml(xml: string): string {
-  // Fix Color elements (ForeColor, BackColor)
-  xml = xml.replace(/<((?:Fore|Back)?Color)([^>]*?)\/>/g, '<$1$2> </$1>');
+  // Fix Color elements (ForeColor, BackColor, BorderColor)
+  xml = xml.replace(/<((?:Fore|Back|Border)?Color)([^>]*?)\/>/g, '<$1$2> </$1>');
   // Fix Font elements
   xml = xml.replace(/<Font([^>]*?)\/>/g, '<Font$1></Font>');
   // Fix RoundRectangle (might be needed too)
@@ -522,7 +522,28 @@ function createPalletLabelXml(data: {
   orderId: string;
   palletNumber: string;
   totalPallets: string;
+  logoBase64?: string;
 }): string {
+  const logoSection = data.logoBase64 ? `
+  <ObjectInfo>
+    <ImageObject>
+      <Name>Logo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${data.logoBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="200" Y="150" Width="5360" Height="900"/>
+  </ObjectInfo>` : '';
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips">
   <PaperOrientation>Portrait</PaperOrientation>
@@ -530,7 +551,7 @@ function createPalletLabelXml(data: {
   <PaperName>1744907 4 in x 6 in</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
-  </DrawCommands>
+  </DrawCommands>${logoSection}
   <ObjectInfo>
     <TextObject>
       <Name>Date</Name>
@@ -549,13 +570,39 @@ function createPalletLabelXml(data: {
         <Element>
           <String>${escapeXml(data.date)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="3500" Y="200" Width="2060" Height="400"/>
+    <Bounds X="3500" Y="1100" Width="2060" Height="350"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectNameLabel</Name>
+      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Bottom</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>PROJECT NAME</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="1500" Width="5360" Height="350"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -567,7 +614,7 @@ function createPalletLabelXml(data: {
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
@@ -581,7 +628,33 @@ function createPalletLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="800" Width="5360" Height="1000"/>
+    <Bounds X="200" Y="1850" Width="5360" Height="900"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>DealerLabel</Name>
+      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Bottom</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>DEALER</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="2800" Width="5360" Height="350"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -593,7 +666,7 @@ function createPalletLabelXml(data: {
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
@@ -601,13 +674,39 @@ function createPalletLabelXml(data: {
         <Element>
           <String>${escapeXml(data.dealer)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="18" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="24" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="2000" Width="5360" Height="600"/>
+    <Bounds X="200" Y="3150" Width="5360" Height="700"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>PhoneLabel</Name>
+      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Bottom</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>PHONE NUMBER</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="200" Y="3900" Width="5360" Height="350"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -619,7 +718,7 @@ function createPalletLabelXml(data: {
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
       <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
+      <VerticalAlignment>Top</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
@@ -627,13 +726,13 @@ function createPalletLabelXml(data: {
         <Element>
           <String>${escapeXml(data.phone)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="24" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="2700" Width="5360" Height="500"/>
+    <Bounds X="200" Y="4250" Width="5360" Height="700"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -653,13 +752,13 @@ function createPalletLabelXml(data: {
         <Element>
           <String>Order #${escapeXml(data.orderId)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="28" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="3400" Width="5360" Height="700"/>
+    <Bounds X="200" Y="5100" Width="5360" Height="700"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -679,13 +778,13 @@ function createPalletLabelXml(data: {
         <Element>
           <String>Pallet ${escapeXml(data.palletNumber)} of ${escapeXml(data.totalPallets)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="48" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="56" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="200" Y="4400" Width="5360" Height="1200"/>
+    <Bounds X="200" Y="6000" Width="5360" Height="2400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -758,12 +857,22 @@ export async function printPalletLabels(
   phone: string,
   orderId: string,
   palletCount: number,
-  _logoBase64?: string
+  logoUrl?: string
 ): Promise<{ success: boolean; printed: number; error?: string }> {
   try {
     const printer = await findPrinterByModel(/4XL|XL/i);
     if (!printer) {
       return { success: false, printed: 0, error: 'No Dymo 4XL printer found. Please connect a Dymo LabelWriter 4XL.' };
+    }
+
+    let logoBase64: string | undefined;
+    if (logoUrl) {
+      try {
+        logoBase64 = await imageToBase64(logoUrl);
+        console.log('[Dymo] Logo loaded successfully');
+      } catch (err) {
+        console.warn('[Dymo] Could not load logo:', err);
+      }
     }
 
     let printed = 0;
@@ -775,7 +884,8 @@ export async function printPalletLabels(
         phone,
         orderId,
         palletNumber: String(i),
-        totalPallets: String(palletCount)
+        totalPallets: String(palletCount),
+        logoBase64
       });
 
       await printLabelRaw(printer.name, labelXml);
