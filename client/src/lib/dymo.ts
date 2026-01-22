@@ -124,6 +124,58 @@ async function findPrinterByModel(modelPattern: RegExp): Promise<DymoPrinterInfo
   return printers.find(p => p.isConnected && modelPattern.test(p.modelName)) || null;
 }
 
+// Get available label types for a printer (for debugging)
+export async function getLabelTypes(printerName: string): Promise<string[]> {
+  const baseUrl = await discoverDymoService();
+  
+  try {
+    const response = await fetch(`${baseUrl}/DYMO/DLS/Printing/GetLabelWriterPapersFromPrinter?printerName=${encodeURIComponent(printerName)}`, {
+      method: 'GET',
+      mode: 'cors',
+    });
+
+    if (!response.ok) {
+      console.log('[Dymo] GetLabelWriterPapersFromPrinter failed:', response.statusText);
+      return [];
+    }
+
+    const xmlText = await response.text();
+    console.log('[Dymo] Available label types XML:', xmlText);
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const paperElements = doc.querySelectorAll('LabelWriterPaper');
+    
+    const types: string[] = [];
+    paperElements.forEach((el) => {
+      const name = el.querySelector('Name')?.textContent;
+      const id = el.querySelector('Id')?.textContent;
+      if (name || id) {
+        types.push(`${id || 'no-id'}: ${name || 'no-name'}`);
+      }
+    });
+    
+    return types;
+  } catch (error) {
+    console.log('[Dymo] Error getting label types:', error);
+    return [];
+  }
+}
+
+// Debug helper: log available label types for 4XL printer
+export async function debugLabelTypes(): Promise<void> {
+  const printers = await getPrinters();
+  console.log('[Dymo] Connected printers:', printers);
+  
+  for (const printer of printers) {
+    if (printer.isConnected) {
+      console.log(`[Dymo] Getting label types for: ${printer.name} (${printer.modelName})`);
+      const types = await getLabelTypes(printer.name);
+      console.log(`[Dymo] Label types for ${printer.name}:`, types);
+    }
+  }
+}
+
 // Print a label using the REST API
 async function printLabelRaw(printerName: string, labelXml: string): Promise<void> {
   const baseUrl = await discoverDymoService();
