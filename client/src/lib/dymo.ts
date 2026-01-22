@@ -479,12 +479,10 @@ function createPalletLabelXml(data: {
     <Bounds X="200" Y="150" Width="5360" Height="900"/>
   </ObjectInfo>` : '';
 
-  // IMPORTANT: The xmlns attribute below fixes the "element not declared" error
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Portrait</PaperOrientation>
-  <Id>LargeShipping</Id>
-  <PaperName>1744907 4 in x 6 in</PaperName>
+  <Id>1744907</Id>  <PaperName>1744907 4 in x 6 in</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
   </DrawCommands>${logoSection}
@@ -500,6 +498,8 @@ function createPalletLabelXml(data: {
         </Element>
       </StyledText>
       <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
     </TextObject>
     <Bounds X="200" Y="1850" Width="5360" Height="900"/>
   </ObjectInfo>
