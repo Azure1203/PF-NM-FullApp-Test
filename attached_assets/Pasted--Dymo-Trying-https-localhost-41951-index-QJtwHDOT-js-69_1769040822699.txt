@@ -1,0 +1,277 @@
+[Dymo] Trying https://localhost:41951... index-QJtwHDOT.js:69:37349
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Connected to https://localhost:41951 index-QJtwHDOT.js:69:37405
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Available printers: 
+Array [ "DYMO LabelWriter 4XL (DYMO LabelWriter 4XL, connected: false)", "DYMO LabelWriter 450 (DYMO LabelWriter 450, connected: true)" ]
+index-QJtwHDOT.js:597:73
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Selected printer for project label: DYMO LabelWriter 450 (DYMO LabelWriter 450) index-QJtwHDOT.js:597:211
+[Dymo] Sending label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Shipping</Id>
+  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red=... index-QJtwHDOT.js:69:38413
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Print failed. Full label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Shipping</Id>
+  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1712</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="200" Width="2860" Height="700"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>OrderNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1712</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="950" Width="2860" Height="500"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>CienappsNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String></String>
+          <Attributes>
+            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="1500" Width="2860" Height="450"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1/21/2026</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="2000" Width="2860" Height="350"></Bounds>
+  </ObjectInfo>
+</DieCutLabel> index-QJtwHDOT.js:69:38775
+[Dymo] Print error: Print failed: Error printing label. Exception: Invalid label file: The 'DieCutLabel' element is not declared. index-QJtwHDOT.js:597:732
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Available printers: 
+Array [ "DYMO LabelWriter 4XL (DYMO LabelWriter 4XL, connected: false)", "DYMO LabelWriter 450 (DYMO LabelWriter 450, connected: true)" ]
+index-QJtwHDOT.js:597:73
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Selected printer for project label: DYMO LabelWriter 450 (DYMO LabelWriter 450) index-QJtwHDOT.js:597:211
+[Dymo] Sending label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Shipping</Id>
+  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red=... index-QJtwHDOT.js:69:38413
+XHR
+POST
+https://localhost:41951/DYMO/DLS/Printing/PrintLabel
+[HTTP/1.1 400 Bad Request 6ms]
+
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Print failed. Full label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Shipping</Id>
+  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1712</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="200" Width="2860" Height="700"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>OrderNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1712</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="950" Width="2860" Height="500"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>CienappsNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String></String>
+          <Attributes>
+            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="1500" Width="2860" Height="450"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"> </BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1/21/2026</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"> </ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="100" Y="2000" Width="2860" Height="350"></Bounds>
+  </ObjectInfo>
+</DieCutLabel> index-QJtwHDOT.js:69:38775
+[Dymo] Print error: Print failed: Error printing label. Exception: Invalid label file: The 'DieCutLabel' element is not declared.
