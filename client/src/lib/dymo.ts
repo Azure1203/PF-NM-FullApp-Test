@@ -185,11 +185,11 @@ function createProjectLabelXml(data: {
   cienappsNumber: string;
   date: string;
 }): string {
-  // Working format: Landscape 30323 Shipping, Id=Address, Bounds X=144 Width=5472
+  // Working format: Landscape 30323 Shipping, Id=Shipping, Bounds X=144 Width=5472
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Address</Id>
+  <Id>Shipping</Id>
   <PaperName>30323 Shipping</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
