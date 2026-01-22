@@ -1,0 +1,116 @@
+[Dymo] Trying https://localhost:41951... index-DE38k7xf.js:69:37349
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Connected to https://localhost:41951 index-DE38k7xf.js:69:37405
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Available printers: 
+Array [ "DYMO LabelWriter 4XL (DYMO LabelWriter 4XL, connected: false)", "DYMO LabelWriter 450 (DYMO LabelWriter 450, connected: true)" ]
+index-DE38k7xf.js:571:73
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Selected printer for project label: DYMO LabelWriter 450 (DYMO LabelWriter 450) index-DE38k7xf.js:571:211
+[Dymo] Sending label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>SmallShipping</Id>
+  <PaperName>30323 Shipping</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+     ... index-DE38k7xf.js:69:38413
+XHR
+POST
+https://localhost:41951/DYMO/DLS/Printing/PrintLabel
+[HTTP/1.1 400 Bad Request 3ms]
+
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Print failed. Full label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>SmallShipping</Id>
+  <PaperName>30323 Shipping</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"></BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1712</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="24" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="144" Y="150" Width="5472" Height="700"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>OrderNumber</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"></BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1712</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="144" Y="1000" Width="5472" Height="500"></Bounds>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"></BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+      <UseFullFontHeight>True</UseFullFontHeight>
+      <Verticalized>False</Verticalized>
+      <StyledText>
+        <Element>
+          <String>1/22/2026</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="12" Bold="False" Italic="False" Underline="False" Strikeout="False"></Font>
+            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="144" Y="2400" Width="5472" Height="350"></Bounds>
+  </ObjectInfo>
+</DieCutLabel> index-DE38k7xf.js:69:38775
+[Dymo] Print error: Print failed: Error printing label. Exception: Requested value 'SmallShipping' was not found.
