@@ -753,7 +753,7 @@ export default function OrderDetails() {
         project?.cienappsJobNumber || ''
       );
       if (result.success) {
-        toast({ title: 'Label printed', description: 'Project label sent to Dymo 450' });
+        toast({ title: 'Label printed', description: 'Project label sent to Zebra printer' });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
