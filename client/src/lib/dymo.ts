@@ -185,15 +185,15 @@ function createProjectLabelXml(data: {
   cienappsNumber: string;
   date: string;
 }): string {
-  // Using working format: Portrait orientation, Id=Address, PaperName=30323 Shipping
-  // Label size: 2-1/8" x 4" = Width 3060 twips x Height 5760 twips in portrait
+  // Working format with xmlns namespace - Landscape orientation for 30323 Shipping (2-1/8" x 4")
+  // Landscape: Width=5760 (4"), Height=3060 (2-1/8")
   return `<?xml version="1.0" encoding="utf-8"?>
-<DieCutLabel Version="8.0" Units="twips">
-  <PaperOrientation>Portrait</PaperOrientation>
-  <Id>Address</Id>
+<DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
+  <PaperOrientation>Landscape</PaperOrientation>
+  <Id>Shipping</Id>
   <PaperName>30323 Shipping</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"/>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
   </DrawCommands>
   <ObjectInfo>
     <TextObject>
@@ -219,7 +219,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="200" Width="2860" Height="1200"/>
+    <Bounds X="100" Y="200" Width="5560" Height="700"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -245,7 +245,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="1500" Width="2860" Height="1000"/>
+    <Bounds X="100" Y="950" Width="5560" Height="500"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -271,7 +271,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="2600" Width="2860" Height="800"/>
+    <Bounds X="100" Y="1500" Width="5560" Height="450"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -282,8 +282,8 @@ function createProjectLabelXml(data: {
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Right</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
@@ -297,7 +297,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="1500" Y="5200" Width="1400" Height="400"/>
+    <Bounds X="100" Y="2000" Width="5560" Height="350"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -330,12 +330,12 @@ function createOrderLabelXml(data: {
   </ObjectInfo>` : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<DieCutLabel Version="8.0" Units="twips">
+<DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Landscape</PaperOrientation>
   <Id>Shipping</Id>
-  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
+  <PaperName>30323 Shipping</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"/>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
   </DrawCommands>${logoSection}
   <ObjectInfo>
     <TextObject>
@@ -501,7 +501,7 @@ function createPalletLabelXml(data: {
   </ObjectInfo>` : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<DieCutLabel Version="8.0" Units="twips">
+<DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Portrait</PaperOrientation>
   <Id>LargeShipping</Id>
   <PaperName>1744907 4 in x 6 in</PaperName>
