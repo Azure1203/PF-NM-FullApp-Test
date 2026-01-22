@@ -89,7 +89,7 @@ async function findZebraPrinter(): Promise<ZebraPrinter | null> {
 }
 
 // Send ZPL to printer via Browser Print
-async function sendZpl(printerUid: string, zpl: string): Promise<void> {
+async function sendZpl(printer: ZebraPrinter, zpl: string): Promise<void> {
   const baseUrl = await discoverBrowserPrint();
   
   const response = await fetch(`${baseUrl}/write`, {
@@ -100,7 +100,12 @@ async function sendZpl(printerUid: string, zpl: string): Promise<void> {
     },
     body: JSON.stringify({
       device: {
-        uid: printerUid
+        name: printer.name,
+        uid: printer.uid,
+        connection: printer.connection,
+        deviceType: printer.deviceType,
+        version: printer.version,
+        provider: printer.provider
       },
       data: zpl
     }),
@@ -173,7 +178,7 @@ export async function printProjectLabel(
     });
     
     console.log('[Zebra] Sending project label ZPL:', zpl);
-    await sendZpl(printer.uid, zpl);
+    await sendZpl(printer, zpl);
     console.log(`[Zebra] Printed project label on ${printer.name}`);
     return { success: true };
   } catch (error) {
@@ -214,7 +219,7 @@ export async function printOrderLabel(
 ^XZ`;
     
     console.log('[Zebra] Sending order label ZPL:', zpl);
-    await sendZpl(printer.uid, zpl);
+    await sendZpl(printer, zpl);
     console.log(`[Zebra] Printed order label on ${printer.name}`);
     return { success: true };
   } catch (error) {
@@ -248,7 +253,7 @@ export async function printPalletLabels(
       });
       
       console.log(`[Zebra] Sending pallet label ${i}/${palletCount} ZPL:`, zpl);
-      await sendZpl(printer.uid, zpl);
+      await sendZpl(printer, zpl);
       printed++;
       console.log(`[Zebra] Printed pallet label ${i}/${palletCount} on ${printer.name}`);
     }
