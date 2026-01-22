@@ -185,12 +185,11 @@ function createProjectLabelXml(data: {
   cienappsNumber: string;
   date: string;
 }): string {
-  // Working format with xmlns namespace - Landscape orientation for 30323 Shipping (2-1/8" x 4")
-  // Landscape: Width=5760 (4"), Height=3060 (2-1/8")
+  // Working format: Landscape 30323 Shipping, Id=Address, Bounds X=144 Width=5472
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Shipping</Id>
+  <Id>Address</Id>
   <PaperName>30323 Shipping</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
@@ -219,7 +218,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="200" Width="5560" Height="700"/>
+    <Bounds X="144" Y="150" Width="5472" Height="700"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -245,33 +244,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="950" Width="5560" Height="500"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>CienappsNumber</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>${escapeXml(data.cienappsNumber)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="100" Y="1500" Width="5560" Height="450"/>
+    <Bounds X="144" Y="1000" Width="5472" Height="500"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -297,7 +270,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="2000" Width="5560" Height="350"/>
+    <Bounds X="144" Y="2400" Width="5472" Height="350"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
