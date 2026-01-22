@@ -2,14 +2,12 @@
 // Uses Zebra Browser Print API with ZPL (Zebra Programming Language)
 // Browser Print runs on localhost:9101 (HTTPS) or localhost:9100 (HTTP)
 
-interface ZebraPrinter {
+// Use Record to allow all fields from Browser Print API response
+// The API returns various fields like name, uid, connection, deviceType, version, provider, manufacturer, etc.
+type ZebraPrinter = Record<string, unknown> & {
   name: string;
   uid: string;
-  connection: string;
-  deviceType: string;
-  version: string;
-  provider: string;
-}
+};
 
 interface PrintResult {
   success: boolean;
@@ -92,6 +90,8 @@ async function findZebraPrinter(): Promise<ZebraPrinter | null> {
 async function sendZpl(printer: ZebraPrinter, zpl: string): Promise<void> {
   const baseUrl = await discoverBrowserPrint();
   
+  // Pass through the entire printer object as-is from the API response
+  // This ensures all required fields (name, uid, connection, manufacturer, etc.) are included
   const response = await fetch(`${baseUrl}/write`, {
     method: 'POST',
     mode: 'cors',
@@ -99,14 +99,7 @@ async function sendZpl(printer: ZebraPrinter, zpl: string): Promise<void> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      device: {
-        name: printer.name,
-        uid: printer.uid,
-        connection: printer.connection,
-        deviceType: printer.deviceType,
-        version: printer.version,
-        provider: printer.provider
-      },
+      device: printer,
       data: zpl
     }),
   });

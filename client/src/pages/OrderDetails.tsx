@@ -758,7 +758,7 @@ export default function OrderDetails() {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to Dymo printer';
+      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setIsPrintingProjectLabel(false);
@@ -785,12 +785,12 @@ export default function OrderDetails() {
       );
       
       if (result.success) {
-        toast({ title: 'Labels printed', description: `${result.printed} pallet label(s) sent to Dymo 4XL` });
+        toast({ title: 'Labels printed', description: `${result.printed} pallet label(s) sent to Zebra printer` });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to Dymo printer';
+      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setIsPrintingPalletLabels(false);
@@ -810,12 +810,12 @@ export default function OrderDetails() {
         pfcLogo
       );
       if (result.success) {
-        toast({ title: 'Label printed', description: 'Order label sent to Dymo 450' });
+        toast({ title: 'Label printed', description: 'Order label sent to Zebra printer' });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to Dymo printer';
+      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setPrintingOrderLabelFileId(null);
