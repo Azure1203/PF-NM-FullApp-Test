@@ -182,39 +182,40 @@ export async function printProjectLabel(
   }
 }
 
-export async function printOrderLabel(
-  projectName: string,
+export async function printHardwareLabel(
   orderName: string,
   allmoxyJobNumber: string,
   orderId: string,
-  cienappsJobNumber: string,
-  logoUrl?: string
+  cienappsJobNumber: string
 ): Promise<PrintResult> {
-  // For now, use the same format as project label
-  // Can be customized later with different layout
+  // Hardware Label - 4x2 inch format
+  // Line 1: (PERFECT FIT) Cienapps Job #: X
+  // Line 2: Perfect Fit Order ID: X
+  // Line 3: Order Name: X + Allmoxy Job #
   try {
     const printer = await findZebraPrinter();
     if (!printer) {
       return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser-Link is running and a printer is connected.' };
     }
     
-    // 4x2 order label
+    // Combine order name with Allmoxy job number
+    const orderLine = allmoxyJobNumber 
+      ? `${orderName} - Allmoxy #${allmoxyJobNumber}`
+      : orderName;
+    
+    // 4x2 hardware label at 203 DPI = 812 x 406 dots
     const zpl = `^XA
 ^PW812
 ^LL406
 ^CF0,40
-^FO50,50^FDOrder #${orderId}^FS
-^CF0,35
-^FO50,120^FD${projectName}^FS
-^CF0,25
-^FO50,190^FD${orderName}^FS
-^FO50,250^FD${allmoxyJobNumber ? `Allmoxy: ${allmoxyJobNumber}` : ''}^FS
-^FO50,310^FD${cienappsJobNumber ? `Job #${cienappsJobNumber}` : ''}^FS
+^FO30,50^FD(PERFECT FIT) Cienapps Job #: ${cienappsJobNumber}^FS
+^FO30,150^FDPerfect Fit Order ID: ${orderId}^FS
+^FO30,250^FDOrder Name: ${orderLine}^FS
 ^XZ`;
     
-    console.log('[Zebra] Sending order label ZPL:', zpl);
+    console.log('[Zebra] Sending hardware label ZPL:', zpl);
     await sendZpl(printer, zpl);
-    console.log(`[Zebra] Printed order label on ${printer.name}`);
+    console.log(`[Zebra] Printed hardware label on ${printer.name}`);
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

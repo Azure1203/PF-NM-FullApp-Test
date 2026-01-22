@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer } from "lucide-react";
-import { printProjectLabel, printOrderLabel, printPalletLabels } from "@/lib/zebra";
+import { printProjectLabel, printHardwareLabel, printPalletLabels } from "@/lib/zebra";
 import pfcLogo from "@assets/logo-perfect-fit-closets-7_1768954555746.jpg";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -797,20 +797,18 @@ export default function OrderDetails() {
     }
   };
 
-  // Print Order Label handler
-  const handlePrintOrderLabel = async (fileId: number, orderName: string, allmoxyJobNumber: string) => {
+  // Print Hardware Label handler
+  const handlePrintHardwareLabel = async (fileId: number, orderName: string, allmoxyJobNumber: string) => {
     setPrintingOrderLabelFileId(fileId);
     try {
-      const result = await printOrderLabel(
-        project?.name || '',
+      const result = await printHardwareLabel(
         orderName,
         allmoxyJobNumber || '',
         project?.orderId || '',
-        project?.cienappsJobNumber || '',
-        pfcLogo
+        project?.cienappsJobNumber || ''
       );
       if (result.success) {
-        toast({ title: 'Label printed', description: 'Order label sent to Zebra printer' });
+        toast({ title: 'Label printed', description: 'Hardware label sent to Zebra printer' });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
@@ -1792,24 +1790,25 @@ export default function OrderDetails() {
                                       >
                                         <div className="flex items-start justify-between gap-2">
                                           <div className="flex-1">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                               <p className="font-medium text-sm">{actualFilePreview?.name || file.originalFilename}</p>
                                               <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handlePrintOrderLabel(
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handlePrintHardwareLabel(
                                                   file.id,
                                                   actualFilePreview?.name || file.originalFilename,
                                                   file.allmoxyJobNumber || ''
                                                 )}
                                                 disabled={printingOrderLabelFileId === file.id}
-                                                data-testid={`button-print-order-label-${file.id}`}
+                                                data-testid={`button-print-hardware-label-${file.id}`}
                                               >
                                                 {printingOrderLabelFileId === file.id ? (
-                                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
                                                 ) : (
-                                                  <Printer className="w-3 h-3" />
+                                                  <Printer className="w-3 h-3 mr-1" />
                                                 )}
+                                                HARDWARE LABEL
                                               </Button>
                                             </div>
                                             {file.allmoxyJobNumber && (
