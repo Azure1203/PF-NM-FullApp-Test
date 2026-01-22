@@ -779,8 +779,6 @@ export default function OrderDetails() {
       const result = await printPalletLabels(
         today,
         project.name,
-        project.dealer || '',
-        project.phone || '',
         project.orderId || '',
         pallets.length,
         pfcLogo

@@ -452,8 +452,6 @@ function createOrderLabelXml(data: {
 function createPalletLabelXml(data: {
   date: string;
   projectName: string;
-  dealer: string;
-  phone: string;
   orderId: string;
   palletNumber: string;
   totalPallets: string;
@@ -471,23 +469,20 @@ function createPalletLabelXml(data: {
       <IsVariable>False</IsVariable>
       <Image>${data.logoBase64}</Image>
       <ScaleMode>Uniform</ScaleMode>
-      <BorderWidth>0</BorderWidth>
-      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
     </ImageObject>
-    <Bounds X="200" Y="150" Width="5360" Height="900"/>
+    <Bounds X="200" Y="150" Width="5360" Height="1200"/>
   </ObjectInfo>` : '';
 
   return `<?xml version="1.0" encoding="utf-8"?>
-<DieCutLabel Version="8.0" Units="twips">
+<DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Portrait</PaperOrientation>
-  <Id>LargeShipping</Id>
-  <PaperName>1744907 4 x 6</PaperName>
+  <Id>1744907</Id>
+  <PaperName>1744907 4 in x 6 in</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
   </DrawCommands>${logoSection}
-  
   <ObjectInfo>
     <TextObject>
       <Name>ProjectName</Name>
@@ -503,9 +498,8 @@ function createPalletLabelXml(data: {
       <VerticalAlignment>Middle</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
     </TextObject>
-    <Bounds X="200" Y="1500" Width="5360" Height="1500"/>
+    <Bounds X="200" Y="1800" Width="5360" Height="1500"/>
   </ObjectInfo>
-
   <ObjectInfo>
     <TextObject>
       <Name>PalletInfo</Name>
@@ -521,23 +515,7 @@ function createPalletLabelXml(data: {
       <VerticalAlignment>Middle</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
     </TextObject>
-    <Bounds X="200" Y="3500" Width="5360" Height="3500"/>
-  </ObjectInfo>
-
-  <ObjectInfo>
-    <TextObject>
-      <Name>FooterInfo</Name>
-      <StyledText>
-        <Element>
-          <String>Order: ${data.orderId} | ${data.date}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="14" Bold="False"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-    </TextObject>
-    <Bounds X="200" Y="8000" Width="5360" Height="400"/>
+    <Bounds X="200" Y="4000" Width="5360" Height="3000"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -624,8 +602,6 @@ export async function printOrderLabel(
 export async function printPalletLabels(
   date: string,
   projectName: string,
-  dealer: string,
-  phone: string,
   orderId: string,
   palletCount: number,
   logoUrl?: string
@@ -651,8 +627,6 @@ export async function printPalletLabels(
       const labelXml = createPalletLabelXml({
         date,
         projectName,
-        dealer,
-        phone,
         orderId,
         palletNumber: String(i),
         totalPallets: String(palletCount),
