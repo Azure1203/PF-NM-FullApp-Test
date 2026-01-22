@@ -180,19 +180,17 @@ function fixDymoXml(xml: string): string {
 // Label XML templates - using simplified format from dymojs example
 
 function createProjectLabelXml(data: {
-  date: string;
   projectName: string;
-  orderId: string;
   palletNumber: string;
   totalPallets: string;
 }): string {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Custom</Id>
-  <PaperName>Custom 2x4</PaperName>
+  <Id>Shipping</Id>
+  <PaperName>30323 Shipping 2-1/8 in x 4 in</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"/>
   </DrawCommands>
   <ObjectInfo>
     <TextObject>
@@ -209,7 +207,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="144" Y="150" Width="5472" Height="1000"/>
+    <Bounds X="144" Y="150" Width="2800" Height="1000"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -226,7 +224,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="144" Y="1400" Width="5472" Height="800"/>
+    <Bounds X="144" Y="1400" Width="2800" Height="800"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -695,11 +693,8 @@ export async function printProjectLabel(
       return { success: false, error: 'No Dymo LabelWriter 450 printer found. Please connect a Dymo LabelWriter 450.' };
     }
 
-    const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
     const labelXml = createProjectLabelXml({
-      date: today,
       projectName: projectName,
-      orderId: orderId,
       palletNumber: palletNumber,
       totalPallets: totalPallets
     });
