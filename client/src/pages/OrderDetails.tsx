@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer } from "lucide-react";
-import { printProjectLabel, printHardwareLabel, printPalletLabels } from "@/lib/zebra";
+import { printProjectLabel, printHardwareLabel, printCTSLabel, printPalletLabels } from "@/lib/zebra";
 import pfcLogo from "@assets/logo-perfect-fit-closets-7_1768954555746.jpg";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -110,7 +110,8 @@ export default function OrderDetails() {
   // Label printing state
   const [isPrintingProjectLabel, setIsPrintingProjectLabel] = useState(false);
   const [isPrintingPalletLabels, setIsPrintingPalletLabels] = useState(false);
-  const [printingOrderLabelFileId, setPrintingOrderLabelFileId] = useState<number | null>(null);
+  const [printingHardwareLabelFileId, setPrintingHardwareLabelFileId] = useState<number | null>(null);
+  const [printingCTSLabelFileId, setPrintingCTSLabelFileId] = useState<number | null>(null);
 
   // Color mapping for PF PRODUCTION STATUS options
   const statusColorMap: Record<string, 'green' | 'red' | 'yellow'> = {
@@ -799,7 +800,7 @@ export default function OrderDetails() {
 
   // Print Hardware Label handler
   const handlePrintHardwareLabel = async (fileId: number, orderName: string, allmoxyJobNumber: string) => {
-    setPrintingOrderLabelFileId(fileId);
+    setPrintingHardwareLabelFileId(fileId);
     try {
       const result = await printHardwareLabel(
         orderName,
@@ -816,7 +817,30 @@ export default function OrderDetails() {
       const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
-      setPrintingOrderLabelFileId(null);
+      setPrintingHardwareLabelFileId(null);
+    }
+  };
+
+  // Print CTS Label handler
+  const handlePrintCTSLabel = async (fileId: number, orderName: string, allmoxyJobNumber: string) => {
+    setPrintingCTSLabelFileId(fileId);
+    try {
+      const result = await printCTSLabel(
+        orderName,
+        allmoxyJobNumber || '',
+        project?.orderId || '',
+        project?.cienappsJobNumber || ''
+      );
+      if (result.success) {
+        toast({ title: 'Label printed', description: 'CTS label sent to Zebra printer' });
+      } else {
+        toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
+      toast({ title: 'Print failed', description: message, variant: 'destructive' });
+    } finally {
+      setPrintingCTSLabelFileId(null);
     }
   };
 
@@ -1800,15 +1824,33 @@ export default function OrderDetails() {
                                                   actualFilePreview?.name || file.originalFilename,
                                                   file.allmoxyJobNumber || ''
                                                 )}
-                                                disabled={printingOrderLabelFileId === file.id}
+                                                disabled={printingHardwareLabelFileId === file.id}
                                                 data-testid={`button-print-hardware-label-${file.id}`}
                                               >
-                                                {printingOrderLabelFileId === file.id ? (
+                                                {printingHardwareLabelFileId === file.id ? (
                                                   <Loader2 className="w-3 h-3 animate-spin mr-1" />
                                                 ) : (
                                                   <Printer className="w-3 h-3 mr-1" />
                                                 )}
                                                 HARDWARE LABEL
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handlePrintCTSLabel(
+                                                  file.id,
+                                                  actualFilePreview?.name || file.originalFilename,
+                                                  file.allmoxyJobNumber || ''
+                                                )}
+                                                disabled={printingCTSLabelFileId === file.id}
+                                                data-testid={`button-print-cts-label-${file.id}`}
+                                              >
+                                                {printingCTSLabelFileId === file.id ? (
+                                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                                ) : (
+                                                  <Scissors className="w-3 h-3 mr-1" />
+                                                )}
+                                                CTS LABEL
                                               </Button>
                                             </div>
                                             {file.allmoxyJobNumber && (

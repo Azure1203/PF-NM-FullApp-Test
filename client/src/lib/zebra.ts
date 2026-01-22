@@ -110,24 +110,50 @@ async function sendZpl(printer: ZebraPrinter, zpl: string): Promise<void> {
   }
 }
 
-// Create ZPL for 4x2 Project Label
+// Calculate optimal font size for 4x2 label based on longest line
+// 4x2 label at 203 DPI = 812 x 406 dots, usable width ~750 dots
+function calculateFontSize(lines: string[]): number {
+  const maxWidth = 750; // usable print width in dots
+  const maxFontSize = 45; // max font size for 4 lines
+  const minFontSize = 20; // minimum readable font size
+  
+  // Find the longest line
+  const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
+  const charCount = longestLine.length;
+  
+  // Approximate character width is ~60% of font height for standard ZPL fonts
+  // So: charCount * (fontSize * 0.6) <= maxWidth
+  // fontSize <= maxWidth / (charCount * 0.6)
+  const calculatedSize = Math.floor(maxWidth / (charCount * 0.55));
+  
+  // Clamp between min and max
+  return Math.min(maxFontSize, Math.max(minFontSize, calculatedSize));
+}
+
+// Create ZPL for 4x2 Project Label with auto-scaling font
 function createProjectLabelZpl(data: {
   projectName: string;
   orderId: string;
   cienappsJobNumber: string;
 }): string {
   // 4x2 inch label at 203 DPI = 812 x 406 dots
-  // 3 lines of text:
-  // Line 1: (PERFECT FIT) Cienapps Job #: X
-  // Line 2: Perfect Fit Order ID: X
-  // Line 3: [Project Name]: X
+  // 4 lines of text with auto-scaling font
+  const line1 = 'PERFECT FIT PROJECT LABEL';
+  const line2 = `[Project Name]: ${data.projectName}`;
+  const line3 = `(PERFECT FIT) Cienapps Job #: ${data.cienappsJobNumber}`;
+  const line4 = `Perfect Fit Order ID: ${data.orderId}`;
+  
+  const fontSize = calculateFontSize([line1, line2, line3, line4]);
+  const lineHeight = Math.floor(406 / 5); // ~81 dots per line with margins
+  
   return `^XA
 ^PW812
 ^LL406
-^CF0,40
-^FO30,50^FD(PERFECT FIT) Cienapps Job #: ${data.cienappsJobNumber}^FS
-^FO30,150^FDPerfect Fit Order ID: ${data.orderId}^FS
-^FO30,250^FD[Project Name]: ${data.projectName}^FS
+^CF0,${fontSize}
+^FO30,${lineHeight * 0.5}^FD${line1}^FS
+^FO30,${lineHeight * 1.5}^FD${line2}^FS
+^FO30,${lineHeight * 2.5}^FD${line3}^FS
+^FO30,${lineHeight * 3.5}^FD${line4}^FS
 ^XZ`;
 }
 
@@ -188,10 +214,7 @@ export async function printHardwareLabel(
   orderId: string,
   cienappsJobNumber: string
 ): Promise<PrintResult> {
-  // Hardware Label - 4x2 inch format
-  // Line 1: (PERFECT FIT) Cienapps Job #: X
-  // Line 2: Perfect Fit Order ID: X
-  // Line 3: Order Name: X + Allmoxy Job #
+  // Hardware Label - 4x2 inch format with auto-scaling
   try {
     const printer = await findZebraPrinter();
     if (!printer) {
@@ -203,19 +226,78 @@ export async function printHardwareLabel(
       ? `${orderName} - Allmoxy #${allmoxyJobNumber}`
       : orderName;
     
+    // 4 lines with auto-scaling
+    const line1 = 'PERFECT FIT HARDWARE LABEL';
+    const line2 = `(PERFECT FIT) Cienapps Job #: ${cienappsJobNumber}`;
+    const line3 = `Perfect Fit Order ID: ${orderId}`;
+    const line4 = `Order Name: ${orderLine}`;
+    
+    const fontSize = calculateFontSize([line1, line2, line3, line4]);
+    const lineHeight = Math.floor(406 / 5);
+    
     // 4x2 hardware label at 203 DPI = 812 x 406 dots
     const zpl = `^XA
 ^PW812
 ^LL406
-^CF0,40
-^FO30,50^FD(PERFECT FIT) Cienapps Job #: ${cienappsJobNumber}^FS
-^FO30,150^FDPerfect Fit Order ID: ${orderId}^FS
-^FO30,250^FDOrder Name: ${orderLine}^FS
+^CF0,${fontSize}
+^FO30,${lineHeight * 0.5}^FD${line1}^FS
+^FO30,${lineHeight * 1.5}^FD${line2}^FS
+^FO30,${lineHeight * 2.5}^FD${line3}^FS
+^FO30,${lineHeight * 3.5}^FD${line4}^FS
 ^XZ`;
     
     console.log('[Zebra] Sending hardware label ZPL:', zpl);
     await sendZpl(printer, zpl);
     console.log(`[Zebra] Printed hardware label on ${printer.name}`);
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[Zebra] Print error:', message);
+    return { success: false, error: message };
+  }
+}
+
+export async function printCTSLabel(
+  orderName: string,
+  allmoxyJobNumber: string,
+  orderId: string,
+  cienappsJobNumber: string
+): Promise<PrintResult> {
+  // CTS (Cut To Size) Label - 4x2 inch format with auto-scaling
+  try {
+    const printer = await findZebraPrinter();
+    if (!printer) {
+      return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser-Link is running and a printer is connected.' };
+    }
+    
+    // Combine order name with Allmoxy job number
+    const orderLine = allmoxyJobNumber 
+      ? `${orderName} - Allmoxy #${allmoxyJobNumber}`
+      : orderName;
+    
+    // 4 lines with auto-scaling
+    const line1 = 'PERFECT FIT CUT TO SIZE LABEL';
+    const line2 = `(PERFECT FIT) Cienapps Job #: ${cienappsJobNumber}`;
+    const line3 = `Perfect Fit Order ID: ${orderId}`;
+    const line4 = `Order Name: ${orderLine}`;
+    
+    const fontSize = calculateFontSize([line1, line2, line3, line4]);
+    const lineHeight = Math.floor(406 / 5);
+    
+    // 4x2 CTS label at 203 DPI = 812 x 406 dots
+    const zpl = `^XA
+^PW812
+^LL406
+^CF0,${fontSize}
+^FO30,${lineHeight * 0.5}^FD${line1}^FS
+^FO30,${lineHeight * 1.5}^FD${line2}^FS
+^FO30,${lineHeight * 2.5}^FD${line3}^FS
+^FO30,${lineHeight * 3.5}^FD${line4}^FS
+^XZ`;
+    
+    console.log('[Zebra] Sending CTS label ZPL:', zpl);
+    await sendZpl(printer, zpl);
+    console.log(`[Zebra] Printed CTS label on ${printer.name}`);
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
