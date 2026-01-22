@@ -166,8 +166,8 @@ function escapeXml(str: string): string {
 // Fix XML for DYMO Connect bug - self-closing Color/Font tags cause errors
 // DYMO Connect requires explicit closing tags with at least a space inside
 function fixDymoXml(xml: string): string {
-  // Fix Color elements (ForeColor, BackColor, BorderColor)
-  xml = xml.replace(/<((?:Fore|Back|Border)?Color)([^>]*?)\/>/g, '<$1$2> </$1>');
+  // Fix Color elements (ForeColor, BackColor, BorderColor) - no space inside
+  xml = xml.replace(/<((?:Fore|Back|Border)?Color)([^>]*?)\/>/g, '<$1$2></$1>');
   // Fix Font elements
   xml = xml.replace(/<Font([^>]*?)\/>/g, '<Font$1></Font>');
   // Fix RoundRectangle (might be needed too)
