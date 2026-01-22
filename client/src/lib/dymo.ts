@@ -189,31 +189,22 @@ function createProjectLabelXml(data: {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>SmallShipping</Id>
-  <PaperName>30323</PaperName>
+  <Id>Custom</Id>
+  <PaperName>Custom 2x4</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
   </DrawCommands>
   <ObjectInfo>
     <TextObject>
       <Name>ProjectName</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
       <HorizontalAlignment>Center</HorizontalAlignment>
       <VerticalAlignment>Middle</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
           <String>${escapeXml(data.projectName)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+            <Font Family="Helvetica" Size="18" Bold="True"/>
           </Attributes>
         </Element>
       </StyledText>
@@ -236,21 +227,6 @@ function createProjectLabelXml(data: {
       </StyledText>
     </TextObject>
     <Bounds X="144" Y="1400" Width="5472" Height="800"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>Date</Name>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <StyledText>
-        <Element>
-          <String>${escapeXml(data.date)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="10"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="144" Y="2400" Width="5472" Height="400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
