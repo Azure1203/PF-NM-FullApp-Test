@@ -1,0 +1,46 @@
+Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content. node.js:418:1
+[Dymo] Trying https://localhost:41951... index-DULJLJSj.js:69:37349
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/StatusConnected” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Connected to https://localhost:41951 index-DULJLJSj.js:69:37405
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/GetPrinters” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Logo loaded successfully index-DULJLJSj.js:527:1554
+[Dymo] Sending label XML: <?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Portrait</PaperOrientation>
+  <Id>LargeShipping</Id>
+  <PaperName>1744907 4 x 6</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <ImageObject>
+      <Name>Logo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Bl... index-DULJLJSj.js:69:38413
+XHR
+POST
+https://localhost:41951/DYMO/DLS/Printing/PrintLabel
+[HTTP/1.1 400 Bad Request 15ms]
+
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74”, initiator “https://perfectfitorders.com/orders/74”, accessing target “https://localhost:41951/DYMO/DLS/Printing/PrintLabel” (127.0.0.1:41951) via fetch. Secure context: True, prompt action: (null) 74
+[Dymo] Print failed. Full label XML: 
+<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips">
+  <PaperOrientation>Portrait</PaperOrientation>
+  <Id>LargeShipping</Id>
+  <PaperName>1744907 4 x 6</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"></RoundRectangle>
+  </DrawCommands>
+  <ObjectInfo>
+    <ImageObject>
+      <Name>Logo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"></ForeColor>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"></BackColor>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>/9j/4gxYSUNDX1BST0ZJTEUAAQEAAAxITGlubwIQAABtbnRyUkdCIFhZWiAHzgACAAkABgAxAABhY3NwTVNGVAAAAABJRUMgc1JHQgAAAAAAAAAAAAAAAAAA9tYAAQAAAADTLUhQICAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABFjcHJ0AAABUAAAADNkZXNjAAABhAAAAGx3dHB0AAAB8AAAABRia3B0AAACBAAAABRyWFlaAAACGAAAABRnWFlaAAACLAAAABRiWFlaAAACQA…
+index-DULJLJSj.js:69:38775
+[Dymo] Print error: Print failed: Error printing label. Exception: Invalid label file: The 'DieCutLabel' element is not declared.
