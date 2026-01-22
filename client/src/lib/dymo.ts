@@ -185,15 +185,15 @@ function createProjectLabelXml(data: {
   cienappsNumber: string;
   date: string;
 }): string {
-  // Working format with xmlns namespace - Landscape orientation for 30323 Shipping (2-1/8" x 4")
-  // Landscape: Width=5760 (4"), Height=3060 (2-1/8")
+  // Working format with xmlns namespace - Portrait orientation for 30323 Shipping (2-1/8" x 4")
+  // Portrait: Width=3060 (2-1/8"), Height=5760 (4") - text flows across the 4" long edge
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
-  <PaperOrientation>Landscape</PaperOrientation>
+  <PaperOrientation>Portrait</PaperOrientation>
   <Id>Shipping</Id>
   <PaperName>30323 Shipping</PaperName>
   <DrawCommands>
-    <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
+    <RoundRectangle X="0" Y="0" Width="3060" Height="5760" Rx="270" Ry="270"/>
   </DrawCommands>
   <ObjectInfo>
     <TextObject>
@@ -219,7 +219,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="200" Width="5560" Height="700"/>
+    <Bounds X="100" Y="200" Width="2860" Height="1200"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -245,7 +245,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="950" Width="5560" Height="500"/>
+    <Bounds X="100" Y="1500" Width="2860" Height="1000"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -271,7 +271,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="1500" Width="5560" Height="450"/>
+    <Bounds X="100" Y="2600" Width="2860" Height="900"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
@@ -297,7 +297,7 @@ function createProjectLabelXml(data: {
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="100" Y="2000" Width="5560" Height="350"/>
+    <Bounds X="100" Y="3600" Width="2860" Height="800"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
