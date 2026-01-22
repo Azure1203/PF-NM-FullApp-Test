@@ -430,7 +430,7 @@ function createPalletLabelXml(data: {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Portrait</PaperOrientation>
-  <Id>LargeShipping</Id>
+  <Id>Shipping</Id>
   <PaperName>1744907 4 in x 6 in</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
