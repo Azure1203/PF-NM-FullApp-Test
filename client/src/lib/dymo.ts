@@ -482,10 +482,11 @@ function createPalletLabelXml(data: {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Portrait</PaperOrientation>
-  <Id>1744907</Id>  <PaperName>1744907 4 in x 6 in</PaperName>
-  <DrawCommands>
+  <Id>1744907</Id>
+  <PaperName>1744907</PaperName> <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
   </DrawCommands>${logoSection}
+  
   <ObjectInfo>
     <TextObject>
       <Name>ProjectName</Name>
@@ -493,7 +494,7 @@ function createPalletLabelXml(data: {
         <Element>
           <String>${data.projectName}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="24" Bold="True"/>
+            <Font Family="Helvetica" Size="48" Bold="True"/>
           </Attributes>
         </Element>
       </StyledText>
@@ -501,8 +502,9 @@ function createPalletLabelXml(data: {
       <VerticalAlignment>Middle</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
     </TextObject>
-    <Bounds X="200" Y="1850" Width="5360" Height="900"/>
+    <Bounds X="200" Y="1500" Width="5360" Height="1500"/>
   </ObjectInfo>
+
   <ObjectInfo>
     <TextObject>
       <Name>PalletInfo</Name>
@@ -510,13 +512,31 @@ function createPalletLabelXml(data: {
         <Element>
           <String>Pallet ${data.palletNumber} of ${data.totalPallets}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="20" Bold="True"/>
+            <Font Family="Helvetica" Size="72" Bold="True"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+    </TextObject>
+    <Bounds X="200" Y="3500" Width="5360" Height="3500"/>
+  </ObjectInfo>
+
+  <ObjectInfo>
+    <TextObject>
+      <Name>FooterInfo</Name>
+      <StyledText>
+        <Element>
+          <String>Order: ${data.orderId} | ${data.date}</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="14" Bold="False"/>
           </Attributes>
         </Element>
       </StyledText>
       <HorizontalAlignment>Center</HorizontalAlignment>
     </TextObject>
-    <Bounds X="200" Y="6000" Width="5360" Height="2400"/>
+    <Bounds X="200" Y="8000" Width="5360" Height="400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
