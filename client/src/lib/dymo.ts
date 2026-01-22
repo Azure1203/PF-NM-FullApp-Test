@@ -427,6 +427,7 @@ function createPalletLabelXml(data: {
     <Bounds X="200" Y="150" Width="5360" Height="900"/>
   </ObjectInfo>` : '';
 
+  // IMPORTANT: The xmlns attribute below fixes the "element not declared" error
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Portrait</PaperOrientation>
@@ -437,235 +438,31 @@ function createPalletLabelXml(data: {
   </DrawCommands>${logoSection}
   <ObjectInfo>
     <TextObject>
-      <Name>Date</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Right</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>${escapeXml(data.date)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="14" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="3500" Y="1100" Width="2060" Height="350"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>ProjectNameLabel</Name>
-      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Bottom</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>PROJECT NAME</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="200" Y="1500" Width="5360" Height="350"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
       <Name>ProjectName</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String>${escapeXml(data.projectName)}</String>
+          <String>${data.projectName}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="36" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+            <Font Family="Helvetica" Size="24" Bold="True"/>
           </Attributes>
         </Element>
       </StyledText>
+      <HorizontalAlignment>Center</HorizontalAlignment>
     </TextObject>
     <Bounds X="200" Y="1850" Width="5360" Height="900"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
-      <Name>DealerLabel</Name>
-      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Bottom</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>DEALER</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="200" Y="2800" Width="5360" Height="350"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>Dealer</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>${escapeXml(data.dealer)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="24" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="200" Y="3150" Width="5360" Height="700"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>PhoneLabel</Name>
-      <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Bottom</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>PHONE NUMBER</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="128" Green="128" Blue="128"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="200" Y="3900" Width="5360" Height="350"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>Phone</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>${escapeXml(data.phone)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="24" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="200" Y="4250" Width="5360" Height="700"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>OrderId</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
-      <StyledText>
-        <Element>
-          <String>Order #${escapeXml(data.orderId)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="28" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-    </TextObject>
-    <Bounds X="200" Y="5100" Width="5360" Height="700"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
       <Name>PalletInfo</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-      <UseFullFontHeight>True</UseFullFontHeight>
-      <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String>Pallet ${escapeXml(data.palletNumber)} of ${escapeXml(data.totalPallets)}</String>
+          <String>Pallet ${data.palletNumber} of ${data.totalPallets}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="56" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-            <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+            <Font Family="Helvetica" Size="20" Bold="True"/>
           </Attributes>
         </Element>
       </StyledText>
+      <HorizontalAlignment>Center</HorizontalAlignment>
     </TextObject>
     <Bounds X="200" Y="6000" Width="5360" Height="2400"/>
   </ObjectInfo>
