@@ -1,0 +1,71 @@
+function createPalletLabelXml(data: {
+  date: string;
+  projectName: string;
+  dealer: string;
+  phone: string;
+  orderId: string;
+  palletNumber: string;
+  totalPallets: string;
+  logoBase64?: string;
+}): string {
+  const logoSection = data.logoBase64 ? `
+  <ObjectInfo>
+    <ImageObject>
+      <Name>Logo</Name>
+      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
+      <LinkedObjectName></LinkedObjectName>
+      <Rotation>Rotation0</Rotation>
+      <IsMirrored>False</IsMirrored>
+      <IsVariable>False</IsVariable>
+      <Image>${data.logoBase64}</Image>
+      <ScaleMode>Uniform</ScaleMode>
+      <BorderWidth>0</BorderWidth>
+      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+    </ImageObject>
+    <Bounds X="200" Y="150" Width="5360" Height="900"/>
+  </ObjectInfo>` : '';
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
+  <PaperOrientation>Portrait</PaperOrientation>
+  <Id>1744907</Id>  <PaperName>1744907 4 in x 6 in</PaperName>
+  <DrawCommands>
+    <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
+  </DrawCommands>${logoSection}
+  <ObjectInfo>
+    <TextObject>
+      <Name>ProjectName</Name>
+      <StyledText>
+        <Element>
+          <String>${data.projectName}</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="24" Bold="True"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
+    </TextObject>
+    <Bounds X="200" Y="1850" Width="5360" Height="900"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>PalletInfo</Name>
+      <StyledText>
+        <Element>
+          <String>Pallet ${data.palletNumber} of ${data.totalPallets}</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="20" Bold="True"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+    </TextObject>
+    <Bounds X="200" Y="6000" Width="5360" Height="2400"/>
+  </ObjectInfo>
+</DieCutLabel>`;
+}

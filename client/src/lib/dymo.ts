@@ -430,8 +430,7 @@ function createPalletLabelXml(data: {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Portrait</PaperOrientation>
-  <Id>SmallShipping</Id>
-  <PaperName>1744907 4 in x 6 in</PaperName>
+  <Id>1744907</Id>  <PaperName>1744907 4 in x 6 in</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="8640" Rx="270" Ry="270"/>
   </DrawCommands>${logoSection}
@@ -440,15 +439,32 @@ function createPalletLabelXml(data: {
       <Name>ProjectName</Name>
       <StyledText>
         <Element>
-          <String>${escapeXml(data.projectName)}</String>
+          <String>${data.projectName}</String>
           <Attributes>
             <Font Family="Helvetica" Size="24" Bold="True"/>
           </Attributes>
         </Element>
       </StyledText>
       <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
     </TextObject>
     <Bounds X="200" Y="1850" Width="5360" Height="900"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>PalletInfo</Name>
+      <StyledText>
+        <Element>
+          <String>Pallet ${data.palletNumber} of ${data.totalPallets}</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="20" Bold="True"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+    </TextObject>
+    <Bounds X="200" Y="6000" Width="5360" Height="2400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
