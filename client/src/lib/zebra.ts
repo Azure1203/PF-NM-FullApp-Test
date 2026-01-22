@@ -113,18 +113,21 @@ async function sendZpl(printer: ZebraPrinter, zpl: string): Promise<void> {
 // Create ZPL for 4x2 Project Label
 function createProjectLabelZpl(data: {
   projectName: string;
-  palletNumber: string;
-  totalPallets: string;
+  orderId: string;
+  cienappsJobNumber: string;
 }): string {
   // 4x2 inch label at 203 DPI = 812 x 406 dots
-  // Using ^FO (Field Origin) and ^A (Font) commands
+  // 3 lines of text:
+  // Line 1: (PERFECT FIT) Cienapps Job #: X
+  // Line 2: Perfect Fit Order ID: X
+  // Line 3: [Project Name]: X
   return `^XA
 ^PW812
 ^LL406
-^CF0,60
-^FO50,80^FD${data.projectName}^FS
 ^CF0,40
-^FO50,200^FDPallet ${data.palletNumber} of ${data.totalPallets}^FS
+^FO30,50^FD(PERFECT FIT) Cienapps Job #: ${data.cienappsJobNumber}^FS
+^FO30,150^FDPerfect Fit Order ID: ${data.orderId}^FS
+^FO30,250^FD[Project Name]: ${data.projectName}^FS
 ^XZ`;
 }
 
@@ -154,9 +157,7 @@ function createPalletLabelZpl(data: {
 export async function printProjectLabel(
   projectName: string,
   orderId: string,
-  cienappsJobNumber: string,
-  palletNumber: string = '1',
-  totalPallets: string = '1'
+  cienappsJobNumber: string
 ): Promise<PrintResult> {
   try {
     const printer = await findZebraPrinter();
@@ -166,8 +167,8 @@ export async function printProjectLabel(
     
     const zpl = createProjectLabelZpl({
       projectName,
-      palletNumber,
-      totalPallets
+      orderId,
+      cienappsJobNumber
     });
     
     console.log('[Zebra] Sending project label ZPL:', zpl);
