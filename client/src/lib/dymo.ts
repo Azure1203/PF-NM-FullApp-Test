@@ -751,15 +751,15 @@ export async function printProjectLabel(
   cienappsJobNumber: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Match standard 450 but exclude XL models
-    const printers = await getPrinters();
-    const printer = printers.find(p => 
-      p.isConnected && 
-      /450|LabelWriter/i.test(p.modelName) && 
-      !/4XL|XL/i.test(p.modelName)
-    );
+    // Log available printers for debugging
+    const allPrinters = await getPrinters();
+    console.log('[Dymo] Available printers:', allPrinters.map(p => `${p.name} (${p.modelName}, connected: ${p.isConnected})`));
+    
+    const printer = await findPrinterByModel(/450/i);
+    console.log('[Dymo] Selected printer for project label:', printer ? `${printer.name} (${printer.modelName})` : 'none');
+    
     if (!printer) {
-      return { success: false, error: 'No Dymo LabelWriter 450 printer found. Please connect a standard Dymo LabelWriter 450 (not 4XL).' };
+      return { success: false, error: 'No Dymo LabelWriter 450 printer found. Please connect a Dymo LabelWriter 450.' };
     }
 
     const today = new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
@@ -789,15 +789,9 @@ export async function printOrderLabel(
   logoUrl?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Match standard 450 but exclude XL models
-    const printers = await getPrinters();
-    const printer = printers.find(p => 
-      p.isConnected && 
-      /450|LabelWriter/i.test(p.modelName) && 
-      !/4XL|XL/i.test(p.modelName)
-    );
+    const printer = await findPrinterByModel(/450/i);
     if (!printer) {
-      return { success: false, error: 'No Dymo LabelWriter 450 printer found. Please connect a standard Dymo LabelWriter 450 (not 4XL).' };
+      return { success: false, error: 'No Dymo LabelWriter 450 printer found. Please connect a Dymo LabelWriter 450.' };
     }
 
     let logoBase64: string | undefined;
