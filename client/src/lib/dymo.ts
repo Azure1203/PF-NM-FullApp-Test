@@ -182,113 +182,75 @@ function fixDymoXml(xml: string): string {
 function createProjectLabelXml(data: {
   date: string;
   projectName: string;
-  dealer: string;
-  phone: string;
   orderId: string;
   palletNumber: string;
   totalPallets: string;
-  logoBase64?: string;
 }): string {
-  const logoSection = data.logoBase64 ? `
-  <ObjectInfo>
-    <ImageObject>
-      <Name>Logo</Name>
-      <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
-      <LinkedObjectName></LinkedObjectName>
-      <Rotation>Rotation0</Rotation>
-      <IsMirrored>False</IsMirrored>
-      <IsVariable>False</IsVariable>
-      <Image>${data.logoBase64}</Image>
-      <ScaleMode>Uniform</ScaleMode>
-      <BorderWidth>0</BorderWidth>
-      <BorderColor Alpha="255" Red="0" Green="0" Blue="0"/>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-    </ImageObject>
-    <Bounds X="100" Y="100" Width="2500" Height="600"/>
-  </ObjectInfo>` : '';
-
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Landscape</PaperOrientation>
   <Id>SmallShipping</Id>
-  <PaperName>30323 Shipping</PaperName>
+  <PaperName>30323</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
-  </DrawCommands>${logoSection}
+  </DrawCommands>
   <ObjectInfo>
     <TextObject>
-      <Name>Date</Name>
+      <Name>ProjectName</Name>
       <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
       <BackColor Alpha="0" Red="255" Green="255" Blue="255"/>
       <LinkedObjectName></LinkedObjectName>
       <Rotation>Rotation0</Rotation>
       <IsMirrored>False</IsMirrored>
       <IsVariable>False</IsVariable>
-      <HorizontalAlignment>Right</HorizontalAlignment>
-      <VerticalAlignment>Top</VerticalAlignment>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
       <TextFitMode>AlwaysFit</TextFitMode>
       <UseFullFontHeight>True</UseFullFontHeight>
       <Verticalized>False</Verticalized>
       <StyledText>
         <Element>
-          <String>${escapeXml(data.date)}</String>
+          <String>${escapeXml(data.projectName)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="10" Bold="False" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
             <ForeColor Alpha="255" Red="0" Green="0" Blue="0"/>
           </Attributes>
         </Element>
       </StyledText>
     </TextObject>
-    <Bounds X="3000" Y="150" Width="2600" Height="300"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>ProjectName</Name>
-      <StyledText>
-        <Element>
-          <String>${escapeXml(data.projectName)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="18" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-      <VerticalAlignment>Middle</VerticalAlignment>
-      <TextFitMode>AlwaysFit</TextFitMode>
-    </TextObject>
-    <Bounds X="100" Y="800" Width="5560" Height="600"/>
-  </ObjectInfo>
-  <ObjectInfo>
-    <TextObject>
-      <Name>OrderId</Name>
-      <StyledText>
-        <Element>
-          <String>Order #${escapeXml(data.orderId)}</String>
-          <Attributes>
-            <Font Family="Helvetica" Size="12" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
-          </Attributes>
-        </Element>
-      </StyledText>
-      <HorizontalAlignment>Center</HorizontalAlignment>
-    </TextObject>
-    <Bounds X="100" Y="1500" Width="5560" Height="400"/>
+    <Bounds X="144" Y="150" Width="5472" Height="1000"/>
   </ObjectInfo>
   <ObjectInfo>
     <TextObject>
       <Name>PalletInfo</Name>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <VerticalAlignment>Middle</VerticalAlignment>
+      <TextFitMode>AlwaysFit</TextFitMode>
       <StyledText>
         <Element>
           <String>Pallet ${escapeXml(data.palletNumber)} of ${escapeXml(data.totalPallets)}</String>
           <Attributes>
-            <Font Family="Helvetica" Size="14" Bold="True" Italic="False" Underline="False" Strikeout="False"/>
+            <Font Family="Helvetica" Size="14" Bold="True"/>
           </Attributes>
         </Element>
       </StyledText>
-      <HorizontalAlignment>Center</HorizontalAlignment>
     </TextObject>
-    <Bounds X="100" Y="2000" Width="5560" Height="800"/>
+    <Bounds X="144" Y="1400" Width="5472" Height="800"/>
+  </ObjectInfo>
+  <ObjectInfo>
+    <TextObject>
+      <Name>Date</Name>
+      <HorizontalAlignment>Center</HorizontalAlignment>
+      <StyledText>
+        <Element>
+          <String>${escapeXml(data.date)}</String>
+          <Attributes>
+            <Font Family="Helvetica" Size="10"/>
+          </Attributes>
+        </Element>
+      </StyledText>
+    </TextObject>
+    <Bounds X="144" Y="2400" Width="5472" Height="400"/>
   </ObjectInfo>
 </DieCutLabel>`;
 }
@@ -761,8 +723,6 @@ export async function printProjectLabel(
     const labelXml = createProjectLabelXml({
       date: today,
       projectName: projectName,
-      dealer: '',
-      phone: '',
       orderId: orderId,
       palletNumber: palletNumber,
       totalPallets: totalPallets
