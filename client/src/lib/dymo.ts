@@ -189,7 +189,6 @@ function createProjectLabelXml(data: {
   totalPallets: string;
   logoBase64?: string;
 }): string {
-  // Scaled logo for the smaller 2.125" height
   const logoSection = data.logoBase64 ? `
   <ObjectInfo>
     <ImageObject>
@@ -213,7 +212,7 @@ function createProjectLabelXml(data: {
   return `<?xml version="1.0" encoding="utf-8"?>
 <DieCutLabel Version="8.0" Units="twips" xmlns="http://www.dymo.com/nam/ls/v1">
   <PaperOrientation>Landscape</PaperOrientation>
-  <Id>Address</Id>
+  <Id>SmallShipping</Id>
   <PaperName>30323 Shipping</PaperName>
   <DrawCommands>
     <RoundRectangle X="0" Y="0" Width="5760" Height="3060" Rx="270" Ry="270"/>
