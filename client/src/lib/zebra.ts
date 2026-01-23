@@ -246,37 +246,52 @@ function createPalletLabelZpl(data: {
   totalPallets: string;
 }): string {
   // 4x6 inch label at 203 DPI = 812 x 1218 dots
-  // Layout: PERFECT FIT PALLET LABEL as top line
-  // Fixed font size 12 for content, size 25 for pallet line
+  // Layout: Content at top, PALLET X OF Y at bottom
+  // Fixed font size 15 for content, size 25 for pallet line
+  
+  // Use size-15 appropriate max chars (27 chars like 4x2)
+  const maxChars = MAX_CHARS_4X2_SIZE15;
   
   const headerLine = 'PERFECT FIT PALLET LABEL';
-  const projectNameParts = wrapText(`Project Name: ${data.projectName}`, MAX_CHARS_4X6);
-  const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, MAX_CHARS_4X6);
+  const projectNameParts = wrapText(`Project Name: ${data.projectName}`, maxChars);
+  const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, maxChars);
   const phoneLine = `Phone Number: ${data.phone || 'N/A'}`;
   const orderIdLine = `Perfect Fit Order ID: ${data.orderId}`;
   const palletLine = `PALLET ${data.palletNumber} OF ${data.totalPallets}`;
   
-  // Build content lines (excluding header and pallet line)
+  // Build content lines
   const contentLines = [headerLine, ...projectNameParts, ...dealerParts, phoneLine, orderIdLine];
   
-  // Calculate line height for content (leaving room for large pallet line at bottom)
-  const palletLineHeight = 120;
-  const availableHeight = 1218 - palletLineHeight;
-  const lineHeight = Math.floor(availableHeight / (contentLines.length + 1));
+  // Layout constants
+  const startY = 60; // Start from top
+  const palletLineY = 1050; // Position for pallet line near bottom
+  const minLineSpacing = FONT_SIZE_15 + 20; // Minimum: font height + padding
+  const maxLineSpacing = 140; // Maximum spacing for readability
   
+  // Calculate available space for content (excluding pallet line area)
+  const availableHeight = palletLineY - startY - FONT_SIZE_15; // Last line must fit above pallet
+  
+  // Calculate line spacing ensuring all lines fit
+  let lineSpacing = Math.floor(availableHeight / Math.max(contentLines.length, 1));
+  lineSpacing = Math.max(minLineSpacing, Math.min(maxLineSpacing, lineSpacing));
+  
+  // ZPL with explicit label length, home position, and top-of-form
   let zpl = `^XA
-^PW812
+^LH0,0
+^LT0
 ^LL1218
-^CF0,${FONT_SIZE_12}`;
+^PW812
+^CF0,${FONT_SIZE_15}`;
   
-  // Add content lines
+  // Add content lines with calculated spacing from top
   contentLines.forEach((line, i) => {
-    zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
+    const yPos = startY + (i * lineSpacing);
+    zpl += `\n^FO30,${yPos}^FD${line}^FS`;
   });
   
-  // Add pallet line with larger font
+  // Add pallet line with larger font near bottom
   zpl += `\n^CF0,${FONT_SIZE_25}`;
-  zpl += `\n^FO30,${1218 - palletLineHeight}^FD${palletLine}^FS`;
+  zpl += `\n^FO30,${palletLineY}^FD${palletLine}^FS`;
   zpl += '\n^XZ';
   
   return zpl;
