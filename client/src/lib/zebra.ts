@@ -112,6 +112,7 @@ async function sendZpl(printer: ZebraPrinter, zpl: string): Promise<void> {
 
 // Fixed font sizes (in dots at 203 DPI)
 const FONT_SIZE_12 = 40; // ~12pt font
+const FONT_SIZE_15 = 50; // ~15pt font for project/hardware labels
 const FONT_SIZE_25 = 75; // ~25pt font for pallet line
 
 // Wrap text to fit within max characters per line
@@ -146,6 +147,10 @@ function wrapText(text: string, maxCharsPerLine: number): string[] {
 // At 40 dots, char width is ~22 dots, so ~34 chars per line
 const MAX_CHARS_4X2 = 34;
 
+// Max characters per line at size 15 font (~50 dots) on 4x2 label
+// At 50 dots, char width is ~27.5 dots, so ~27 chars per line
+const MAX_CHARS_4X2_SIZE15 = 27;
+
 // Max characters per line at size 12 font on 4x6 label
 const MAX_CHARS_4X6 = 34;
 
@@ -156,10 +161,10 @@ function createProjectLabelZpl(data: {
   cienappsJobNumber: string;
 }): string {
   // 4x2 inch label at 203 DPI = 812 x 406 dots
-  // Fixed font size 12 (~40 dots) with text wrapping
+  // Fixed font size 15 (~50 dots) with text wrapping
   const line1 = 'PERFECT FIT PROJECT LABEL';
   const line2 = `Cienapps & CV Job #: ${data.cienappsJobNumber}`;
-  const line3Parts = wrapText(`Project Name: ${data.projectName}`, MAX_CHARS_4X2);
+  const line3Parts = wrapText(`Project Name: ${data.projectName}`, MAX_CHARS_4X2_SIZE15);
   const line4 = `Perfect Fit Order ID: ${data.orderId}`;
   
   // Build all lines including wrapped ones
@@ -169,7 +174,7 @@ function createProjectLabelZpl(data: {
   let zpl = `^XA
 ^PW812
 ^LL406
-^CF0,${FONT_SIZE_12}`;
+^CF0,${FONT_SIZE_15}`;
   
   allLines.forEach((line, i) => {
     zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
@@ -275,11 +280,11 @@ export async function printHardwareLabel(
       ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName}`;
     
-    // Fixed font size 12 with text wrapping
+    // Fixed font size 15 with text wrapping
     const line1 = 'PERFECT FIT HARDWARE LABEL';
     const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
     const line3 = `Perfect Fit Order ID: ${orderId}`;
-    const line4Parts = wrapText(orderLine, MAX_CHARS_4X2);
+    const line4Parts = wrapText(orderLine, MAX_CHARS_4X2_SIZE15);
     const palletLine = palletNumber ? `PALLET ${palletNumber}` : '';
     
     // Build all lines including wrapped ones
@@ -291,7 +296,7 @@ export async function printHardwareLabel(
     let zpl = `^XA
 ^PW812
 ^LL406
-^CF0,${FONT_SIZE_12}`;
+^CF0,${FONT_SIZE_15}`;
     
     allLines.forEach((line, i) => {
       zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
