@@ -244,33 +244,43 @@ function createProjectLabelZpl(data: {
   cienappsJobNumber: string;
 }, labelSize: LabelSize): string {
   // Absolute 203 DPI dots for 4x2
-  const labelWidth = 812;
-  const labelHeight = 406;
+  const labelWidth = 812;   // 4 inches
+  const labelHeight = 406;  // 2 inches
+  const leftMargin = 30;
   
+  // Build ZPL with exact same "Direct Thermal" handshake as the 4x6
   let zpl = `^XA` +
-    `^MTD^MNW^MFN,N` + // Direct Thermal, Web Sensing, No extra feed
-    `^PW${labelWidth}` + 
-    `^LL${labelHeight}` + 
-    `^LS0` +             // Ensure no horizontal shift
-    `^LT0` +             // Ensure no vertical shift
-    `^PR4` +             // Set print speed to 4 (stable for small labels)
+    `^MTD` +      // Direct Thermal
+    `^MNW` +      // Web/Gap Sensing
+    `^PW${labelWidth}` +
+    `^LL${labelHeight}` +
+    `^LS0` +
     `^CI28`;
 
-  // Use ^A0N (Font 0, Normal orientation) for precision
-  
-  // Line 1: Header
-  zpl += `\n^FO30,40^A0N,45,45^FDPERFECT FIT PROJECT LABEL^FS`;
-  
-  // Line 2: Job Number
-  zpl += `\n^FO30,120^A0N,35,35^FDJob #: ${data.cienappsJobNumber || 'N/A'}^FS`;
-  
-  // Line 3: Project Name
-  zpl += `\n^FO30,190^A0N,35,35^FDProject: ${data.projectName || 'N/A'}^FS`;
-  
-  // Line 4: Order ID
-  zpl += `\n^FO30,260^A0N,35,35^FDOrder ID: ${data.orderId || 'N/A'}^FS`;
+  let yPos = 30; // Start higher up for the 2" label
 
-  // Debug border to visualize label boundaries
+  // --- Header ---
+  zpl += `\n^CF0,45`; // Slightly smaller header font (16pt)
+  zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PROJECT LABEL^FS`;
+  yPos += 45;
+  zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`; // Header underline
+  yPos += 35;
+
+  // --- Content Sections (Compressed for 4x2) ---
+  zpl += `\n^CF0,35`; // Standard font for the rest (12pt)
+
+  // Section 1: Job #
+  zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${data.cienappsJobNumber || 'N/A'}^FS`;
+  yPos += 65;
+
+  // Section 2: Project Name
+  zpl += `\n^FO${leftMargin},${yPos}^FDProject: ${data.projectName || 'N/A'}^FS`;
+  yPos += 65;
+
+  // Section 3: Order ID
+  zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${data.orderId || 'N/A'}^FS`;
+
+  // Debug border - shows label boundaries
   zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
 
   zpl += '\n^XZ';
@@ -420,41 +430,52 @@ export async function printHardwareLabel(
     }
     
     // Absolute 203 DPI dots for 4x2
-    const labelWidth = 812;
-    const labelHeight = 406;
+    const labelWidth = 812;   // 4 inches
+    const labelHeight = 406;  // 2 inches
+    const leftMargin = 30;
     
+    // Build ZPL with exact same "Direct Thermal" handshake as the 4x6
     let zpl = `^XA` +
-      `^MTD^MNW^MFN,N` + // Direct Thermal, Web Sensing, No extra feed
-      `^PW${labelWidth}` + 
-      `^LL${labelHeight}` + 
-      `^LS0` +             // Ensure no horizontal shift
-      `^LT0` +             // Ensure no vertical shift
-      `^PR4` +             // Set print speed to 4 (stable for small labels)
+      `^MTD` +      // Direct Thermal
+      `^MNW` +      // Web/Gap Sensing
+      `^PW${labelWidth}` +
+      `^LL${labelHeight}` +
+      `^LS0` +
       `^CI28`;
 
-    // Use ^A0N (Font 0, Normal orientation) for precision
-    
-    // Line 1: Header
-    zpl += `\n^FO30,40^A0N,45,45^FDPERFECT FIT HARDWARE LABEL^FS`;
-    
-    // Line 2: Job Number
-    zpl += `\n^FO30,100^A0N,35,35^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
-    
-    // Line 3: Order ID
-    zpl += `\n^FO30,155^A0N,35,35^FDOrder ID: ${orderId || 'N/A'}^FS`;
-    
-    // Line 4: Order Name with Allmoxy job number
+    let yPos = 30;
+
+    // --- Header ---
+    zpl += `\n^CF0,45`;
+    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT HARDWARE LABEL^FS`;
+    yPos += 45;
+    zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`;
+    yPos += 35;
+
+    // --- Content Sections ---
+    zpl += `\n^CF0,35`;
+
+    // Section 1: Job #
+    zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
+    yPos += 55;
+
+    // Section 2: Order ID
+    zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${orderId || 'N/A'}^FS`;
+    yPos += 55;
+
+    // Section 3: Order Name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
       ? `Order: ${orderName || 'N/A'} ${allmoxyJobNumber}`
       : `Order: ${orderName || 'N/A'}`;
-    zpl += `\n^FO30,210^A0N,35,35^FD${orderLine}^FS`;
-    
-    // Line 5: Pallet number (if provided)
+    zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
+    yPos += 55;
+
+    // Section 4: Pallet number (if provided)
     if (palletNumber) {
-      zpl += `\n^FO30,265^A0N,35,35^FDPALLET ${palletNumber}^FS`;
+      zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
     }
 
-    // Debug border to visualize label boundaries
+    // Debug border
     zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
 
     zpl += '\n^XZ';
@@ -489,46 +510,57 @@ export async function printCTSLabel(
     }
     
     // Absolute 203 DPI dots for 4x2
-    const labelWidth = 812;
-    const labelHeight = 406;
+    const labelWidth = 812;   // 4 inches
+    const labelHeight = 406;  // 2 inches
+    const leftMargin = 30;
     
+    // Build ZPL with exact same "Direct Thermal" handshake as the 4x6
     let zpl = `^XA` +
-      `^MTD^MNW^MFN,N` + // Direct Thermal, Web Sensing, No extra feed
-      `^PW${labelWidth}` + 
-      `^LL${labelHeight}` + 
-      `^LS0` +             // Ensure no horizontal shift
-      `^LT0` +             // Ensure no vertical shift
-      `^PR4` +             // Set print speed to 4 (stable for small labels)
+      `^MTD` +      // Direct Thermal
+      `^MNW` +      // Web/Gap Sensing
+      `^PW${labelWidth}` +
+      `^LL${labelHeight}` +
+      `^LS0` +
       `^CI28`;
 
-    // Use ^A0N (Font 0, Normal orientation) for precision
-    // Using smaller font (30,30) to fit more lines
-    
-    // Line 1: Header
-    zpl += `\n^FO30,30^A0N,40,40^FDPERFECT FIT CTS LABEL^FS`;
-    
-    // Line 2: Job Number
-    zpl += `\n^FO30,85^A0N,30,30^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
-    
-    // Line 3: Order ID
-    zpl += `\n^FO30,130^A0N,30,30^FDOrder ID: ${orderId || 'N/A'}^FS`;
-    
-    // Line 4: Order Name with Allmoxy job number
+    let yPos = 25;
+
+    // --- Header ---
+    zpl += `\n^CF0,40`; // Smaller header for CTS (more lines needed)
+    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT CTS LABEL^FS`;
+    yPos += 40;
+    zpl += `\n^FO${leftMargin},${yPos}^GB350,2,2^FS`;
+    yPos += 25;
+
+    // --- Content Sections (smaller font to fit 5-6 lines) ---
+    zpl += `\n^CF0,30`;
+
+    // Section 1: Job #
+    zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
+    yPos += 45;
+
+    // Section 2: Order ID
+    zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${orderId || 'N/A'}^FS`;
+    yPos += 45;
+
+    // Section 3: Order Name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
       ? `Order: ${orderName || 'N/A'} ${allmoxyJobNumber}`
       : `Order: ${orderName || 'N/A'}`;
-    zpl += `\n^FO30,175^A0N,30,30^FD${orderLine}^FS`;
-    
-    // Line 5: Product info (Name + Code + Length + Quantity)
+    zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
+    yPos += 45;
+
+    // Section 4: Product info (Name + Code + Length + Quantity)
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
-    zpl += `\n^FO30,220^A0N,30,30^FD${productLine}^FS`;
-    
-    // Line 6: Pallet number (if provided)
+    zpl += `\n^FO${leftMargin},${yPos}^FD${productLine}^FS`;
+    yPos += 45;
+
+    // Section 5: Pallet number (if provided)
     if (palletNumber) {
-      zpl += `\n^FO30,265^A0N,30,30^FDPALLET ${palletNumber}^FS`;
+      zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
     }
 
-    // Debug border to visualize label boundaries
+    // Debug border
     zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
 
     zpl += '\n^XZ';
