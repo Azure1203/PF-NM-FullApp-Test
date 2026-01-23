@@ -243,46 +243,42 @@ function createProjectLabelZpl(data: {
   orderId: string;
   cienappsJobNumber: string;
 }, labelSize: LabelSize): string {
-  // Absolute 203 DPI dots for 4x2
+  // GX420d 203 DPI Specs for 4x2
   const labelWidth = 812;   // 4 inches
   const labelHeight = 406;  // 2 inches
-  const leftMargin = 30;
-  
-  // Build ZPL - clear buffer first, then match working pallet label structure
-  let zpl = `~JA`;         // Cancel any pending label format in buffer
-  zpl += `^XA`;
-  zpl += `^MTD`;           // Direct Thermal
-  zpl += `^MNW`;           // Web/Gap Sensing
-  zpl += `^PW${labelWidth}`;
-  zpl += `^LL${labelHeight}`;
-  zpl += `^LS0`;
-  zpl += `^LT0`;           // No vertical shift
-  zpl += `^CI28`;
+  const leftMargin = 40;
 
-  let yPos = 30;
+  // Header with Purge (~JA) to clear buffer and Reset commands
+  let zpl = `^XA` +
+    `~JA` +             // Clear any "ghost" data stuck in the printer
+    `^MTD^MNW^MFN,N` +  // Direct Thermal, Web Sensing, No extra feed
+    `^PW${labelWidth}` + 
+    `^LL${labelHeight}` + 
+    `^LS0^LT0` +        // Force start at the absolute top-left
+    `^CI28`;
 
-  // --- Header ---
-  zpl += `\n^CF0,40`;
-  zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PROJECT LABEL (4x2 LABEL)^FS`;
-  yPos += 45;
-  zpl += `\n^FO${leftMargin},${yPos}^GB500,2,2^FS`;
-  yPos += 25;
+  let yPos = 55; 
 
-  // --- Content ---
-  zpl += `\n^CF0,30`;
+  // Line 1: Header
+  zpl += `\n^CF0,50`; 
+  zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PROJECT LABEL^FS`;
+  yPos += 55;
+  zpl += `\n^FO${leftMargin},${yPos}^GB450,2,2^FS`; // Underline
+  yPos += 75;
 
+  // Line 2: Cienapps Job #
+  zpl += `\n^CF0,35`; 
   zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS`;
-  yPos += 45;
+  yPos += 75;
 
+  // Line 3: Project Name
   zpl += `\n^FO${leftMargin},${yPos}^FDProject Name: ${data.projectName || 'N/A'}^FS`;
-  yPos += 45;
+  yPos += 75;
 
+  // Line 4: Order ID
   zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS`;
 
-  // Debug border
-  zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
-
-  zpl += `\n^XZ`;
+  zpl += '\n^XZ';
   return zpl;
 }
 
@@ -434,49 +430,44 @@ export async function printHardwareLabel(
     const labelHeight = 406;  // 2 inches
     const leftMargin = 30;
     
-    // Build ZPL - clear buffer first, then match working pallet label structure
-    let zpl = `~JA`;         // Cancel any pending label format in buffer
-    zpl += `^XA`;
-    zpl += `^MTD`;           // Direct Thermal
-    zpl += `^MNW`;           // Web/Gap Sensing
-    zpl += `^PW${labelWidth}`;
-    zpl += `^LL${labelHeight}`;
-    zpl += `^LS0`;
-    zpl += `^LT0`;           // No vertical shift
-    zpl += `^CI28`;
+    // Header with Purge (~JA) to clear buffer and Reset commands
+    let zpl = `^XA` +
+      `~JA` +             // Clear any "ghost" data stuck in the printer
+      `^MTD^MNW^MFN,N` +  // Direct Thermal, Web Sensing, No extra feed
+      `^PW${labelWidth}` + 
+      `^LL${labelHeight}` + 
+      `^LS0^LT0` +        // Force start at the absolute top-left
+      `^CI28`;
 
-    let yPos = 25;
+    let yPos = 40;
 
-    // --- Header ---
-    zpl += `\n^CF0,35`;
-    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT HARDWARE LABEL (4x2 LABEL)^FS`;
-    yPos += 40;
-    zpl += `\n^FO${leftMargin},${yPos}^GB500,2,2^FS`;
-    yPos += 20;
+    // Line 1: Header
+    zpl += `\n^CF0,45`;
+    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT HARDWARE LABEL^FS`;
+    yPos += 50;
+    zpl += `\n^FO${leftMargin},${yPos}^GB450,2,2^FS`; // Underline
+    yPos += 30;
 
-    // --- Content ---
-    zpl += `\n^CF0,28`;
+    // Content lines
+    zpl += `\n^CF0,30`;
 
     zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
-    yPos += 40;
+    yPos += 50;
 
     zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
-    yPos += 40;
+    yPos += 50;
 
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName || 'N/A'}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
-    yPos += 40;
+    yPos += 50;
 
     if (palletNumber) {
       zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
     }
 
-    // Debug border
-    zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
-
-    zpl += `\n^XZ`;
+    zpl += '\n^XZ';
     
     console.log('[Zebra] Sending hardware label ZPL:', zpl);
     await sendZpl(printer, zpl);
@@ -512,53 +503,48 @@ export async function printCTSLabel(
     const labelHeight = 406;  // 2 inches
     const leftMargin = 30;
     
-    // Build ZPL - clear buffer first, then match working pallet label structure
-    let zpl = `~JA`;         // Cancel any pending label format in buffer
-    zpl += `^XA`;
-    zpl += `^MTD`;           // Direct Thermal
-    zpl += `^MNW`;           // Web/Gap Sensing
-    zpl += `^PW${labelWidth}`;
-    zpl += `^LL${labelHeight}`;
-    zpl += `^LS0`;
-    zpl += `^LT0`;           // No vertical shift
-    zpl += `^CI28`;
+    // Header with Purge (~JA) to clear buffer and Reset commands
+    let zpl = `^XA` +
+      `~JA` +             // Clear any "ghost" data stuck in the printer
+      `^MTD^MNW^MFN,N` +  // Direct Thermal, Web Sensing, No extra feed
+      `^PW${labelWidth}` + 
+      `^LL${labelHeight}` + 
+      `^LS0^LT0` +        // Force start at the absolute top-left
+      `^CI28`;
 
-    let yPos = 20;
+    let yPos = 30;
 
-    // --- Header ---
-    zpl += `\n^CF0,30`;
-    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT CTS LABEL (4x2 LABEL)^FS`;
-    yPos += 35;
-    zpl += `\n^FO${leftMargin},${yPos}^GB450,2,2^FS`;
-    yPos += 18;
+    // Line 1: Header
+    zpl += `\n^CF0,40`;
+    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT CTS LABEL^FS`;
+    yPos += 45;
+    zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`; // Underline
+    yPos += 25;
 
-    // --- Content (smaller font for CTS - 6 lines needed) ---
+    // Content lines (smaller font for CTS - 6 lines needed)
     zpl += `\n^CF0,25`;
 
     zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
-    yPos += 35;
+    yPos += 38;
 
     zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
-    yPos += 35;
+    yPos += 38;
 
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName || 'N/A'}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
-    yPos += 35;
+    yPos += 38;
 
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${productLine}^FS`;
-    yPos += 35;
+    yPos += 38;
 
     if (palletNumber) {
       zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
     }
 
-    // Debug border
-    zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
-
-    zpl += `\n^XZ`;
+    zpl += '\n^XZ';
     
     console.log('[Zebra] Sending CTS label ZPL:', zpl);
     await sendZpl(printer, zpl);
