@@ -273,9 +273,9 @@ function createProjectLabelZpl(data: {
 }
 
 // Font sizes for pallet labels (GX420d at 203 DPI)
-// 20pt = 56 dots, 28pt = 79 dots (dots = points * 203/72)
+// 20pt = 56 dots, 35pt = 99 dots (dots = points * 203/72)
 const PALLET_FONT_NORMAL = 56;  // 20pt font for content lines
-const PALLET_FONT_LARGE = 79;   // 28pt font for pallet number
+const PALLET_FONT_FOOTER = 99;  // 35pt font for pallet footer
 const PALLET_MAX_CHARS = 28;
 
 // Create ZPL for 4x6 Pallet Label - optimized for GX420d direct thermal printer
@@ -306,8 +306,8 @@ function createPalletLabelZpl(data: {
   
   // Layout calculations
   const startY = 60;
-  const palletLineY = 1100; // Fixed near the bottom of 6" (1218 total)
-  const availableHeight = palletLineY - startY;
+  const contentEndY = 900; // Leave room for pallet footer which starts at 920
+  const availableHeight = contentEndY - startY;
   
   // Dynamic spacing ensures we don't bleed into the next label
   const lineSpacing = Math.min(100, Math.floor(availableHeight / contentLines.length));
@@ -325,15 +325,28 @@ function createPalletLabelZpl(data: {
   zpl += `\n^CF0,${PALLET_FONT_NORMAL}`;
   contentLines.forEach((line, i) => {
     const yPos = startY + (i * lineSpacing);
-    // Boundary check: only print if within the 6-inch limit
-    if (yPos < 1050) {
+    // Boundary check: only print if within content area (before footer)
+    if (yPos < contentEndY) {
       zpl += `\n^FO40,${yPos}^FD${line}^FS`;
     }
   });
   
-  // Add large pallet footer at bottom
-  zpl += `\n^CF0,${PALLET_FONT_LARGE}`;
-  zpl += `\n^FO40,${palletLineY}^FDPALLET ${data.palletNumber} OF ${data.totalPallets}^FS`;
+  // Add pallet footer at bottom - centered with underline
+  // "PALLET" centered with underline on first line
+  // "X OF Y" centered on second line
+  const palletTextY = 920;  // Position for "PALLET" text
+  const underlineY = palletTextY + 95; // Just below the text
+  const numberY = underlineY + 30; // Position for "X OF Y"
+  
+  zpl += `\n^CF0,${PALLET_FONT_FOOTER}`;
+  // Center "PALLET" using field block (^FB with C justification)
+  zpl += `\n^FO0,${palletTextY}^FB${labelWidth},1,0,C^FDPALLET^FS`;
+  // Draw underline (centered, about 300 dots wide, 3 dots thick)
+  const underlineWidth = 300;
+  const underlineX = Math.floor((labelWidth - underlineWidth) / 2);
+  zpl += `\n^FO${underlineX},${underlineY}^GB${underlineWidth},3,3^FS`;
+  // Center "X OF Y" using field block
+  zpl += `\n^FO0,${numberY}^FB${labelWidth},1,0,C^FD${data.palletNumber} OF ${data.totalPallets}^FS`;
   
   zpl += '\n^XZ';
   
