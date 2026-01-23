@@ -273,10 +273,14 @@ function createProjectLabelZpl(data: {
 }
 
 // Font sizes for pallet labels (GX420d at 203 DPI)
-// 20pt = 56 dots, 35pt = 99 dots (dots = points * 203/72)
+// 20pt = 56 dots, 40pt = 113 dots (dots = points * 203/72)
 const PALLET_FONT_NORMAL = 56;  // 20pt font for content lines
-const PALLET_FONT_FOOTER = 99;  // 35pt font for pallet footer
-const PALLET_MAX_CHARS = 28;
+const PALLET_FONT_FOOTER = 113; // 40pt font for pallet footer
+const PALLET_MAX_CHARS = 24;    // Max chars for value text wrapping
+
+// Line thickness constants
+const THIN_LINE = 2;   // Thin underline under labels
+const BOLD_LINE = 6;   // Bold separator between sections
 
 // Create ZPL for 4x6 Pallet Label - optimized for GX420d direct thermal printer
 function createPalletLabelZpl(data: {
@@ -288,29 +292,11 @@ function createPalletLabelZpl(data: {
   palletNumber: string;
   totalPallets: string;
 }, labelSize: LabelSize): string {
-  // Fixed 4x6 dimensions at 203 DPI (ignore labelSize param for consistent pallet labels)
+  // Fixed 4x6 dimensions at 203 DPI
   const labelWidth = 812;  // 4 inches * 203 DPI
   const labelHeight = 1218; // 6 inches * 203 DPI
-  
-  // Prepare and wrap content
-  const projectNameParts = wrapText(`Project: ${data.projectName}`, PALLET_MAX_CHARS);
-  const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, PALLET_MAX_CHARS);
-  
-  const contentLines = [
-    'PERFECT FIT PALLET LABEL',
-    ...projectNameParts,
-    ...dealerParts,
-    `Phone: ${data.phone || 'N/A'}`,
-    `Order ID: ${data.orderId}`
-  ];
-  
-  // Layout calculations
-  const startY = 60;
-  const contentEndY = 900; // Leave room for pallet footer which starts at 920
-  const availableHeight = contentEndY - startY;
-  
-  // Dynamic spacing ensures we don't bleed into the next label
-  const lineSpacing = Math.min(100, Math.floor(availableHeight / contentLines.length));
+  const leftMargin = 40;
+  const lineWidth = labelWidth - (leftMargin * 2); // Width for separator lines
   
   // Build ZPL string with direct thermal settings
   let zpl = `^XA` +
@@ -321,31 +307,61 @@ function createPalletLabelZpl(data: {
     `^LS0` + // Label shift zero
     `^CI28`; // Character encoding
   
-  // Add content lines with normal font
-  zpl += `\n^CF0,${PALLET_FONT_NORMAL}`;
-  contentLines.forEach((line, i) => {
-    const yPos = startY + (i * lineSpacing);
-    // Boundary check: only print if within content area (before footer)
-    if (yPos < contentEndY) {
-      zpl += `\n^FO40,${yPos}^FD${line}^FS`;
-    }
-  });
+  let yPos = 30;
   
-  // Add pallet footer at bottom - centered with underline
-  // "PALLET" centered with underline on first line
-  // "X OF Y" centered on second line
-  const palletTextY = 920;  // Position for "PALLET" text
-  const underlineY = palletTextY + 95; // Just below the text
-  const numberY = underlineY + 30; // Position for "X OF Y"
+  // Helper to add a section: label (underlined), value, then bold separator
+  const addSection = (label: string, value: string, addSeparator: boolean = true) => {
+    // Label text
+    zpl += `\n^CF0,${PALLET_FONT_NORMAL}`;
+    zpl += `\n^FO${leftMargin},${yPos}^FD${label}^FS`;
+    yPos += 55;
+    
+    // Thin underline under label (width based on label length estimate)
+    const labelUnderlineWidth = Math.min(label.length * 30, 300);
+    zpl += `\n^FO${leftMargin},${yPos}^GB${labelUnderlineWidth},${THIN_LINE},${THIN_LINE}^FS`;
+    yPos += 15;
+    
+    // Value text (may wrap)
+    const valueParts = wrapText(value, PALLET_MAX_CHARS);
+    valueParts.forEach(part => {
+      zpl += `\n^FO${leftMargin},${yPos}^FD${part}^FS`;
+      yPos += 60;
+    });
+    
+    // Bold separator line (only if requested)
+    if (addSeparator) {
+      yPos += 10;
+      zpl += `\n^FO${leftMargin},${yPos}^GB${lineWidth},${BOLD_LINE},${BOLD_LINE}^FS`;
+      yPos += 25;
+    }
+  };
+  
+  // Header - "PERFECT FIT PALLET LABEL" with thin underline (no separator after)
+  zpl += `\n^CF0,${PALLET_FONT_NORMAL}`;
+  zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PALLET LABEL^FS`;
+  yPos += 55;
+  zpl += `\n^FO${leftMargin},${yPos}^GB${450},${THIN_LINE},${THIN_LINE}^FS`;
+  yPos += 30;
+  
+  // Content sections with separators
+  addSection('Project:', data.projectName || 'N/A');
+  addSection('Dealer:', data.dealer || 'N/A');
+  addSection('Phone:', data.phone || 'N/A');
+  addSection('Order ID:', data.orderId, false); // No separator after last section
+  
+  // Pallet footer at bottom - centered
+  const palletTextY = 950;
+  const palletUnderlineY = palletTextY + 110;
+  const numberY = palletUnderlineY + 35;
   
   zpl += `\n^CF0,${PALLET_FONT_FOOTER}`;
-  // Center "PALLET" using field block (^FB with C justification)
+  // Center "PALLET" using field block
   zpl += `\n^FO0,${palletTextY}^FB${labelWidth},1,0,C^FDPALLET^FS`;
-  // Draw underline (centered, about 300 dots wide, 3 dots thick)
-  const underlineWidth = 300;
-  const underlineX = Math.floor((labelWidth - underlineWidth) / 2);
-  zpl += `\n^FO${underlineX},${underlineY}^GB${underlineWidth},3,3^FS`;
-  // Center "X OF Y" using field block
+  // Thin underline (centered, about 320 dots wide)
+  const palletUnderlineWidth = 320;
+  const palletUnderlineX = Math.floor((labelWidth - palletUnderlineWidth) / 2);
+  zpl += `\n^FO${palletUnderlineX},${palletUnderlineY}^GB${palletUnderlineWidth},${THIN_LINE},${THIN_LINE}^FS`;
+  // Center "X OF Y"
   zpl += `\n^FO0,${numberY}^FB${labelWidth},1,0,C^FD${data.palletNumber} OF ${data.totalPallets}^FS`;
   
   zpl += '\n^XZ';
