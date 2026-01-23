@@ -272,7 +272,12 @@ function createProjectLabelZpl(data: {
   return zpl;
 }
 
-// Create ZPL for 4x6 Pallet Label with fixed font and text wrapping
+// Font sizes for pallet labels (GX420d at 203 DPI)
+const PALLET_FONT_NORMAL = 40;
+const PALLET_FONT_LARGE = 80;
+const PALLET_MAX_CHARS = 28;
+
+// Create ZPL for 4x6 Pallet Label - optimized for GX420d direct thermal printer
 function createPalletLabelZpl(data: {
   date: string;
   projectName: string;
@@ -282,56 +287,53 @@ function createPalletLabelZpl(data: {
   palletNumber: string;
   totalPallets: string;
 }, labelSize: LabelSize): string {
-  // Get dimensions from config (in dots)
-  const labelWidth = inchesToDots(labelSize.widthInches);
-  const labelHeight = inchesToDots(labelSize.heightInches);
-  // Layout: Content at top, PALLET X OF Y at bottom
-  // Fixed font size 15 for content, size 25 for pallet line
+  // Fixed 4x6 dimensions at 203 DPI (ignore labelSize param for consistent pallet labels)
+  const labelWidth = 812;  // 4 inches * 203 DPI
+  const labelHeight = 1218; // 6 inches * 203 DPI
   
-  // Use size-15 appropriate max chars (27 chars like 4x2)
-  const maxChars = MAX_CHARS_4X2_SIZE15;
+  // Prepare and wrap content
+  const projectNameParts = wrapText(`Project: ${data.projectName}`, PALLET_MAX_CHARS);
+  const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, PALLET_MAX_CHARS);
   
-  const headerLine = 'PERFECT FIT PALLET LABEL';
-  const projectNameParts = wrapText(`Project Name: ${data.projectName}`, maxChars);
-  const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, maxChars);
-  const phoneLine = `Phone Number: ${data.phone || 'N/A'}`;
-  const orderIdLine = `Perfect Fit Order ID: ${data.orderId}`;
-  const palletLine = `PALLET ${data.palletNumber} OF ${data.totalPallets}`;
+  const contentLines = [
+    'PERFECT FIT PALLET LABEL',
+    ...projectNameParts,
+    ...dealerParts,
+    `Phone: ${data.phone || 'N/A'}`,
+    `Order ID: ${data.orderId}`
+  ];
   
-  // Build content lines
-  const contentLines = [headerLine, ...projectNameParts, ...dealerParts, phoneLine, orderIdLine];
+  // Layout calculations
+  const startY = 60;
+  const palletLineY = 1100; // Fixed near the bottom of 6" (1218 total)
+  const availableHeight = palletLineY - startY;
   
-  // Layout constants - positions relative to label height
-  const startY = 60; // Start from top
-  const palletLineY = labelHeight - 120; // Position for pallet line near bottom (120 dots from bottom)
-  const minLineSpacing = FONT_SIZE_15 + 20; // Minimum: font height + padding
-  const maxLineSpacing = 140; // Maximum spacing for readability
+  // Dynamic spacing ensures we don't bleed into the next label
+  const lineSpacing = Math.min(100, Math.floor(availableHeight / contentLines.length));
   
-  // Calculate available space for content (excluding pallet line area)
-  const availableHeight = palletLineY - startY - FONT_SIZE_15; // Last line must fit above pallet
+  // Build ZPL string with direct thermal settings
+  let zpl = `^XA` +
+    `^MTD` + // Direct Thermal (no ribbon)
+    `^MNW` + // Web/Gap Sensing (detects end of label)
+    `^PW${labelWidth}` +
+    `^LL${labelHeight}` +
+    `^LS0` + // Label shift zero
+    `^CI28`; // Character encoding
   
-  // Calculate line spacing ensuring all lines fit
-  let lineSpacing = Math.floor(availableHeight / Math.max(contentLines.length, 1));
-  lineSpacing = Math.max(minLineSpacing, Math.min(maxLineSpacing, lineSpacing));
-  
-  // ZPL with explicit label length, home position, and top-of-form
-  // Rely on printer's default media mode and ^LL to control label length
-  let zpl = `^XA
-^LH0,0
-^LT0
-^PW${labelWidth}
-^LL${labelHeight}
-^CF0,${FONT_SIZE_15}`;
-  
-  // Add content lines with calculated spacing from top
+  // Add content lines with normal font
+  zpl += `\n^CF0,${PALLET_FONT_NORMAL}`;
   contentLines.forEach((line, i) => {
     const yPos = startY + (i * lineSpacing);
-    zpl += `\n^FO30,${yPos}^FD${line}^FS`;
+    // Boundary check: only print if within the 6-inch limit
+    if (yPos < 1050) {
+      zpl += `\n^FO40,${yPos}^FD${line}^FS`;
+    }
   });
   
-  // Add pallet line with larger font near bottom
-  zpl += `\n^CF0,${FONT_SIZE_25}`;
-  zpl += `\n^FO30,${palletLineY}^FD${palletLine}^FS`;
+  // Add large pallet footer at bottom
+  zpl += `\n^CF0,${PALLET_FONT_LARGE}`;
+  zpl += `\n^FO40,${palletLineY}^FDPALLET ${data.palletNumber} OF ${data.totalPallets}^FS`;
+  
   zpl += '\n^XZ';
   
   return zpl;
