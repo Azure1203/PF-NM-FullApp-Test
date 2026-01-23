@@ -4,7 +4,7 @@
 
 // Use Record to allow all fields from Browser Print API response
 // The API returns various fields like name, uid, connection, deviceType, version, provider, manufacturer, etc.
-type ZebraPrinter = Record<string, unknown> & {
+export type ZebraPrinter = Record<string, unknown> & {
   name: string;
   uid: string;
 };
@@ -18,6 +18,32 @@ interface PalletPrintResult {
   success: boolean;
   printed: number;
   error?: string;
+}
+
+// Printer configuration stored per-computer in localStorage
+interface PrinterConfig {
+  printer4x2Uid: string | null;  // For Project, Hardware, CTS labels
+  printer4x6Uid: string | null;  // For Pallet labels
+}
+
+const PRINTER_CONFIG_KEY = 'zebra_printer_config';
+
+// Get stored printer configuration
+export function getPrinterConfig(): PrinterConfig {
+  try {
+    const stored = localStorage.getItem(PRINTER_CONFIG_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return { printer4x2Uid: null, printer4x6Uid: null };
+}
+
+// Save printer configuration
+export function savePrinterConfig(config: PrinterConfig): void {
+  localStorage.setItem(PRINTER_CONFIG_KEY, JSON.stringify(config));
 }
 
 // Cached working base URL
@@ -84,6 +110,31 @@ async function findZebraPrinter(): Promise<ZebraPrinter | null> {
   const printers = await getZebraPrinters();
   console.log('[Zebra] Available printers:', printers);
   return printers.length > 0 ? printers[0] : null;
+}
+
+// Find configured printer for a specific label size
+async function findConfiguredPrinter(labelSize: '4x2' | '4x6'): Promise<ZebraPrinter | null> {
+  const printers = await getZebraPrinters();
+  console.log('[Zebra] Available printers:', printers);
+  
+  if (printers.length === 0) {
+    return null;
+  }
+  
+  const config = getPrinterConfig();
+  const configuredUid = labelSize === '4x2' ? config.printer4x2Uid : config.printer4x6Uid;
+  
+  if (configuredUid) {
+    const configuredPrinter = printers.find(p => p.uid === configuredUid);
+    if (configuredPrinter) {
+      console.log(`[Zebra] Using configured ${labelSize} printer: ${configuredPrinter.name}`);
+      return configuredPrinter;
+    }
+    console.log(`[Zebra] Configured ${labelSize} printer not found, falling back to first available`);
+  }
+  
+  // Fall back to first printer if none configured
+  return printers[0];
 }
 
 // Send ZPL to printer via Browser Print
@@ -239,9 +290,9 @@ export async function printProjectLabel(
   cienappsJobNumber: string
 ): Promise<PrintResult> {
   try {
-    const printer = await findZebraPrinter();
+    const printer = await findConfiguredPrinter('4x2');
     if (!printer) {
-      return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser-Link is running and a printer is connected.' };
+      return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
     const zpl = createProjectLabelZpl({
@@ -270,9 +321,9 @@ export async function printHardwareLabel(
 ): Promise<PrintResult> {
   // Hardware Label - 4x2 inch format with fixed font and text wrapping
   try {
-    const printer = await findZebraPrinter();
+    const printer = await findConfiguredPrinter('4x2');
     if (!printer) {
-      return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser-Link is running and a printer is connected.' };
+      return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
     // Combine order name with Allmoxy job number
@@ -328,9 +379,9 @@ export async function printCTSLabel(
 ): Promise<PrintResult> {
   // CTS (Cut To Size) Label - 4x2 inch format with fixed font and text wrapping
   try {
-    const printer = await findZebraPrinter();
+    const printer = await findConfiguredPrinter('4x2');
     if (!printer) {
-      return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser-Link is running and a printer is connected.' };
+      return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
     // Combine order name with Allmoxy job number
@@ -386,9 +437,9 @@ export async function printPalletLabels(
   phone?: string
 ): Promise<PalletPrintResult> {
   try {
-    const printer = await findZebraPrinter();
+    const printer = await findConfiguredPrinter('4x6');
     if (!printer) {
-      return { success: false, printed: 0, error: 'No Zebra printer found. Please ensure Zebra Browser-Link is running and a printer is connected.' };
+      return { success: false, printed: 0, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
     let printed = 0;

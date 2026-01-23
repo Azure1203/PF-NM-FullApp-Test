@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield } from "lucide-react";
+import { PrinterSettings } from "@/components/PrinterSettings";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -230,6 +231,7 @@ export default function Dashboard() {
                   Products
                 </Button>
               </Link>
+              <PrinterSettings />
               <Link href="/admin/users">
                 <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-admin-users">
                   <Shield className="w-4 h-4" />
