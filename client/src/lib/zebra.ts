@@ -110,68 +110,76 @@ async function sendZpl(printer: ZebraPrinter, zpl: string): Promise<void> {
   }
 }
 
-// Calculate optimal font size for 4x2 label based on longest line
-// 4x2 label at 203 DPI = 812 x 406 dots, usable width ~750 dots
-function calculateFontSize(lines: string[]): number {
-  const maxWidth = 750; // usable print width in dots
-  const maxFontSize = 45; // max font size for 4 lines
-  const minFontSize = 20; // minimum readable font size
+// Fixed font sizes (in dots at 203 DPI)
+const FONT_SIZE_12 = 40; // ~12pt font
+const FONT_SIZE_25 = 75; // ~25pt font for pallet line
+
+// Wrap text to fit within max characters per line
+function wrapText(text: string, maxCharsPerLine: number): string[] {
+  if (text.length <= maxCharsPerLine) {
+    return [text];
+  }
   
-  // Find the longest line
-  const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
-  const charCount = longestLine.length;
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
   
-  // Approximate character width is ~60% of font height for standard ZPL fonts
-  // So: charCount * (fontSize * 0.6) <= maxWidth
-  // fontSize <= maxWidth / (charCount * 0.6)
-  const calculatedSize = Math.floor(maxWidth / (charCount * 0.55));
+  for (const word of words) {
+    if (currentLine.length === 0) {
+      currentLine = word;
+    } else if ((currentLine + ' ' + word).length <= maxCharsPerLine) {
+      currentLine += ' ' + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
   
-  // Clamp between min and max
-  return Math.min(maxFontSize, Math.max(minFontSize, calculatedSize));
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
 }
 
-// Create ZPL for 4x2 Project Label with auto-scaling font
+// Max characters per line at size 12 font (~40 dots) on 4x2 label (750 dots usable width)
+// At 40 dots, char width is ~22 dots, so ~34 chars per line
+const MAX_CHARS_4X2 = 34;
+
+// Max characters per line at size 12 font on 4x6 label
+const MAX_CHARS_4X6 = 34;
+
+// Create ZPL for 4x2 Project Label with fixed font and text wrapping
 function createProjectLabelZpl(data: {
   projectName: string;
   orderId: string;
   cienappsJobNumber: string;
 }): string {
   // 4x2 inch label at 203 DPI = 812 x 406 dots
-  // 4 lines of text with auto-scaling font
+  // Fixed font size 12 (~40 dots) with text wrapping
   const line1 = 'PERFECT FIT PROJECT LABEL';
   const line2 = `Cienapps & CV Job #: ${data.cienappsJobNumber}`;
-  const line3 = `Project Name: ${data.projectName}`;
+  const line3Parts = wrapText(`Project Name: ${data.projectName}`, MAX_CHARS_4X2);
   const line4 = `Perfect Fit Order ID: ${data.orderId}`;
   
-  const fontSize = calculateFontSize([line1, line2, line3, line4]);
-  const lineHeight = Math.floor(406 / 5); // ~81 dots per line with margins
+  // Build all lines including wrapped ones
+  const allLines = [line1, line2, ...line3Parts, line4];
+  const lineHeight = Math.floor(406 / (allLines.length + 1));
   
-  return `^XA
+  let zpl = `^XA
 ^PW812
 ^LL406
-^CF0,${fontSize}
-^FO30,${lineHeight * 0.5}^FD${line1}^FS
-^FO30,${lineHeight * 1.5}^FD${line2}^FS
-^FO30,${lineHeight * 2.5}^FD${line3}^FS
-^FO30,${lineHeight * 3.5}^FD${line4}^FS
-^XZ`;
+^CF0,${FONT_SIZE_12}`;
+  
+  allLines.forEach((line, i) => {
+    zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
+  });
+  
+  zpl += '\n^XZ';
+  return zpl;
 }
 
-// Calculate optimal font size for 4x6 pallet label based on longest line
-// 4x6 label at 203 DPI = 812 x 1218 dots, usable width ~750 dots
-function calculatePalletFontSize(lines: string[]): number {
-  const maxWidth = 750;
-  const maxFontSize = 60;
-  const minFontSize = 25;
-  
-  const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
-  const charCount = longestLine.length;
-  
-  const calculatedSize = Math.floor(maxWidth / (charCount * 0.55));
-  return Math.min(maxFontSize, Math.max(minFontSize, calculatedSize));
-}
-
-// Create ZPL for 4x6 Pallet Label with auto-scaling
+// Create ZPL for 4x6 Pallet Label with fixed font and text wrapping
 function createPalletLabelZpl(data: {
   date: string;
   projectName: string;
@@ -183,31 +191,41 @@ function createPalletLabelZpl(data: {
 }): string {
   // 4x6 inch label at 203 DPI = 812 x 1218 dots
   // Layout: Date top-left, PERFECT FIT top-right
-  // Then 5 content lines plus pallet info
+  // Fixed font size 12 for content, size 25 for pallet line
   
-  const line1 = `Project Name: ${data.projectName}`;
-  const line2 = `Dealer: ${data.dealer || 'N/A'}`;
-  const line3 = `Phone: ${data.phone || 'N/A'}`;
-  const line4 = `Perfect Fit Order ID: ${data.orderId}`;
-  const line5 = `PALLET ${data.palletNumber} OF ${data.totalPallets}`;
+  const projectNameParts = wrapText(`Project Name: ${data.projectName}`, MAX_CHARS_4X6);
+  const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, MAX_CHARS_4X6);
+  const phoneLine = `Phone Number: ${data.phone || 'N/A'}`;
+  const orderIdLine = `Perfect Fit Order ID: ${data.orderId}`;
+  const palletLine = `PALLET ${data.palletNumber} OF ${data.totalPallets}`;
   
-  const fontSize = calculatePalletFontSize([line1, line2, line3, line4, line5]);
-  const lineHeight = Math.floor(1218 / 8); // 8 sections for header + 5 lines + margins
+  // Build content lines (excluding header and pallet line)
+  const contentLines = [...projectNameParts, ...dealerParts, phoneLine, orderIdLine];
   
-  return `^XA
+  // Calculate line height for content (leaving room for header and large pallet line)
+  const headerHeight = 80;
+  const palletLineHeight = 120;
+  const availableHeight = 1218 - headerHeight - palletLineHeight;
+  const lineHeight = Math.floor(availableHeight / (contentLines.length + 1));
+  
+  let zpl = `^XA
 ^PW812
 ^LL1218
-^CF0,35
+^CF0,${FONT_SIZE_12}
 ^FO30,30^FD${data.date}^FS
-^FO500,30^FDPERFECT FIT^FS
-^CF0,${fontSize}
-^FO30,${lineHeight * 1.5}^FD${line1}^FS
-^FO30,${lineHeight * 2.5}^FD${line2}^FS
-^FO30,${lineHeight * 3.5}^FD${line3}^FS
-^FO30,${lineHeight * 4.5}^FD${line4}^FS
-^CF0,${Math.min(fontSize + 15, 75)}
-^FO30,${lineHeight * 6}^FD${line5}^FS
-^XZ`;
+^FO500,30^FDPERFECT FIT^FS`;
+  
+  // Add content lines
+  contentLines.forEach((line, i) => {
+    zpl += `\n^FO30,${headerHeight + lineHeight * (i + 0.5)}^FD${line}^FS`;
+  });
+  
+  // Add pallet line with larger font
+  zpl += `\n^CF0,${FONT_SIZE_25}`;
+  zpl += `\n^FO30,${1218 - palletLineHeight}^FD${palletLine}^FS`;
+  zpl += '\n^XZ';
+  
+  return zpl;
 }
 
 // Public print functions
@@ -246,7 +264,7 @@ export async function printHardwareLabel(
   orderId: string,
   cienappsJobNumber: string
 ): Promise<PrintResult> {
-  // Hardware Label - 4x2 inch format with auto-scaling
+  // Hardware Label - 4x2 inch format with fixed font and text wrapping
   try {
     const printer = await findZebraPrinter();
     if (!printer) {
@@ -255,28 +273,29 @@ export async function printHardwareLabel(
     
     // Combine order name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
-      ? `${orderName} - Allmoxy #${allmoxyJobNumber}`
-      : orderName;
+      ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
+      : `Order Name: ${orderName}`;
     
-    // 4 lines with auto-scaling
+    // Fixed font size 12 with text wrapping
     const line1 = 'PERFECT FIT HARDWARE LABEL';
     const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
     const line3 = `Perfect Fit Order ID: ${orderId}`;
-    const line4 = `Order Name: ${orderLine}`;
+    const line4Parts = wrapText(orderLine, MAX_CHARS_4X2);
     
-    const fontSize = calculateFontSize([line1, line2, line3, line4]);
-    const lineHeight = Math.floor(406 / 5);
+    // Build all lines including wrapped ones
+    const allLines = [line1, line2, line3, ...line4Parts];
+    const lineHeight = Math.floor(406 / (allLines.length + 1));
     
-    // 4x2 hardware label at 203 DPI = 812 x 406 dots
-    const zpl = `^XA
+    let zpl = `^XA
 ^PW812
 ^LL406
-^CF0,${fontSize}
-^FO30,${lineHeight * 0.5}^FD${line1}^FS
-^FO30,${lineHeight * 1.5}^FD${line2}^FS
-^FO30,${lineHeight * 2.5}^FD${line3}^FS
-^FO30,${lineHeight * 3.5}^FD${line4}^FS
-^XZ`;
+^CF0,${FONT_SIZE_12}`;
+    
+    allLines.forEach((line, i) => {
+      zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
+    });
+    
+    zpl += '\n^XZ';
     
     console.log('[Zebra] Sending hardware label ZPL:', zpl);
     await sendZpl(printer, zpl);
@@ -299,7 +318,7 @@ export async function printCTSLabel(
   quantity: number,
   cutLength: number
 ): Promise<PrintResult> {
-  // CTS (Cut To Size) Label - 4x2 inch format with auto-scaling, 5 lines
+  // CTS (Cut To Size) Label - 4x2 inch format with fixed font and text wrapping
   try {
     const printer = await findZebraPrinter();
     if (!printer) {
@@ -308,33 +327,33 @@ export async function printCTSLabel(
     
     // Combine order name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
-      ? `${orderName} - Allmoxy #${allmoxyJobNumber}`
-      : orderName;
+      ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
+      : `Order Name: ${orderName}`;
     
-    // Product info line: Name - Code - Qty X @ Ymm
-    const productLine = `${productName} - ${productCode} - Qty ${quantity} @ ${cutLength.toFixed(1)}mm`;
+    // Product info line: Name + Code + Quantity
+    const productLine = `${productName} + ${productCode} + ${quantity}`;
     
-    // 5 lines with auto-scaling
+    // Fixed font size 12 with text wrapping
     const line1 = 'PERFECT FIT CTS LABEL';
     const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
     const line3 = `Perfect Fit Order ID: ${orderId}`;
-    const line4 = `Order Name: ${orderLine}`;
-    const line5 = productLine;
+    const line4Parts = wrapText(orderLine, MAX_CHARS_4X2);
+    const line5Parts = wrapText(productLine, MAX_CHARS_4X2);
     
-    const fontSize = calculateFontSize([line1, line2, line3, line4, line5]);
-    const lineHeight = Math.floor(406 / 6); // 6 sections for 5 lines with margins
+    // Build all lines including wrapped ones
+    const allLines = [line1, line2, line3, ...line4Parts, ...line5Parts];
+    const lineHeight = Math.floor(406 / (allLines.length + 1));
     
-    // 4x2 CTS label at 203 DPI = 812 x 406 dots
-    const zpl = `^XA
+    let zpl = `^XA
 ^PW812
 ^LL406
-^CF0,${fontSize}
-^FO30,${lineHeight * 0.5}^FD${line1}^FS
-^FO30,${lineHeight * 1.5}^FD${line2}^FS
-^FO30,${lineHeight * 2.5}^FD${line3}^FS
-^FO30,${lineHeight * 3.5}^FD${line4}^FS
-^FO30,${lineHeight * 4.5}^FD${line5}^FS
-^XZ`;
+^CF0,${FONT_SIZE_12}`;
+    
+    allLines.forEach((line, i) => {
+      zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
+    });
+    
+    zpl += '\n^XZ';
     
     console.log('[Zebra] Sending CTS label ZPL:', zpl);
     await sendZpl(printer, zpl);
