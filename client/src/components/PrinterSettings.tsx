@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Printer, RefreshCw, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -31,6 +32,10 @@ export function PrinterSettings() {
   const [loading, setLoading] = useState(false);
   const [printer4x2, setPrinter4x2] = useState<string>("");
   const [printer4x6, setPrinter4x6] = useState<string>("");
+  const [label4x2Width, setLabel4x2Width] = useState<string>("4");
+  const [label4x2Height, setLabel4x2Height] = useState<string>("2");
+  const [label4x6Width, setLabel4x6Width] = useState<string>("4");
+  const [label4x6Height, setLabel4x6Height] = useState<string>("6");
   const { toast } = useToast();
 
   const loadPrinters = async () => {
@@ -50,6 +55,11 @@ export function PrinterSettings() {
       } else if (availablePrinters.length > 0) {
         setPrinter4x6(availablePrinters[0].uid);
       }
+      // Load label sizes
+      setLabel4x2Width(String(config.label4x2Size.widthInches));
+      setLabel4x2Height(String(config.label4x2Size.heightInches));
+      setLabel4x6Width(String(config.label4x6Size.widthInches));
+      setLabel4x6Height(String(config.label4x6Size.heightInches));
     } catch (error) {
       toast({
         title: "Cannot connect to Zebra Browser Print",
@@ -71,6 +81,14 @@ export function PrinterSettings() {
     savePrinterConfig({
       printer4x2Uid: printer4x2 || null,
       printer4x6Uid: printer4x6 || null,
+      label4x2Size: {
+        widthInches: parseFloat(label4x2Width) || 4,
+        heightInches: parseFloat(label4x2Height) || 2,
+      },
+      label4x6Size: {
+        widthInches: parseFloat(label4x6Width) || 4,
+        heightInches: parseFloat(label4x6Height) || 6,
+      },
     });
     toast({
       title: "Printer settings saved",
@@ -123,36 +141,96 @@ export function PrinterSettings() {
             </div>
           ) : (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="printer-4x2">4x2 Labels (Project, Hardware, CTS)</Label>
-                <Select value={printer4x2} onValueChange={setPrinter4x2}>
-                  <SelectTrigger id="printer-4x2" data-testid="select-printer-4x2">
-                    <SelectValue placeholder="Select a printer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {printers.map((p) => (
-                      <SelectItem key={p.uid} value={p.uid}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4 p-3 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <Label htmlFor="printer-4x2" className="font-medium">Small Labels (Project, Hardware, CTS)</Label>
+                  <Select value={printer4x2} onValueChange={setPrinter4x2}>
+                    <SelectTrigger id="printer-4x2" data-testid="select-printer-4x2">
+                      <SelectValue placeholder="Select a printer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printers.map((p) => (
+                        <SelectItem key={p.uid} value={p.uid}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="label-4x2-width" className="text-xs text-muted-foreground">Width (inches)</Label>
+                    <Input
+                      id="label-4x2-width"
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="10"
+                      value={label4x2Width}
+                      onChange={(e) => setLabel4x2Width(e.target.value)}
+                      data-testid="input-label-4x2-width"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="label-4x2-height" className="text-xs text-muted-foreground">Height (inches)</Label>
+                    <Input
+                      id="label-4x2-height"
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="10"
+                      value={label4x2Height}
+                      onChange={(e) => setLabel4x2Height(e.target.value)}
+                      data-testid="input-label-4x2-height"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="printer-4x6">4x6 Labels (Pallet)</Label>
-                <Select value={printer4x6} onValueChange={setPrinter4x6}>
-                  <SelectTrigger id="printer-4x6" data-testid="select-printer-4x6">
-                    <SelectValue placeholder="Select a printer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {printers.map((p) => (
-                      <SelectItem key={p.uid} value={p.uid}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4 p-3 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <Label htmlFor="printer-4x6" className="font-medium">Large Labels (Pallet)</Label>
+                  <Select value={printer4x6} onValueChange={setPrinter4x6}>
+                    <SelectTrigger id="printer-4x6" data-testid="select-printer-4x6">
+                      <SelectValue placeholder="Select a printer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {printers.map((p) => (
+                        <SelectItem key={p.uid} value={p.uid}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="label-4x6-width" className="text-xs text-muted-foreground">Width (inches)</Label>
+                    <Input
+                      id="label-4x6-width"
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="10"
+                      value={label4x6Width}
+                      onChange={(e) => setLabel4x6Width(e.target.value)}
+                      data-testid="input-label-4x6-width"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="label-4x6-height" className="text-xs text-muted-foreground">Height (inches)</Label>
+                    <Input
+                      id="label-4x6-height"
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      max="10"
+                      value={label4x6Height}
+                      onChange={(e) => setLabel4x6Height(e.target.value)}
+                      data-testid="input-label-4x6-height"
+                    />
+                  </div>
+                </div>
               </div>
             </>
           )}

@@ -20,25 +20,57 @@ interface PalletPrintResult {
   error?: string;
 }
 
-// Printer configuration stored per-computer in localStorage
-interface PrinterConfig {
-  printer4x2Uid: string | null;  // For Project, Hardware, CTS labels
-  printer4x6Uid: string | null;  // For Pallet labels
+// Label size configuration in inches
+export interface LabelSize {
+  widthInches: number;
+  heightInches: number;
 }
 
+// Printer configuration stored per-computer in localStorage
+export interface PrinterConfig {
+  printer4x2Uid: string | null;  // For Project, Hardware, CTS labels
+  printer4x6Uid: string | null;  // For Pallet labels
+  label4x2Size: LabelSize;       // Actual dimensions for "4x2" labels
+  label4x6Size: LabelSize;       // Actual dimensions for "4x6" labels
+}
+
+// Default label sizes
+const DEFAULT_4X2_SIZE: LabelSize = { widthInches: 4, heightInches: 2 };
+const DEFAULT_4X6_SIZE: LabelSize = { widthInches: 4, heightInches: 6 };
+
 const PRINTER_CONFIG_KEY = 'zebra_printer_config';
+
+// Printer DPI (dots per inch) - standard for Zebra printers
+const PRINTER_DPI = 203;
+
+// Convert inches to dots
+export function inchesToDots(inches: number): number {
+  return Math.round(inches * PRINTER_DPI);
+}
 
 // Get stored printer configuration
 export function getPrinterConfig(): PrinterConfig {
   try {
     const stored = localStorage.getItem(PRINTER_CONFIG_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Ensure label sizes have defaults if not set
+      return {
+        printer4x2Uid: parsed.printer4x2Uid || null,
+        printer4x6Uid: parsed.printer4x6Uid || null,
+        label4x2Size: parsed.label4x2Size || DEFAULT_4X2_SIZE,
+        label4x6Size: parsed.label4x6Size || DEFAULT_4X6_SIZE,
+      };
     }
   } catch {
     // Ignore parse errors
   }
-  return { printer4x2Uid: null, printer4x6Uid: null };
+  return { 
+    printer4x2Uid: null, 
+    printer4x6Uid: null,
+    label4x2Size: DEFAULT_4X2_SIZE,
+    label4x6Size: DEFAULT_4X6_SIZE,
+  };
 }
 
 // Save printer configuration
@@ -210,8 +242,11 @@ function createProjectLabelZpl(data: {
   projectName: string;
   orderId: string;
   cienappsJobNumber: string;
-}): string {
-  // 4x2 inch label at 203 DPI = 812 x 406 dots
+}, labelSize: LabelSize): string {
+  // Get dimensions from config (in dots)
+  const labelWidth = inchesToDots(labelSize.widthInches);
+  const labelHeight = inchesToDots(labelSize.heightInches);
+  
   // Fixed font size 15 (~50 dots) with text wrapping
   const line1 = 'PERFECT FIT PROJECT LABEL';
   const line2 = `Cienapps & CV Job #: ${data.cienappsJobNumber}`;
@@ -220,11 +255,13 @@ function createProjectLabelZpl(data: {
   
   // Build all lines including wrapped ones
   const allLines = [line1, line2, ...line3Parts, line4];
-  const lineHeight = Math.floor(406 / (allLines.length + 1));
+  const lineHeight = Math.floor(labelHeight / (allLines.length + 1));
   
   let zpl = `^XA
-^PW812
-^LL406
+^LH0,0
+^LT0
+^PW${labelWidth}
+^LL${labelHeight}
 ^CF0,${FONT_SIZE_15}`;
   
   allLines.forEach((line, i) => {
@@ -244,8 +281,10 @@ function createPalletLabelZpl(data: {
   orderId: string;
   palletNumber: string;
   totalPallets: string;
-}): string {
-  // 4x6 inch label at 203 DPI = 812 x 1218 dots
+}, labelSize: LabelSize): string {
+  // Get dimensions from config (in dots)
+  const labelWidth = inchesToDots(labelSize.widthInches);
+  const labelHeight = inchesToDots(labelSize.heightInches);
   // Layout: Content at top, PALLET X OF Y at bottom
   // Fixed font size 15 for content, size 25 for pallet line
   
@@ -262,9 +301,9 @@ function createPalletLabelZpl(data: {
   // Build content lines
   const contentLines = [headerLine, ...projectNameParts, ...dealerParts, phoneLine, orderIdLine];
   
-  // Layout constants
+  // Layout constants - positions relative to label height
   const startY = 60; // Start from top
-  const palletLineY = 1050; // Position for pallet line near bottom
+  const palletLineY = labelHeight - 120; // Position for pallet line near bottom (120 dots from bottom)
   const minLineSpacing = FONT_SIZE_15 + 20; // Minimum: font height + padding
   const maxLineSpacing = 140; // Maximum spacing for readability
   
@@ -279,8 +318,8 @@ function createPalletLabelZpl(data: {
   let zpl = `^XA
 ^LH0,0
 ^LT0
-^LL1218
-^PW812
+^PW${labelWidth}
+^LL${labelHeight}
 ^CF0,${FONT_SIZE_15}`;
   
   // Add content lines with calculated spacing from top
@@ -310,11 +349,12 @@ export async function printProjectLabel(
       return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
+    const config = getPrinterConfig();
     const zpl = createProjectLabelZpl({
       projectName,
       orderId,
       cienappsJobNumber
-    });
+    }, config.label4x2Size);
     
     console.log('[Zebra] Sending project label ZPL:', zpl);
     await sendZpl(printer, zpl);
@@ -341,6 +381,10 @@ export async function printHardwareLabel(
       return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
+    const config = getPrinterConfig();
+    const labelWidth = inchesToDots(config.label4x2Size.widthInches);
+    const labelHeight = inchesToDots(config.label4x2Size.heightInches);
+    
     // Combine order name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName} ${allmoxyJobNumber}`
@@ -357,11 +401,13 @@ export async function printHardwareLabel(
     const allLines = [line1, line2, line3, ...line4Parts];
     if (palletLine) allLines.push(palletLine);
     
-    const lineHeight = Math.floor(406 / (allLines.length + 1));
+    const lineHeight = Math.floor(labelHeight / (allLines.length + 1));
     
     let zpl = `^XA
-^PW812
-^LL406
+^LH0,0
+^LT0
+^PW${labelWidth}
+^LL${labelHeight}
 ^CF0,${FONT_SIZE_15}`;
     
     allLines.forEach((line, i) => {
@@ -399,6 +445,10 @@ export async function printCTSLabel(
       return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
+    const config = getPrinterConfig();
+    const labelWidth = inchesToDots(config.label4x2Size.widthInches);
+    const labelHeight = inchesToDots(config.label4x2Size.heightInches);
+    
     // Combine order name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
@@ -419,11 +469,13 @@ export async function printCTSLabel(
     const allLines = [line1, line2, line3, ...line4Parts, ...line5Parts];
     if (palletLine) allLines.push(palletLine);
     
-    const lineHeight = Math.floor(406 / (allLines.length + 1));
+    const lineHeight = Math.floor(labelHeight / (allLines.length + 1));
     
     let zpl = `^XA
-^PW812
-^LL406
+^LH0,0
+^LT0
+^PW${labelWidth}
+^LL${labelHeight}
 ^CF0,${FONT_SIZE_12}`;
     
     allLines.forEach((line, i) => {
@@ -457,6 +509,8 @@ export async function printPalletLabels(
       return { success: false, printed: 0, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
+    const config = getPrinterConfig();
+    
     let printed = 0;
     for (let i = 1; i <= palletCount; i++) {
       const zpl = createPalletLabelZpl({
@@ -467,7 +521,7 @@ export async function printPalletLabels(
         orderId,
         palletNumber: String(i),
         totalPallets: String(palletCount)
-      });
+      }, config.label4x6Size);
       
       console.log(`[Zebra] Sending pallet label ${i}/${palletCount} ZPL:`, zpl);
       await sendZpl(printer, zpl);
