@@ -1,0 +1,94 @@
+// Standard constants for GX420d (203 DPI)
+const DPI = 203;
+const FONT_SIZE_NORMAL = 40;
+const FONT_SIZE_LARGE = 80;
+const MAX_CHARS = 28;
+
+interface LabelData {
+  projectName: string;
+  dealer: string;
+  phone: string;
+  orderId: string;
+  palletNumber: string;
+  totalPallets: string;
+}
+
+/**
+ * Wraps text into an array of strings based on character limit
+ */
+function wrapText(text: string, limit: number): string[] {
+  if (!text) return ['N/A'];
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  words.forEach(word => {
+    if ((currentLine + word).length <= limit) {
+      currentLine += (currentLine === '' ? '' : ' ') + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  });
+  lines.push(currentLine);
+  return lines;
+}
+
+/**
+ * Generates ZPL specifically for 4x6 labels on a GX420d
+ */
+export function createPalletLabelZpl(data: LabelData): string {
+  // 1. Setup Dimensions (Fixed 4x6 @ 203 DPI)
+  const labelWidth = 812; 
+  const labelHeight = 1218;
+
+  // 2. Prepare and Wrap Content
+  const projectNameParts = wrapText(`Project: ${data.projectName}`, MAX_CHARS);
+  const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, MAX_CHARS);
+  
+  const contentLines = [
+    'PERFECT FIT PALLET LABEL',
+    ...projectNameParts,
+    ...dealerParts,
+    `Phone: ${data.phone || 'N/A'}`,
+    `Order ID: ${data.orderId}`
+  ];
+
+  // 3. Layout Calculations
+  const startY = 60;
+  const palletLineY = 1100; // Fixed near the bottom of the 6" (1218 total)
+  const availableHeight = palletLineY - startY;
+  
+  // Dynamic spacing ensures we don't bleed into the next label
+  const lineSpacing = Math.min(100, Math.floor(availableHeight / contentLines.length));
+
+  // 4. Build ZPL String
+  let zpl = `^XA
+^MTD` + // Set to Direct Thermal (No ribbon)
+`^MNW` + // Web/Gap Sensing (Detects end of label)
+`^PW${labelWidth}
+^LL${labelHeight}
+^LS0
+^CI28`;
+
+  // Add Content Lines
+  zpl += `\n^CF0,${FONT_SIZE_NORMAL}`;
+  contentLines.forEach((line, i) => {
+    const yPos = startY + (i * lineSpacing);
+    // Boundary check: only print if within the 6-inch limit
+    if (yPos < 1050) {
+      zpl += `\n^FO40,${yPos}^FD${line}^FS`;
+    }
+  });
+
+  // Add Large Pallet Footer at Bottom
+  zpl += `\n^CF0,${FONT_SIZE_LARGE}`;
+  zpl += `\n^FO40,${palletLineY}^FD${data.palletNumber} OF ${data.totalPallets}^FS`;
+
+  // Optional: 6-inch Diagnostic Border (Uncomment to debug alignment)
+  // zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
+
+  zpl += '\n^XZ';
+
+  return zpl;
+}
