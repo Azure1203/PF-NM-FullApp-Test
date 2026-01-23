@@ -260,7 +260,8 @@ export async function printHardwareLabel(
   orderName: string,
   allmoxyJobNumber: string,
   orderId: string,
-  cienappsJobNumber: string
+  cienappsJobNumber: string,
+  palletNumber?: number
 ): Promise<PrintResult> {
   // Hardware Label - 4x2 inch format with fixed font and text wrapping
   try {
@@ -279,9 +280,12 @@ export async function printHardwareLabel(
     const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
     const line3 = `Perfect Fit Order ID: ${orderId}`;
     const line4Parts = wrapText(orderLine, MAX_CHARS_4X2);
+    const palletLine = palletNumber ? `PALLET ${palletNumber}` : '';
     
     // Build all lines including wrapped ones
     const allLines = [line1, line2, line3, ...line4Parts];
+    if (palletLine) allLines.push(palletLine);
+    
     const lineHeight = Math.floor(406 / (allLines.length + 1));
     
     let zpl = `^XA
@@ -314,7 +318,8 @@ export async function printCTSLabel(
   productName: string,
   productCode: string,
   quantity: number,
-  cutLength: number
+  cutLength: number,
+  palletNumber?: number
 ): Promise<PrintResult> {
   // CTS (Cut To Size) Label - 4x2 inch format with fixed font and text wrapping
   try {
@@ -330,6 +335,7 @@ export async function printCTSLabel(
     
     // Product info line: Name + Code + Quantity
     const productLine = `${productName} + ${productCode} + ${quantity}`;
+    const palletLine = palletNumber ? `PALLET ${palletNumber}` : '';
     
     // Fixed font size 12 with text wrapping
     const line1 = 'PERFECT FIT CTS LABEL';
@@ -340,6 +346,8 @@ export async function printCTSLabel(
     
     // Build all lines including wrapped ones
     const allLines = [line1, line2, line3, ...line4Parts, ...line5Parts];
+    if (palletLine) allLines.push(palletLine);
+    
     const lineHeight = Math.floor(406 / (allLines.length + 1));
     
     let zpl = `^XA

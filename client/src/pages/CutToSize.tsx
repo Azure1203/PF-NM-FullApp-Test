@@ -12,11 +12,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X, Check, Home, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import type { OrderFile, CtsPart, CtsPartConfig, Project } from "@shared/schema";
+import type { OrderFile, CtsPart, CtsPartConfig, Project, Pallet } from "@shared/schema";
 import { printCTSLabel } from "@/lib/zebra";
 
 interface CtsPartWithConfig extends CtsPart {
   config: CtsPartConfig | null;
+}
+
+interface PalletWithFiles extends Pallet {
+  fileIds: number[];
 }
 
 export default function CutToSize() {
@@ -40,6 +44,12 @@ export default function CutToSize() {
   // Get project details for label printing
   const { data: project } = useQuery<Project>({
     queryKey: ['/api/orders', fileInfo?.file?.projectId],
+    enabled: !!fileInfo?.file?.projectId,
+  });
+
+  // Fetch pallets for this project to get pallet number for label printing
+  const { data: pallets = [] } = useQuery<PalletWithFiles[]>({
+    queryKey: ['/api/orders', fileInfo?.file?.projectId, 'pallets'],
     enabled: !!fileInfo?.file?.projectId,
   });
 
@@ -130,6 +140,10 @@ export default function CutToSize() {
       const orderName = fileInfo?.file?.poNumber || fileInfo?.file?.originalFilename || '';
       const allmoxyJobNumber = fileInfo?.file?.allmoxyJobNumber || '';
       
+      // Find the pallet number for this file
+      const filePallet = pallets.find(p => p.fileIds.includes(fileId));
+      const palletNumber = filePallet?.palletNumber;
+      
       const result = await printCTSLabel(
         orderName,
         allmoxyJobNumber,
@@ -138,7 +152,8 @@ export default function CutToSize() {
         part.description || 'Unknown',
         part.partNumber,
         part.quantity,
-        Number(part.cutLength)
+        Number(part.cutLength),
+        palletNumber
       );
       
       if (result.success) {

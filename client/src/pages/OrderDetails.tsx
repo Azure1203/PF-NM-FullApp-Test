@@ -802,11 +802,16 @@ export default function OrderDetails() {
   const handlePrintHardwareLabel = async (fileId: number, orderName: string, allmoxyJobNumber: string) => {
     setPrintingHardwareLabelFileId(fileId);
     try {
+      // Find the pallet number for this file
+      const filePallet = pallets.find(p => p.fileIds.includes(fileId));
+      const palletNumber = filePallet?.palletNumber;
+      
       const result = await printHardwareLabel(
         orderName,
         allmoxyJobNumber || '',
         project?.orderId || '',
-        project?.cienappsJobNumber || ''
+        project?.cienappsJobNumber || '',
+        palletNumber
       );
       if (result.success) {
         toast({ title: 'Label printed', description: 'Hardware label sent to Zebra printer' });
