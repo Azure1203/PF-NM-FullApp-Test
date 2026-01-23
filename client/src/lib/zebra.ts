@@ -277,7 +277,7 @@ export async function printHardwareLabel(
     
     // Combine order name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
-      ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
+      ? `Order Name: ${orderName} ${allmoxyJobNumber}`
       : `Order Name: ${orderName}`;
     
     // Fixed font size 15 with text wrapping
@@ -335,7 +335,7 @@ export async function printCTSLabel(
     
     // Combine order name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
-      ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
+      ? `Order Name: ${orderName} ${allmoxyJobNumber}`
       : `Order Name: ${orderName}`;
     
     // Product info line: Name + Code + Quantity
