@@ -273,8 +273,9 @@ function createProjectLabelZpl(data: {
 }
 
 // Font sizes for pallet labels (GX420d at 203 DPI)
-const PALLET_FONT_NORMAL = 40;
-const PALLET_FONT_LARGE = 80;
+// 20pt = 56 dots, 28pt = 79 dots (dots = points * 203/72)
+const PALLET_FONT_NORMAL = 56;  // 20pt font for content lines
+const PALLET_FONT_LARGE = 79;   // 28pt font for pallet number
 const PALLET_MAX_CHARS = 28;
 
 // Create ZPL for 4x6 Pallet Label - optimized for GX420d direct thermal printer
