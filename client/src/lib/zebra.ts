@@ -237,36 +237,52 @@ const MAX_CHARS_4X2_SIZE15 = 27;
 // Max characters per line at size 12 font on 4x6 label
 const MAX_CHARS_4X6 = 34;
 
-// Create ZPL for 4x2 Project Label with fixed font and text wrapping
+// Create ZPL for 4x2 Project Label - optimized for direct thermal printing
 function createProjectLabelZpl(data: {
   projectName: string;
   orderId: string;
   cienappsJobNumber: string;
 }, labelSize: LabelSize): string {
-  // Get dimensions from config (in dots)
-  const labelWidth = inchesToDots(labelSize.widthInches);
-  const labelHeight = inchesToDots(labelSize.heightInches);
+  // Fixed 4x2 dimensions at 203 DPI
+  const labelWidth = 812;   // 4 inches * 203 DPI
+  const labelHeight = 406;  // 2 inches * 203 DPI
+  const leftMargin = 30;
   
-  // Fixed font size 15 (~50 dots) with text wrapping
-  const line1 = 'PERFECT FIT PROJECT LABEL';
-  const line2 = `Cienapps & CV Job #: ${data.cienappsJobNumber}`;
-  const line3Parts = wrapText(`Project Name: ${data.projectName}`, MAX_CHARS_4X2_SIZE15);
-  const line4 = `Perfect Fit Order ID: ${data.orderId}`;
+  // Build ZPL with direct thermal settings (same as pallet label)
+  let zpl = `^XA` +
+    `^MTD` +  // Direct Thermal (no ribbon)
+    `^MNW` +  // Web/Gap Sensing
+    `^PW${labelWidth}` +
+    `^LL${labelHeight}` +
+    `^LS0` +  // Label shift zero
+    `^CI28`;  // Character encoding
   
-  // Build all lines including wrapped ones
-  const allLines = [line1, line2, ...line3Parts, line4];
-  const lineHeight = Math.floor(labelHeight / (allLines.length + 1));
+  // Fixed layout positions for 4 lines on 4x2 label
+  const linePositions = [30, 110, 190, 270];  // Y positions for each line
   
-  let zpl = `^XA
-^LH0,0
-^LT0
-^PW${labelWidth}
-^LL${labelHeight}
-^CF0,${FONT_SIZE_15}`;
+  zpl += `\n^CF0,${FONT_SIZE_15}`;
   
-  allLines.forEach((line, i) => {
-    zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
-  });
+  // Line 1: Header
+  zpl += `\n^FO${leftMargin},${linePositions[0]}^FDPERFECT FIT PROJECT LABEL^FS`;
+  
+  // Line 2: Cienapps Job #
+  zpl += `\n^FO${leftMargin},${linePositions[1]}^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS`;
+  
+  // Line 3: Project Name (may wrap)
+  const projectParts = wrapText(`Project Name: ${data.projectName || 'N/A'}`, MAX_CHARS_4X2_SIZE15);
+  zpl += `\n^FO${leftMargin},${linePositions[2]}^FD${projectParts[0]}^FS`;
+  
+  // Line 4: Order ID (or wrapped project name continuation)
+  if (projectParts.length > 1) {
+    zpl += `\n^FO${leftMargin},${linePositions[3]}^FD${projectParts[1]}^FS`;
+  } else {
+    zpl += `\n^FO${leftMargin},${linePositions[3]}^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS`;
+  }
+  
+  // If project name wrapped, add order ID at bottom
+  if (projectParts.length > 1) {
+    zpl += `\n^FO${leftMargin},350^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS`;
+  }
   
   zpl += '\n^XZ';
   return zpl;
@@ -407,45 +423,55 @@ export async function printHardwareLabel(
   cienappsJobNumber: string,
   palletNumber?: number
 ): Promise<PrintResult> {
-  // Hardware Label - 4x2 inch format with fixed font and text wrapping
+  // Hardware Label - 4x2 inch format with direct thermal settings
   try {
     const printer = await findConfiguredPrinter('4x2');
     if (!printer) {
       return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
-    const config = getPrinterConfig();
-    const labelWidth = inchesToDots(config.label4x2Size.widthInches);
-    const labelHeight = inchesToDots(config.label4x2Size.heightInches);
+    // Fixed 4x2 dimensions at 203 DPI
+    const labelWidth = 812;   // 4 inches * 203 DPI
+    const labelHeight = 406;  // 2 inches * 203 DPI
+    const leftMargin = 30;
     
-    // Combine order name with Allmoxy job number
+    // Build ZPL with direct thermal settings
+    let zpl = `^XA` +
+      `^MTD` +  // Direct Thermal (no ribbon)
+      `^MNW` +  // Web/Gap Sensing
+      `^PW${labelWidth}` +
+      `^LL${labelHeight}` +
+      `^LS0` +  // Label shift zero
+      `^CI28`;  // Character encoding
+    
+    // Fixed layout positions for 4x2 label (5 lines max)
+    const linePositions = [25, 95, 165, 235, 305];  // Y positions
+    let lineIndex = 0;
+    
+    zpl += `\n^CF0,${FONT_SIZE_15}`;
+    
+    // Line 1: Header
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FDPERFECT FIT HARDWARE LABEL^FS`;
+    
+    // Line 2: Cienapps Job #
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
+    
+    // Line 3: Order ID
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
+    
+    // Line 4: Order Name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
-      ? `Order Name: ${orderName} ${allmoxyJobNumber}`
-      : `Order Name: ${orderName}`;
+      ? `Order Name: ${orderName || 'N/A'} ${allmoxyJobNumber}`
+      : `Order Name: ${orderName || 'N/A'}`;
+    const orderParts = wrapText(orderLine, MAX_CHARS_4X2_SIZE15);
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FD${orderParts[0]}^FS`;
     
-    // Fixed font size 15 with text wrapping
-    const line1 = 'PERFECT FIT HARDWARE LABEL';
-    const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
-    const line3 = `Perfect Fit Order ID: ${orderId}`;
-    const line4Parts = wrapText(orderLine, MAX_CHARS_4X2_SIZE15);
-    const palletLine = palletNumber ? `PALLET ${palletNumber}` : '';
-    
-    // Build all lines including wrapped ones
-    const allLines = [line1, line2, line3, ...line4Parts];
-    if (palletLine) allLines.push(palletLine);
-    
-    const lineHeight = Math.floor(labelHeight / (allLines.length + 1));
-    
-    let zpl = `^XA
-^LH0,0
-^LT0
-^PW${labelWidth}
-^LL${labelHeight}
-^CF0,${FONT_SIZE_15}`;
-    
-    allLines.forEach((line, i) => {
-      zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
-    });
+    // Line 5: Pallet number or wrapped order name
+    if (orderParts.length > 1) {
+      zpl += `\n^FO${leftMargin},${linePositions[lineIndex]}^FD${orderParts[1]}^FS`;
+    } else if (palletNumber) {
+      zpl += `\n^FO${leftMargin},${linePositions[lineIndex]}^FDPALLET ${palletNumber}^FS`;
+    }
     
     zpl += '\n^XZ';
     
@@ -471,49 +497,58 @@ export async function printCTSLabel(
   cutLength: number,
   palletNumber?: number
 ): Promise<PrintResult> {
-  // CTS (Cut To Size) Label - 4x2 inch format with fixed font and text wrapping
+  // CTS (Cut To Size) Label - 4x2 inch format with direct thermal settings
   try {
     const printer = await findConfiguredPrinter('4x2');
     if (!printer) {
       return { success: false, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
-    const config = getPrinterConfig();
-    const labelWidth = inchesToDots(config.label4x2Size.widthInches);
-    const labelHeight = inchesToDots(config.label4x2Size.heightInches);
+    // Fixed 4x2 dimensions at 203 DPI
+    const labelWidth = 812;   // 4 inches * 203 DPI
+    const labelHeight = 406;  // 2 inches * 203 DPI
+    const leftMargin = 30;
     
-    // Combine order name with Allmoxy job number
+    // Build ZPL with direct thermal settings
+    let zpl = `^XA` +
+      `^MTD` +  // Direct Thermal (no ribbon)
+      `^MNW` +  // Web/Gap Sensing
+      `^PW${labelWidth}` +
+      `^LL${labelHeight}` +
+      `^LS0` +  // Label shift zero
+      `^CI28`;  // Character encoding
+    
+    // Fixed layout positions for 4x2 label (6 lines with smaller font)
+    const linePositions = [20, 80, 140, 200, 260, 320];  // Y positions
+    let lineIndex = 0;
+    
+    zpl += `\n^CF0,${FONT_SIZE_12}`;
+    
+    // Line 1: Header
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FDPERFECT FIT CTS LABEL^FS`;
+    
+    // Line 2: Cienapps Job #
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
+    
+    // Line 3: Order ID
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
+    
+    // Line 4: Order Name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
-      ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
-      : `Order Name: ${orderName}`;
+      ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
+      : `Order Name: ${orderName || 'N/A'}`;
+    const orderParts = wrapText(orderLine, MAX_CHARS_4X2);
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FD${orderParts[0]}^FS`;
     
-    // Product info line: Name + Code + Length + Quantity
-    const productLine = `${productName} + ${productCode} + ${cutLength} + ${quantity}`;
-    const palletLine = palletNumber ? `PALLET ${palletNumber}` : '';
+    // Line 5: Product info (Name + Code + Length + Quantity)
+    const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
+    const productParts = wrapText(productLine, MAX_CHARS_4X2);
+    zpl += `\n^FO${leftMargin},${linePositions[lineIndex++]}^FD${productParts[0]}^FS`;
     
-    // Fixed font size 12 with text wrapping
-    const line1 = 'PERFECT FIT CTS LABEL';
-    const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
-    const line3 = `Perfect Fit Order ID: ${orderId}`;
-    const line4Parts = wrapText(orderLine, MAX_CHARS_4X2);
-    const line5Parts = wrapText(productLine, MAX_CHARS_4X2);
-    
-    // Build all lines including wrapped ones
-    const allLines = [line1, line2, line3, ...line4Parts, ...line5Parts];
-    if (palletLine) allLines.push(palletLine);
-    
-    const lineHeight = Math.floor(labelHeight / (allLines.length + 1));
-    
-    let zpl = `^XA
-^LH0,0
-^LT0
-^PW${labelWidth}
-^LL${labelHeight}
-^CF0,${FONT_SIZE_12}`;
-    
-    allLines.forEach((line, i) => {
-      zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
-    });
+    // Line 6: Pallet number (if provided)
+    if (palletNumber) {
+      zpl += `\n^FO${leftMargin},${linePositions[lineIndex]}^FDPALLET ${palletNumber}^FS`;
+    }
     
     zpl += '\n^XZ';
     
