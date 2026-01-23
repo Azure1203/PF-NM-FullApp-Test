@@ -248,8 +248,9 @@ function createProjectLabelZpl(data: {
   const labelHeight = 406;  // 2 inches
   const leftMargin = 30;
   
-  // Build ZPL - match working pallet label structure exactly
-  let zpl = `^XA`;
+  // Build ZPL - clear buffer first, then match working pallet label structure
+  let zpl = `~JA`;         // Cancel any pending label format in buffer
+  zpl += `^XA`;
   zpl += `^MTD`;           // Direct Thermal
   zpl += `^MNW`;           // Web/Gap Sensing
   zpl += `^PW${labelWidth}`;
@@ -311,14 +312,15 @@ function createPalletLabelZpl(data: {
   const leftMargin = 40;
   const lineWidth = labelWidth - (leftMargin * 2); // Width for separator lines
   
-  // Build ZPL string with direct thermal settings
-  let zpl = `^XA` +
-    `^MTD` + // Direct Thermal (no ribbon)
-    `^MNW` + // Web/Gap Sensing (detects end of label)
-    `^PW${labelWidth}` +
-    `^LL${labelHeight}` +
-    `^LS0` + // Label shift zero
-    `^CI28`; // Character encoding
+  // Build ZPL string - clear buffer first, then direct thermal settings
+  let zpl = `~JA`;  // Cancel any pending label format in buffer
+  zpl += `^XA`;
+  zpl += `^MTD`;    // Direct Thermal (no ribbon)
+  zpl += `^MNW`;    // Web/Gap Sensing (detects end of label)
+  zpl += `^PW${labelWidth}`;
+  zpl += `^LL${labelHeight}`;
+  zpl += `^LS0`;    // Label shift zero
+  zpl += `^CI28`;   // Character encoding
   
   let yPos = 78;  // Start 6mm down from top edge (48 dots at 203 DPI)
   
@@ -432,8 +434,9 @@ export async function printHardwareLabel(
     const labelHeight = 406;  // 2 inches
     const leftMargin = 30;
     
-    // Build ZPL - match working pallet label structure exactly
-    let zpl = `^XA`;
+    // Build ZPL - clear buffer first, then match working pallet label structure
+    let zpl = `~JA`;         // Cancel any pending label format in buffer
+    zpl += `^XA`;
     zpl += `^MTD`;           // Direct Thermal
     zpl += `^MNW`;           // Web/Gap Sensing
     zpl += `^PW${labelWidth}`;
@@ -509,8 +512,9 @@ export async function printCTSLabel(
     const labelHeight = 406;  // 2 inches
     const leftMargin = 30;
     
-    // Build ZPL - match working pallet label structure exactly
-    let zpl = `^XA`;
+    // Build ZPL - clear buffer first, then match working pallet label structure
+    let zpl = `~JA`;         // Cancel any pending label format in buffer
+    zpl += `^XA`;
     zpl += `^MTD`;           // Direct Thermal
     zpl += `^MNW`;           // Web/Gap Sensing
     zpl += `^PW${labelWidth}`;
