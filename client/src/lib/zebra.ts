@@ -315,9 +315,8 @@ function createPalletLabelZpl(data: {
   lineSpacing = Math.max(minLineSpacing, Math.min(maxLineSpacing, lineSpacing));
   
   // ZPL with explicit label length, home position, and top-of-form
-  // ^MNN = Enable media tracking for non-continuous labels
+  // Rely on printer's default media mode and ^LL to control label length
   let zpl = `^XA
-^MNN
 ^LH0,0
 ^LT0
 ^PW${labelWidth}
