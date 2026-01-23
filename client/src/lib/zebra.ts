@@ -307,7 +307,7 @@ function createPalletLabelZpl(data: {
     `^LS0` + // Label shift zero
     `^CI28`; // Character encoding
   
-  let yPos = 30;
+  let yPos = 78;  // Start 6mm down from top edge (48 dots at 203 DPI)
   
   // Helper to add a section: label (underlined), value, then bold separator
   const addSection = (label: string, value: string, addSeparator: boolean = true) => {
