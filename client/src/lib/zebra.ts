@@ -139,8 +139,8 @@ function createProjectLabelZpl(data: {
   // 4x2 inch label at 203 DPI = 812 x 406 dots
   // 4 lines of text with auto-scaling font
   const line1 = 'PERFECT FIT PROJECT LABEL';
-  const line2 = `[Project Name]: ${data.projectName}`;
-  const line3 = `(PERFECT FIT) Cienapps Job #: ${data.cienappsJobNumber}`;
+  const line2 = `Cienapps & CV Job #: ${data.cienappsJobNumber}`;
+  const line3 = `Project Name: ${data.projectName}`;
   const line4 = `Perfect Fit Order ID: ${data.orderId}`;
   
   const fontSize = calculateFontSize([line1, line2, line3, line4]);
@@ -157,24 +157,56 @@ function createProjectLabelZpl(data: {
 ^XZ`;
 }
 
-// Create ZPL for 4x6 Pallet Label  
+// Calculate optimal font size for 4x6 pallet label based on longest line
+// 4x6 label at 203 DPI = 812 x 1218 dots, usable width ~750 dots
+function calculatePalletFontSize(lines: string[]): number {
+  const maxWidth = 750;
+  const maxFontSize = 60;
+  const minFontSize = 25;
+  
+  const longestLine = lines.reduce((a, b) => a.length > b.length ? a : b, '');
+  const charCount = longestLine.length;
+  
+  const calculatedSize = Math.floor(maxWidth / (charCount * 0.55));
+  return Math.min(maxFontSize, Math.max(minFontSize, calculatedSize));
+}
+
+// Create ZPL for 4x6 Pallet Label with auto-scaling
 function createPalletLabelZpl(data: {
   date: string;
   projectName: string;
+  dealer: string;
+  phone: string;
   orderId: string;
   palletNumber: string;
   totalPallets: string;
 }): string {
   // 4x6 inch label at 203 DPI = 812 x 1218 dots
+  // Layout: Date top-left, PERFECT FIT top-right
+  // Then 5 content lines plus pallet info
+  
+  const line1 = `Project Name: ${data.projectName}`;
+  const line2 = `Dealer: ${data.dealer || 'N/A'}`;
+  const line3 = `Phone: ${data.phone || 'N/A'}`;
+  const line4 = `Perfect Fit Order ID: ${data.orderId}`;
+  const line5 = `PALLET ${data.palletNumber} OF ${data.totalPallets}`;
+  
+  const fontSize = calculatePalletFontSize([line1, line2, line3, line4, line5]);
+  const lineHeight = Math.floor(1218 / 8); // 8 sections for header + 5 lines + margins
+  
   return `^XA
 ^PW812
 ^LL1218
-^CF0,80
-^FO50,150^FD${data.projectName}^FS
-^CF0,120
-^FO50,400^FDPallet ${data.palletNumber} of ${data.totalPallets}^FS
-^CF0,30
-^FO50,1100^FDOrder: ${data.orderId} | ${data.date}^FS
+^CF0,35
+^FO30,30^FD${data.date}^FS
+^FO500,30^FDPERFECT FIT^FS
+^CF0,${fontSize}
+^FO30,${lineHeight * 1.5}^FD${line1}^FS
+^FO30,${lineHeight * 2.5}^FD${line2}^FS
+^FO30,${lineHeight * 3.5}^FD${line3}^FS
+^FO30,${lineHeight * 4.5}^FD${line4}^FS
+^CF0,${Math.min(fontSize + 15, 75)}
+^FO30,${lineHeight * 6}^FD${line5}^FS
 ^XZ`;
 }
 
@@ -228,7 +260,7 @@ export async function printHardwareLabel(
     
     // 4 lines with auto-scaling
     const line1 = 'PERFECT FIT HARDWARE LABEL';
-    const line2 = `(PERFECT FIT) Cienapps Job #: ${cienappsJobNumber}`;
+    const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
     const line3 = `Perfect Fit Order ID: ${orderId}`;
     const line4 = `Order Name: ${orderLine}`;
     
@@ -261,9 +293,13 @@ export async function printCTSLabel(
   orderName: string,
   allmoxyJobNumber: string,
   orderId: string,
-  cienappsJobNumber: string
+  cienappsJobNumber: string,
+  productName: string,
+  productCode: string,
+  quantity: number,
+  cutLength: number
 ): Promise<PrintResult> {
-  // CTS (Cut To Size) Label - 4x2 inch format with auto-scaling
+  // CTS (Cut To Size) Label - 4x2 inch format with auto-scaling, 5 lines
   try {
     const printer = await findZebraPrinter();
     if (!printer) {
@@ -275,14 +311,18 @@ export async function printCTSLabel(
       ? `${orderName} - Allmoxy #${allmoxyJobNumber}`
       : orderName;
     
-    // 4 lines with auto-scaling
-    const line1 = 'PERFECT FIT CUT TO SIZE LABEL';
-    const line2 = `(PERFECT FIT) Cienapps Job #: ${cienappsJobNumber}`;
+    // Product info line: Name - Code - Qty X @ Ymm
+    const productLine = `${productName} - ${productCode} - Qty ${quantity} @ ${cutLength.toFixed(1)}mm`;
+    
+    // 5 lines with auto-scaling
+    const line1 = 'PERFECT FIT CTS LABEL';
+    const line2 = `Cienapps & CV Job #: ${cienappsJobNumber}`;
     const line3 = `Perfect Fit Order ID: ${orderId}`;
     const line4 = `Order Name: ${orderLine}`;
+    const line5 = productLine;
     
-    const fontSize = calculateFontSize([line1, line2, line3, line4]);
-    const lineHeight = Math.floor(406 / 5);
+    const fontSize = calculateFontSize([line1, line2, line3, line4, line5]);
+    const lineHeight = Math.floor(406 / 6); // 6 sections for 5 lines with margins
     
     // 4x2 CTS label at 203 DPI = 812 x 406 dots
     const zpl = `^XA
@@ -293,6 +333,7 @@ export async function printCTSLabel(
 ^FO30,${lineHeight * 1.5}^FD${line2}^FS
 ^FO30,${lineHeight * 2.5}^FD${line3}^FS
 ^FO30,${lineHeight * 3.5}^FD${line4}^FS
+^FO30,${lineHeight * 4.5}^FD${line5}^FS
 ^XZ`;
     
     console.log('[Zebra] Sending CTS label ZPL:', zpl);
@@ -311,7 +352,8 @@ export async function printPalletLabels(
   projectName: string,
   orderId: string,
   palletCount: number,
-  logoUrl?: string
+  dealer?: string,
+  phone?: string
 ): Promise<PalletPrintResult> {
   try {
     const printer = await findZebraPrinter();
@@ -324,6 +366,8 @@ export async function printPalletLabels(
       const zpl = createPalletLabelZpl({
         date,
         projectName,
+        dealer: dealer || '',
+        phone: phone || '',
         orderId,
         palletNumber: String(i),
         totalPallets: String(palletCount)

@@ -9,10 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X, Check, Home } from "lucide-react";
+import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X, Check, Home, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import type { OrderFile, CtsPart, CtsPartConfig } from "@shared/schema";
+import type { OrderFile, CtsPart, CtsPartConfig, Project } from "@shared/schema";
+import { printCTSLabel } from "@/lib/zebra";
 
 interface CtsPartWithConfig extends CtsPart {
   config: CtsPartConfig | null;
@@ -28,11 +29,18 @@ export default function CutToSize() {
   
   const [editingConfig, setEditingConfig] = useState<{ [partNumber: string]: { rackLocation: string } }>({});
   const [uploadingPart, setUploadingPart] = useState<string | null>(null);
+  const [printingPartId, setPrintingPartId] = useState<number | null>(null);
   const fileInputRefs = useRef<{ [partNumber: string]: HTMLInputElement | null }>({});
 
   const { data: fileInfo } = useQuery<{ file: any; projectName: string }>({
     queryKey: ['/api/files', fileId],
     enabled: !!fileId && fileId > 0,
+  });
+
+  // Get project details for label printing
+  const { data: project } = useQuery<Project>({
+    queryKey: ['/api/orders', fileInfo?.file?.projectId],
+    enabled: !!fileInfo?.file?.projectId,
   });
 
   const { data: ctsParts, isLoading } = useQuery<CtsPartWithConfig[]>({
@@ -116,6 +124,36 @@ export default function CutToSize() {
     });
   };
 
+  const handlePrintCTSLabel = async (part: CtsPartWithConfig) => {
+    setPrintingPartId(part.id);
+    try {
+      const orderName = fileInfo?.file?.poNumber || fileInfo?.file?.originalFilename || '';
+      const allmoxyJobNumber = fileInfo?.file?.allmoxyJobNumber || '';
+      
+      const result = await printCTSLabel(
+        orderName,
+        allmoxyJobNumber,
+        project?.orderId || '',
+        project?.cienappsJobNumber || '',
+        part.description || 'Unknown',
+        part.partNumber,
+        part.quantity,
+        Number(part.cutLength)
+      );
+      
+      if (result.success) {
+        toast({ title: 'Label printed', description: 'CTS label sent to Zebra printer' });
+      } else {
+        toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
+      toast({ title: 'Print failed', description: message, variant: 'destructive' });
+    } finally {
+      setPrintingPartId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center">
@@ -194,9 +232,25 @@ export default function CutToSize() {
                           className="w-8 h-8 border-2 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                           data-testid="checkbox-cut-status"
                         />
-                        <div>
-                          <CardTitle className={`text-lg ${part.isCut ? 'line-through text-muted-foreground' : ''}`} data-testid="text-part-number">{part.partNumber}</CardTitle>
-                          <CardDescription data-testid="text-part-description">{part.description || "No description"}</CardDescription>
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <CardTitle className={`text-lg ${part.isCut ? 'line-through text-muted-foreground' : ''}`} data-testid="text-part-number">{part.partNumber}</CardTitle>
+                            <CardDescription data-testid="text-part-description">{part.description || "No description"}</CardDescription>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePrintCTSLabel(part)}
+                            disabled={printingPartId === part.id}
+                            data-testid={`button-print-cts-label-${part.id}`}
+                          >
+                            {printingPartId === part.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                            ) : (
+                              <Printer className="w-3 h-3 mr-1" />
+                            )}
+                            CTS LABEL
+                          </Button>
                         </div>
                       </div>
                       <div className="text-right">
