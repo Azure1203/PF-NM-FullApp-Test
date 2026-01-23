@@ -261,22 +261,22 @@ function createProjectLabelZpl(data: {
   let yPos = 30;
 
   // --- Header ---
-  zpl += `\n^CF0,45`;
-  zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PROJECT LABEL^FS`;
-  yPos += 50;
-  zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`;
-  yPos += 30;
+  zpl += `\n^CF0,40`;
+  zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PROJECT LABEL (4x2 LABEL)^FS`;
+  yPos += 45;
+  zpl += `\n^FO${leftMargin},${yPos}^GB500,2,2^FS`;
+  yPos += 25;
 
   // --- Content ---
-  zpl += `\n^CF0,35`;
+  zpl += `\n^CF0,30`;
 
-  zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${data.cienappsJobNumber || 'N/A'}^FS`;
-  yPos += 55;
+  zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS`;
+  yPos += 45;
 
-  zpl += `\n^FO${leftMargin},${yPos}^FDProject: ${data.projectName || 'N/A'}^FS`;
-  yPos += 55;
+  zpl += `\n^FO${leftMargin},${yPos}^FDProject Name: ${data.projectName || 'N/A'}^FS`;
+  yPos += 45;
 
-  zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${data.orderId || 'N/A'}^FS`;
+  zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS`;
 
   // Debug border
   zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
@@ -442,29 +442,29 @@ export async function printHardwareLabel(
     zpl += `^LT0`;           // No vertical shift
     zpl += `^CI28`;
 
-    let yPos = 30;
+    let yPos = 25;
 
     // --- Header ---
-    zpl += `\n^CF0,45`;
-    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT HARDWARE LABEL^FS`;
-    yPos += 50;
-    zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`;
-    yPos += 30;
+    zpl += `\n^CF0,35`;
+    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT HARDWARE LABEL (4x2 LABEL)^FS`;
+    yPos += 40;
+    zpl += `\n^FO${leftMargin},${yPos}^GB500,2,2^FS`;
+    yPos += 20;
 
     // --- Content ---
-    zpl += `\n^CF0,35`;
+    zpl += `\n^CF0,28`;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
-    yPos += 55;
+    zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
+    yPos += 40;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${orderId || 'N/A'}^FS`;
-    yPos += 55;
+    zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
+    yPos += 40;
 
     const orderLine = allmoxyJobNumber 
-      ? `Order: ${orderName || 'N/A'} ${allmoxyJobNumber}`
-      : `Order: ${orderName || 'N/A'}`;
+      ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
+      : `Order Name: ${orderName || 'N/A'}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
-    yPos += 55;
+    yPos += 40;
 
     if (palletNumber) {
       zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
@@ -519,33 +519,33 @@ export async function printCTSLabel(
     zpl += `^LT0`;           // No vertical shift
     zpl += `^CI28`;
 
-    let yPos = 25;
+    let yPos = 20;
 
     // --- Header ---
-    zpl += `\n^CF0,40`;
-    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT CTS LABEL^FS`;
-    yPos += 45;
-    zpl += `\n^FO${leftMargin},${yPos}^GB350,2,2^FS`;
-    yPos += 25;
-
-    // --- Content (smaller font for CTS - more lines) ---
     zpl += `\n^CF0,30`;
+    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT CTS LABEL (4x2 LABEL)^FS`;
+    yPos += 35;
+    zpl += `\n^FO${leftMargin},${yPos}^GB450,2,2^FS`;
+    yPos += 18;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
-    yPos += 40;
+    // --- Content (smaller font for CTS - 6 lines needed) ---
+    zpl += `\n^CF0,25`;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${orderId || 'N/A'}^FS`;
-    yPos += 40;
+    zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
+    yPos += 35;
+
+    zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
+    yPos += 35;
 
     const orderLine = allmoxyJobNumber 
-      ? `Order: ${orderName || 'N/A'} ${allmoxyJobNumber}`
-      : `Order: ${orderName || 'N/A'}`;
+      ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
+      : `Order Name: ${orderName || 'N/A'}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
-    yPos += 40;
+    yPos += 35;
 
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${productLine}^FS`;
-    yPos += 40;
+    yPos += 35;
 
     if (palletNumber) {
       zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
