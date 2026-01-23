@@ -335,11 +335,11 @@ export async function printCTSLabel(
     
     // Combine order name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
-      ? `Order Name: ${orderName} ${allmoxyJobNumber}`
+      ? `Order Name: ${orderName} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName}`;
     
-    // Product info line: Name + Code + Quantity
-    const productLine = `${productName} + ${productCode} + ${quantity}`;
+    // Product info line: Name + Code + Length + Quantity
+    const productLine = `${productName} + ${productCode} + ${cutLength} + ${quantity}`;
     const palletLine = palletNumber ? `PALLET ${palletNumber}` : '';
     
     // Fixed font size 12 with text wrapping
