@@ -248,42 +248,40 @@ function createProjectLabelZpl(data: {
   const labelHeight = 406;  // 2 inches
   const leftMargin = 30;
   
-  // Build ZPL with exact same "Direct Thermal" handshake as the 4x6
-  let zpl = `^XA` +
-    `^MTD` +      // Direct Thermal
-    `^MNW` +      // Web/Gap Sensing
-    `^PW${labelWidth}` +
-    `^LL${labelHeight}` +
-    `^LS0` +
-    `^CI28`;
+  // Build ZPL - match working pallet label structure exactly
+  let zpl = `^XA`;
+  zpl += `^MTD`;           // Direct Thermal
+  zpl += `^MNW`;           // Web/Gap Sensing
+  zpl += `^PW${labelWidth}`;
+  zpl += `^LL${labelHeight}`;
+  zpl += `^LS0`;
+  zpl += `^LT0`;           // No vertical shift
+  zpl += `^CI28`;
 
-  let yPos = 30; // Start higher up for the 2" label
+  let yPos = 30;
 
   // --- Header ---
-  zpl += `\n^CF0,45`; // Slightly smaller header font (16pt)
+  zpl += `\n^CF0,45`;
   zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PROJECT LABEL^FS`;
-  yPos += 45;
-  zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`; // Header underline
-  yPos += 35;
+  yPos += 50;
+  zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`;
+  yPos += 30;
 
-  // --- Content Sections (Compressed for 4x2) ---
-  zpl += `\n^CF0,35`; // Standard font for the rest (12pt)
+  // --- Content ---
+  zpl += `\n^CF0,35`;
 
-  // Section 1: Job #
   zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${data.cienappsJobNumber || 'N/A'}^FS`;
-  yPos += 65;
+  yPos += 55;
 
-  // Section 2: Project Name
   zpl += `\n^FO${leftMargin},${yPos}^FDProject: ${data.projectName || 'N/A'}^FS`;
-  yPos += 65;
+  yPos += 55;
 
-  // Section 3: Order ID
   zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${data.orderId || 'N/A'}^FS`;
 
-  // Debug border - shows label boundaries
+  // Debug border
   zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
 
-  zpl += '\n^XZ';
+  zpl += `\n^XZ`;
   return zpl;
 }
 
@@ -434,43 +432,40 @@ export async function printHardwareLabel(
     const labelHeight = 406;  // 2 inches
     const leftMargin = 30;
     
-    // Build ZPL with exact same "Direct Thermal" handshake as the 4x6
-    let zpl = `^XA` +
-      `^MTD` +      // Direct Thermal
-      `^MNW` +      // Web/Gap Sensing
-      `^PW${labelWidth}` +
-      `^LL${labelHeight}` +
-      `^LS0` +
-      `^CI28`;
+    // Build ZPL - match working pallet label structure exactly
+    let zpl = `^XA`;
+    zpl += `^MTD`;           // Direct Thermal
+    zpl += `^MNW`;           // Web/Gap Sensing
+    zpl += `^PW${labelWidth}`;
+    zpl += `^LL${labelHeight}`;
+    zpl += `^LS0`;
+    zpl += `^LT0`;           // No vertical shift
+    zpl += `^CI28`;
 
     let yPos = 30;
 
     // --- Header ---
     zpl += `\n^CF0,45`;
     zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT HARDWARE LABEL^FS`;
-    yPos += 45;
+    yPos += 50;
     zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`;
-    yPos += 35;
+    yPos += 30;
 
-    // --- Content Sections ---
+    // --- Content ---
     zpl += `\n^CF0,35`;
 
-    // Section 1: Job #
     zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
     yPos += 55;
 
-    // Section 2: Order ID
     zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${orderId || 'N/A'}^FS`;
     yPos += 55;
 
-    // Section 3: Order Name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
       ? `Order: ${orderName || 'N/A'} ${allmoxyJobNumber}`
       : `Order: ${orderName || 'N/A'}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
     yPos += 55;
 
-    // Section 4: Pallet number (if provided)
     if (palletNumber) {
       zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
     }
@@ -478,7 +473,7 @@ export async function printHardwareLabel(
     // Debug border
     zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
 
-    zpl += '\n^XZ';
+    zpl += `\n^XZ`;
     
     console.log('[Zebra] Sending hardware label ZPL:', zpl);
     await sendZpl(printer, zpl);
@@ -514,48 +509,44 @@ export async function printCTSLabel(
     const labelHeight = 406;  // 2 inches
     const leftMargin = 30;
     
-    // Build ZPL with exact same "Direct Thermal" handshake as the 4x6
-    let zpl = `^XA` +
-      `^MTD` +      // Direct Thermal
-      `^MNW` +      // Web/Gap Sensing
-      `^PW${labelWidth}` +
-      `^LL${labelHeight}` +
-      `^LS0` +
-      `^CI28`;
+    // Build ZPL - match working pallet label structure exactly
+    let zpl = `^XA`;
+    zpl += `^MTD`;           // Direct Thermal
+    zpl += `^MNW`;           // Web/Gap Sensing
+    zpl += `^PW${labelWidth}`;
+    zpl += `^LL${labelHeight}`;
+    zpl += `^LS0`;
+    zpl += `^LT0`;           // No vertical shift
+    zpl += `^CI28`;
 
     let yPos = 25;
 
     // --- Header ---
-    zpl += `\n^CF0,40`; // Smaller header for CTS (more lines needed)
+    zpl += `\n^CF0,40`;
     zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT CTS LABEL^FS`;
-    yPos += 40;
+    yPos += 45;
     zpl += `\n^FO${leftMargin},${yPos}^GB350,2,2^FS`;
     yPos += 25;
 
-    // --- Content Sections (smaller font to fit 5-6 lines) ---
+    // --- Content (smaller font for CTS - more lines) ---
     zpl += `\n^CF0,30`;
 
-    // Section 1: Job #
     zpl += `\n^FO${leftMargin},${yPos}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS`;
-    yPos += 45;
+    yPos += 40;
 
-    // Section 2: Order ID
     zpl += `\n^FO${leftMargin},${yPos}^FDOrder ID: ${orderId || 'N/A'}^FS`;
-    yPos += 45;
+    yPos += 40;
 
-    // Section 3: Order Name with Allmoxy job number
     const orderLine = allmoxyJobNumber 
       ? `Order: ${orderName || 'N/A'} ${allmoxyJobNumber}`
       : `Order: ${orderName || 'N/A'}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
-    yPos += 45;
+    yPos += 40;
 
-    // Section 4: Product info (Name + Code + Length + Quantity)
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
     zpl += `\n^FO${leftMargin},${yPos}^FD${productLine}^FS`;
-    yPos += 45;
+    yPos += 40;
 
-    // Section 5: Pallet number (if provided)
     if (palletNumber) {
       zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
     }
@@ -563,7 +554,7 @@ export async function printCTSLabel(
     // Debug border
     zpl += `\n^FO0,0^GB${labelWidth},${labelHeight},2^FS`;
 
-    zpl += '\n^XZ';
+    zpl += `\n^XZ`;
     
     console.log('[Zebra] Sending CTS label ZPL:', zpl);
     await sendZpl(printer, zpl);
