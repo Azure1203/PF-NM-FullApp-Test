@@ -315,7 +315,9 @@ function createPalletLabelZpl(data: {
   lineSpacing = Math.max(minLineSpacing, Math.min(maxLineSpacing, lineSpacing));
   
   // ZPL with explicit label length, home position, and top-of-form
+  // ^MNN = Enable media tracking for non-continuous labels
   let zpl = `^XA
+^MNN
 ^LH0,0
 ^LT0
 ^PW${labelWidth}
@@ -504,12 +506,29 @@ export async function printPalletLabels(
   phone?: string
 ): Promise<PalletPrintResult> {
   try {
+    const config = getPrinterConfig();
+    
+    // Require explicit 4x6 printer configuration for pallet labels
+    if (!config.printer4x6Uid) {
+      return { 
+        success: false, 
+        printed: 0, 
+        error: 'No 4x6 printer configured. Please go to Printer Settings and select a printer for "Large Labels (Pallet)".' 
+      };
+    }
+    
     const printer = await findConfiguredPrinter('4x6');
     if (!printer) {
       return { success: false, printed: 0, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
-    const config = getPrinterConfig();
+    // Send media calibration command first (as a separate transmission)
+    // ~JC = Calibrate media sensors to recognize current label size
+    console.log('[Zebra] Sending media calibration command to 4x6 printer');
+    await sendZpl(printer, '~JC');
+    
+    // Small delay to allow calibration to complete (1 second for reliability)
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     let printed = 0;
     for (let i = 1; i <= palletCount; i++) {
