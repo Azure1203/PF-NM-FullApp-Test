@@ -190,9 +190,10 @@ function createPalletLabelZpl(data: {
   totalPallets: string;
 }): string {
   // 4x6 inch label at 203 DPI = 812 x 1218 dots
-  // Layout: Date top-left, PERFECT FIT top-right
+  // Layout: PERFECT FIT PALLET LABEL as top line
   // Fixed font size 12 for content, size 25 for pallet line
   
+  const headerLine = 'PERFECT FIT PALLET LABEL';
   const projectNameParts = wrapText(`Project Name: ${data.projectName}`, MAX_CHARS_4X6);
   const dealerParts = wrapText(`Dealer: ${data.dealer || 'N/A'}`, MAX_CHARS_4X6);
   const phoneLine = `Phone Number: ${data.phone || 'N/A'}`;
@@ -200,24 +201,21 @@ function createPalletLabelZpl(data: {
   const palletLine = `PALLET ${data.palletNumber} OF ${data.totalPallets}`;
   
   // Build content lines (excluding header and pallet line)
-  const contentLines = [...projectNameParts, ...dealerParts, phoneLine, orderIdLine];
+  const contentLines = [headerLine, ...projectNameParts, ...dealerParts, phoneLine, orderIdLine];
   
-  // Calculate line height for content (leaving room for header and large pallet line)
-  const headerHeight = 80;
+  // Calculate line height for content (leaving room for large pallet line at bottom)
   const palletLineHeight = 120;
-  const availableHeight = 1218 - headerHeight - palletLineHeight;
+  const availableHeight = 1218 - palletLineHeight;
   const lineHeight = Math.floor(availableHeight / (contentLines.length + 1));
   
   let zpl = `^XA
 ^PW812
 ^LL1218
-^CF0,${FONT_SIZE_12}
-^FO30,30^FD${data.date}^FS
-^FO500,30^FDPERFECT FIT^FS`;
+^CF0,${FONT_SIZE_12}`;
   
   // Add content lines
   contentLines.forEach((line, i) => {
-    zpl += `\n^FO30,${headerHeight + lineHeight * (i + 0.5)}^FD${line}^FS`;
+    zpl += `\n^FO30,${lineHeight * (i + 0.5)}^FD${line}^FS`;
   });
   
   // Add pallet line with larger font
