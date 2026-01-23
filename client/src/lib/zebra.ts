@@ -523,14 +523,6 @@ export async function printPalletLabels(
       return { success: false, printed: 0, error: 'No Zebra printer found. Please ensure Zebra Browser Print is running and a printer is connected.' };
     }
     
-    // Send media calibration command first (as a separate transmission)
-    // ~JC = Calibrate media sensors to recognize current label size
-    console.log('[Zebra] Sending media calibration command to 4x6 printer');
-    await sendZpl(printer, '~JC');
-    
-    // Small delay to allow calibration to complete (1 second for reliability)
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
     let printed = 0;
     for (let i = 1; i <= palletCount; i++) {
       const zpl = createPalletLabelZpl({
