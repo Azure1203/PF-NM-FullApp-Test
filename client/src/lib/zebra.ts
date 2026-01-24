@@ -247,33 +247,17 @@ function createProjectLabelZpl(data: {
   const labelHeight = 406;
   const leftMargin = 40;
 
-  // AGGRESSIVE RESET SEQUENCE - Multiple commands to force proper mode
-  // Step 1: Exit diagnostic/dump mode
-  let zpl = `^XA^JD^XZ\n`;
-  // Step 2: Clear print buffer
-  zpl += `~JA\n`;
-  // Step 3: Reset printer to factory defaults for format commands
-  zpl += `^XA^JUF^XZ\n`;
-  // Step 4: Set direct thermal mode explicitly
-  zpl += `^XA^MTD^XZ\n`;
-  // Step 5: Clear all buffered data again
-  zpl += `~JA\n`;
+  // STEP 1: Turn off Diagnostic/Dump Mode and Clear Buffer
+  // This block runs and finishes before the label starts.
+  let zpl = `^XA^JD^XZ\n` + 
+            `^XA~JA^XZ\n`;
 
-  // THE ACTUAL LABEL - with all settings explicit
-  zpl += `^XA`;
-  // Media settings: Direct Thermal, Web/Gap sensing, No extra feed
-  zpl += `^MTD^MNW^MFN,N`;
-  // Label dimensions
-  zpl += `^PW${labelWidth}`;
-  zpl += `^LL${labelHeight}`;
-  // Position resets
-  zpl += `^LS0^LT0`;
-  // Character encoding
-  zpl += `^CI28`;
-  // Print mode: Tear-off
-  zpl += `^MMT`;
-  // Print rate/speed (medium)
-  zpl += `^PR4,4,4`;
+  // STEP 2: The Actual Label
+  zpl += `^XA` +
+    `^MTD^MNW^MFN,N` + 
+    `^PW${labelWidth}` + 
+    `^LL${labelHeight}` +
+    `^LS0^LT0^CI28`;
 
   // Use fixed Y positions to ensure no "creeping" or overlapping
   // Line 1: Header
