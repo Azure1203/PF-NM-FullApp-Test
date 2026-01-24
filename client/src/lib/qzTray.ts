@@ -182,22 +182,15 @@ function createProjectLabelZpl(data: {
   const labelHeight = 406;
   const leftMargin = 40;
 
-  let zpl = `^XA^JD^XZ\n` + 
-            `^XA~JA^XZ\n`;
+  let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
 
-  zpl += `^XA` +
-    `^MTD^MNW^MFN,N` + 
-    `^PW${labelWidth}` + 
-    `^LL${labelHeight}` +
-    `^LS0^LT0^CI28`;
+  zpl += `^FO${leftMargin},50^A0N,50,50^FDPERFECT FIT PROJECT LABEL^FS\n`;
+  zpl += `^FO${leftMargin},105^GB450,2,2^FS\n`;
+  zpl += `^FO${leftMargin},170^A0N,35,35^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},245^A0N,35,35^FDProject Name: ${data.projectName || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},320^A0N,35,35^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS\n`;
 
-  zpl += `\n^FO${leftMargin},50^A0N,50,50^FDPERFECT FIT PROJECT LABEL^FS`;
-  zpl += `\n^FO${leftMargin},105^GB450,2,2^FS`;
-  zpl += `\n^FO${leftMargin},170^A0N,35,35^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS`;
-  zpl += `\n^FO${leftMargin},245^A0N,35,35^FDProject Name: ${data.projectName || 'N/A'}^FS`;
-  zpl += `\n^FO${leftMargin},320^A0N,35,35^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS`;
-
-  zpl += '\n^XZ';
+  zpl += '^XZ';
   return zpl;
 }
 
@@ -243,30 +236,23 @@ export async function printHardwareLabel(
     const labelHeight = 406;
     const leftMargin = 40;
     
-    let zpl = `^XA^JD^XZ\n` + 
-              `^XA~JA^XZ\n`;
+    let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
 
-    zpl += `^XA` +
-      `^MTD^MNW^MFN,N` + 
-      `^PW${labelWidth}` + 
-      `^LL${labelHeight}` +
-      `^LS0^LT0^CI28`;
-
-    zpl += `\n^FO${leftMargin},35^A0N,45,45^FDPERFECT FIT HARDWARE LABEL^FS`;
-    zpl += `\n^FO${leftMargin},85^GB450,2,2^FS`;
-    zpl += `\n^FO${leftMargin},115^A0N,30,30^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
-    zpl += `\n^FO${leftMargin},170^A0N,30,30^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
+    zpl += `^FO${leftMargin},35^A0N,45,45^FDPERFECT FIT HARDWARE LABEL^FS\n`;
+    zpl += `^FO${leftMargin},85^GB450,2,2^FS\n`;
+    zpl += `^FO${leftMargin},115^A0N,30,30^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
+    zpl += `^FO${leftMargin},170^A0N,30,30^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS\n`;
 
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName || 'N/A'}`;
-    zpl += `\n^FO${leftMargin},225^A0N,30,30^FD${orderLine}^FS`;
+    zpl += `^FO${leftMargin},225^A0N,30,30^FD${orderLine}^FS\n`;
 
     if (palletNumber) {
-      zpl += `\n^FO${leftMargin},280^A0N,30,30^FDPALLET ${palletNumber}^FS`;
+      zpl += `^FO${leftMargin},280^A0N,30,30^FDPALLET ${palletNumber}^FS\n`;
     }
 
-    zpl += '\n^XZ';
+    zpl += '^XZ';
     
     console.log('[QZ Tray] Sending hardware label ZPL:', zpl);
     await sendZpl(printerName, zpl);
@@ -300,33 +286,26 @@ export async function printCTSLabel(
     const labelHeight = 406;
     const leftMargin = 40;
     
-    let zpl = `^XA^JD^XZ\n` + 
-              `^XA~JA^XZ\n`;
+    let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
 
-    zpl += `^XA` +
-      `^MTD^MNW^MFN,N` + 
-      `^PW${labelWidth}` + 
-      `^LL${labelHeight}` +
-      `^LS0^LT0^CI28`;
-
-    zpl += `\n^FO${leftMargin},25^A0N,38,38^FDPERFECT FIT CTS LABEL^FS`;
-    zpl += `\n^FO${leftMargin},68^GB400,2,2^FS`;
-    zpl += `\n^FO${leftMargin},90^A0N,25,25^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
-    zpl += `\n^FO${leftMargin},135^A0N,25,25^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
+    zpl += `^FO${leftMargin},25^A0N,38,38^FDPERFECT FIT CTS LABEL^FS\n`;
+    zpl += `^FO${leftMargin},68^GB400,2,2^FS\n`;
+    zpl += `^FO${leftMargin},90^A0N,25,25^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
+    zpl += `^FO${leftMargin},135^A0N,25,25^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS\n`;
 
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName || 'N/A'}`;
-    zpl += `\n^FO${leftMargin},180^A0N,25,25^FD${orderLine}^FS`;
+    zpl += `^FO${leftMargin},180^A0N,25,25^FD${orderLine}^FS\n`;
 
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
-    zpl += `\n^FO${leftMargin},225^A0N,25,25^FD${productLine}^FS`;
+    zpl += `^FO${leftMargin},225^A0N,25,25^FD${productLine}^FS\n`;
 
     if (palletNumber) {
-      zpl += `\n^FO${leftMargin},270^A0N,25,25^FDPALLET ${palletNumber}^FS`;
+      zpl += `^FO${leftMargin},270^A0N,25,25^FDPALLET ${palletNumber}^FS\n`;
     }
 
-    zpl += '\n^XZ';
+    zpl += '^XZ';
     
     console.log('[QZ Tray] Sending CTS label ZPL:', zpl);
     await sendZpl(printerName, zpl);
