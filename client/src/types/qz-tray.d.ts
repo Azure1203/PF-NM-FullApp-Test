@@ -13,6 +13,11 @@ declare module 'qz-tray' {
       create(printer: string, options?: object): object;
     };
     print(config: object, data: Array<string | object>): Promise<void>;
+    security: {
+      setCertificatePromise(callback: (resolve: (cert: string) => void) => void): void;
+      setSignatureAlgorithm(algorithm: string): void;
+      setSignaturePromise(callback: (toSign: (signature: string) => void) => (request: string) => Promise<void>): void;
+    };
   }
 
   const qz: QZ;

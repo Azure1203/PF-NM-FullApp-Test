@@ -70,8 +70,51 @@ export function savePrinterConfig(config: PrinterConfig): void {
 }
 
 let isConnected = false;
+let signingSetup = false;
+
+// Set up QZ Tray signing to eliminate "Allow" pop-ups
+function setupSigning(): void {
+  if (signingSetup) return;
+  
+  // Set up certificate callback
+  qz.security.setCertificatePromise(async (resolve: (cert: string) => void) => {
+    try {
+      const response = await fetch('/api/qz/certificate');
+      const certificate = await response.text();
+      resolve(certificate);
+    } catch (error) {
+      console.error('[QZ Tray] Failed to get certificate:', error);
+      resolve(''); // Empty certificate will use insecure mode
+    }
+  });
+  
+  // Set up signing callback
+  qz.security.setSignatureAlgorithm('SHA512');
+  qz.security.setSignaturePromise((toSign: (data: string) => void) => {
+    return async (request: string) => {
+      try {
+        const response = await fetch('/api/qz/sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request }),
+        });
+        const data = await response.json();
+        toSign(data.signature || '');
+      } catch (error) {
+        console.error('[QZ Tray] Failed to sign request:', error);
+        toSign(''); // Empty signature will use insecure mode
+      }
+    };
+  });
+  
+  signingSetup = true;
+  console.log('[QZ Tray] Signing callbacks configured');
+}
 
 async function ensureConnection(): Promise<void> {
+  // Set up signing before connecting
+  setupSigning();
+  
   if (qz.websocket.isActive()) {
     isConnected = true;
     return;
