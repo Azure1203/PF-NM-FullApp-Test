@@ -1,0 +1,87 @@
+[Zebra] Trying https://localhost:9101... index-DV8Bwpzf.js:52:25084
+[Zebra] Connected to Browser Print at https://localhost:9101 index-DV8Bwpzf.js:52:25191
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/available” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 2 74
+[Zebra] Available printers: 
+Array [ {…}, {…} ]
+index-DV8Bwpzf.js:52:25756
+[Zebra] Using configured 4x2 printer: 30j122400196 index-DV8Bwpzf.js:52:25930
+[Zebra] Sending project label ZPL: ^XA~JA^MTD^MNW^MFN,N^PW812^LL406^LS0^LT0^CI28
+^CF0,50
+^FO40,55^FDPERFECT FIT PROJECT LABEL^FS
+^FO40,110^GB450,2,2^FS
+^CF0,35
+^FO40,185^FDCienapps & CV Job #: N/A^FS
+^FO40,260^FDProject Name: 1712^FS
+^FO40,335^FDPerfect Fit Order ID: 1712^FS
+^XZ index-DV8Bwpzf.js:73:286
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/write” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 74
+[Zebra] Printed project label on 30j122400196 index-DV8Bwpzf.js:73:352
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/available” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 74
+[Zebra] Available printers: 
+Array [ {…}, {…} ]
+index-DV8Bwpzf.js:52:25756
+[Zebra] Using configured 4x2 printer: 30j122400196 index-DV8Bwpzf.js:52:25930
+[Zebra] Sending project label ZPL: ^XA~JA^MTD^MNW^MFN,N^PW812^LL406^LS0^LT0^CI28
+^CF0,50
+^FO40,55^FDPERFECT FIT PROJECT LABEL^FS
+^FO40,110^GB450,2,2^FS
+^CF0,35
+^FO40,185^FDCienapps & CV Job #: N/A^FS
+^FO40,260^FDProject Name: 1712^FS
+^FO40,335^FDPerfect Fit Order ID: 1712^FS
+^XZ index-DV8Bwpzf.js:73:286
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/write” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 74
+[Zebra] Printed project label on 30j122400196 index-DV8Bwpzf.js:73:352
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/available” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 74
+[Zebra] Available printers: 
+Array [ {…}, {…} ]
+index-DV8Bwpzf.js:52:25756
+[Zebra] Using configured 4x6 printer: 30j144300201 index-DV8Bwpzf.js:52:25930
+[Zebra] Sending pallet label 1/1 ZPL: ~JA^XA^MTD^MNW^PW812^LL1218^LS0^CI28
+^CF0,56
+^FO40,78^FDPERFECT FIT PALLET LABEL^FS
+^FO40,133^GB450,2,2^FS
+^CF0,56
+^FO40,163^FDProject:^FS
+^FO40,218^GB240,2,2^FS
+^FO40,233^FD1712^FS
+^FO40,303^GB732,6,6^FS
+^CF0,56
+^FO40,328^FDDealer:^FS
+^FO40,383^GB210,2,2^FS
+^FO40,398^FDClosets Made Simple CO^FS
+^FO40,458^FDShepard Trucking^FS
+^FO40,528^GB732,6,6^FS
+^CF0,56
+^FO40,553^FDPhone:^FS
+^FO40,608^GB180,2,2^FS
+^FO40,623^FD905-768-7070^FS
+^FO40,693^GB732,6,6^FS
+^CF0,56
+^FO40,718^FDOrder ID:^FS
+^FO40,773^GB270,2,2^FS
+^FO40,788^FD1712^FS
+^CF0,113
+^FO0,950^FB812,1,0,C^FDPALLET^FS
+^FO246,1060^GB320,2,2^FS
+^FO0,1095^FB812,1,0,C^FD1 OF 1^FS
+^XZ index-DV8Bwpzf.js:92:805
+[Zebra] Printed pallet label 1/1 on 30j144300201 index-DV8Bwpzf.js:92:884
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/write” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 74
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/available” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 74
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/available” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null) 74
+[Zebra] Available printers: 
+Array [ {…}, {…} ]
+index-DV8Bwpzf.js:52:25756
+[Zebra] Using configured 4x2 printer: 30j122400196 index-DV8Bwpzf.js:52:25930
+[Zebra] Sending project label ZPL: ^XA~JA^MTD^MNW^MFN,N^PW812^LL406^LS0^LT0^CI28
+^CF0,50
+^FO40,55^FDPERFECT FIT PROJECT LABEL^FS
+^FO40,110^GB450,2,2^FS
+^CF0,35
+^FO40,185^FDCienapps & CV Job #: N/A^FS
+^FO40,260^FDProject Name: 1712^FS
+^FO40,335^FDPerfect Fit Order ID: 1712^FS
+^XZ index-DV8Bwpzf.js:73:286
+[Zebra] Printed project label on 30j122400196 index-DV8Bwpzf.js:73:352
+Local Network Access detected: top-level site “https://perfectfitorders.com/orders/74?scrollToPallet=36”, initiator “https://perfectfitorders.com/orders/74?scrollToPallet=36”, accessing target “https://localhost:9101/write” (127.0.0.1:9101) via fetch. Secure context: True, prompt action: (null)
