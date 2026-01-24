@@ -13,7 +13,7 @@ import { ArrowLeft, Scissors, MapPin, Image, Save, Loader2, Package, Upload, X, 
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import type { OrderFile, CtsPart, CtsPartConfig, Project, Pallet } from "@shared/schema";
-import { printCTSLabel } from "@/lib/zebra";
+import { printCTSLabel } from "@/lib/qzTray";
 
 interface CtsPartWithConfig extends CtsPart {
   config: CtsPartConfig | null;

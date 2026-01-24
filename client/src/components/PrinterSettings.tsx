@@ -24,7 +24,7 @@ import {
   getPrinterConfig,
   savePrinterConfig,
   type ZebraPrinter,
-} from "@/lib/zebra";
+} from "@/lib/qzTray";
 
 export function PrinterSettings() {
   const [open, setOpen] = useState(false);
@@ -45,25 +45,24 @@ export function PrinterSettings() {
       setPrinters(availablePrinters);
       
       const config = getPrinterConfig();
-      if (config.printer4x2Uid) {
-        setPrinter4x2(config.printer4x2Uid);
+      if (config.printer4x2Name) {
+        setPrinter4x2(config.printer4x2Name);
       } else if (availablePrinters.length > 0) {
-        setPrinter4x2(availablePrinters[0].uid);
+        setPrinter4x2(availablePrinters[0].name);
       }
-      if (config.printer4x6Uid) {
-        setPrinter4x6(config.printer4x6Uid);
+      if (config.printer4x6Name) {
+        setPrinter4x6(config.printer4x6Name);
       } else if (availablePrinters.length > 0) {
-        setPrinter4x6(availablePrinters[0].uid);
+        setPrinter4x6(availablePrinters[0].name);
       }
-      // Load label sizes
       setLabel4x2Width(String(config.label4x2Size.widthInches));
       setLabel4x2Height(String(config.label4x2Size.heightInches));
       setLabel4x6Width(String(config.label4x6Size.widthInches));
       setLabel4x6Height(String(config.label4x6Size.heightInches));
     } catch (error) {
       toast({
-        title: "Cannot connect to Zebra Browser Print",
-        description: "Make sure Browser Print is running on your computer.",
+        title: "Cannot connect to QZ Tray",
+        description: "Make sure QZ Tray is installed and running on your computer. Download from https://qz.io",
         variant: "destructive",
       });
     } finally {
@@ -79,8 +78,8 @@ export function PrinterSettings() {
 
   const handleSave = () => {
     savePrinterConfig({
-      printer4x2Uid: printer4x2 || null,
-      printer4x6Uid: printer4x6 || null,
+      printer4x2Name: printer4x2 || null,
+      printer4x6Name: printer4x6 || null,
       label4x2Size: {
         widthInches: parseFloat(label4x2Width) || 4,
         heightInches: parseFloat(label4x2Height) || 2,
@@ -109,7 +108,7 @@ export function PrinterSettings() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Zebra Printer Settings
+            Printer Settings (QZ Tray)
           </DialogTitle>
           <DialogDescription>
             Configure which printer to use for each label size. Settings are saved per computer.
@@ -136,8 +135,8 @@ export function PrinterSettings() {
           {printers.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
               <Printer className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No Zebra printers found</p>
-              <p className="text-sm">Make sure Zebra Browser Print is running</p>
+              <p>No printers found</p>
+              <p className="text-sm">Make sure QZ Tray is running</p>
             </div>
           ) : (
             <>
@@ -150,7 +149,7 @@ export function PrinterSettings() {
                     </SelectTrigger>
                     <SelectContent>
                       {printers.map((p) => (
-                        <SelectItem key={p.uid} value={p.uid}>
+                        <SelectItem key={p.name} value={p.name}>
                           {p.name}
                         </SelectItem>
                       ))}
@@ -196,7 +195,7 @@ export function PrinterSettings() {
                     </SelectTrigger>
                     <SelectContent>
                       {printers.map((p) => (
-                        <SelectItem key={p.uid} value={p.uid}>
+                        <SelectItem key={p.name} value={p.name}>
                           {p.name}
                         </SelectItem>
                       ))}
