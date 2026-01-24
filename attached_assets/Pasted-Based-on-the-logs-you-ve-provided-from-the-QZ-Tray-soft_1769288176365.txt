@@ -1,0 +1,32 @@
+Based on the logs you've provided from the QZ Tray software, the system is attempting to print a label to a Zebra GX420t printer using raw ZPL code.
+
+The logs show a repetition of the same events, which suggests a possible loop or multiple rapid requests from your web application. Here is a breakdown of what the logs are telling us:
+1. Key Log Highlights
+
+    Printer Found: The software successfully identified 13 printers and matched the specific request for ZDesigner GX420t.
+
+    Request Allowed: The user (or the "anonymous" web request) successfully granted permission to access the printer and initiate the print job.
+
+    Print Job Sent: At 14:55:16,866, the log confirms: Sending print job to printer.
+
+    Missing File: You see Substitutions file missing, skipping: C:\ProgramData\qz\substitutions.json. This is generally not an error; it just means you aren't using the advanced text-replacement feature of QZ Tray.
+
+2. The ZPL Label Data
+
+The "raw" data being sent is a ZPL (Zebra Programming Language) script. If you were wondering what it actually says, here is the translated content:
+Field	Value
+Title	PERFECT FIT PROJECT LABEL
+Job #	Cienapps & CV Job #: N/A
+Project Name	1712
+Order ID	1712
+3. Potential Issues to Address
+
+While the logs show the job was "sent," if the label isn't physically printing, check these three things:
+
+    Redundant Requests: The logs show the same printers.find call repeating many times in a single second. This often indicates a logic error in your JavaScript findPrinter() function (e.g., calling it inside a loop or a high-frequency useEffect).
+
+    The Signature Field: The logs show "signature":"". This means you are running QZ Tray in Insecure/Development Mode. For production, you’ll need to sign your requests with a digital certificate to remove the "Allow" pop-up.
+
+    Coordinate Offsets: The logs show position":{"x":-1280, "y":696}. This suggests the "Allow" dialog is appearing on a secondary monitor or off-screen. If users can't see the pop-up, the print job will hang.
+
+Would you like me to help you debug the JavaScript code that is triggering these print requests to stop the repetition?
