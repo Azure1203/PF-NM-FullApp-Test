@@ -1,10 +1,10 @@
 // QZ Tray Label Printing Utility
-// Uses QZ Tray for raw ZPL printing to Zebra thermal printers
+// Uses QZ Tray for raw ZPL printing to thermal label printers
 // QZ Tray must be installed and running on the local machine
 
 import qz from 'qz-tray';
 
-export type ZebraPrinter = {
+export type Printer = {
   name: string;
   uid: string;
 };
@@ -89,7 +89,7 @@ async function ensureConnection(): Promise<void> {
   }
 }
 
-export async function getZebraPrinters(): Promise<ZebraPrinter[]> {
+export async function getPrinters(): Promise<Printer[]> {
   try {
     await ensureConnection();
     const printers = await qz.printers.find();
@@ -110,7 +110,7 @@ export async function getZebraPrinters(): Promise<ZebraPrinter[]> {
 }
 
 async function findConfiguredPrinter(labelSize: '4x2' | '4x6'): Promise<string | null> {
-  const printers = await getZebraPrinters();
+  const printers = await getPrinters();
   console.log('[QZ Tray] Available printers:', printers);
   
   if (printers.length === 0) {

@@ -157,12 +157,12 @@ export default function CutToSize() {
       );
       
       if (result.success) {
-        toast({ title: 'Label printed', description: 'CTS label sent to Zebra printer' });
+        toast({ title: 'Label printed', description: 'CTS label sent to printer' });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
+      const message = error instanceof Error ? error.message : 'Could not connect to printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setPrintingPartId(null);

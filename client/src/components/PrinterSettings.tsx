@@ -20,15 +20,15 @@ import { Input } from "@/components/ui/input";
 import { Printer, RefreshCw, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
-  getZebraPrinters,
+  getPrinters,
   getPrinterConfig,
   savePrinterConfig,
-  type ZebraPrinter,
+  type Printer as PrinterType,
 } from "@/lib/qzTray";
 
 export function PrinterSettings() {
   const [open, setOpen] = useState(false);
-  const [printers, setPrinters] = useState<ZebraPrinter[]>([]);
+  const [printers, setPrinters] = useState<PrinterType[]>([]);
   const [loading, setLoading] = useState(false);
   const [printer4x2, setPrinter4x2] = useState<string>("");
   const [printer4x6, setPrinter4x6] = useState<string>("");
@@ -41,7 +41,7 @@ export function PrinterSettings() {
   const loadPrinters = async () => {
     setLoading(true);
     try {
-      const availablePrinters = await getZebraPrinters();
+      const availablePrinters = await getPrinters();
       setPrinters(availablePrinters);
       
       const config = getPrinterConfig();

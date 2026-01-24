@@ -753,12 +753,12 @@ export default function OrderDetails() {
         project?.cienappsJobNumber || ''
       );
       if (result.success) {
-        toast({ title: 'Label printed', description: 'Project label sent to Zebra printer' });
+        toast({ title: 'Label printed', description: 'Project label sent to printer' });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
+      const message = error instanceof Error ? error.message : 'Could not connect to printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setIsPrintingProjectLabel(false);
@@ -786,12 +786,12 @@ export default function OrderDetails() {
       );
       
       if (result.success) {
-        toast({ title: 'Labels printed', description: `${result.printed} pallet label(s) sent to Zebra printer` });
+        toast({ title: 'Labels printed', description: `${result.printed} pallet label(s) sent to printer` });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
+      const message = error instanceof Error ? error.message : 'Could not connect to printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setIsPrintingPalletLabels(false);
@@ -814,12 +814,12 @@ export default function OrderDetails() {
         palletNumber
       );
       if (result.success) {
-        toast({ title: 'Label printed', description: 'Hardware label sent to Zebra printer' });
+        toast({ title: 'Label printed', description: 'Hardware label sent to printer' });
       } else {
         toast({ title: 'Print failed', description: result.error, variant: 'destructive' });
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not connect to Zebra printer';
+      const message = error instanceof Error ? error.message : 'Could not connect to printer';
       toast({ title: 'Print failed', description: message, variant: 'destructive' });
     } finally {
       setPrintingHardwareLabelFileId(null);
