@@ -243,40 +243,35 @@ function createProjectLabelZpl(data: {
   orderId: string;
   cienappsJobNumber: string;
 }, labelSize: LabelSize): string {
-  // GX420d 203 DPI Specs for 4x2
-  const labelWidth = 812;   // 4 inches
-  const labelHeight = 406;  // 2 inches
+  const labelWidth = 812;
+  const labelHeight = 406;
   const leftMargin = 40;
 
-  // Header with Purge (~JA) to clear buffer and Reset commands
-  let zpl = `^XA` +
-    `~JA` +             // Clear any "ghost" data stuck in the printer
-    `^MTD^MNW^MFN,N` +  // Direct Thermal, Web Sensing, No extra feed
+  // STEP 1: Turn off Diagnostic/Dump Mode and Clear Buffer
+  // This block runs and finishes before the label starts.
+  let zpl = `^XA^JD^XZ\n` + 
+            `^XA~JA^XZ\n`;
+
+  // STEP 2: The Actual Label
+  zpl += `^XA` +
+    `^MTD^MNW^MFN,N` + 
     `^PW${labelWidth}` + 
-    `^LL${labelHeight}` + 
-    `^LS0^LT0` +        // Force start at the absolute top-left
-    `^CI28`;
+    `^LL${labelHeight}` +
+    `^LS0^LT0^CI28`;
 
-  let yPos = 55; 
-
+  // Use fixed Y positions to ensure no "creeping" or overlapping
   // Line 1: Header
-  zpl += `\n^CF0,50`; 
-  zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT PROJECT LABEL^FS`;
-  yPos += 55;
-  zpl += `\n^FO${leftMargin},${yPos}^GB450,2,2^FS`; // Underline
-  yPos += 75;
+  zpl += `\n^FO${leftMargin},50^A0N,50,50^FDPERFECT FIT PROJECT LABEL^FS`;
+  zpl += `\n^FO${leftMargin},105^GB450,2,2^FS`;
 
-  // Line 2: Cienapps Job #
-  zpl += `\n^CF0,35`; 
-  zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS`;
-  yPos += 75;
+  // Line 2: Job #
+  zpl += `\n^FO${leftMargin},170^A0N,35,35^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS`;
 
   // Line 3: Project Name
-  zpl += `\n^FO${leftMargin},${yPos}^FDProject Name: ${data.projectName || 'N/A'}^FS`;
-  yPos += 75;
+  zpl += `\n^FO${leftMargin},245^A0N,35,35^FDProject Name: ${data.projectName || 'N/A'}^FS`;
 
   // Line 4: Order ID
-  zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS`;
+  zpl += `\n^FO${leftMargin},320^A0N,35,35^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS`;
 
   zpl += '\n^XZ';
   return zpl;
@@ -428,43 +423,39 @@ export async function printHardwareLabel(
     // Absolute 203 DPI dots for 4x2
     const labelWidth = 812;   // 4 inches
     const labelHeight = 406;  // 2 inches
-    const leftMargin = 30;
+    const leftMargin = 40;
     
-    // Header with Purge (~JA) to clear buffer and Reset commands
-    let zpl = `^XA` +
-      `~JA` +             // Clear any "ghost" data stuck in the printer
-      `^MTD^MNW^MFN,N` +  // Direct Thermal, Web Sensing, No extra feed
+    // STEP 1: Turn off Diagnostic/Dump Mode and Clear Buffer
+    let zpl = `^XA^JD^XZ\n` + 
+              `^XA~JA^XZ\n`;
+
+    // STEP 2: The Actual Label
+    zpl += `^XA` +
+      `^MTD^MNW^MFN,N` + 
       `^PW${labelWidth}` + 
-      `^LL${labelHeight}` + 
-      `^LS0^LT0` +        // Force start at the absolute top-left
-      `^CI28`;
+      `^LL${labelHeight}` +
+      `^LS0^LT0^CI28`;
 
-    let yPos = 40;
-
+    // Use fixed Y positions to ensure no "creeping" or overlapping
     // Line 1: Header
-    zpl += `\n^CF0,45`;
-    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT HARDWARE LABEL^FS`;
-    yPos += 50;
-    zpl += `\n^FO${leftMargin},${yPos}^GB450,2,2^FS`; // Underline
-    yPos += 30;
+    zpl += `\n^FO${leftMargin},35^A0N,45,45^FDPERFECT FIT HARDWARE LABEL^FS`;
+    zpl += `\n^FO${leftMargin},85^GB450,2,2^FS`;
 
-    // Content lines
-    zpl += `\n^CF0,30`;
+    // Line 2: Job #
+    zpl += `\n^FO${leftMargin},115^A0N,30,30^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
-    yPos += 50;
+    // Line 3: Order ID
+    zpl += `\n^FO${leftMargin},170^A0N,30,30^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
-    yPos += 50;
-
+    // Line 4: Order Name + Allmoxy
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName || 'N/A'}`;
-    zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
-    yPos += 50;
+    zpl += `\n^FO${leftMargin},225^A0N,30,30^FD${orderLine}^FS`;
 
+    // Line 5: Pallet (optional)
     if (palletNumber) {
-      zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
+      zpl += `\n^FO${leftMargin},280^A0N,30,30^FDPALLET ${palletNumber}^FS`;
     }
 
     zpl += '\n^XZ';
@@ -501,47 +492,43 @@ export async function printCTSLabel(
     // Absolute 203 DPI dots for 4x2
     const labelWidth = 812;   // 4 inches
     const labelHeight = 406;  // 2 inches
-    const leftMargin = 30;
+    const leftMargin = 40;
     
-    // Header with Purge (~JA) to clear buffer and Reset commands
-    let zpl = `^XA` +
-      `~JA` +             // Clear any "ghost" data stuck in the printer
-      `^MTD^MNW^MFN,N` +  // Direct Thermal, Web Sensing, No extra feed
+    // STEP 1: Turn off Diagnostic/Dump Mode and Clear Buffer
+    let zpl = `^XA^JD^XZ\n` + 
+              `^XA~JA^XZ\n`;
+
+    // STEP 2: The Actual Label
+    zpl += `^XA` +
+      `^MTD^MNW^MFN,N` + 
       `^PW${labelWidth}` + 
-      `^LL${labelHeight}` + 
-      `^LS0^LT0` +        // Force start at the absolute top-left
-      `^CI28`;
+      `^LL${labelHeight}` +
+      `^LS0^LT0^CI28`;
 
-    let yPos = 30;
-
+    // Use fixed Y positions to ensure no "creeping" or overlapping
     // Line 1: Header
-    zpl += `\n^CF0,40`;
-    zpl += `\n^FO${leftMargin},${yPos}^FDPERFECT FIT CTS LABEL^FS`;
-    yPos += 45;
-    zpl += `\n^FO${leftMargin},${yPos}^GB400,2,2^FS`; // Underline
-    yPos += 25;
+    zpl += `\n^FO${leftMargin},25^A0N,38,38^FDPERFECT FIT CTS LABEL^FS`;
+    zpl += `\n^FO${leftMargin},68^GB400,2,2^FS`;
 
-    // Content lines (smaller font for CTS - 6 lines needed)
-    zpl += `\n^CF0,25`;
+    // Line 2: Job #
+    zpl += `\n^FO${leftMargin},90^A0N,25,25^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS`;
-    yPos += 38;
+    // Line 3: Order ID
+    zpl += `\n^FO${leftMargin},135^A0N,25,25^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
 
-    zpl += `\n^FO${leftMargin},${yPos}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS`;
-    yPos += 38;
-
+    // Line 4: Order Name + Allmoxy
     const orderLine = allmoxyJobNumber 
       ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
       : `Order Name: ${orderName || 'N/A'}`;
-    zpl += `\n^FO${leftMargin},${yPos}^FD${orderLine}^FS`;
-    yPos += 38;
+    zpl += `\n^FO${leftMargin},180^A0N,25,25^FD${orderLine}^FS`;
 
+    // Line 5: Product info
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
-    zpl += `\n^FO${leftMargin},${yPos}^FD${productLine}^FS`;
-    yPos += 38;
+    zpl += `\n^FO${leftMargin},225^A0N,25,25^FD${productLine}^FS`;
 
+    // Line 6: Pallet (optional)
     if (palletNumber) {
-      zpl += `\n^FO${leftMargin},${yPos}^FDPALLET ${palletNumber}^FS`;
+      zpl += `\n^FO${leftMargin},270^A0N,25,25^FDPALLET ${palletNumber}^FS`;
     }
 
     zpl += '\n^XZ';
