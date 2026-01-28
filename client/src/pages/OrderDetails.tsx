@@ -1964,6 +1964,20 @@ export default function OrderDetails() {
                                                         Cut To File ({(actualFilePreview as any).ctsPartsCount || 0})
                                                       </Button>
                                                     )}
+                                                    
+                                                    {/* Netley Packing Slip PDF */}
+                                                    {file.netleyPackingSlipPdfPath && (
+                                                      <Button
+                                                        size="lg"
+                                                        variant="outline"
+                                                        onClick={() => handlePdfDownload(file.id, 'netley-packing-slip-pdf')}
+                                                        className="border-2 border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
+                                                        data-testid={`button-download-packing-slip-${file.id}`}
+                                                      >
+                                                        <Download className="w-5 h-5 mr-2" />
+                                                        Packing Slip
+                                                      </Button>
+                                                    )}
                                                   </>
                                                 );
                                               })()}

@@ -67,6 +67,7 @@ export const orderFiles = pgTable("order_files", {
   cutToFilePdfPath: text("cut_to_file_pdf_path"), // Path to Cut To File PDF in object storage
   eliasDovetailPdfPath: text("elias_dovetail_pdf_path"), // Path to Elias PF Dovetail Drawers PDF in object storage
   netley5PiecePdfPath: text("netley_5_piece_pdf_path"), // Path to Netley 5 Piece Shaker Door PDF in object storage
+  netleyPackingSlipPdfPath: text("netley_packing_slip_pdf_path"), // Path to Netley Packing Slip PDF in object storage
   hardwareCsvPath: text("hardware_csv_path"), // Path to hardware CSV in object storage
   hardwareBoStatus: text("hardware_bo_status"), // Calculated BO status: 'NO BO HARDWARE', 'WAITING FOR BO HARDWARE', 'BO HARDWARE ARRIVED'
   

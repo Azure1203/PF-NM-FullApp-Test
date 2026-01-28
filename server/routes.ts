@@ -2954,6 +2954,69 @@ export async function registerRoutes(
     }
   });
 
+  // Download Netley Packing Slip PDF for a file
+  app.get('/api/files/:fileId/netley-packing-slip-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.netleyPackingSlipPdfPath) {
+        return res.status(404).json({ message: 'No Netley Packing Slip PDF found for this file' });
+      }
+      
+      const pdfBuffer = await objectStorageService.downloadBuffer(fileData.file.netleyPackingSlipPdfPath);
+      if (!pdfBuffer) {
+        return res.status(404).json({ message: 'PDF file not found in storage' });
+      }
+      
+      const filename = fileData.file.netleyPackingSlipPdfPath.split('/').pop() || 'netley-packing-slip.pdf';
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+      
+    } catch (err: any) {
+      console.error('[API] Error downloading Netley Packing Slip PDF:', err.message);
+      res.status(500).json({ message: 'Failed to download PDF', error: err.message });
+    }
+  });
+
+  // Delete Netley Packing Slip PDF for a file
+  app.delete('/api/files/:fileId/netley-packing-slip-pdf', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const fileData = await storage.getFileWithProject(fileId);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: 'File not found' });
+      }
+      
+      if (!fileData.file.netleyPackingSlipPdfPath) {
+        return res.status(404).json({ message: 'No Netley Packing Slip PDF found for this file' });
+      }
+      
+      const deleted = await objectStorageService.deleteObject(fileData.file.netleyPackingSlipPdfPath);
+      if (!deleted) {
+        console.log(`[API] Object storage file not found for ${fileId}, clearing database reference anyway`);
+      }
+      
+      await storage.updateOrderFile(fileId, {
+        netleyPackingSlipPdfPath: null
+      });
+      
+      console.log(`[API] Deleted Netley Packing Slip PDF for file ${fileId}`);
+      
+      res.json({ message: 'Netley Packing Slip PDF deleted successfully' });
+      
+    } catch (err: any) {
+      console.error('[API] Error deleting Netley Packing Slip PDF:', err.message);
+      res.status(500).json({ message: 'Failed to delete PDF', error: err.message });
+    }
+  });
+
   // Serve packing slip images from object storage
   // Security: Only allow images matching the expected pattern to prevent path traversal
   app.get('/api/packing-slip-images/:imagePath', isAuthenticated, async (req, res) => {

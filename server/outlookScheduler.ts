@@ -11,7 +11,7 @@ let pollIntervalId: NodeJS.Timeout | null = null;
 
 const objectStorageService = new ObjectStorageService();
 
-// PDF type definitions for matching attachments (no packing slip - checklist comes from CSV)
+// PDF type definitions for matching attachments
 const PDF_TYPES = {
   cutToFile: {
     patterns: ['Cut To File', 'Cut to File', 'Cut To Size', 'Cut to Size'],
@@ -27,6 +27,11 @@ const PDF_TYPES = {
     patterns: ['Netley 5 Piece Shaker Door', '5 Piece Shaker Door', 'Netley 5 Piece'],
     dbColumn: 'netley5PiecePdfPath',
     suffix: 'Netley 5 Piece Shaker Door'
+  },
+  netleyPackingSlip: {
+    patterns: ['Netley Packing Slip', 'Netley_Packing_Slip'],
+    dbColumn: 'netleyPackingSlipPdfPath',
+    suffix: 'Netley Packing Slip'
   }
 } as const;
 
@@ -155,7 +160,8 @@ async function processOutlookEmails(): Promise<{ processed: number; matched: num
       hasPdfs: {
         cutToFile: !!file.cutToFilePdfPath,
         eliasDovetail: !!file.eliasDovetailPdfPath,
-        netley5Piece: !!file.netley5PiecePdfPath
+        netley5Piece: !!file.netley5PiecePdfPath,
+        netleyPackingSlip: !!file.netleyPackingSlipPdfPath
       }
     }));
     
