@@ -126,6 +126,15 @@ Preferred communication style: Simple, everyday language.
   - Richelieu doors counted when product has category=COMPONENT AND supplier contains 'Richelieu'
 - **No More Keyword Matching**: Replaced hardcoded keyword arrays with database lookups
 
+### Outlook Integration - Netley Packing Slip PDF Support
+- **Auto-Detection**: Outlook scheduler now detects and matches "Netley Packing Slip" PDFs (e.g., `1892 - Netley Packing Slip.pdf`)
+- **Pattern Matching**: Matches filenames containing "Netley Packing Slip" or "Netley_Packing_Slip"
+- **Database Column**: `netleyPackingSlipPdfPath` stores the path to the PDF in object storage
+- **API Endpoints**:
+  - GET /api/files/:fileId/netley-packing-slip-pdf - Download the PDF
+  - DELETE /api/files/:fileId/netley-packing-slip-pdf - Delete the PDF
+- **UI**: Purple "Packing Slip" button displayed in Order Details when PDF is available
+
 ### Outlook Integration - Automatic Hardware CSV Processing
 - **CSV Attachment Detection**: Outlook scheduler now detects CSV attachments (not just PDFs)
 - **Hardware CSV Matching**: Files with "HARDWARE" in filename are matched to orders by order number
