@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle } from "lucide-react";
 import { PrinterSettings } from "@/components/PrinterSettings";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -217,14 +217,21 @@ export default function Dashboard() {
                     {outlookSyncStatus?.status?.lastSuccessAt ? (
                       <>
                         <p>Last sync: {format(new Date(outlookSyncStatus.status.lastSuccessAt), 'MMM d, h:mm a')}</p>
-                        <p className="text-muted-foreground">Auto-syncs every 15 min</p>
+                        <p className="text-muted-foreground">Auto-syncs every 30 min</p>
                       </>
                     ) : (
-                      <p>Auto-syncs every 15 minutes</p>
+                      <p>Auto-syncs every 30 minutes</p>
                     )}
                   </div>
                 </TooltipContent>
               </Tooltip>
+              <Link href="/how-it-works">
+                <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-how-it-works">
+                  <HelpCircle className="w-4 h-4" />
+                  <span className="hidden sm:inline">How It Works</span>
+                  <span className="sm:hidden">Help</span>
+                </Button>
+              </Link>
               <Link href="/products">
                 <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-products">
                   <Package className="w-4 h-4" />
