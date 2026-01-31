@@ -63,7 +63,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<"all" | "in_production" | "pending" | "synced" | "shipped">("all");
   
   // Sections that count as "In Production"
-  const IN_PRODUCTION_SECTIONS = ["JOB CONFIRMED", "HARDWARE PACKED", "PALLET PACKED", "READY TO SUBMIT", "READY TO LOAD"];
+  const IN_PRODUCTION_SECTIONS = ["JOB CONFIRMED", "PACK HARDWARE", "HARDWARE PACKED", "PALLET PACKED", "READY TO SUBMIT", "READY TO LOAD"];
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticSearch, setDiagnosticSearch] = useState("");
 

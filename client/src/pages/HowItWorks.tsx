@@ -144,7 +144,7 @@ export default function HowItWorks() {
                   <li>Creates a task in Asana with all order information</li>
                   <li>Custom fields are populated (parts counts, shipping info, etc.)</li>
                   <li>Status badges show production progress (IN PRODUCTION, SHIPPED)</li>
-                  <li>Asana section determines order status: JOB CONFIRMED → HARDWARE PACKED → PALLET PACKED → READY TO SUBMIT → READY TO LOAD → SHIPPED</li>
+                  <li>Asana section determines order status: JOB CONFIRMED → PACK HARDWARE → HARDWARE PACKED → PALLET PACKED → READY TO SUBMIT → READY TO LOAD → SHIPPED</li>
                 </ul>
               </CardContent>
             </Card>

@@ -65,6 +65,7 @@ When the order is ready, sync it to Asana for production tracking:
 4. Status badges show production progress (IN PRODUCTION, SHIPPED)
 5. Asana section determines order status:
    - JOB CONFIRMED
+   - PACK HARDWARE
    - HARDWARE PACKED
    - PALLET PACKED
    - READY TO SUBMIT

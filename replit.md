@@ -82,7 +82,7 @@ Preferred communication style: Simple, everyday language.
   - Included in file breakdown cards and file details panel
   - Full type safety with types in shared/routes.ts and shared/schema.ts
 - Added "IN PRODUCTION" and "SHIPPED" status badges to order cards based on Asana section
-  - Purple badge shows "IN PRODUCTION" for sections: JOB CONFIRMED, HARDWARE PACKED, PALLET PACKED, READY TO SUBMIT, READY TO LOAD
+  - Purple badge shows "IN PRODUCTION" for sections: JOB CONFIRMED, PACK HARDWARE, HARDWARE PACKED, PALLET PACKED, READY TO SUBMIT, READY TO LOAD
   - Teal badge shows "SHIPPED" when order is in SHIPPED section
   - These are display-only badges derived from Asana section data (no sync back to Asana)
 - Improved mobile responsiveness of Dashboard:
