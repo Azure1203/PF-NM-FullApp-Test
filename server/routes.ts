@@ -5061,6 +5061,36 @@ export async function registerRoutes(
     }
   });
 
+  // Bootstrap first admin (one-time use, no auth required if no admin exists)
+  app.post('/api/admin/bootstrap-admin', async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: 'Email required' });
+      }
+      
+      // Check if any admin exists - this endpoint only works when no admin exists
+      const allUsers = await storage.getAllowedUsers();
+      const existingAdmin = allUsers.find(u => u.isAdmin === true);
+      if (existingAdmin) {
+        return res.status(403).json({ message: 'Admin already exists. Use the toggle endpoint.' });
+      }
+      
+      // Find user by email and make them admin
+      const user = allUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      await storage.updateAllowedUserAdmin(user.id, true);
+      console.log(`[Admin] Bootstrap: Set ${email} as first admin`);
+      res.json({ success: true, message: `${email} is now an admin` });
+    } catch (e: any) {
+      console.error('[Admin] Bootstrap error:', e);
+      res.status(500).json({ message: 'Failed to bootstrap admin', error: e.message });
+    }
+  });
+
   // Check if current user is admin
   app.get('/api/admin/is-admin', isAuthenticated, async (req, res) => {
     try {
