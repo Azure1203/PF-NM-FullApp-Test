@@ -1542,7 +1542,7 @@ export default function OrderDetails() {
                     </div>
                     <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.maxLength)}`}>
                       <p className="text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
-                      <p className="text-xs text-muted-foreground">mm max</p>
+                      <p className="text-xs text-muted-foreground">max length</p>
                     </div>
                     <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.maxWidth || 0)}`}>
                       <p className="text-2xl font-bold" data-testid="text-max-width">{preview.totals.maxWidth || 0}</p>
@@ -1722,7 +1722,7 @@ export default function OrderDetails() {
                                       { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'Cut to Size Parts' },
                                       { key: 'wallRail', value: previewFiles.reduce((sum, f) => sum + ((f as any).wallRailPieces || 0), 0), label: 'Wall Rail Pieces' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
-                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm max' },
+                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'max length' },
                                       { key: 'maxWidth', value: Math.max(...previewFiles.map(f => f.maxWidth || 0)), label: 'mm wide' }
                                     ];
                                     
@@ -1891,7 +1891,7 @@ export default function OrderDetails() {
                                                     </div>
                                                     <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.maxLength)}`} data-testid={`metric-maxlength-${file.id}`}>
                                                       <p className="text-lg font-bold">{actualFilePreview.maxLength}</p>
-                                                      <p className="text-[9px]">mm max</p>
+                                                      <p className="text-[9px]">max length</p>
                                                     </div>
                                                     <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.maxWidth || 0)}`} data-testid={`metric-maxwidth-${file.id}`}>
                                                       <p className="text-lg font-bold">{actualFilePreview.maxWidth || 0}</p>
