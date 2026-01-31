@@ -774,10 +774,14 @@ export async function registerRoutes(
         const pallets = await storage.getPalletsForProject(project.id);
         const hardwarePackaged = pallets.some(p => p.hardwarePackaged === true);
         
+        // Extract file names for display
+        const fileNames = files.map(f => f.originalFilename);
+        
         return {
           ...project,
           ctsStatus: { hasCTSParts, allCtsCut },
-          hardwarePackaged
+          hardwarePackaged,
+          fileNames
         };
       })
     );

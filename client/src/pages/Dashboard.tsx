@@ -385,6 +385,22 @@ export default function Dashboard() {
                         <span className="hidden sm:inline">Date: {project.createdAt ? format(new Date(project.createdAt), 'PPP') : 'N/A'}</span>
                       </div>
                       
+                      {/* CSV File Names */}
+                      {(project as any).fileNames && (project as any).fileNames.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {(project as any).fileNames.map((fileName: string, idx: number) => (
+                            <Badge 
+                              key={idx}
+                              variant="secondary"
+                              className="text-xs"
+                              data-testid={`text-filename-${project.id}-${idx}`}
+                            >
+                              {fileName.replace(/\.csv$/i, '')}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      
                       {/* PF Production Section Status */}
                       {project.asanaSection && (
                         <div className="mt-1.5 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
