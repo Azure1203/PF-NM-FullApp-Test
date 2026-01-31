@@ -69,6 +69,11 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026
+- **Max Width Tracking**: Added maxWidth field to track the widest part in each order (from CSV column 4)
+  - Displayed alongside Max Length in project totals ("mm wide" label)
+  - Shown in pallet metrics grid as info-only metric
+  - Included in file breakdown cards and file details panel
+  - Full type safety with types in shared/routes.ts and shared/schema.ts
 - Added "IN PRODUCTION" and "SHIPPED" status badges to order cards based on Asana section
   - Purple badge shows "IN PRODUCTION" for sections: JOB CONFIRMED, HARDWARE PACKED, PALLET PACKED, READY TO SUBMIT, READY TO LOAD
   - Teal badge shows "SHIPPED" when order is in SHIPPED section
