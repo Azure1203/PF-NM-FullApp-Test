@@ -117,6 +117,8 @@ export interface IStorage {
   deleteAllowedUser(id: number): Promise<boolean>;
   isUserAllowed(username: string, email?: string): Promise<boolean>;
   isWhitelistEmpty(): Promise<boolean>;
+  updateAllowedUserAdmin(id: number, isAdmin: boolean): Promise<boolean>;
+  isUserAdmin(username: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -609,6 +611,21 @@ export class DatabaseStorage implements IStorage {
   async isWhitelistEmpty(): Promise<boolean> {
     const users = await db.select().from(allowedUsers).limit(1);
     return users.length === 0;
+  }
+
+  async updateAllowedUserAdmin(id: number, isAdmin: boolean): Promise<boolean> {
+    const [updated] = await db
+      .update(allowedUsers)
+      .set({ isAdmin })
+      .where(eq(allowedUsers.id, id))
+      .returning();
+    return !!updated;
+  }
+
+  async isUserAdmin(username: string): Promise<boolean> {
+    if (!username) return false;
+    const user = await this.getAllowedUserByUsername(username);
+    return user?.isAdmin === true;
   }
 }
 

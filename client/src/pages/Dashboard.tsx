@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useOrders, useDeleteOrder } from "@/hooks/use-orders";
+import { useIsAdmin } from "@/hooks/use-admin";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,8 @@ export default function Dashboard() {
   const { data: projects, isLoading } = useOrders();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
   const { user } = useAuth();
+  const { data: adminStatus } = useIsAdmin();
+  const isAdmin = adminStatus?.isAdmin === true;
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_production" | "pending" | "synced" | "shipped">("all");
@@ -461,30 +464,32 @@ export default function Dashboard() {
                     <StatusBadge status={project.status as any} />
                     
                     <div className="flex items-center gap-2">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently remove the project "{project.name}" and all its files.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={() => deleteProject(project.id)}
-                              className="bg-destructive text-destructive-foreground"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid={`button-delete-project-${project.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently remove the project "{project.name}" and all its files.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => deleteProject(project.id)}
+                                className="bg-destructive text-destructive-foreground"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
 
                       <Link href={`/orders/${project.id}`}>
                         <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:translate-x-1 group-hover:text-primary transition-all">

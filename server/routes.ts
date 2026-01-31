@@ -795,8 +795,18 @@ export async function registerRoutes(
     res.json({ ...project, files });
   });
 
-  // Delete a project (protected)
+  // Delete a project (admin only)
   app.delete(api.orders.delete.path, isAuthenticated, async (req, res) => {
+    // Check if user is admin
+    const replitUser = (req as any).user;
+    if (!replitUser?.name) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    const isAdmin = await storage.isUserAdmin(replitUser.name);
+    if (!isAdmin) {
+      return res.status(403).json({ message: 'Only admins can delete orders' });
+    }
+    
     const success = await storage.deleteProject(Number(req.params.id));
     if (!success) {
       return res.status(404).json({ message: 'Project not found' });
@@ -5015,6 +5025,54 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error('[Admin] Error deleting allowed user:', e);
       res.status(500).json({ message: 'Failed to delete allowed user', error: e.message });
+    }
+  });
+
+  // Toggle admin status for a user (admin only)
+  app.post('/api/admin/allowed-users/:id/toggle-admin', isAuthenticated, async (req, res) => {
+    try {
+      // Check if requester is admin
+      const replitUser = (req as any).user;
+      if (!replitUser?.name) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+      const requesterIsAdmin = await storage.isUserAdmin(replitUser.name);
+      if (!requesterIsAdmin) {
+        return res.status(403).json({ message: 'Only admins can modify admin status' });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid user ID' });
+      }
+
+      const user = await storage.getAllowedUser(id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const newIsAdmin = !user.isAdmin;
+      await storage.updateAllowedUserAdmin(id, newIsAdmin);
+      console.log(`[Admin] ${replitUser.name} toggled admin status for ${user.email || user.username}: ${newIsAdmin}`);
+      res.json({ success: true, isAdmin: newIsAdmin });
+    } catch (e: any) {
+      console.error('[Admin] Error toggling admin status:', e);
+      res.status(500).json({ message: 'Failed to toggle admin status', error: e.message });
+    }
+  });
+
+  // Check if current user is admin
+  app.get('/api/admin/is-admin', isAuthenticated, async (req, res) => {
+    try {
+      const replitUser = (req as any).user;
+      if (!replitUser?.name) {
+        return res.json({ isAdmin: false });
+      }
+      const isAdmin = await storage.isUserAdmin(replitUser.name);
+      res.json({ isAdmin });
+    } catch (e: any) {
+      console.error('[Admin] Error checking admin status:', e);
+      res.status(500).json({ message: 'Failed to check admin status', error: e.message });
     }
   });
 

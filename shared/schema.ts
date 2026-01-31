@@ -367,6 +367,7 @@ export const allowedUsers = pgTable("allowed_users", {
   email: text("email").unique(), // Email address (optional)
   displayName: text("display_name"), // Optional display name
   addedBy: text("added_by"), // Who added this user
+  isAdmin: boolean("is_admin").default(false), // Whether user has admin privileges (can delete orders)
   createdAt: timestamp("created_at").defaultNow(),
 });
 

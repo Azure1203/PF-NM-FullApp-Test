@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Plus, ArrowLeft, Trash2, Loader2, Users, UserPlus, Shield
+  Plus, ArrowLeft, Trash2, Loader2, Users, UserPlus, Shield, ShieldCheck
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -39,11 +40,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
+import { useIsAdmin } from "@/hooks/use-admin";
 import type { AllowedUser } from "@shared/schema";
 
 export default function AdminUsers() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: adminStatus } = useIsAdmin();
+  const isCurrentUserAdmin = adminStatus?.isAdmin === true;
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -95,6 +99,24 @@ export default function AdminUsers() {
     onError: (error: any) => {
       toast({ 
         title: "Failed to remove user", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const toggleAdminMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest('POST', `/api/admin/allowed-users/${id}/toggle-admin`);
+      return res.json();
+    },
+    onSuccess: (data: { isAdmin: boolean }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/allowed-users'] });
+      toast({ title: data.isAdmin ? "User is now an admin" : "Admin privileges removed" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to update admin status", 
         description: error.message, 
         variant: "destructive" 
       });
@@ -175,6 +197,7 @@ export default function AdminUsers() {
                     <TableHead>Display Name</TableHead>
                     <TableHead>Added By</TableHead>
                     <TableHead>Date Added</TableHead>
+                    <TableHead>Admin</TableHead>
                     <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -195,6 +218,19 @@ export default function AdminUsers() {
                       </TableCell>
                       <TableCell>
                         {formatDate(allowedUser.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={allowedUser.isAdmin === true}
+                            onCheckedChange={() => toggleAdminMutation.mutate(allowedUser.id)}
+                            disabled={toggleAdminMutation.isPending || !isCurrentUserAdmin}
+                            data-testid={`switch-admin-${allowedUser.id}`}
+                          />
+                          {allowedUser.isAdmin && (
+                            <ShieldCheck className="h-4 w-4 text-primary" />
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <AlertDialog>

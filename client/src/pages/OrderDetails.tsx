@@ -8,6 +8,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 import { useOrder, useUpdateOrder, useSyncOrder, useDeleteOrder } from "@/hooks/use-orders";
+import { useIsAdmin } from "@/hooks/use-admin";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -242,6 +243,8 @@ export default function OrderDetails() {
   const { mutate: updateProject, isPending: isUpdating } = useUpdateOrder();
   const { mutate: syncProject, isPending: isSyncing } = useSyncOrder();
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
+  const { data: adminStatus } = useIsAdmin();
+  const isAdmin = adminStatus?.isAdmin === true;
   
   // Query key used by useOrder hook - defined early for use in all mutations
   const orderQueryKey = [api.orders.get.path, id];
@@ -859,30 +862,32 @@ export default function OrderDetails() {
           </Link>
           
           <div className="flex gap-2">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-destructive hover:bg-destructive/10">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Project
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the project
-                    and all its files from the database.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
-                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {isAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="text-destructive hover:bg-destructive/10" data-testid="button-delete-project">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Project
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the project
+                      and all its files from the database.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+                      {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             
             {project.status === 'synced' && project.asanaTaskId && (
               <Button 
