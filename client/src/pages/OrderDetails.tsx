@@ -1544,6 +1544,10 @@ export default function OrderDetails() {
                       <p className="text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
                       <p className="text-xs text-muted-foreground">mm max</p>
                     </div>
+                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.maxWidth || 0)}`}>
+                      <p className="text-2xl font-bold" data-testid="text-max-width">{preview.totals.maxWidth || 0}</p>
+                      <p className="text-xs text-muted-foreground">mm wide</p>
+                    </div>
                   </div>
                 );
               })()}
@@ -1718,7 +1722,8 @@ export default function OrderDetails() {
                                       { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'Cut to Size Parts' },
                                       { key: 'wallRail', value: previewFiles.reduce((sum, f) => sum + ((f as any).wallRailPieces || 0), 0), label: 'Wall Rail Pieces' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
-                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm max' }
+                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm max' },
+                                      { key: 'maxWidth', value: Math.max(...previewFiles.map(f => f.maxWidth || 0)), label: 'mm wide' }
                                     ];
                                     
                                     return (
@@ -1726,7 +1731,7 @@ export default function OrderDetails() {
                                         {metrics.map(({ key, value, label }) => {
                                           const isPackaged = status[key];
                                           const numValue = typeof value === 'number' ? value : parseInt(value) || 0;
-                                          const isInfoOnly = key === 'weight' || key === 'maxLength';
+                                          const isInfoOnly = key === 'weight' || key === 'maxLength' || key === 'maxWidth';
                                           // CTS button is auto-green when all CTS parts in all orders are cut
                                           const isCtsAutoGreen = key === 'cts' && allCtsCut;
                                           const isAutoGreen = numValue === 0 || isInfoOnly || isCtsAutoGreen;
@@ -1887,6 +1892,10 @@ export default function OrderDetails() {
                                                     <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.maxLength)}`} data-testid={`metric-maxlength-${file.id}`}>
                                                       <p className="text-lg font-bold">{actualFilePreview.maxLength}</p>
                                                       <p className="text-[9px]">mm max</p>
+                                                    </div>
+                                                    <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.maxWidth || 0)}`} data-testid={`metric-maxwidth-${file.id}`}>
+                                                      <p className="text-lg font-bold">{actualFilePreview.maxWidth || 0}</p>
+                                                      <p className="text-[9px]">mm wide</p>
                                                     </div>
                                                   </>
                                                 );
@@ -2438,6 +2447,13 @@ export default function OrderDetails() {
                           <div>
                             <p className="font-semibold" data-testid="text-file-maxlength">{preview.fileBreakdowns[selectedFileIndex].maxLength} mm</p>
                             <p className="text-xs text-muted-foreground">Max Length</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-lg">
+                          <Ruler className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-semibold" data-testid="text-file-maxwidth">{preview.fileBreakdowns[selectedFileIndex].maxWidth || 0} mm</p>
+                            <p className="text-xs text-muted-foreground">Max Width</p>
                           </div>
                         </div>
                       </div>

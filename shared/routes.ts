@@ -32,6 +32,7 @@ export interface SyncPreview {
     ctsPartsCount: number;
     weightLbs: number;
     maxLength: number;
+    maxWidth: number;
     fileCount: number;
     wallRailPieces: number;
   };
@@ -52,6 +53,7 @@ export interface SyncPreview {
     fivePieceDoors: number;
     weightLbs: number;
     maxLength: number;
+    maxWidth: number;
     hasGlassParts: boolean;
     glassInserts: number;
     glassShelves: number;

@@ -545,7 +545,7 @@ async function generatePackingSlipChecklistForFile(fileId: number, rawContent: s
 
 // Count parts from actual CSV data rows
 // Now async to cross-reference with products DB for M&J Woodcraft and Richelieu counts
-async function countPartsFromCSV(records: string[][], productsMap?: Map<string, { category: string; supplier: string | null }>): Promise<{ coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; weightLbs: number; customParts: string[]; wallRailPieces: number }> {
+async function countPartsFromCSV(records: string[][], productsMap?: Map<string, { category: string; supplier: string | null }>): Promise<{ coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; maxWidth: number; weightLbs: number; customParts: string[]; wallRailPieces: number }> {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
@@ -830,6 +830,7 @@ export async function registerRoutes(
     let hasMJDoors = false;
     let hasRichelieuDoors = false;
     let overallMaxLength = 0;
+    let overallMaxWidth = 0;
 
     interface FileBreakdown {
       name: string;
@@ -839,6 +840,7 @@ export async function registerRoutes(
       fivePieceDoors: number;
       weightLbs: number;
       maxLength: number;
+      maxWidth: number;
       hasGlassParts: boolean;
       glassInserts: number;
       glassShelves: number;
@@ -876,6 +878,7 @@ export async function registerRoutes(
       if (file.hasMJDoors) hasMJDoors = true;
       if (file.hasRichelieuDoors) hasRichelieuDoors = true;
       if ((file.maxLength || 0) > overallMaxLength) overallMaxLength = file.maxLength || 0;
+      if ((file.maxWidth || 0) > overallMaxWidth) overallMaxWidth = file.maxWidth || 0;
 
       // Get CTS parts count and cut status for this file
       const fileCtsPartsCount = await storage.getCtsPartsCountForFile(file.id);
@@ -895,6 +898,7 @@ export async function registerRoutes(
         fivePieceDoors: file.fivePieceDoors || 0,
         weightLbs: file.weightLbs || 0,
         maxLength: file.maxLength || 0,
+        maxWidth: file.maxWidth || 0,
         hasGlassParts: file.hasGlassParts || false,
         glassInserts: file.glassInserts || 0,
         glassShelves: file.glassShelves || 0,
@@ -943,6 +947,7 @@ export async function registerRoutes(
         ctsPartsCount: totalCtsPartsCount,
         weightLbs: Math.round(totalWeight),
         maxLength: overallMaxLength,
+        maxWidth: overallMaxWidth,
         fileCount: projectFiles.length,
         wallRailPieces: totalWallRailPieces
       },
@@ -1047,6 +1052,7 @@ export async function registerRoutes(
           fivePieceDoors: partCounts.fivePiece,
           weightLbs: Math.round(partCounts.weightLbs),
           maxLength: Math.round(partCounts.maxLength),
+          maxWidth: Math.round(partCounts.maxWidth),
           hasGlassParts: partCounts.hasGlassParts,
           glassInserts: partCounts.glassInserts,
           glassShelves: partCounts.glassShelves,
@@ -2191,6 +2197,7 @@ export async function registerRoutes(
       let hasMJDoors = false;
       let hasRichelieuDoors = false;
       let overallMaxLength = 0;
+      let overallMaxWidth = 0;
       let hasCTSParts = false;
 
       // Use stored values from database instead of re-parsing CSV
@@ -2206,6 +2213,7 @@ export async function registerRoutes(
         if (file.hasMJDoors) hasMJDoors = true;
         if (file.hasRichelieuDoors) hasRichelieuDoors = true;
         if ((file.maxLength || 0) > overallMaxLength) overallMaxLength = file.maxLength || 0;
+        if ((file.maxWidth || 0) > overallMaxWidth) overallMaxWidth = file.maxWidth || 0;
         
         // Check for CTS parts using stored data
         const ctsCount = await storage.getCtsPartsCountForFile(file.id);
@@ -3311,6 +3319,7 @@ export async function registerRoutes(
               fivePieceDoors: counts.fivePiece,
               weightLbs: Math.round(counts.weightLbs),
               maxLength: Math.round(counts.maxLength),
+              maxWidth: Math.round(counts.maxWidth),
               hasGlassParts: counts.hasGlassParts,
               glassInserts: counts.glassInserts,
               glassShelves: counts.glassShelves,
