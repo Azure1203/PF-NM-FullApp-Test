@@ -799,10 +799,11 @@ export async function registerRoutes(
   app.delete(api.orders.delete.path, isAuthenticated, async (req, res) => {
     // Check if user is admin
     const replitUser = (req as any).user;
-    if (!replitUser?.name) {
+    const username = replitUser?.claims?.username || replitUser?.name;
+    if (!username) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
-    const isAdmin = await storage.isUserAdmin(replitUser.name);
+    const isAdmin = await storage.isUserAdmin(username);
     if (!isAdmin) {
       return res.status(403).json({ message: 'Only admins can delete orders' });
     }
@@ -5033,10 +5034,11 @@ export async function registerRoutes(
     try {
       // Check if requester is admin
       const replitUser = (req as any).user;
-      if (!replitUser?.name) {
+      const username = replitUser?.claims?.username || replitUser?.name;
+      if (!username) {
         return res.status(401).json({ message: 'Not authenticated' });
       }
-      const requesterIsAdmin = await storage.isUserAdmin(replitUser.name);
+      const requesterIsAdmin = await storage.isUserAdmin(username);
       if (!requesterIsAdmin) {
         return res.status(403).json({ message: 'Only admins can modify admin status' });
       }
@@ -5095,10 +5097,11 @@ export async function registerRoutes(
   app.get('/api/admin/is-admin', isAuthenticated, async (req, res) => {
     try {
       const replitUser = (req as any).user;
-      if (!replitUser?.name) {
+      const username = replitUser?.claims?.username || replitUser?.name;
+      if (!username) {
         return res.json({ isAdmin: false });
       }
-      const isAdmin = await storage.isUserAdmin(replitUser.name);
+      const isAdmin = await storage.isUserAdmin(username);
       res.json({ isAdmin });
     } catch (e: any) {
       console.error('[Admin] Error checking admin status:', e);
