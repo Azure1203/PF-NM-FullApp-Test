@@ -50,6 +50,7 @@ export const orderFiles = pgTable("order_files", {
   fivePieceDoors: integer("five_piece_doors").default(0),
   weightLbs: integer("weight_lbs").default(0),
   maxLength: integer("max_length").default(0),
+  maxWidth: integer("max_width").default(0),
   hasGlassParts: boolean("has_glass_parts").default(false),
   glassInserts: integer("glass_inserts").default(0),
   glassShelves: integer("glass_shelves").default(0),

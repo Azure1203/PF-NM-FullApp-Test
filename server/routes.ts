@@ -561,6 +561,7 @@ async function countPartsFromCSV(records: string[][], productsMap?: Map<string, 
   let mjDoorsCount = 0;
   let richelieuDoorsCount = 0;
   let maxLength = 0;
+  let maxWidth = 0;
   let weightLbs = 0;
   let wallRailPieces = 0;
   
@@ -578,7 +579,7 @@ async function countPartsFromCSV(records: string[][], productsMap?: Map<string, 
     }
   }
 
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts: [], wallRailPieces };
+  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, maxWidth, weightLbs, customParts: [], wallRailPieces };
 
   // If productsMap not provided, fetch products from database
   // Collect all codes first so we can batch lookup
@@ -674,14 +675,17 @@ async function countPartsFromCSV(records: string[][], productsMap?: Map<string, 
       glassShelves += quantity;
     }
 
-    // Track max part height (column 3 is Height)
+    // Track max part height (column 3 is Height) and max part width (column 4 is Width)
     const height = parseFloat(row[3] || '0') || 0;
+    const width = parseFloat(row[4] || '0') || 0;
     if (height > maxLength) {
       maxLength = height;
     }
+    if (width > maxWidth) {
+      maxWidth = width;
+    }
 
     // Calculate weight for this part (Height × Width in mm², then convert to sq ft)
-    const width = parseFloat(row[4] || '0') || 0;
     if (height > 0 && width > 0) {
       const areaSqMm = height * width * quantity;
       const areaSqFt = areaSqMm / SQMM_TO_SQFT;
@@ -726,7 +730,7 @@ async function countPartsFromCSV(records: string[][], productsMap?: Map<string, 
   if (hasDoubleThick) customParts.push('DOUBLE THICK PARTS');
   if (hasShakerDoors) customParts.push('SHAKER DOORS');
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, weightLbs, customParts, wallRailPieces };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, maxWidth, weightLbs, customParts, wallRailPieces };
 }
 
 export async function registerRoutes(
