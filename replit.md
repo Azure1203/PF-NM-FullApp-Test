@@ -69,6 +69,13 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes
 
 ### January 2026
+- **Admin-Only Delete System**: Implemented role-based access control for order deletion
+  - Added `isAdmin` boolean field to `allowedUsers` table
+  - Admin toggle switch in AdminUsers page (disabled for non-admins)
+  - Delete order endpoint (DELETE /api/orders/:id) requires admin status, returns 403 for non-admins
+  - Toggle admin endpoint (POST /api/admin/allowed-users/:id/toggle-admin) also requires admin status
+  - Delete buttons hidden in Dashboard and OrderDetails pages for non-admin users
+  - `useIsAdmin()` hook checks current user's admin status via GET /api/admin/is-admin
 - **Max Width Tracking**: Added maxWidth field to track the widest part in each order (from CSV column 4)
   - Displayed alongside Max Length in project totals ("mm wide" label)
   - Shown in pallet metrics grid as info-only metric
