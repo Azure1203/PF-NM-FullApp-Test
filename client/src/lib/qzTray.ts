@@ -78,8 +78,16 @@ function setupSigning(): void {
   
   // Set up certificate callback - returns a Promise that resolves to the certificate string
   qz.security.setCertificatePromise(() => {
+    console.log('[QZ Tray] Certificate requested by QZ Tray');
     return fetch('/api/qz/certificate')
-      .then(response => response.text())
+      .then(response => {
+        console.log('[QZ Tray] Certificate response status:', response.status);
+        return response.text();
+      })
+      .then(cert => {
+        console.log('[QZ Tray] Certificate received, length:', cert.length);
+        return cert;
+      })
       .catch(error => {
         console.error('[QZ Tray] Failed to get certificate:', error);
         return ''; // Empty certificate will use insecure mode
@@ -89,13 +97,20 @@ function setupSigning(): void {
   // Set up signing callback - takes toSign data and returns a Promise resolving to signature
   qz.security.setSignatureAlgorithm('SHA512');
   qz.security.setSignaturePromise((toSign: string) => {
+    console.log('[QZ Tray] Signature requested for data length:', toSign?.length);
     return fetch('/api/qz/sign', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ request: toSign }),
     })
-      .then(response => response.json())
-      .then(data => data.signature || '')
+      .then(response => {
+        console.log('[QZ Tray] Signature response status:', response.status);
+        return response.json();
+      })
+      .then(data => {
+        console.log('[QZ Tray] Signature received, length:', data.signature?.length || 0);
+        return data.signature || '';
+      })
       .catch(error => {
         console.error('[QZ Tray] Failed to sign request:', error);
         return ''; // Empty signature will use insecure mode
@@ -129,9 +144,11 @@ async function ensureConnection(): Promise<void> {
 
 export async function getPrinters(): Promise<Printer[]> {
   try {
+    console.log('[QZ Tray] getPrinters() called');
     await ensureConnection();
+    console.log('[QZ Tray] Connection established, calling qz.printers.find()...');
     const printers = await qz.printers.find();
-    console.log('[QZ Tray] Available printers:', printers);
+    console.log('[QZ Tray] qz.printers.find() returned:', printers);
     
     if (Array.isArray(printers)) {
       return printers.map((name: string) => ({
