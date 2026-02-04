@@ -14,9 +14,9 @@ declare module 'qz-tray' {
     };
     print(config: object, data: Array<string | object>): Promise<void>;
     security: {
-      setCertificatePromise(callback: (resolve: (cert: string) => void) => void): void;
+      setCertificatePromise(callback: () => Promise<string>): void;
       setSignatureAlgorithm(algorithm: string): void;
-      setSignaturePromise(callback: (toSign: (signature: string) => void) => (request: string) => Promise<void>): void;
+      setSignaturePromise(callback: (toSign: string) => Promise<string>): void;
     };
   }
 

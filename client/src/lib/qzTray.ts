@@ -76,35 +76,30 @@ let signingSetup = false;
 function setupSigning(): void {
   if (signingSetup) return;
   
-  // Set up certificate callback
-  qz.security.setCertificatePromise(async (resolve: (cert: string) => void) => {
-    try {
-      const response = await fetch('/api/qz/certificate');
-      const certificate = await response.text();
-      resolve(certificate);
-    } catch (error) {
-      console.error('[QZ Tray] Failed to get certificate:', error);
-      resolve(''); // Empty certificate will use insecure mode
-    }
+  // Set up certificate callback - returns a Promise that resolves to the certificate string
+  qz.security.setCertificatePromise(() => {
+    return fetch('/api/qz/certificate')
+      .then(response => response.text())
+      .catch(error => {
+        console.error('[QZ Tray] Failed to get certificate:', error);
+        return ''; // Empty certificate will use insecure mode
+      });
   });
   
-  // Set up signing callback
+  // Set up signing callback - takes toSign data and returns a Promise resolving to signature
   qz.security.setSignatureAlgorithm('SHA512');
-  qz.security.setSignaturePromise((toSign: (data: string) => void) => {
-    return async (request: string) => {
-      try {
-        const response = await fetch('/api/qz/sign', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ request }),
-        });
-        const data = await response.json();
-        toSign(data.signature || '');
-      } catch (error) {
+  qz.security.setSignaturePromise((toSign: string) => {
+    return fetch('/api/qz/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request: toSign }),
+    })
+      .then(response => response.json())
+      .then(data => data.signature || '')
+      .catch(error => {
         console.error('[QZ Tray] Failed to sign request:', error);
-        toSign(''); // Empty signature will use insecure mode
-      }
-    };
+        return ''; // Empty signature will use insecure mode
+      });
   });
   
   signingSetup = true;
