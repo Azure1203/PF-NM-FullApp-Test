@@ -70,60 +70,11 @@ export function savePrinterConfig(config: PrinterConfig): void {
 }
 
 let isConnected = false;
-let signingSetup = false;
 
-// Set up QZ Tray signing to eliminate "Allow" pop-ups
-function setupSigning(): void {
-  if (signingSetup) return;
-  
-  // Set up certificate callback - returns a Promise that resolves to the certificate string
-  qz.security.setCertificatePromise(() => {
-    console.log('[QZ Tray] Certificate requested by QZ Tray');
-    return fetch('/api/qz/certificate')
-      .then(response => {
-        console.log('[QZ Tray] Certificate response status:', response.status);
-        return response.text();
-      })
-      .then(cert => {
-        console.log('[QZ Tray] Certificate received, length:', cert.length);
-        return cert;
-      })
-      .catch(error => {
-        console.error('[QZ Tray] Failed to get certificate:', error);
-        return ''; // Empty certificate will use insecure mode
-      });
-  });
-  
-  // Set up signing callback - takes toSign data and returns a Promise resolving to signature
-  qz.security.setSignatureAlgorithm('SHA512');
-  qz.security.setSignaturePromise((toSign: string) => {
-    console.log('[QZ Tray] Signature requested for data length:', toSign?.length);
-    return fetch('/api/qz/sign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ request: toSign }),
-    })
-      .then(response => {
-        console.log('[QZ Tray] Signature response status:', response.status);
-        return response.json();
-      })
-      .then(data => {
-        console.log('[QZ Tray] Signature received, length:', data.signature?.length || 0);
-        return data.signature || '';
-      })
-      .catch(error => {
-        console.error('[QZ Tray] Failed to sign request:', error);
-        return ''; // Empty signature will use insecure mode
-      });
-  });
-  
-  signingSetup = true;
-  console.log('[QZ Tray] Signing callbacks configured');
-}
+// Signing callbacks removed - QZ Tray will show "Allow" dialog for each site
+// To enable auto-signing without dialogs, set QZ_TRAY_CERTIFICATE and QZ_TRAY_PRIVATE_KEY env vars
 
 async function ensureConnection(): Promise<void> {
-  // Set up signing before connecting
-  setupSigning();
   
   if (qz.websocket.isActive()) {
     isConnected = true;
