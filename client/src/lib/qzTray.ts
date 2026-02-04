@@ -190,11 +190,11 @@ function createProjectLabelZpl(data: {
 
   let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
 
-  zpl += `^FO${leftMargin},50^A0N,50,50^FDPERFECT FIT PROJECT LABEL^FS\n`;
-  zpl += `^FO${leftMargin},105^GB450,2,2^FS\n`;
-  zpl += `^FO${leftMargin},170^A0N,35,35^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},245^A0N,35,35^FDProject Name: ${data.projectName || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},320^A0N,35,35^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},25^A0N,50,50^FDPERFECT FIT PROJECT LABEL^FS\n`;
+  zpl += `^FO${leftMargin},80^GB450,2,2^FS\n`;
+  zpl += `^FO${leftMargin},110^A0N,50,50^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},180^A0N,50,50^FDProject Name: ${data.projectName || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},250^A0N,50,50^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS\n`;
 
   zpl += '^XZ';
   return zpl;
