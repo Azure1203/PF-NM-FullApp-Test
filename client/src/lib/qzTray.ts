@@ -281,7 +281,7 @@ export async function printHardwareLabel(
     yPos += lineHeight;
 
     const orderNameText = `ORDER NAME: ${orderName || 'N/A'}`;
-    const orderNameLines = wrapText(orderNameText, maxChars).slice(0, 3);
+    const orderNameLines = wrapText(orderNameText, 35).slice(0, 3);
     for (const line of orderNameLines) {
       zpl += `^FO${leftMargin},${yPos}^A0N,${smallerFontSize},${smallerFontSize}^FD${line}^FS\n`;
       yPos += smallerLineHeight;
