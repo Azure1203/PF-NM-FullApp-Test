@@ -186,15 +186,17 @@ function createProjectLabelZpl(data: {
 }, labelSize: LabelSize): string {
   const labelWidth = 812;
   const labelHeight = 406;
-  const leftMargin = 40;
+  const leftMargin = 30;
+  const fontSize = 60;
+  const lineHeight = 90;
 
   let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
 
-  zpl += `^FO${leftMargin},25^A0N,50,50^FDPERFECT FIT PROJECT LABEL^FS\n`;
-  zpl += `^FO${leftMargin},80^GB450,2,2^FS\n`;
-  zpl += `^FO${leftMargin},110^A0N,50,50^FDCienapps & CV Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},180^A0N,50,50^FDProject Name: ${data.projectName || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},250^A0N,50,50^FDPerfect Fit Order ID: ${data.orderId || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},15^A0N,${fontSize},${fontSize}^FDPERFECT FIT PROJECT LABEL^FS\n`;
+  zpl += `^FO${leftMargin},78^GB500,3,3^FS\n`;
+  zpl += `^FO${leftMargin},105^A0N,${fontSize},${fontSize}^FDJob #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},${105 + lineHeight}^A0N,${fontSize},${fontSize}^FDName: ${data.projectName || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},${105 + lineHeight * 2}^A0N,${fontSize},${fontSize}^FDOrder ID: ${data.orderId || 'N/A'}^FS\n`;
 
   zpl += '^XZ';
   return zpl;
@@ -240,42 +242,31 @@ export async function printHardwareLabel(
     
     const labelWidth = 812;
     const labelHeight = 406;
-    const leftMargin = 40;
-    const fontSize = 50;
-    const lineHeight = 55;
-    const maxChars = 28;
-    const maxLinesPerField = palletNumber ? 1 : 2;
+    const leftMargin = 30;
+    const fontSize = 55;
+    const lineHeight = 70;
+    const maxChars = 30;
     
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
-    let yPos = 15;
+    let yPos = 12;
 
     zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPERFECT FIT HARDWARE LABEL^FS\n`;
-    yPos += 50;
-    zpl += `^FO${leftMargin},${yPos}^GB450,2,2^FS\n`;
+    yPos += 58;
+    zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
     yPos += 18;
 
-    const jobText = `Job #: ${cienappsJobNumber || 'N/A'}`;
-    const jobLines = wrapText(jobText, maxChars).slice(0, maxLinesPerField);
-    for (const line of jobLines) {
-      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
-      yPos += lineHeight;
-    }
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS\n`;
+    yPos += lineHeight;
 
-    const orderIdText = `Order ID: ${orderId || 'N/A'}`;
-    const orderIdLines = wrapText(orderIdText, maxChars).slice(0, maxLinesPerField);
-    for (const line of orderIdLines) {
-      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
-      yPos += lineHeight;
-    }
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDOrder ID: ${orderId || 'N/A'}^FS\n`;
+    yPos += lineHeight;
 
     const orderNameText = allmoxyJobNumber 
-      ? `Order: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
-      : `Order: ${orderName || 'N/A'}`;
-    const orderNameLines = wrapText(orderNameText, maxChars).slice(0, maxLinesPerField);
-    for (const line of orderNameLines) {
-      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
-      yPos += lineHeight;
-    }
+      ? `${orderName || 'N/A'} + ${allmoxyJobNumber}`
+      : `${orderName || 'N/A'}`;
+    const truncatedName = orderNameText.length > maxChars ? orderNameText.substring(0, maxChars - 2) + '..' : orderNameText;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${truncatedName}^FS\n`;
+    yPos += lineHeight;
 
     if (palletNumber) {
       zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPALLET ${palletNumber}^FS\n`;
