@@ -748,18 +748,19 @@ export async function registerRoutes(
   // Create object storage service instance
   const objectStorageService = new ObjectStorageService();
 
-  // QZ Tray signing endpoint - signs print requests with private key
   app.post('/api/qz/sign', async (req, res) => {
     const { toSign } = req.body;
     if (!toSign || typeof toSign !== 'string') {
       return res.status(400).send('Missing or invalid toSign parameter');
     }
     
-    const privateKey = process.env.QZ_PRIVATE_KEY;
+    let privateKey = process.env.QZ_PRIVATE_KEY;
     if (!privateKey) {
       console.error('[QZ Sign] QZ_PRIVATE_KEY environment variable not set');
       return res.status(500).send('QZ signing not configured');
     }
+    
+    privateKey = privateKey.replace(/\\n/g, '\n');
     
     try {
       const sign = crypto.createSign('SHA512');
@@ -5146,56 +5147,6 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error('[Admin] Error checking if user is allowed:', e);
       res.status(500).json({ message: 'Failed to check user', error: e.message });
-    }
-  });
-
-  // ============================================
-  // QZ Tray Signing Endpoint
-  // ============================================
-  
-  // Sign a message for QZ Tray (eliminates "Allow" pop-ups)
-  app.post('/api/qz/sign', async (req, res) => {
-    try {
-      const { request } = req.body;
-      
-      if (!request) {
-        return res.status(400).json({ error: 'Request data is required' });
-      }
-      
-      const privateKey = process.env.QZ_TRAY_PRIVATE_KEY;
-      
-      if (!privateKey) {
-        // If no private key configured, return empty signature (will use insecure mode)
-        console.log('[QZ Tray] No private key configured, using insecure mode');
-        return res.json({ signature: '' });
-      }
-      
-      // Sign the request using SHA512 with RSA
-      const sign = crypto.createSign('SHA512');
-      sign.update(request);
-      const signature = sign.sign(privateKey, 'base64');
-      
-      res.json({ signature });
-    } catch (e: any) {
-      console.error('[QZ Tray] Signing error:', e);
-      res.status(500).json({ error: 'Failed to sign request', message: e.message });
-    }
-  });
-
-  // Get QZ Tray certificate (public certificate for browser to verify)
-  app.get('/api/qz/certificate', async (req, res) => {
-    try {
-      const certificate = process.env.QZ_TRAY_CERTIFICATE;
-      
-      if (!certificate) {
-        // Return empty certificate if not configured
-        return res.type('text/plain').send('');
-      }
-      
-      res.type('text/plain').send(certificate);
-    } catch (e: any) {
-      console.error('[QZ Tray] Certificate error:', e);
-      res.status(500).json({ error: 'Failed to get certificate' });
     }
   });
 
