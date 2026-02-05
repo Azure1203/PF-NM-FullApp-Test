@@ -224,9 +224,9 @@ function createProjectLabelZpl(data: {
   const maxChars = 25;
 
   let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
-  let yPos = 15;
+  let yPos = 31;
 
-  zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPROJECT LABEL^FS\n`;
+  zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FDPROJECT LABEL^FS\n`;
   yPos += 55;
   zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
   yPos += 20;
