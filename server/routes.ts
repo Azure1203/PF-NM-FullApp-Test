@@ -762,6 +762,17 @@ export async function registerRoutes(
     
     privateKey = privateKey.replace(/\\n/g, '\n');
     
+    if (!privateKey.includes('\n')) {
+      const pemHeader = '-----BEGIN PRIVATE KEY-----';
+      const pemFooter = '-----END PRIVATE KEY-----';
+      let keyBody = privateKey
+        .replace(pemHeader, '')
+        .replace(pemFooter, '')
+        .replace(/\s+/g, '');
+      const lines = keyBody.match(/.{1,64}/g) || [];
+      privateKey = [pemHeader, ...lines, pemFooter].join('\n');
+    }
+    
     try {
       const sign = crypto.createSign('SHA512');
       sign.update(toSign);
