@@ -298,7 +298,7 @@ export async function printHardwareLabel(
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
     let yPos = 24;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDHARDWARE LABEL^FS\n`;
+    zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FDHARDWARE LABEL^FS\n`;
     yPos += 48;
     zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
     yPos += 12;
