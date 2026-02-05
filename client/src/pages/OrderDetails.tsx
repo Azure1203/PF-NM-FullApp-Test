@@ -808,13 +808,15 @@ export default function OrderDetails() {
       // Find the pallet number for this file
       const filePallet = pallets.find(p => p.fileIds.includes(fileId));
       const palletNumber = filePallet?.palletNumber;
+      const palletCount = pallets.length;
       
       const result = await printHardwareLabel(
         orderName,
         allmoxyJobNumber || '',
         project?.orderId || '',
         project?.cienappsJobNumber || '',
-        palletNumber
+        palletNumber,
+        palletCount
       );
       if (result.success) {
         toast({ title: 'Label printed', description: 'Hardware label sent to printer' });

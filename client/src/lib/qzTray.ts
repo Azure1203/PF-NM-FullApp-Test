@@ -245,7 +245,8 @@ export async function printHardwareLabel(
   allmoxyJobNumber: string,
   orderId: string,
   cienappsJobNumber: string,
-  palletNumber?: number
+  palletNumber?: number,
+  palletCount?: number
 ): Promise<PrintResult> {
   try {
     const printerName = await findConfiguredPrinter('4x2');
@@ -256,33 +257,40 @@ export async function printHardwareLabel(
     const labelWidth = 812;
     const labelHeight = 406;
     const leftMargin = 30;
-    const fontSize = 55;
-    const lineHeight = 70;
-    const maxChars = 30;
+    const fontSize = 50;
+    const smallerFontSize = 45;
+    const lineHeight = 50;
+    const smallerLineHeight = 45;
+    const maxChars = 25;
     
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
-    let yPos = 12;
+    let yPos = 8;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPERFECT FIT HARDWARE LABEL^FS\n`;
-    yPos += 58;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDHARDWARE LABEL^FS\n`;
+    yPos += 48;
     zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
-    yPos += 18;
+    yPos += 12;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
     yPos += lineHeight;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDOrder ID: ${orderId || 'N/A'}^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDALLMOXY #: ${allmoxyJobNumber || 'N/A'}^FS\n`;
     yPos += lineHeight;
 
-    const orderNameText = allmoxyJobNumber 
-      ? `${orderName || 'N/A'} + ${allmoxyJobNumber}`
-      : `${orderName || 'N/A'}`;
-    const truncatedName = orderNameText.length > maxChars ? orderNameText.substring(0, maxChars - 2) + '..' : orderNameText;
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${truncatedName}^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPF ORDER ID: ${orderId || 'N/A'}^FS\n`;
     yPos += lineHeight;
 
-    if (palletNumber) {
-      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPALLET ${palletNumber}^FS\n`;
+    const orderNameText = `ORDER NAME: ${orderName || 'N/A'}`;
+    const orderNameLines = wrapText(orderNameText, maxChars).slice(0, 3);
+    for (const line of orderNameLines) {
+      zpl += `^FO${leftMargin},${yPos}^A0N,${smallerFontSize},${smallerFontSize}^FD${line}^FS\n`;
+      yPos += smallerLineHeight;
+    }
+
+    if (palletNumber && palletCount) {
+      zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FDPALLET ${palletNumber} OF ${palletCount}^FS\n`;
+    } else if (palletNumber) {
+      zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FDPALLET ${palletNumber}^FS\n`;
     }
 
     zpl += '^XZ';
