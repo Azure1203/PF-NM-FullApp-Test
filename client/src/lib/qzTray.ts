@@ -194,8 +194,8 @@ function createProjectLabelZpl(data: {
 
   zpl += `^FO${leftMargin},15^A0N,${fontSize},${fontSize}^FDPERFECT FIT PROJECT LABEL^FS\n`;
   zpl += `^FO${leftMargin},78^GB500,3,3^FS\n`;
-  zpl += `^FO${leftMargin},105^A0N,${fontSize},${fontSize}^FDJob #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},${105 + lineHeight}^A0N,${fontSize},${fontSize}^FDName: ${data.projectName || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},105^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},${105 + lineHeight}^A0N,${fontSize},${fontSize}^FDProject Name: ${data.projectName || 'N/A'}^FS\n`;
   zpl += `^FO${leftMargin},${105 + lineHeight * 2}^A0N,${fontSize},${fontSize}^FDOrder ID: ${data.orderId || 'N/A'}^FS\n`;
 
   zpl += '^XZ';
