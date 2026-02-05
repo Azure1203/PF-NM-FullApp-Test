@@ -1,0 +1,98 @@
+Layout was forced before the page was fully loaded. If stylesheets are not yet loaded this may cause a flash of unstyled content. node.js:418:1
+[QZ Tray] getPrinters() called index-BNoGSBw5.js:52:55918
+[QZ Tray] Signing configuration initialized index-BNoGSBw5.js:52:55465
+[QZ Tray] Connecting... index-BNoGSBw5.js:52:55595
+Established connection with QZ Tray on wss://localhost:8181 index-BNoGSBw5.js:52:24998
+[QZ Tray] Certificate loaded successfully index-BNoGSBw5.js:52:55054
+[QZ Tray] Connected successfully index-BNoGSBw5.js:52:55669
+[QZ Tray] Connection established, calling qz.printers.find()... index-BNoGSBw5.js:52:55975
+XHR
+POST
+https://perfectfitorders.com/api/qz/sign
+[HTTP/3 500  118ms]
+
+Signing failed Error: Signing failed
+    kI https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    callSign https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    sendData https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    promise callback*bI/openConnection/s.websocket.connection.sendData https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    n https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    promise https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    dataPromise https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    find https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    TN https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    C https://perfectfitorders.com/assets/index-BNoGSBw5.js:104
+    TI https://perfectfitorders.com/assets/index-BNoGSBw5.js:104
+    pd https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Mi https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    H1 https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Ha https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Tv https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Zs https://perfectfitorders.com/assets/index-BNoGSBw5.js:6
+    Kn https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Kn https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Rr https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    P1 https://perfectfitorders.com/assets/index-BNoGSBw5.js:6
+    Mn https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    p https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    onOpenToggle https://perfectfitorders.com/assets/index-BNoGSBw5.js:48
+    Le https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    $o https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    rf https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Cg https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ax https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ix https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Af https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Ap https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Cc https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Af https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    pf https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ES https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ox https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Tf https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    al https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    al https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    createRoot https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    <anonymous> https://perfectfitorders.com/assets/index-BNoGSBw5.js:121
+index-BNoGSBw5.js:52:25175
+[QZ Tray] Error getting printers: Error: Failed to sign request
+    sendData https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    promise callback*bI/openConnection/s.websocket.connection.sendData https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    n https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    promise https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    dataPromise https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    find https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    TN https://perfectfitorders.com/assets/index-BNoGSBw5.js:52
+    C https://perfectfitorders.com/assets/index-BNoGSBw5.js:104
+    TI https://perfectfitorders.com/assets/index-BNoGSBw5.js:104
+    pd https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Mi https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    H1 https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Ha https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Tv https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Zs https://perfectfitorders.com/assets/index-BNoGSBw5.js:6
+    Kn https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Kn https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Rr https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    P1 https://perfectfitorders.com/assets/index-BNoGSBw5.js:6
+    Mn https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    p https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    onOpenToggle https://perfectfitorders.com/assets/index-BNoGSBw5.js:48
+    Le https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    $o https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    rf https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Cg https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ax https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ix https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Af https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Ap https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    Cc https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Af https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    pf https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ES https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    ox https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    Tf https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    al https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    al https://perfectfitorders.com/assets/index-BNoGSBw5.js:5
+    createRoot https://perfectfitorders.com/assets/index-BNoGSBw5.js:8
+    <anonymous> https://perfectfitorders.com/assets/index-BNoGSBw5.js:121
