@@ -188,22 +188,22 @@ function createProjectLabelZpl(data: {
   const labelHeight = 406;
   const leftMargin = 30;
   const fontSize = 60;
-  const lineHeight = 70;
+  const lineHeight = 60;
   const maxChars = 25;
 
   let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
   let yPos = 15;
 
   zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPERFECT FIT PROJECT LABEL^FS\n`;
-  yPos += 63;
+  yPos += 55;
   zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
-  yPos += 25;
+  yPos += 20;
 
   zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
   yPos += lineHeight;
 
   const projectNameText = `Project Name: ${data.projectName || 'N/A'}`;
-  const projectNameLines = wrapText(projectNameText, maxChars).slice(0, 2);
+  const projectNameLines = wrapText(projectNameText, maxChars).slice(0, 3);
   for (const line of projectNameLines) {
     zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
     yPos += lineHeight;
