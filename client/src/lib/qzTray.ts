@@ -351,14 +351,14 @@ export async function printCTSLabel(
     yPos += largeLineHeight;
 
     const orderNameText = `Order Name: ${orderName || 'N/A'}`;
-    const orderNameLines = wrapText(orderNameText, maxChars).slice(0, 2);
+    const orderNameLines = wrapText(orderNameText, maxChars).slice(0, 3);
     for (const line of orderNameLines) {
       zpl += `^FO${leftMargin},${yPos}^A0N,${smallFontSize},${smallFontSize}^FD${line}^FS\n`;
       yPos += smallLineHeight;
     }
 
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + (LENGTH: ${cutLength} MM) + (QTY: ${quantity})`;
-    const productLines = wrapText(productLine, maxChars).slice(0, 3);
+    const productLines = wrapText(productLine, maxChars).slice(0, 2);
     for (const line of productLines) {
       zpl += `^FO${leftMargin},${yPos}^A0N,${smallFontSize},${smallFontSize}^FD${line}^FS\n`;
       yPos += smallLineHeight;
