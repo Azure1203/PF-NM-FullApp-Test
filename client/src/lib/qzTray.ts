@@ -70,11 +70,54 @@ export function savePrinterConfig(config: PrinterConfig): void {
 }
 
 let isConnected = false;
+let signingConfigured = false;
 
-// Signing callbacks removed - QZ Tray will show "Allow" dialog for each site
-// To enable auto-signing without dialogs, set QZ_TRAY_CERTIFICATE and QZ_TRAY_PRIVATE_KEY env vars
+// Configure QZ Tray certificate and signing for auto-approval
+function configureQzSigning(): void {
+  if (signingConfigured) return;
+  
+  // Set certificate promise - loads from public file
+  qz.security.setCertificatePromise((): Promise<string> => {
+    return fetch('/qz-certificate.txt', { cache: 'no-store' })
+      .then(response => {
+        if (response.ok) {
+          return response.text();
+        }
+        throw new Error('Certificate not found');
+      })
+      .then(cert => {
+        console.log('[QZ Tray] Certificate loaded successfully');
+        return cert;
+      });
+  });
+
+  // Set signature promise - calls server to sign with private key
+  qz.security.setSignatureAlgorithm('SHA512');
+  qz.security.setSignaturePromise((toSign: string): Promise<string> => {
+    return fetch('/api/qz/sign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ toSign })
+    })
+      .then(response => {
+        if (response.ok) {
+          return response.text();
+        }
+        throw new Error('Signing failed');
+      })
+      .then(signature => {
+        console.log('[QZ Tray] Request signed successfully');
+        return signature;
+      });
+  });
+  
+  signingConfigured = true;
+  console.log('[QZ Tray] Signing configuration initialized');
+}
 
 async function ensureConnection(): Promise<void> {
+  // Configure signing before connecting
+  configureQzSigning();
   
   if (qz.websocket.isActive()) {
     isConnected = true;

@@ -748,6 +748,30 @@ export async function registerRoutes(
   // Create object storage service instance
   const objectStorageService = new ObjectStorageService();
 
+  // QZ Tray signing endpoint - signs print requests with private key
+  app.post('/api/qz/sign', async (req, res) => {
+    const { toSign } = req.body;
+    if (!toSign || typeof toSign !== 'string') {
+      return res.status(400).send('Missing or invalid toSign parameter');
+    }
+    
+    const privateKey = process.env.QZ_PRIVATE_KEY;
+    if (!privateKey) {
+      console.error('[QZ Sign] QZ_PRIVATE_KEY environment variable not set');
+      return res.status(500).send('QZ signing not configured');
+    }
+    
+    try {
+      const sign = crypto.createSign('SHA512');
+      sign.update(toSign);
+      const signature = sign.sign(privateKey, 'base64');
+      res.send(signature);
+    } catch (error) {
+      console.error('[QZ Sign] Signing error:', error);
+      res.status(500).send('Signing failed');
+    }
+  });
+
   // List all projects with status summaries (protected)
   app.get(api.orders.list.path, isAuthenticated, async (req, res) => {
     const allProjects = await storage.getProjects();
