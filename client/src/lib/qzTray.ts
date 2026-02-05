@@ -328,22 +328,36 @@ export async function printCTSLabel(
     const leftMargin = 40;
     
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
+    const fontSize = 25;
+    const lineHeight = 30;
+    let yPos = 20;
 
-    zpl += `^FO${leftMargin},25^A0N,38,38^FDPERFECT FIT CTS LABEL^FS\n`;
-    zpl += `^FO${leftMargin},68^GB400,2,2^FS\n`;
-    zpl += `^FO${leftMargin},90^A0N,25,25^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
-    zpl += `^FO${leftMargin},135^A0N,25,25^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,38,38^FDCTS LABEL^FS\n`;
+    yPos += 45;
+    zpl += `^FO${leftMargin},${yPos}^GB400,2,2^FS\n`;
+    yPos += 15;
 
-    const orderLine = allmoxyJobNumber 
-      ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
-      : `Order Name: ${orderName || 'N/A'}`;
-    zpl += `^FO${leftMargin},180^A0N,25,25^FD${orderLine}^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
+    yPos += lineHeight;
 
-    const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + ${quantity}`;
-    zpl += `^FO${leftMargin},225^A0N,25,25^FD${productLine}^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS\n`;
+    yPos += lineHeight;
+
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDAllmoxy Job #: ${allmoxyJobNumber || 'N/A'}^FS\n`;
+    yPos += lineHeight;
+
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDOrder Name: ${orderName || 'N/A'}^FS\n`;
+    yPos += lineHeight;
+
+    const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + (QTY: ${quantity})`;
+    const productLines = wrapText(productLine, 40).slice(0, 3);
+    for (const line of productLines) {
+      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
+      yPos += lineHeight;
+    }
 
     if (palletNumber) {
-      zpl += `^FO${leftMargin},270^A0N,25,25^FDPALLET ${palletNumber}^FS\n`;
+      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPALLET ${palletNumber}^FS\n`;
     }
 
     zpl += '^XZ';
