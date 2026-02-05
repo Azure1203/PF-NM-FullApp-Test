@@ -179,6 +179,53 @@ const MAX_CHARS_4X2 = 34;
 const MAX_CHARS_4X6 = 34;
 const PALLET_MAX_CHARS = 24;
 
+function calculateOptimalFontSize(
+  lines: string[],
+  usableWidth: number,
+  usableHeight: number,
+  minFontSize: number = 35,
+  maxFontSize: number = 70
+): { fontSize: number; lineHeight: number; charsPerLine: number; maxLinesPerField: number } {
+  const charWidthRatio = 0.55;
+  const lineHeightRatio = 1.4;
+  
+  for (let fontSize = maxFontSize; fontSize >= minFontSize; fontSize -= 5) {
+    const charWidth = fontSize * charWidthRatio;
+    const charsPerLine = Math.floor(usableWidth / charWidth);
+    const lineHeight = Math.floor(fontSize * lineHeightRatio);
+    
+    let totalLinesNeeded = 0;
+    for (const line of lines) {
+      const linesForThisField = Math.ceil(line.length / charsPerLine);
+      totalLinesNeeded += Math.max(1, linesForThisField);
+    }
+    
+    const totalHeightNeeded = totalLinesNeeded * lineHeight;
+    const maxTotalLines = Math.floor(usableHeight / lineHeight);
+    const maxLinesPerField = Math.max(1, Math.floor(maxTotalLines / lines.length));
+    
+    if (totalHeightNeeded <= usableHeight) {
+      return { fontSize, lineHeight, charsPerLine, maxLinesPerField };
+    }
+  }
+  
+  const fontSize = minFontSize;
+  const lineHeight = Math.floor(fontSize * lineHeightRatio);
+  const charsPerLine = Math.floor(usableWidth / (fontSize * charWidthRatio));
+  const maxTotalLines = Math.floor(usableHeight / lineHeight);
+  return {
+    fontSize,
+    lineHeight,
+    charsPerLine,
+    maxLinesPerField: Math.max(1, Math.floor(maxTotalLines / lines.length))
+  };
+}
+
+function truncateWithEllipsis(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return text.substring(0, maxChars - 2) + '..';
+}
+
 function createProjectLabelZpl(data: {
   projectName: string;
   orderId: string;
@@ -187,16 +234,39 @@ function createProjectLabelZpl(data: {
   const labelWidth = 812;
   const labelHeight = 406;
   const leftMargin = 30;
-  const fontSize = 60;
-  const lineHeight = 90;
+  const usableWidth = labelWidth - (leftMargin * 2);
+  const titleHeight = 75;
+  const usableHeight = labelHeight - titleHeight - 20;
+  const maxYPos = labelHeight - 20;
+
+  const lines = [
+    `Job #: ${data.cienappsJobNumber || 'N/A'}`,
+    `Name: ${data.projectName || 'N/A'}`,
+    `Order ID: ${data.orderId || 'N/A'}`
+  ];
+
+  const { fontSize, lineHeight, charsPerLine, maxLinesPerField } = calculateOptimalFontSize(lines, usableWidth, usableHeight);
 
   let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
+  let yPos = 15;
 
-  zpl += `^FO${leftMargin},15^A0N,${fontSize},${fontSize}^FDPERFECT FIT PROJECT LABEL^FS\n`;
-  zpl += `^FO${leftMargin},78^GB500,3,3^FS\n`;
-  zpl += `^FO${leftMargin},105^A0N,${fontSize},${fontSize}^FDJob #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},${105 + lineHeight}^A0N,${fontSize},${fontSize}^FDName: ${data.projectName || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},${105 + lineHeight * 2}^A0N,${fontSize},${fontSize}^FDOrder ID: ${data.orderId || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPERFECT FIT PROJECT LABEL^FS\n`;
+  yPos += fontSize + 15;
+  zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
+  yPos += 20;
+
+  for (const line of lines) {
+    if (yPos > maxYPos) break;
+    let wrappedLines = wrapText(line, charsPerLine).slice(0, maxLinesPerField);
+    if (wrappedLines.length === maxLinesPerField && line.length > charsPerLine * maxLinesPerField) {
+      wrappedLines[maxLinesPerField - 1] = truncateWithEllipsis(wrappedLines[maxLinesPerField - 1], charsPerLine);
+    }
+    for (const wrappedLine of wrappedLines) {
+      if (yPos > maxYPos) break;
+      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${wrappedLine}^FS\n`;
+      yPos += lineHeight;
+    }
+  }
 
   zpl += '^XZ';
   return zpl;
@@ -243,33 +313,43 @@ export async function printHardwareLabel(
     const labelWidth = 812;
     const labelHeight = 406;
     const leftMargin = 30;
-    const fontSize = 55;
-    const lineHeight = 70;
-    const maxChars = 30;
+    const usableWidth = labelWidth - (leftMargin * 2);
+    const titleHeight = 75;
+    const usableHeight = labelHeight - titleHeight - 20;
+    const maxYPos = labelHeight - 20;
+
+    const orderNameText = allmoxyJobNumber 
+      ? `${orderName || 'N/A'} + ${allmoxyJobNumber}`
+      : `${orderName || 'N/A'}`;
+
+    const lines = [
+      `Job #: ${cienappsJobNumber || 'N/A'}`,
+      `Order ID: ${orderId || 'N/A'}`,
+      orderNameText,
+      ...(palletNumber ? [`PALLET ${palletNumber}`] : [])
+    ];
+
+    const { fontSize, lineHeight, charsPerLine, maxLinesPerField } = calculateOptimalFontSize(lines, usableWidth, usableHeight);
     
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
     let yPos = 12;
 
     zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPERFECT FIT HARDWARE LABEL^FS\n`;
-    yPos += 58;
+    yPos += fontSize + 12;
     zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
     yPos += 18;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDJob #: ${cienappsJobNumber || 'N/A'}^FS\n`;
-    yPos += lineHeight;
-
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDOrder ID: ${orderId || 'N/A'}^FS\n`;
-    yPos += lineHeight;
-
-    const orderNameText = allmoxyJobNumber 
-      ? `${orderName || 'N/A'} + ${allmoxyJobNumber}`
-      : `${orderName || 'N/A'}`;
-    const truncatedName = orderNameText.length > maxChars ? orderNameText.substring(0, maxChars - 2) + '..' : orderNameText;
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${truncatedName}^FS\n`;
-    yPos += lineHeight;
-
-    if (palletNumber) {
-      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPALLET ${palletNumber}^FS\n`;
+    for (const line of lines) {
+      if (yPos > maxYPos) break;
+      let wrappedLines = wrapText(line, charsPerLine).slice(0, maxLinesPerField);
+      if (wrappedLines.length === maxLinesPerField && line.length > charsPerLine * maxLinesPerField) {
+        wrappedLines[maxLinesPerField - 1] = truncateWithEllipsis(wrappedLines[maxLinesPerField - 1], charsPerLine);
+      }
+      for (const wrappedLine of wrappedLines) {
+        if (yPos > maxYPos) break;
+        zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${wrappedLine}^FS\n`;
+        yPos += lineHeight;
+      }
     }
 
     zpl += '^XZ';
