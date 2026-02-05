@@ -329,45 +329,47 @@ export async function printCTSLabel(
     const leftMargin = 40;
     
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
-    const fontSize = 38;
-    const lineHeight = 42;
+    const largeFontSize = 38;
+    const largeLineHeight = 42;
+    const smallFontSize = 35;
+    const smallLineHeight = 38;
     const maxChars = 38;
     let yPos = 20;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCTS LABEL^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${largeFontSize},${largeFontSize}^FDCTS LABEL^FS\n`;
     yPos += 45;
     zpl += `^FO${leftMargin},${yPos}^GB400,2,2^FS\n`;
     yPos += 15;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
-    yPos += lineHeight;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${largeFontSize},${largeFontSize}^FDCienapps Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
+    yPos += largeLineHeight;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS\n`;
-    yPos += lineHeight;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${largeFontSize},${largeFontSize}^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS\n`;
+    yPos += largeLineHeight;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDAllmoxy Job #: ${allmoxyJobNumber || 'N/A'}^FS\n`;
-    yPos += lineHeight;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${largeFontSize},${largeFontSize}^FDAllmoxy Job #: ${allmoxyJobNumber || 'N/A'}^FS\n`;
+    yPos += largeLineHeight;
 
     const orderNameText = `Order Name: ${orderName || 'N/A'}`;
     const orderNameLines = wrapText(orderNameText, maxChars).slice(0, 2);
     for (const line of orderNameLines) {
-      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
-      yPos += lineHeight;
+      zpl += `^FO${leftMargin},${yPos}^A0N,${smallFontSize},${smallFontSize}^FD${line}^FS\n`;
+      yPos += smallLineHeight;
     }
 
     const productLine = `${productName || 'N/A'} + ${productCode || 'N/A'} + ${cutLength} + (QTY: ${quantity})`;
     const productLines = wrapText(productLine, maxChars).slice(0, 3);
     for (const line of productLines) {
-      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
-      yPos += lineHeight;
+      zpl += `^FO${leftMargin},${yPos}^A0N,${smallFontSize},${smallFontSize}^FD${line}^FS\n`;
+      yPos += smallLineHeight;
     }
 
     if (palletNumber && palletCount) {
       const palletText = `PALLET ${palletNumber} OF ${palletCount}`;
-      zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FD${palletText}^FS\n`;
+      zpl += `^FO0,${yPos}^A0N,${smallFontSize},${smallFontSize}^FB${labelWidth},1,0,C^FD${palletText}^FS\n`;
     } else if (palletNumber) {
       const palletText = `PALLET ${palletNumber}`;
-      zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FD${palletText}^FS\n`;
+      zpl += `^FO0,${yPos}^A0N,${smallFontSize},${smallFontSize}^FB${labelWidth},1,0,C^FD${palletText}^FS\n`;
     }
 
     zpl += '^XZ';
