@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck } from "lucide-react";
 
 export default function HowItWorks() {
   return (
@@ -196,6 +196,105 @@ export default function HowItWorks() {
               </CardContent>
             </Card>
           </div>
+
+          <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-label-printing">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-labels-title">Label Printing</h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-labels-description">
+              The system supports printing 4 types of labels directly from the browser using QZ Tray and Zebra thermal printers.
+            </p>
+
+            <div className="space-y-6">
+              <Card data-testid="card-label-types">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-label-types-title">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                      <Tag className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    Label Types
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400">
+                  <div className="space-y-4" data-testid="list-label-types">
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-200">Project Label (4x2")</h4>
+                      <p className="text-sm mt-1">Shows the project name, Cienapps job number, and PF Order ID. Used to identify the project on boxes and pallets.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-200">Hardware Label (4x2")</h4>
+                      <p className="text-sm mt-1">Shows the Cienapps job number, Allmoxy number, PF Order ID, order name, and pallet number. Used to label hardware packages.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-200">CTS Label (4x2")</h4>
+                      <p className="text-sm mt-1">Shows all job identifiers, order name, product code, cut length, and quantity. Used to label Cut-To-Size parts.</p>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-200">Pallet Label (4x6")</h4>
+                      <p className="text-sm mt-1">A larger label showing the project name, dealer name, dealer phone number, PF Order ID, and a large pallet number. One label is printed per pallet.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-printers">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-printers-title">
+                    <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center">
+                      <Printer className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+                    Printer Setup
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400">
+                  <p className="mb-3" data-testid="text-printers-description">The system uses Zebra thermal printers that print using ZPL (Zebra Programming Language):</p>
+                  <ul className="list-disc list-inside space-y-2" data-testid="list-printers">
+                    <li><strong>4x2" Printer</strong> - Used for Project, Hardware, and CTS labels. This is a standard Zebra desktop printer loaded with 4"x2" direct thermal labels.</li>
+                    <li><strong>4x6" Printer</strong> - Used for Pallet labels. This is a Zebra printer loaded with 4"x6" direct thermal labels.</li>
+                    <li>Both printers must be installed on the computer and the printer names must be configured in the Printer Settings dialog (gear icon on the dashboard).</li>
+                    <li>Printer names must match exactly what's shown in Windows Printers &amp; Scanners.</li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-qz-tray">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-qz-tray-title">
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    QZ Tray &amp; Digital Certificate
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400">
+                  <p className="mb-3" data-testid="text-qz-description">QZ Tray is a small program that runs in the background on your computer. It acts as a bridge between the web browser and your printers, allowing the website to send print jobs directly to the Zebra printers.</p>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-4 mb-2">How It Works</h4>
+                  <ul className="list-disc list-inside space-y-2" data-testid="list-qz-how">
+                    <li>QZ Tray runs in the system tray (near the clock) on each computer</li>
+                    <li>When you click a "Print" button, the website sends the label data to QZ Tray</li>
+                    <li>QZ Tray forwards the label data (ZPL commands) to the correct printer</li>
+                    <li>The label prints instantly without any print dialog</li>
+                  </ul>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-4 mb-2">Digital Certificate (Auto-Signing)</h4>
+                  <p className="mb-2">QZ Tray requires a digital certificate to trust the website. This prevents unauthorized websites from printing. Our setup uses auto-signing so you never see a trust prompt:</p>
+                  <ul className="list-disc list-inside space-y-2" data-testid="list-qz-cert">
+                    <li>A custom digital certificate is stored in the app</li>
+                    <li>The matching private key is stored securely on the server</li>
+                    <li>When QZ Tray connects, the server signs the connection request automatically</li>
+                    <li>QZ Tray verifies the signature and trusts the website — no manual approval needed</li>
+                  </ul>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-4 mb-2">Setting Up a New Computer</h4>
+                  <ol className="list-decimal list-inside space-y-2" data-testid="list-qz-setup">
+                    <li>Install QZ Tray from <strong>qz.io</strong></li>
+                    <li>Copy the <strong>override.crt</strong> certificate file to the QZ Tray installation folder (typically <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">C:\Program Files\QZ Tray\</code>)</li>
+                    <li>Install and name the Zebra printers in Windows (names must match what's configured in Printer Settings)</li>
+                    <li>Restart QZ Tray — auto-signing will work immediately</li>
+                  </ol>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
 
           <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-filters">
             <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-filters-title">Dashboard Filters</h2>
