@@ -209,7 +209,7 @@ function createProjectLabelZpl(data: {
     yPos += lineHeight;
   }
 
-  zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDOrder ID: ${data.orderId || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPF Order ID: ${data.orderId || 'N/A'}^FS\n`;
 
   zpl += '^XZ';
   return zpl;
