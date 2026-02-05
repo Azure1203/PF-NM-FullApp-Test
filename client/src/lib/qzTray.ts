@@ -241,21 +241,44 @@ export async function printHardwareLabel(
     const labelWidth = 812;
     const labelHeight = 406;
     const leftMargin = 40;
+    const fontSize = 50;
+    const lineHeight = 55;
+    const maxChars = 28;
+    const maxLinesPerField = palletNumber ? 1 : 2;
     
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
+    let yPos = 15;
 
-    zpl += `^FO${leftMargin},35^A0N,45,45^FDPERFECT FIT HARDWARE LABEL^FS\n`;
-    zpl += `^FO${leftMargin},85^GB450,2,2^FS\n`;
-    zpl += `^FO${leftMargin},115^A0N,30,30^FDCienapps & CV Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
-    zpl += `^FO${leftMargin},170^A0N,30,30^FDPerfect Fit Order ID: ${orderId || 'N/A'}^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPERFECT FIT HARDWARE LABEL^FS\n`;
+    yPos += 50;
+    zpl += `^FO${leftMargin},${yPos}^GB450,2,2^FS\n`;
+    yPos += 18;
 
-    const orderLine = allmoxyJobNumber 
-      ? `Order Name: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
-      : `Order Name: ${orderName || 'N/A'}`;
-    zpl += `^FO${leftMargin},225^A0N,30,30^FD${orderLine}^FS\n`;
+    const jobText = `Job #: ${cienappsJobNumber || 'N/A'}`;
+    const jobLines = wrapText(jobText, maxChars).slice(0, maxLinesPerField);
+    for (const line of jobLines) {
+      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
+      yPos += lineHeight;
+    }
+
+    const orderIdText = `Order ID: ${orderId || 'N/A'}`;
+    const orderIdLines = wrapText(orderIdText, maxChars).slice(0, maxLinesPerField);
+    for (const line of orderIdLines) {
+      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
+      yPos += lineHeight;
+    }
+
+    const orderNameText = allmoxyJobNumber 
+      ? `Order: ${orderName || 'N/A'} + ${allmoxyJobNumber}`
+      : `Order: ${orderName || 'N/A'}`;
+    const orderNameLines = wrapText(orderNameText, maxChars).slice(0, maxLinesPerField);
+    for (const line of orderNameLines) {
+      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
+      yPos += lineHeight;
+    }
 
     if (palletNumber) {
-      zpl += `^FO${leftMargin},280^A0N,30,30^FDPALLET ${palletNumber}^FS\n`;
+      zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPALLET ${palletNumber}^FS\n`;
     }
 
     zpl += '^XZ';
