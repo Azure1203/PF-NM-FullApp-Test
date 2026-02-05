@@ -378,7 +378,7 @@ export async function printPalletLabels(
       let yPos = 78;
       
       zpl += `^CF0,56\n`;
-      zpl += `^FO${leftMargin},${yPos}^FDPERFECT FIT PALLET LABEL^FS\n`;
+      zpl += `^FO${leftMargin},${yPos}^FDPALLET LABEL^FS\n`;
       yPos += lineSpacing;
       zpl += `^FO${leftMargin},${yPos}^GB450,2,2^FS\n`;
       yPos += 30;
@@ -389,7 +389,7 @@ export async function printPalletLabels(
       zpl += `^FO${leftMargin},${yPos}^GB240,2,2^FS\n`;
       yPos += 15;
       
-      const wrappedProject = wrapText(projectName || 'N/A', PALLET_MAX_CHARS);
+      const wrappedProject = wrapText(projectName || 'N/A', PALLET_MAX_CHARS).slice(0, 3);
       for (const line of wrappedProject) {
         zpl += `^FO${leftMargin},${yPos}^FD${line}^FS\n`;
         yPos += 60;
@@ -416,9 +416,9 @@ export async function printPalletLabels(
       yPos += 25;
       
       zpl += `^CF0,56\n`;
-      zpl += `^FO${leftMargin},${yPos}^FDPhone:^FS\n`;
+      zpl += `^FO${leftMargin},${yPos}^FDDealer Phone #:^FS\n`;
       yPos += lineSpacing;
-      zpl += `^FO${leftMargin},${yPos}^GB180,2,2^FS\n`;
+      zpl += `^FO${leftMargin},${yPos}^GB380,2,2^FS\n`;
       yPos += 15;
       zpl += `^FO${leftMargin},${yPos}^FD${phone || 'N/A'}^FS\n`;
       yPos += 70;
@@ -427,9 +427,9 @@ export async function printPalletLabels(
       yPos += 25;
       
       zpl += `^CF0,56\n`;
-      zpl += `^FO${leftMargin},${yPos}^FDOrder ID:^FS\n`;
+      zpl += `^FO${leftMargin},${yPos}^FDPF ORDER ID:^FS\n`;
       yPos += lineSpacing;
-      zpl += `^FO${leftMargin},${yPos}^GB270,2,2^FS\n`;
+      zpl += `^FO${leftMargin},${yPos}^GB320,2,2^FS\n`;
       yPos += 15;
       zpl += `^FO${leftMargin},${yPos}^FD${orderId || 'N/A'}^FS\n`;
       
