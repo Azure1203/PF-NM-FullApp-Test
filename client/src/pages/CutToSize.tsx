@@ -153,7 +153,8 @@ export default function CutToSize() {
         part.partNumber,
         part.quantity,
         Number(part.cutLength),
-        palletNumber
+        palletNumber,
+        pallets.length > 0 ? pallets.length : undefined
       );
       
       if (result.success) {
