@@ -336,7 +336,7 @@ export async function printCTSLabel(
     const maxChars = 38;
     let yPos = 20;
 
-    zpl += `^FO${leftMargin},${yPos}^A0N,${largeFontSize},${largeFontSize}^FDCTS LABEL^FS\n`;
+    zpl += `^FO0,${yPos}^A0N,${largeFontSize},${largeFontSize}^FB${labelWidth},1,0,C^FDCTS LABEL^FS\n`;
     yPos += 45;
     zpl += `^FO${leftMargin},${yPos}^GB400,2,2^FS\n`;
     yPos += 15;
