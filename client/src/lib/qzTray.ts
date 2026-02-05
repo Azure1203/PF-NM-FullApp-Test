@@ -228,7 +228,7 @@ function createProjectLabelZpl(data: {
 
   zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FDPROJECT LABEL^FS\n`;
   yPos += 55;
-  zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
+  zpl += `^FO${leftMargin},${yPos}^GB${labelWidth - leftMargin * 2},3,3^FS\n`;
   yPos += 20;
 
   zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
@@ -300,7 +300,7 @@ export async function printHardwareLabel(
 
     zpl += `^FO0,${yPos}^A0N,${fontSize},${fontSize}^FB${labelWidth},1,0,C^FDHARDWARE LABEL^FS\n`;
     yPos += 48;
-    zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^GB${labelWidth - leftMargin * 2},3,3^FS\n`;
     yPos += 12;
 
     zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
@@ -370,7 +370,7 @@ export async function printCTSLabel(
 
     zpl += `^FO0,${yPos}^A0N,${largeFontSize},${largeFontSize}^FB${labelWidth},1,0,C^FDCTS LABEL^FS\n`;
     yPos += 45;
-    zpl += `^FO${leftMargin},${yPos}^GB400,2,2^FS\n`;
+    zpl += `^FO${leftMargin},${yPos}^GB${labelWidth - leftMargin * 2},2,2^FS\n`;
     yPos += 15;
 
     zpl += `^FO${leftMargin},${yPos}^A0N,${largeFontSize},${largeFontSize}^FDCienapps Job #: ${cienappsJobNumber || 'N/A'}^FS\n`;
