@@ -264,7 +264,7 @@ export async function printHardwareLabel(
     const maxChars = 25;
     
     let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
-    let yPos = 8;
+    let yPos = 24;
 
     zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDHARDWARE LABEL^FS\n`;
     yPos += 48;
