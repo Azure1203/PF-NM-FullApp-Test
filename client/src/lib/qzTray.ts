@@ -188,15 +188,28 @@ function createProjectLabelZpl(data: {
   const labelHeight = 406;
   const leftMargin = 30;
   const fontSize = 60;
-  const lineHeight = 90;
+  const lineHeight = 70;
+  const maxChars = 25;
 
   let zpl = `~JA^XA^MTD^MNW^PW${labelWidth}^LL${labelHeight}^LS0^CI28\n`;
+  let yPos = 15;
 
-  zpl += `^FO${leftMargin},15^A0N,${fontSize},${fontSize}^FDPERFECT FIT PROJECT LABEL^FS\n`;
-  zpl += `^FO${leftMargin},78^GB500,3,3^FS\n`;
-  zpl += `^FO${leftMargin},105^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},${105 + lineHeight}^A0N,${fontSize},${fontSize}^FDProject Name: ${data.projectName || 'N/A'}^FS\n`;
-  zpl += `^FO${leftMargin},${105 + lineHeight * 2}^A0N,${fontSize},${fontSize}^FDOrder ID: ${data.orderId || 'N/A'}^FS\n`;
+  zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDPERFECT FIT PROJECT LABEL^FS\n`;
+  yPos += 63;
+  zpl += `^FO${leftMargin},${yPos}^GB500,3,3^FS\n`;
+  yPos += 25;
+
+  zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDCienapps Job #: ${data.cienappsJobNumber || 'N/A'}^FS\n`;
+  yPos += lineHeight;
+
+  const projectNameText = `Project Name: ${data.projectName || 'N/A'}`;
+  const projectNameLines = wrapText(projectNameText, maxChars).slice(0, 2);
+  for (const line of projectNameLines) {
+    zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FD${line}^FS\n`;
+    yPos += lineHeight;
+  }
+
+  zpl += `^FO${leftMargin},${yPos}^A0N,${fontSize},${fontSize}^FDOrder ID: ${data.orderId || 'N/A'}^FS\n`;
 
   zpl += '^XZ';
   return zpl;
