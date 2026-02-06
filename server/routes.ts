@@ -748,6 +748,16 @@ export async function registerRoutes(
   // Create object storage service instance
   const objectStorageService = new ObjectStorageService();
 
+  app.get('/api/qz/certificate', (_req, res) => {
+    const certPath = path.join(process.cwd(), 'client', 'public', 'qz-certificate.txt');
+    res.download(certPath, 'override.crt', (err) => {
+      if (err) {
+        console.error('[QZ Certificate] Download error:', err);
+        res.status(500).send('Certificate file not found');
+      }
+    });
+  });
+
   app.post('/api/qz/sign', async (req, res) => {
     const { toSign } = req.body;
     if (!toSign || typeof toSign !== 'string') {

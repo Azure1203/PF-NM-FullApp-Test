@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle } from "lucide-react";
 
 export default function HowItWorks() {
   return (
@@ -265,32 +265,155 @@ export default function HowItWorks() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-slate-600 dark:text-slate-400">
-                  <p className="mb-3" data-testid="text-qz-description">QZ Tray is a small program that runs in the background on your computer. It acts as a bridge between the web browser and your printers, allowing the website to send print jobs directly to the Zebra printers.</p>
+                  <p className="mb-3" data-testid="text-qz-description">QZ Tray is a small program that runs in the background on your computer. It acts as a bridge between the web browser and your Zebra printers, allowing the website to send print jobs directly without any print dialog or driver configuration.</p>
 
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-4 mb-2">How It Works</h4>
-                  <ul className="list-disc list-inside space-y-2" data-testid="list-qz-how">
-                    <li>QZ Tray runs in the system tray (near the clock) on each computer</li>
-                    <li>When you click a "Print" button, the website sends the label data to QZ Tray</li>
-                    <li>QZ Tray forwards the label data (ZPL commands) to the correct printer</li>
-                    <li>The label prints instantly without any print dialog</li>
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">What is QZ Tray?</h4>
+                  <ul className="list-disc list-inside space-y-2" data-testid="list-qz-what">
+                    <li>QZ Tray is a free, lightweight application that installs on each workstation</li>
+                    <li>It sits in the system tray (the small icons near the clock in the taskbar)</li>
+                    <li>It creates a connection between the website and the printers installed on that computer</li>
+                    <li>Without QZ Tray running, the print buttons on the website will not work</li>
                   </ul>
 
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-4 mb-2">Digital Certificate (Auto-Signing)</h4>
-                  <p className="mb-2">QZ Tray requires a digital certificate to trust the website. This prevents unauthorized websites from printing. Our setup uses auto-signing so you never see a trust prompt:</p>
-                  <ul className="list-disc list-inside space-y-2" data-testid="list-qz-cert">
-                    <li>A custom digital certificate is stored in the app</li>
-                    <li>The matching private key is stored securely on the server</li>
-                    <li>When QZ Tray connects, the server signs the connection request automatically</li>
-                    <li>QZ Tray verifies the signature and trusts the website — no manual approval needed</li>
-                  </ul>
-
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-4 mb-2">Setting Up a New Computer</h4>
-                  <ol className="list-decimal list-inside space-y-2" data-testid="list-qz-setup">
-                    <li>Install QZ Tray from <strong>qz.io</strong></li>
-                    <li>Copy the <strong>override.crt</strong> certificate file to the QZ Tray installation folder (typically <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">C:\Program Files\QZ Tray\</code>)</li>
-                    <li>Install and name the Zebra printers in Windows (names must match what's configured in Printer Settings)</li>
-                    <li>Restart QZ Tray — auto-signing will work immediately</li>
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">How Printing Works</h4>
+                  <ol className="list-decimal list-inside space-y-2" data-testid="list-qz-how">
+                    <li>You click a "Print" button on the website (e.g., Print Project Label, Print Hardware Label)</li>
+                    <li>The website creates the label content as ZPL commands (the language Zebra printers understand)</li>
+                    <li>The website sends those commands to QZ Tray running on your computer</li>
+                    <li>QZ Tray forwards the commands directly to the correct Zebra printer</li>
+                    <li>The label prints instantly — no print dialog, no preview, no extra clicks</li>
                   </ol>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">Why a Digital Certificate is Needed</h4>
+                  <p className="mb-2">QZ Tray uses a security system to make sure only trusted websites can send print jobs. Without a certificate, QZ Tray would show a popup asking you to approve every single print request. Our setup eliminates that:</p>
+                  <ul className="list-disc list-inside space-y-2" data-testid="list-qz-cert">
+                    <li>A <strong>digital certificate</strong> (the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> file) is placed in the QZ Tray folder on each computer</li>
+                    <li>The matching <strong>private key</strong> is stored securely on the server — it never leaves the server</li>
+                    <li>When the website connects to QZ Tray, the server signs the connection using the private key</li>
+                    <li>QZ Tray checks that signature against the certificate on the computer — if they match, the website is trusted</li>
+                    <li>This all happens automatically in the background — you never see a trust prompt or approval dialog</li>
+                  </ul>
+                  <p className="mt-2 text-sm">The certificate is valid from February 4, 2026 to February 4, 2046 (20 years). It is named "QZ Tray Demo Cert" — this name is normal and expected.</p>
+
+                  <div className="mt-5 p-4 bg-emerald-50 dark:bg-emerald-950 rounded-lg border border-emerald-200 dark:border-emerald-800" data-testid="section-qz-download">
+                    <h4 className="font-semibold text-emerald-800 dark:text-emerald-200 mb-2 flex items-center gap-2">
+                      <Download className="w-4 h-4" />
+                      Download Certificate File
+                    </h4>
+                    <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-3">
+                      Download the <code className="bg-emerald-100 dark:bg-emerald-900 px-1 rounded text-sm">override.crt</code> file below. You will need this file when setting up QZ Tray on any new workstation.
+                    </p>
+                    <a href="/api/qz/certificate" download="override.crt" data-testid="button-download-cert">
+                      <Button variant="default" className="gap-2">
+                        <Download className="w-4 h-4" />
+                        Download override.crt
+                      </Button>
+                    </a>
+                  </div>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-3 flex items-center gap-2">
+                    <Monitor className="w-4 h-4" />
+                    Setting Up a New Workstation
+                  </h4>
+                  <p className="mb-3">Follow these steps to set up label printing on a new computer:</p>
+
+                  <div className="space-y-3" data-testid="list-qz-setup">
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">1</span>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Install QZ Tray</p>
+                        <p className="text-sm mt-1">Go to <a href="https://qz.io/download" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline" data-testid="link-qz-download">qz.io/download</a> and download QZ Tray for Windows. Run the installer with default settings. After installation, QZ Tray will appear in your system tray.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">2</span>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Download the certificate file</p>
+                        <p className="text-sm mt-1">Use the download button above to get the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> file. Save it somewhere easy to find (like the Desktop).</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">3</span>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Copy the certificate to the QZ Tray folder</p>
+                        <p className="text-sm mt-1">Copy <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> into the QZ Tray installation folder. The default location is:</p>
+                        <code className="block mt-1 text-sm bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded">C:\Program Files\QZ Tray\</code>
+                        <p className="text-sm mt-1">Windows may ask for administrator permission — click "Continue" to allow the copy.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">4</span>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Restart QZ Tray</p>
+                        <p className="text-sm mt-1">Right-click the QZ Tray icon in the system tray and choose <strong>Exit</strong>. Then reopen QZ Tray from the Start Menu. It needs to restart so it picks up the new certificate file.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">5</span>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Install the Zebra printers in Windows</p>
+                        <p className="text-sm mt-1">Connect your Zebra printers via USB. Go to <strong>Settings &gt; Printers &amp; Scanners</strong> and make sure each printer appears with a name. Note the exact printer names — you will need them in the next step.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">6</span>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Configure printer names on the website</p>
+                        <p className="text-sm mt-1">On the dashboard, click the gear icon to open Printer Settings. Enter the exact printer names from Windows for the 4x2" and 4x6" printers. These names are saved in your browser, so each workstation can have different printer names.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">7</span>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">Test it</p>
+                        <p className="text-sm mt-1">Open any order and click one of the print buttons. The label should print automatically with no approval popup. If it works, the workstation is fully set up.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-3 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Troubleshooting
+                  </h4>
+                  <div className="space-y-3" data-testid="list-qz-troubleshoot">
+                    <div>
+                      <p className="font-medium text-slate-700 dark:text-slate-300">Print button does nothing / "QZ Tray not found" message</p>
+                      <p className="text-sm mt-1">QZ Tray is not running. Look for the QZ icon in the system tray. If it's not there, open QZ Tray from the Start Menu. It must be running whenever you want to print.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-700 dark:text-slate-300">QZ Tray asks for approval / shows a trust popup</p>
+                      <p className="text-sm mt-1">The certificate is missing or not in the right place. Make sure <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> is in <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">C:\Program Files\QZ Tray\</code> and that QZ Tray was restarted after copying it.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-700 dark:text-slate-300">Label doesn't print / wrong printer</p>
+                      <p className="text-sm mt-1">Check that the printer name in the website's Printer Settings matches exactly what's in Windows Printers &amp; Scanners (including capitalization and spaces). Also confirm the printer is powered on and has labels loaded.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-700 dark:text-slate-300">Label prints but looks wrong (garbled text, blank)</p>
+                      <p className="text-sm mt-1">The printer may not be set to ZPL mode. Zebra printers can run in different "languages." Refer to your printer's manual or contact support to switch it to ZPL mode.</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-700 dark:text-slate-300">Windows shows "This certificate is not trusted" when viewing the file</p>
+                      <p className="text-sm mt-1">This Windows warning is normal and can be safely ignored. You do NOT need to install the certificate into the Windows certificate store. QZ Tray reads it directly from its own folder.</p>
+                    </div>
+                  </div>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-2 flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    Important Notes
+                  </h4>
+                  <ul className="list-disc list-inside space-y-2 text-sm" data-testid="list-qz-notes">
+                    <li>QZ Tray must be running on the computer for printing to work. If the computer restarts, QZ Tray should start automatically (it's set to run on startup by default).</li>
+                    <li>Printer names are saved per browser/computer. If you use a different browser or a different computer, you will need to re-enter the printer names in Printer Settings.</li>
+                    <li>The certificate file is the same for all workstations — you only need one copy.</li>
+                    <li>You do NOT need to do anything on the server or website when adding new workstations. Just install QZ Tray and the certificate on the new computer.</li>
+                  </ul>
                 </CardContent>
               </Card>
             </div>
