@@ -129,9 +129,9 @@ export default function HardwareChecklist() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-10">
         
-        <div className="flex gap-4 mb-6">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
           <Link href="/">
             <Button variant="ghost" className="pl-0 text-muted-foreground hover:text-foreground" data-testid="button-back-dashboard">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -154,12 +154,12 @@ export default function HardwareChecklist() {
         />
 
         {fileInfo && (
-          <Card className="border-none shadow-md mb-6" data-testid="hardware-file-info">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-3">
-                <Box className="w-6 h-6 text-primary" />
-                <div>
-                  <p className="text-xs text-muted-foreground" data-testid="text-order-name">Order Name: {fileInfo.file?.poNumber || fileInfo.file?.originalFilename || 'N/A'}</p>
+          <Card className="border-none shadow-md mb-4 sm:mb-6" data-testid="hardware-file-info">
+            <CardContent className="py-3 sm:py-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <Box className="w-5 h-5 sm:w-6 sm:h-6 text-primary flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate" data-testid="text-order-name">Order Name: {fileInfo.file?.poNumber || fileInfo.file?.originalFilename || 'N/A'}</p>
                   {fileInfo.file?.allmoxyJobNumber && (
                     <p className="text-sm text-primary font-medium" data-testid="text-job-number">Allmoxy Job #{fileInfo.file.allmoxyJobNumber}</p>
                   )}
@@ -171,11 +171,11 @@ export default function HardwareChecklist() {
         )}
 
         {progress.total > 0 && (
-          <Card className="border-none shadow-md mb-6" data-testid="hardware-progress-card">
-            <CardContent className="py-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-lg ${allPacked ? 'bg-green-500' : 'bg-primary'}`}>
+          <Card className="border-none shadow-md mb-4 sm:mb-6" data-testid="hardware-progress-card">
+            <CardContent className="py-3 sm:py-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className={`p-2 sm:p-3 rounded-lg ${allPacked ? 'bg-green-500' : 'bg-primary'}`}>
                     {allPacked ? (
                       <CheckCircle className="w-6 h-6 text-white" />
                     ) : (
@@ -183,7 +183,7 @@ export default function HardwareChecklist() {
                     )}
                   </div>
                   <div>
-                    <p className={`text-lg font-semibold ${allPacked ? 'text-green-600' : ''}`} data-testid="text-progress-status">
+                    <p className={`text-base sm:text-lg font-semibold ${allPacked ? 'text-green-600' : ''}`} data-testid="text-progress-status">
                       {allPacked ? 'All Hardware Packed!' : 'Packing Progress'}
                     </p>
                     <div className="flex items-center gap-3 mt-1">
@@ -227,29 +227,29 @@ export default function HardwareChecklist() {
                 }`} 
                 data-testid={`hardware-item-${item.id}`}
               >
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-4">
+                <CardHeader className="pb-2 sm:pb-4">
+                  <div className="flex items-start justify-between gap-2 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                       <Checkbox
                         checked={item.isPacked}
                         onCheckedChange={(checked) => togglePacked({ itemId: item.id, isPacked: !!checked })}
-                        className="w-8 h-8 border-2 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                        className="w-7 h-7 sm:w-8 sm:h-8 border-2 flex-shrink-0 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                         data-testid={`checkbox-packed-${item.id}`}
                       />
-                      <div>
-                        <CardTitle className={`text-lg font-mono ${item.isPacked ? 'line-through text-muted-foreground' : ''}`} data-testid={`text-product-code-${item.id}`}>
+                      <div className="min-w-0">
+                        <CardTitle className={`text-sm sm:text-lg font-mono break-all ${item.isPacked ? 'line-through text-muted-foreground' : ''}`} data-testid={`text-product-code-${item.id}`}>
                           {item.productCode}
                         </CardTitle>
-                        <CardDescription data-testid={`text-product-name-${item.id}`}>
+                        <CardDescription className="text-xs sm:text-sm" data-testid={`text-product-name-${item.id}`}>
                           {item.productName || "No description"}
                         </CardDescription>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className={`text-3xl font-bold ${item.isPacked ? 'text-green-600' : 'text-primary'}`} data-testid={`text-quantity-${item.id}`}>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`text-2xl sm:text-3xl font-bold ${item.isPacked ? 'text-green-600' : 'text-primary'}`} data-testid={`text-quantity-${item.id}`}>
                         x{item.quantity}
                       </div>
-                      <div className="text-sm text-muted-foreground">{item.isPacked ? 'Packed' : 'Quantity'}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">{item.isPacked ? 'Packed' : 'Quantity'}</div>
                       {item.ctsCutLength !== undefined && (
                         <Badge 
                           variant="outline" 
@@ -262,8 +262,8 @@ export default function HardwareChecklist() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                <CardContent className="space-y-3 sm:space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/30 rounded-lg">
                     <div className="flex items-center gap-3">
                       <Package className="w-5 h-5 text-muted-foreground" />
                       <div>
@@ -282,7 +282,7 @@ export default function HardwareChecklist() {
 
                     {item.imagePath && (
                       <div className="flex items-center gap-3">
-                        <div className="w-[7.5rem] h-[7.5rem] rounded border overflow-hidden bg-white flex-shrink-0" data-testid={`container-image-${item.id}`}>
+                        <div className="w-20 h-20 sm:w-[7.5rem] sm:h-[7.5rem] rounded border overflow-hidden bg-white flex-shrink-0" data-testid={`container-image-${item.id}`}>
                           <img
                             src={item.imagePath}
                             alt={item.productCode}

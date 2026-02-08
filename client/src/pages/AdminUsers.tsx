@@ -173,7 +173,7 @@ export default function AdminUsers() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -189,6 +189,7 @@ export default function AdminUsers() {
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : allowedUsers && allowedUsers.length > 0 ? (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -268,6 +269,7 @@ export default function AdminUsers() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />

@@ -180,9 +180,9 @@ export default function CutToSize() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10">
         
-        <div className="flex gap-4 mb-6">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mb-6">
           <Link href="/">
             <Button variant="ghost" className="pl-0 text-muted-foreground hover:text-foreground">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -239,23 +239,24 @@ export default function CutToSize() {
               
               return (
                 <Card key={part.id} className={`border-none shadow-md transition-colors ${part.isCut ? 'bg-green-50 dark:bg-green-950/20 border-2 border-green-400' : ''}`} data-testid={`cts-part-${part.id}`}>
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-4">
+                  <CardHeader className="pb-4 px-3 sm:px-6">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                         <Checkbox
                           checked={part.isCut}
                           onCheckedChange={(checked) => toggleCutStatus({ partId: part.id, isCut: !!checked })}
-                          className="w-8 h-8 border-2 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                          className="w-8 h-8 border-2 shrink-0 mt-1 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                           data-testid="checkbox-cut-status"
                         />
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <CardTitle className={`text-lg ${part.isCut ? 'line-through text-muted-foreground' : ''}`} data-testid="text-part-number">{part.partNumber}</CardTitle>
-                            <CardDescription data-testid="text-part-description">{part.description || "No description"}</CardDescription>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="min-w-0">
+                            <CardTitle className={`text-base sm:text-lg truncate ${part.isCut ? 'line-through text-muted-foreground' : ''}`} data-testid="text-part-number">{part.partNumber}</CardTitle>
+                            <CardDescription className="truncate" data-testid="text-part-description">{part.description || "No description"}</CardDescription>
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
+                            className="shrink-0 self-start"
                             onClick={() => handlePrintCTSLabel(part)}
                             disabled={printingPartId === part.id}
                             data-testid={`button-print-cts-label-${part.id}`}
@@ -269,14 +270,14 @@ export default function CutToSize() {
                           </Button>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className={`text-3xl font-bold ${part.isCut ? 'text-green-600' : 'text-primary'}`} data-testid="text-cut-length">{Number(part.cutLength).toFixed(1)} mm</div>
+                      <div className="text-left sm:text-right ml-11 sm:ml-0 shrink-0">
+                        <div className={`text-2xl sm:text-3xl font-bold ${part.isCut ? 'text-green-600' : 'text-primary'}`} data-testid="text-cut-length">{Number(part.cutLength).toFixed(1)} mm</div>
                         <div className="text-sm text-muted-foreground">{part.isCut ? 'Cut Complete' : 'Cut Length'}</div>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 bg-muted/30 rounded-lg">
+                  <CardContent className="space-y-6 px-3 sm:px-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 p-3 sm:p-4 bg-muted/30 rounded-lg">
                       <div className="flex items-center gap-3">
                         <Package className="w-5 h-5 text-muted-foreground" />
                         <div>
@@ -343,7 +344,7 @@ export default function CutToSize() {
                             <Image className="w-4 h-4" />
                             Reference Image
                           </Label>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <input
                               type="file"
                               accept="image/*"
@@ -358,6 +359,7 @@ export default function CutToSize() {
                             <Button
                               type="button"
                               variant="outline"
+                              className="w-full sm:w-auto"
                               onClick={() => fileInputRefs.current[part.partNumber]?.click()}
                               disabled={uploadingPart === part.partNumber}
                               data-testid="button-upload-image"
@@ -376,7 +378,7 @@ export default function CutToSize() {
                         </div>
                       </div>
                       <Button
-                        className="mt-4"
+                        className="mt-4 w-full sm:w-auto"
                         onClick={() => handleSaveConfig(part.partNumber)}
                         disabled={isSaving}
                         data-testid="button-save-config"

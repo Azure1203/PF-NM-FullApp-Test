@@ -258,7 +258,7 @@ export default function Products() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 max-w-6xl">
+        <div className="container mx-auto px-3 sm:px-6 py-4 max-w-6xl">
           <div className="flex items-center gap-4">
             <Link href="/">
               <Button variant="ghost" size="icon" data-testid="button-back-to-dashboard">
@@ -270,7 +270,7 @@ export default function Products() {
         </div>
       </div>
       
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <div className="container mx-auto px-3 sm:px-6 py-6 max-w-6xl">
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -364,16 +364,16 @@ export default function Products() {
         </div>
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <Skeleton key={i} className="h-48" />
             ))}
           </div>
         ) : products && products.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
               <Card key={product.id} className="hover-elevate" data-testid={`card-product-${product.id}`}>
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-start justify-between gap-2">
                     {product.imagePath && (
                       <div className="flex-shrink-0">

@@ -144,7 +144,7 @@ export default function UploadOrder() {
         />
 
         <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden">
-          <CardContent className="p-8">
+          <CardContent className="p-4 sm:p-8">
             <div className="space-y-8">
               <FileUpload 
                 onFilesSelect={handleFilesSelect} 

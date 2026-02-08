@@ -185,20 +185,20 @@ export default function ComponentImport() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 max-w-6xl">
-          <div className="flex items-center gap-4">
+        <div className="container mx-auto px-3 sm:px-4 py-4 max-w-6xl">
+          <div className="flex items-center gap-4 flex-wrap">
             <Link href="/products">
               <Button variant="ghost" size="icon" data-testid="button-back-to-products">
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold">Component Import</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Component Import</h1>
             <Badge variant="secondary">COMPONENT category</Badge>
           </div>
         </div>
       </div>
       
-      <div className="container mx-auto px-4 py-6 max-w-6xl space-y-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-6xl space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Upload Component CSV</CardTitle>
@@ -307,7 +307,7 @@ export default function ComponentImport() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="max-h-64 overflow-y-auto border rounded-md">
+                  <div className="max-h-64 overflow-y-auto overflow-x-auto border rounded-md">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -336,7 +336,7 @@ export default function ComponentImport() {
             {preview.changedItems.length > 0 && (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <CardTitle className="flex items-center gap-2">
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
                         {preview.changedItems.length}
@@ -357,7 +357,7 @@ export default function ComponentImport() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="max-h-64 overflow-y-auto border rounded-md">
+                  <div className="max-h-64 overflow-y-auto overflow-x-auto border rounded-md">
                     <Table>
                       <TableHeader>
                         <TableRow>

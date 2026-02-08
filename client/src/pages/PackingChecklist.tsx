@@ -162,7 +162,7 @@ export default function PackingChecklist() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
           {fileInfo && (
             <Link href={`/orders/${fileInfo.projectId}`}>
@@ -176,9 +176,9 @@ export default function PackingChecklist() {
 
         <Card>
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div className="flex items-center gap-3">
-                <div className={`p-3 rounded-lg ${isComplete ? 'bg-green-500' : 'bg-primary'}`}>
+                <div className={`p-2 sm:p-3 rounded-lg ${isComplete ? 'bg-green-500' : 'bg-primary'}`}>
                   {isComplete ? (
                     <CheckCircle className="w-6 h-6 text-white" />
                   ) : (
@@ -189,7 +189,7 @@ export default function PackingChecklist() {
                   <CardTitle className={isComplete ? 'text-green-700 dark:text-green-400' : ''}>
                     Packaging Checklist
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-all">
                     {fileInfo?.originalFilename || `File #${fileId}`}
                     {fileInfo?.allmoxyJobNumber && (
                       <span className="ml-2 text-primary font-medium">
@@ -199,13 +199,13 @@ export default function PackingChecklist() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-40">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="w-full sm:w-40">
                   <Progress value={progress.percentage} className="h-3" />
                 </div>
                 <Badge 
                   variant="secondary" 
-                  className={`text-lg px-3 py-1 ${isComplete ? 'bg-green-500 text-white' : ''}`}
+                  className={`text-base sm:text-lg px-3 py-1 flex-shrink-0 ${isComplete ? 'bg-green-500 text-white' : ''}`}
                 >
                   {progress.checked} / {progress.total}
                 </Badge>
@@ -238,13 +238,14 @@ export default function PackingChecklist() {
               items.map((item) => (
                 <div 
                   key={item.id}
-                  className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${
+                  className={`flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border transition-colors ${
                     item.isChecked 
                       ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800' 
                       : 'bg-background border-border hover-elevate'
                   }`}
                   data-testid={`checklist-item-${item.id}`}
                 >
+                  <div className="flex items-start gap-3 sm:contents">
                   <Checkbox
                     checked={item.isChecked}
                     onCheckedChange={(checked) => {
@@ -254,13 +255,13 @@ export default function PackingChecklist() {
                       });
                     }}
                     disabled={toggleMutation.isPending}
-                    className="mt-1"
+                    className="mt-1 w-6 h-6 sm:w-4 sm:h-4 flex-shrink-0"
                     data-testid={`checkbox-item-${item.id}`}
                   />
                   
                   {/* Show product database image if available, otherwise packing slip image, otherwise placeholder */}
                   {item.productInfo?.imagePath ? (
-                    <div className="w-24 h-24 flex-shrink-0 rounded-md overflow-hidden border bg-muted border-primary/20">
+                    <div className="w-16 h-16 sm:w-24 sm:h-24 flex-shrink-0 rounded-md overflow-hidden border bg-muted border-primary/20">
                       <img 
                         src={item.productInfo.imagePath}
                         alt={item.partCode}
@@ -271,7 +272,7 @@ export default function PackingChecklist() {
                       />
                     </div>
                   ) : item.imagePath ? (
-                    <div className="w-24 h-24 flex-shrink-0 rounded-md overflow-hidden border bg-muted">
+                    <div className="w-16 h-16 sm:w-24 sm:h-24 flex-shrink-0 rounded-md overflow-hidden border bg-muted">
                       <img 
                         src={`/api/packing-slip-images/${encodeURIComponent(item.imagePath)}`}
                         alt={item.partCode}
@@ -282,15 +283,17 @@ export default function PackingChecklist() {
                       />
                     </div>
                   ) : (
-                    <div className="w-20 h-20 flex-shrink-0 rounded-md bg-muted flex items-center justify-center">
-                      <Package className="w-8 h-8 text-muted-foreground/50" />
+                    <div className="w-14 h-14 sm:w-20 sm:h-20 flex-shrink-0 rounded-md bg-muted flex items-center justify-center">
+                      <Package className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground/50" />
                     </div>
-                  )}
+                  )
+                  }
+                  </div>
                   
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 w-full sm:w-auto">
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className={`font-mono text-lg font-semibold ${item.isChecked ? 'line-through text-muted-foreground' : ''}`}>
+                      <div className="min-w-0">
+                        <p className={`font-mono text-base sm:text-lg font-semibold break-all ${item.isChecked ? 'line-through text-muted-foreground' : ''}`}>
                           {item.partCode}
                         </p>
                         {/* Show product name if available from database, otherwise show parsed description */}
@@ -305,10 +308,10 @@ export default function PackingChecklist() {
                           </p>
                         )}
                       </div>
-                      <div className="flex flex-col items-end gap-1">
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
                         <Badge 
                           variant={item.isChecked ? "outline" : "default"} 
-                          className="flex-shrink-0 text-base px-3"
+                          className="flex-shrink-0 text-sm sm:text-base px-2 sm:px-3"
                         >
                           Qty: {item.quantity}
                         </Badge>

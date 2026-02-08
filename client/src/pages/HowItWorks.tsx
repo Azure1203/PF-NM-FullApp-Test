@@ -287,7 +287,7 @@ export default function HowItWorks() {
                   <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">Why a Digital Certificate is Needed</h4>
                   <p className="mb-2">QZ Tray uses a security system to make sure only trusted websites can send print jobs. Without a certificate, QZ Tray would show a popup asking you to approve every single print request. Our setup eliminates that:</p>
                   <ul className="list-disc list-inside space-y-2" data-testid="list-qz-cert">
-                    <li>A <strong>digital certificate</strong> (the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> file) is placed in the QZ Tray folder on each computer</li>
+                    <li>A <strong>digital certificate</strong> (the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> file) is placed in the QZ Tray folder on each computer</li>
                     <li>The matching <strong>private key</strong> is stored securely on the server — it never leaves the server</li>
                     <li>When the website connects to QZ Tray, the server signs the connection using the private key</li>
                     <li>QZ Tray checks that signature against the certificate on the computer — if they match, the website is trusted</li>
@@ -301,10 +301,10 @@ export default function HowItWorks() {
                       Download Certificate File
                     </h4>
                     <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-3">
-                      Download the <code className="bg-emerald-100 dark:bg-emerald-900 px-1 rounded text-sm">override.crt</code> file below. You will need this file when setting up QZ Tray on any new workstation.
+                      Download the <code className="bg-emerald-100 dark:bg-emerald-900 px-1 rounded text-sm break-all">override.crt</code> file below. You will need this file when setting up QZ Tray on any new workstation.
                     </p>
                     <a href="/api/qz/certificate" download="override.crt" data-testid="button-download-cert">
-                      <Button variant="default" className="gap-2">
+                      <Button variant="default" className="gap-2 w-full sm:w-auto">
                         <Download className="w-4 h-4" />
                         Download override.crt
                       </Button>
@@ -330,7 +330,7 @@ export default function HowItWorks() {
                       <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">2</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Download the certificate file</p>
-                        <p className="text-sm mt-1">Use the download button above to get the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> file. Save it somewhere easy to find (like the Desktop).</p>
+                        <p className="text-sm mt-1">Use the download button above to get the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> file. Save it somewhere easy to find (like the Desktop).</p>
                       </div>
                     </div>
 
@@ -338,8 +338,8 @@ export default function HowItWorks() {
                       <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">3</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Copy the certificate to the QZ Tray folder</p>
-                        <p className="text-sm mt-1">Copy <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> into the QZ Tray installation folder. The default location is:</p>
-                        <code className="block mt-1 text-sm bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded">C:\Program Files\QZ Tray\</code>
+                        <p className="text-sm mt-1">Copy <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> into the QZ Tray installation folder. The default location is:</p>
+                        <code className="block mt-1 text-sm bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded break-all">C:\Program Files\QZ Tray\</code>
                         <p className="text-sm mt-1">Windows may ask for administrator permission — click "Continue" to allow the copy.</p>
                       </div>
                     </div>
@@ -388,7 +388,7 @@ export default function HowItWorks() {
                     </div>
                     <div>
                       <p className="font-medium text-slate-700 dark:text-slate-300">QZ Tray asks for approval / shows a trust popup</p>
-                      <p className="text-sm mt-1">The certificate is missing or not in the right place. Make sure <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">override.crt</code> is in <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">C:\Program Files\QZ Tray\</code> and that QZ Tray was restarted after copying it.</p>
+                      <p className="text-sm mt-1">The certificate is missing or not in the right place. Make sure <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> is in <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">C:\Program Files\QZ Tray\</code> and that QZ Tray was restarted after copying it.</p>
                     </div>
                     <div>
                       <p className="font-medium text-slate-700 dark:text-slate-300">Label doesn't print / wrong printer</p>
