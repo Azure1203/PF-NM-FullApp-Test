@@ -170,6 +170,15 @@ Preferred communication style: Simple, everyday language.
 - **UI Display**: Packing Checklist page shows amber "Cut: X.X mm" badge for items with .CTS suffix
 - **Data Source**: Cut lengths stored directly on packing slip items from CSV import
 
+### Full Mobile Optimization (February 2026)
+- **Scope**: All 10+ pages optimized for mobile responsiveness
+- **Pattern**: CSS-only changes using Tailwind responsive prefixes (sm:, md:, lg:)
+- **Common Changes**: px-3 sm:px-6 containers, responsive grids (grid-cols-1 sm:grid-cols-2), flex-wrap on button rows, overflow-x-auto on tables, text-xl sm:text-2xl scaling, w-full sm:w-auto buttons
+- **OrderDetails**: Icon-only buttons on mobile, 2-col project totals grid, shorter button text, responsive pallet metrics, smaller PDF buttons
+- **Checklists**: Stacked layouts on mobile (flex-col sm:flex-row), responsive image/checkbox sizes, text scaling
+- **Import/Admin Pages**: overflow-x-auto on tables, responsive padding and title sizes
+- **HowItWorks**: break-all on code blocks, full-width download button on mobile
+
 ### Data Fix Scripts
 - **script/fix-drawer-slide-skus.sql**: One-time script to fix drawer slide SKU codes
   - Removes extra dash: M-105-DS10-XXX → M-105-DS10XXX
