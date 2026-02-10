@@ -483,8 +483,9 @@ export default function HowItWorks() {
                     <div><strong>Packing Checklist tab</strong> - Part codes, colors, quantities, dimensions, checked status</div>
                   </div>
 
-                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">How Often to Back Up</h4>
-                  <p className="text-sm">There is no automatic schedule - you run it manually whenever you want a snapshot. A good habit is to back up at least once a week, or before making major changes. Each backup creates a new spreadsheet, so previous backups are not overwritten.</p>
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">Automatic Daily Backup</h4>
+                  <p className="text-sm mb-2">The system automatically runs a backup every day at <strong>3:00 AM</strong>. Each backup creates a new spreadsheet inside the "Perfect Fit Orders Replit Backup" folder in Google Drive, so previous backups are never overwritten.</p>
+                  <p className="text-sm">You can also run a manual backup at any time by clicking the "Backup" button on the Dashboard.</p>
                 </CardContent>
               </Card>
 

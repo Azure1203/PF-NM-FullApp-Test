@@ -13,7 +13,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
-import { getGoogleSheetsClient } from "./googleSheets";
+import { getGoogleSheetsClient, getGoogleDriveClient } from "./googleSheets";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption } from "@shared/schema";
@@ -5187,6 +5187,44 @@ export async function registerRoutes(
       const spreadsheetId = spreadsheet.data.spreadsheetId!;
       const spreadsheetUrl = spreadsheet.data.spreadsheetUrl!;
       console.log('[Backup] Created spreadsheet:', spreadsheetId);
+      
+      const drive = await getGoogleDriveClient();
+      const FOLDER_NAME = 'Perfect Fit Orders Replit Backup';
+      
+      const folderSearch = await drive.files.list({
+        q: `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`,
+        fields: 'files(id, name)',
+        spaces: 'drive',
+      });
+      
+      let folderId: string;
+      if (folderSearch.data.files && folderSearch.data.files.length > 0) {
+        folderId = folderSearch.data.files[0].id!;
+        console.log('[Backup] Found existing folder:', folderId);
+      } else {
+        const folder = await drive.files.create({
+          requestBody: {
+            name: FOLDER_NAME,
+            mimeType: 'application/vnd.google-apps.folder',
+          },
+          fields: 'id',
+        });
+        folderId = folder.data.id!;
+        console.log('[Backup] Created new folder:', folderId);
+      }
+      
+      const file = await drive.files.get({
+        fileId: spreadsheetId,
+        fields: 'parents',
+      });
+      const previousParents = (file.data.parents || []).join(',');
+      await drive.files.update({
+        fileId: spreadsheetId,
+        addParents: folderId,
+        removeParents: previousParents,
+        fields: 'id, parents',
+      });
+      console.log('[Backup] Moved spreadsheet to folder:', FOLDER_NAME);
       
       const allProjects = await storage.getProjects();
       const allProducts = await db.select().from(

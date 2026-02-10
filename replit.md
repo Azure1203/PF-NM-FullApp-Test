@@ -180,12 +180,15 @@ Preferred communication style: Simple, everyday language.
 - **HowItWorks**: break-all on code blocks, full-width download button on mobile
 
 ### Google Sheets Backup (February 2026)
-- **Integration**: Google Sheets via Replit Connectors OAuth
-- **Client**: server/googleSheets.ts - Google Sheets client with OAuth token from Replit connectors
+- **Integration**: Google Sheets + Google Drive via Replit Connectors OAuth
+- **Client**: server/googleSheets.ts - Google Sheets and Drive clients with OAuth token from Replit connectors
 - **Endpoint**: POST /api/backup/google-sheets - Creates a new spreadsheet with all database data
 - **Tabs**: Orders, Order Files, Products, Pallets, Hardware Checklist, Packing Checklist
+- **Folder**: All backups stored in "Perfect Fit Orders Replit Backup" folder in Google Drive (auto-created)
 - **Features**: Formatted blue headers, complete column export, auto-opens spreadsheet URL
 - **UI**: "Backup" button in Dashboard header, shows loading spinner during export, success toast with stats
+- **Daily Auto-Backup**: server/backupScheduler.ts runs at 3:00 AM daily, same export logic as manual backup
+- **Scheduler**: Uses setTimeout chain to schedule next run at 3 AM, started from server/index.ts alongside Outlook scheduler
 
 ### Data Fix Scripts
 - **script/fix-drawer-slide-skus.sql**: One-time script to fix drawer slide SKU codes

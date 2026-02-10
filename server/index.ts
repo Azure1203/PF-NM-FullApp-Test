@@ -133,6 +133,12 @@ app.use((req, res, next) => {
         }).catch(err => {
           log(`Failed to load Outlook scheduler: ${err}`, 'outlook');
         });
+        
+        import('./backupScheduler').then(({ startBackupScheduler }) => {
+          startBackupScheduler();
+        }).catch(err => {
+          log(`Failed to load backup scheduler: ${err}`, 'backup');
+        });
       }, 60000);
     },
   );
