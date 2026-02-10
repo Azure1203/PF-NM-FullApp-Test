@@ -13,6 +13,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
+import { getGoogleSheetsClient } from "./googleSheets";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption } from "@shared/schema";
@@ -5156,6 +5157,198 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error('[Admin] Error checking admin status:', e);
       res.status(500).json({ message: 'Failed to check admin status', error: e.message });
+    }
+  });
+
+  // ==================== GOOGLE SHEETS BACKUP ====================
+  app.post('/api/backup/google-sheets', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[Backup] Starting Google Sheets backup...');
+      
+      const sheets = await getGoogleSheetsClient();
+      
+      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const title = `PF Order Backup - ${timestamp}`;
+      
+      const spreadsheet = await sheets.spreadsheets.create({
+        requestBody: {
+          properties: { title },
+          sheets: [
+            { properties: { title: 'Orders' } },
+            { properties: { title: 'Order Files' } },
+            { properties: { title: 'Products' } },
+            { properties: { title: 'Pallets' } },
+            { properties: { title: 'Hardware Checklist' } },
+            { properties: { title: 'Packing Checklist' } },
+          ]
+        }
+      });
+      
+      const spreadsheetId = spreadsheet.data.spreadsheetId!;
+      const spreadsheetUrl = spreadsheet.data.spreadsheetUrl!;
+      console.log('[Backup] Created spreadsheet:', spreadsheetId);
+      
+      const allProjects = await storage.getProjects();
+      const allProducts = await db.select().from(
+        (await import('@shared/schema')).products
+      );
+      
+      const { pallets: palletsTable, palletFileAssignments, orderFiles: orderFilesTable, hardwareChecklistItems: hwTable, packingSlipItems: psTable } = await import('@shared/schema');
+      
+      const allOrderFiles = await db.select().from(orderFilesTable);
+      const allPallets = await db.select().from(palletsTable);
+      const allPalletAssignments = await db.select().from(palletFileAssignments);
+      const allHardwareItems = await db.select().from(hwTable);
+      const allPackingItems = await db.select().from(psTable);
+      
+      const ordersData: any[][] = [
+        ['ID', 'Name', 'Date', 'Dealer', 'Shipping Address', 'Phone', 'Tax ID', 'Order ID', 'Status', 'Asana Task ID', 'Asana Section', 'PF Order Status', 'PF Production Status', 'Cienapps Job #', 'Notes', 'Created At']
+      ];
+      for (const p of allProjects) {
+        ordersData.push([
+          p.id, p.name, p.date || '', p.dealer || '', p.shippingAddress || '', p.phone || '', 
+          p.taxId || '', p.orderId || '', p.status, p.asanaTaskId || '', 
+          p.asanaSection || '', p.pfOrderStatus || '',
+          Array.isArray(p.pfProductionStatus) ? p.pfProductionStatus.join(', ') : '',
+          p.cienappsJobNumber || '', p.notes || '',
+          p.createdAt ? new Date(p.createdAt).toISOString() : ''
+        ]);
+      }
+      
+      const filesData: any[][] = [
+        ['ID', 'Project ID', 'Filename', 'PO Number', 'Core Parts', 'Dovetails', 'Assembled Drawers', '5-Piece Doors', 'Weight (lbs)', 'Max Length', 'Max Width', 'Has Glass', 'Glass Inserts', 'Glass Shelves', 'Has MJ Doors', 'Has Richelieu Doors', 'Has Double Thick', 'Has Shaker Doors', 'MJ Doors Count', 'Richelieu Doors Count', 'Double Thick Count', 'Wall Rail Pieces', 'Allmoxy Job #', 'HW BO Status', 'Packaging Link', 'Notes', 'Created At']
+      ];
+      for (const f of allOrderFiles) {
+        filesData.push([
+          f.id, f.projectId, f.originalFilename, f.poNumber || '', 
+          f.coreParts || 0, f.dovetails || 0, f.assembledDrawers || 0, f.fivePieceDoors || 0,
+          f.weightLbs || 0, f.maxLength || 0, f.maxWidth || 0,
+          f.hasGlassParts ? 'YES' : 'NO', f.glassInserts || 0, f.glassShelves || 0, 
+          f.hasMJDoors ? 'YES' : 'NO', f.hasRichelieuDoors ? 'YES' : 'NO',
+          f.hasDoubleThick ? 'YES' : 'NO', f.hasShakerDoors ? 'YES' : 'NO',
+          f.mjDoorsCount || 0, f.richelieuDoorsCount || 0, f.doubleThickCount || 0,
+          f.wallRailPieces || 0, f.allmoxyJobNumber || '', f.hardwareBoStatus || '',
+          f.packagingLink || '', f.notes || '', 
+          f.createdAt ? new Date(f.createdAt).toISOString() : ''
+        ]);
+      }
+      
+      const productsData: any[][] = [
+        ['ID', 'Code', 'Name', 'Supplier', 'Category', 'Stock Status', 'Weight (g)', 'Import Row #', 'Notes', 'Created At', 'Updated At']
+      ];
+      for (const p of allProducts) {
+        productsData.push([
+          p.id, p.code, p.name || '', p.supplier || '', p.category, p.stockStatus || '',
+          p.weight || '', p.importRowNumber || '', p.notes || '',
+          p.createdAt ? new Date(p.createdAt).toISOString() : '',
+          p.updatedAt ? new Date(p.updatedAt).toISOString() : ''
+        ]);
+      }
+      
+      const palletAssignmentMap = new Map<number, number[]>();
+      for (const a of allPalletAssignments) {
+        if (!palletAssignmentMap.has(a.palletId)) palletAssignmentMap.set(a.palletId, []);
+        palletAssignmentMap.get(a.palletId)!.push(a.fileId);
+      }
+      
+      const palletsData: any[][] = [
+        ['ID', 'Project ID', 'Pallet #', 'Size', 'Custom Size', 'Notes', 'Assigned File IDs', 'Created At']
+      ];
+      for (const p of allPallets) {
+        const fileIds = palletAssignmentMap.get(p.id) || [];
+        palletsData.push([
+          p.id, p.projectId, p.palletNumber, p.size, p.customSize || '',
+          p.notes || '', fileIds.join(', '),
+          p.createdAt ? new Date(p.createdAt).toISOString() : ''
+        ]);
+      }
+      
+      const hwData: any[][] = [
+        ['ID', 'File ID', 'Product ID', 'Product Code', 'Product Name', 'Quantity', 'Cut Length', 'Is Buyout', 'Buyout Arrived', 'Is Packed', 'Packed By', 'Packed At', 'Not In Database', 'Sort Order', 'Created At']
+      ];
+      for (const h of allHardwareItems) {
+        hwData.push([
+          h.id, h.fileId, h.productId || '', h.productCode, h.productName || '', h.quantity,
+          h.cutLength || '', h.isBuyout ? 'YES' : 'NO', h.buyoutArrived ? 'YES' : 'NO',
+          h.isPacked ? 'YES' : 'NO', h.packedBy || '', 
+          h.packedAt ? new Date(h.packedAt).toISOString() : '',
+          h.notInDatabase ? 'YES' : 'NO', h.sortOrder || 0,
+          h.createdAt ? new Date(h.createdAt).toISOString() : ''
+        ]);
+      }
+      
+      const psData: any[][] = [
+        ['ID', 'File ID', 'Part Code', 'Color', 'Quantity', 'Height', 'Width', 'Length', 'Thickness', 'Description', 'Is Checked', 'Checked By', 'Checked At', 'Sort Order', 'Created At']
+      ];
+      for (const p of allPackingItems) {
+        psData.push([
+          p.id, p.fileId, p.partCode, p.color || '', p.quantity,
+          p.height || '', p.width || '', p.length || '', p.thickness || '',
+          p.description || '', p.isChecked ? 'YES' : 'NO', p.checkedBy || '',
+          p.checkedAt ? new Date(p.checkedAt).toISOString() : '',
+          p.sortOrder || 0,
+          p.createdAt ? new Date(p.createdAt).toISOString() : ''
+        ]);
+      }
+      
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          valueInputOption: 'RAW',
+          data: [
+            { range: 'Orders!A1', values: ordersData },
+            { range: 'Order Files!A1', values: filesData },
+            { range: 'Products!A1', values: productsData },
+            { range: 'Pallets!A1', values: palletsData },
+            { range: 'Hardware Checklist!A1', values: hwData },
+            { range: 'Packing Checklist!A1', values: psData },
+          ]
+        }
+      });
+      
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: spreadsheet.data.sheets!.map(sheet => ({
+            repeatCell: {
+              range: {
+                sheetId: sheet.properties!.sheetId!,
+                startRowIndex: 0,
+                endRowIndex: 1,
+              },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 0.2, green: 0.4, blue: 0.7 },
+                  textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } }
+                }
+              },
+              fields: 'userEnteredFormat(backgroundColor,textFormat)'
+            }
+          }))
+        }
+      });
+      
+      console.log('[Backup] Google Sheets backup complete:', spreadsheetUrl);
+      
+      const stats = {
+        orders: allProjects.length,
+        files: allOrderFiles.length,
+        products: allProducts.length,
+        pallets: allPallets.length,
+        hardwareItems: allHardwareItems.length,
+        packingItems: allPackingItems.length,
+      };
+      
+      res.json({ 
+        message: 'Backup completed successfully', 
+        spreadsheetUrl,
+        spreadsheetId,
+        title,
+        stats
+      });
+    } catch (e: any) {
+      console.error('[Backup] Google Sheets backup failed:', e);
+      res.status(500).json({ message: 'Backup failed', error: e.message });
     }
   });
 

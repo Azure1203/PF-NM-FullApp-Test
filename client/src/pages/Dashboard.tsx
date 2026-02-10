@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle, Database, ExternalLink } from "lucide-react";
 import { PrinterSettings } from "@/components/PrinterSettings";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -66,6 +66,25 @@ export default function Dashboard() {
   const IN_PRODUCTION_SECTIONS = ["JOB CONFIRMED", "PACK HARDWARE", "HARDWARE PACKED", "PALLET PACKED", "READY TO SUBMIT", "READY TO LOAD"];
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticSearch, setDiagnosticSearch] = useState("");
+
+  const { mutate: backupToSheets, isPending: isBackingUp } = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/backup/google-sheets');
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Backup complete",
+        description: `Saved ${data.stats.orders} orders, ${data.stats.products} products, ${data.stats.hardwareItems} hardware items to Google Sheets.`
+      });
+      if (data.spreadsheetUrl) {
+        window.open(data.spreadsheetUrl, '_blank');
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Backup failed", description: error.message, variant: "destructive" });
+    }
+  });
 
   const { data: outlookSyncStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; emailsProcessed: number; emailsMatched: number } | null }>({
     queryKey: ['/api/outlook/sync-status'],
@@ -242,6 +261,21 @@ export default function Dashboard() {
                 </Button>
               </Link>
               <PrinterSettings />
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="gap-2 rounded-xl" 
+                data-testid="button-backup-sheets"
+                onClick={() => backupToSheets()}
+                disabled={isBackingUp}
+              >
+                {isBackingUp ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Database className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">{isBackingUp ? 'Backing up...' : 'Backup'}</span>
+              </Button>
               <Link href="/admin/users">
                 <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-admin-users">
                   <Shield className="w-4 h-4" />

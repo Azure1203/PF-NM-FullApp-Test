@@ -179,6 +179,14 @@ Preferred communication style: Simple, everyday language.
 - **Import/Admin Pages**: overflow-x-auto on tables, responsive padding and title sizes
 - **HowItWorks**: break-all on code blocks, full-width download button on mobile
 
+### Google Sheets Backup (February 2026)
+- **Integration**: Google Sheets via Replit Connectors OAuth
+- **Client**: server/googleSheets.ts - Google Sheets client with OAuth token from Replit connectors
+- **Endpoint**: POST /api/backup/google-sheets - Creates a new spreadsheet with all database data
+- **Tabs**: Orders, Order Files, Products, Pallets, Hardware Checklist, Packing Checklist
+- **Features**: Formatted blue headers, complete column export, auto-opens spreadsheet URL
+- **UI**: "Backup" button in Dashboard header, shows loading spinner during export, success toast with stats
+
 ### Data Fix Scripts
 - **script/fix-drawer-slide-skus.sql**: One-time script to fix drawer slide SKU codes
   - Removes extra dash: M-105-DS10-XXX → M-105-DS10XXX
