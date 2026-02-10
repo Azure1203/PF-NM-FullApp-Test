@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle, HardDrive, Database, Globe } from "lucide-react";
 
 export default function HowItWorks() {
   return (
@@ -414,6 +414,119 @@ export default function HowItWorks() {
                     <li>The certificate file is the same for all workstations — you only need one copy.</li>
                     <li>You do NOT need to do anything on the server or website when adding new workstations. Just install QZ Tray and the certificate on the new computer.</li>
                   </ul>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-backup">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-backup-title">Backup &amp; Disaster Recovery</h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-backup-description">
+              The system uses two separate backup strategies to protect your data: GitHub for the application code, and Google Sheets for the database contents.
+            </p>
+
+            <div className="space-y-6">
+              <Card data-testid="card-github-backup">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-github-backup-title">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                    </div>
+                    GitHub - Code Backup
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400">
+                  <p className="mb-3" data-testid="text-github-description">All application code is backed up to a private GitHub repository. This protects the code that runs the system (the website, server, database structure, etc.).</p>
+                  <ul className="list-disc list-inside space-y-2" data-testid="list-github-items">
+                    <li><strong>What it backs up</strong> - All source code files, configuration, database schema definitions, and build scripts</li>
+                    <li><strong>What it does NOT back up</strong> - Database data (orders, products, checklists), uploaded PDFs, or product images</li>
+                    <li><strong>How it works</strong> - Code changes are pushed to GitHub using Git. Each push creates a snapshot of the entire codebase that can be restored at any time.</li>
+                    <li><strong>When to use</strong> - If the application code is lost or needs to be restored, the entire codebase can be pulled from GitHub to rebuild the system</li>
+                  </ul>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">How to Push Code to GitHub</h4>
+                  <ol className="list-decimal list-inside space-y-2 text-sm" data-testid="list-github-steps">
+                    <li>Open the Git panel in Replit (the branch icon in the left sidebar)</li>
+                    <li>Review the changed files to make sure everything looks correct</li>
+                    <li>Write a short description of what changed (e.g., "Added Google Sheets backup")</li>
+                    <li>Click "Commit &amp; Push" to send the code to GitHub</li>
+                  </ol>
+                  <p className="mt-3 text-sm">It's a good idea to push to GitHub after any significant changes to the system.</p>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-sheets-backup">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-sheets-backup-title">
+                    <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                      <Database className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    Google Sheets - Data Backup
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400">
+                  <p className="mb-3" data-testid="text-sheets-description">The "Backup" button on the Dashboard exports all your database data to a new Google Spreadsheet. This protects your actual order data, product database, and checklist records.</p>
+                  <ul className="list-disc list-inside space-y-2" data-testid="list-sheets-items">
+                    <li><strong>What it backs up</strong> - Orders, order files, products, pallets, hardware checklist items, and packing checklist items</li>
+                    <li><strong>What it does NOT back up</strong> - Uploaded PDFs and product images (these are stored separately in object storage)</li>
+                    <li><strong>How it works</strong> - Click the "Backup" button in the Dashboard header. The system creates a new Google Spreadsheet with 6 tabs (one for each data type) and exports every record with all fields.</li>
+                    <li><strong>Where it goes</strong> - The spreadsheet is created in the Google account that is connected to this app. It opens automatically when the export finishes.</li>
+                  </ul>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">What's in the Spreadsheet</h4>
+                  <div className="space-y-2 text-sm" data-testid="list-sheets-tabs">
+                    <div><strong>Orders tab</strong> - Project name, PO number, dealer name, shipping address, Asana task ID, status, timestamps</div>
+                    <div><strong>Order Files tab</strong> - Filenames, part counts (core parts, dovetails, 5-piece doors, etc.), weights, dimensions, glass/door flags, job numbers, notes</div>
+                    <div><strong>Products tab</strong> - Product codes, names, suppliers, categories, stock status, weights</div>
+                    <div><strong>Pallets tab</strong> - Pallet numbers, sizes, assigned files, notes</div>
+                    <div><strong>Hardware Checklist tab</strong> - Product codes, quantities, buyout status, packed status, arrival dates</div>
+                    <div><strong>Packing Checklist tab</strong> - Part codes, colors, quantities, dimensions, checked status</div>
+                  </div>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">How Often to Back Up</h4>
+                  <p className="text-sm">There is no automatic schedule - you run it manually whenever you want a snapshot. A good habit is to back up at least once a week, or before making major changes. Each backup creates a new spreadsheet, so previous backups are not overwritten.</p>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-backup-summary">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-backup-summary-title">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
+                      <HardDrive className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    Recovery Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400">
+                  <p className="mb-3" data-testid="text-recovery-description">If something goes wrong, here's what you need to recover:</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border dark:border-slate-700" data-testid="table-recovery-summary">
+                      <thead>
+                        <tr className="bg-slate-100 dark:bg-slate-800">
+                          <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">What's Lost</th>
+                          <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">How to Recover</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="p-2 border-b dark:border-slate-700">Application code</td>
+                          <td className="p-2 border-b dark:border-slate-700">Pull from GitHub</td>
+                        </tr>
+                        <tr>
+                          <td className="p-2 border-b dark:border-slate-700">Orders &amp; checklists</td>
+                          <td className="p-2 border-b dark:border-slate-700">Reference the Google Sheets backup to re-enter data</td>
+                        </tr>
+                        <tr>
+                          <td className="p-2 border-b dark:border-slate-700">Product database</td>
+                          <td className="p-2 border-b dark:border-slate-700">Re-import from the hardware/component CSV files, or reference the Google Sheets backup</td>
+                        </tr>
+                        <tr>
+                          <td className="p-2">PDFs &amp; product images</td>
+                          <td className="p-2">These would need to be re-fetched from Outlook emails or re-uploaded</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </CardContent>
               </Card>
             </div>
