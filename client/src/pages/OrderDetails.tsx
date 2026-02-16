@@ -1550,11 +1550,11 @@ export default function OrderDetails() {
                     </div>
                     <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.maxLength)}`}>
                       <p className="text-xl sm:text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
-                      <p className="text-xs text-muted-foreground">max length</p>
+                      <p className="text-xs text-muted-foreground">mm Longest Part</p>
                     </div>
                     <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.maxWidth || 0)}`}>
                       <p className="text-xl sm:text-2xl font-bold" data-testid="text-max-width">{preview.totals.maxWidth || 0}</p>
-                      <p className="text-xs text-muted-foreground">mm wide</p>
+                      <p className="text-xs text-muted-foreground">mm Widest Part</p>
                     </div>
                   </div>
                 );
@@ -1730,8 +1730,8 @@ export default function OrderDetails() {
                                       { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'Cut to Size Parts' },
                                       { key: 'wallRail', value: previewFiles.reduce((sum, f) => sum + ((f as any).wallRailPieces || 0), 0), label: 'Wall Rail Pieces' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
-                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'max length' },
-                                      { key: 'maxWidth', value: Math.max(...previewFiles.map(f => f.maxWidth || 0)), label: 'mm wide' }
+                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm Longest Part' },
+                                      { key: 'maxWidth', value: Math.max(...previewFiles.map(f => f.maxWidth || 0)), label: 'mm Widest Part' }
                                     ];
                                     
                                     return (
@@ -1899,11 +1899,11 @@ export default function OrderDetails() {
                                                     </div>
                                                     <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.maxLength)}`} data-testid={`metric-maxlength-${file.id}`}>
                                                       <p className="text-lg font-bold">{actualFilePreview.maxLength}</p>
-                                                      <p className="text-[9px]">max length</p>
+                                                      <p className="text-[9px]">mm Longest Part</p>
                                                     </div>
                                                     <div className={`text-center p-2 rounded ${getMetricStyle(actualFilePreview.maxWidth || 0)}`} data-testid={`metric-maxwidth-${file.id}`}>
                                                       <p className="text-lg font-bold">{actualFilePreview.maxWidth || 0}</p>
-                                                      <p className="text-[9px]">mm wide</p>
+                                                      <p className="text-[9px]">mm Widest Part</p>
                                                     </div>
                                                   </>
                                                 );
@@ -2450,14 +2450,14 @@ export default function OrderDetails() {
                           <Ruler className="w-5 h-5 text-muted-foreground" />
                           <div>
                             <p className="font-semibold" data-testid="text-file-maxlength">{preview.fileBreakdowns[selectedFileIndex].maxLength} mm</p>
-                            <p className="text-xs text-muted-foreground">Max Length</p>
+                            <p className="text-xs text-muted-foreground">mm Longest Part</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 p-2 sm:p-3 bg-muted/20 rounded-lg">
                           <Ruler className="w-5 h-5 text-muted-foreground" />
                           <div>
                             <p className="font-semibold" data-testid="text-file-maxwidth">{preview.fileBreakdowns[selectedFileIndex].maxWidth || 0} mm</p>
-                            <p className="text-xs text-muted-foreground">Max Width</p>
+                            <p className="text-xs text-muted-foreground">mm Widest Part</p>
                           </div>
                         </div>
                       </div>
