@@ -2390,7 +2390,7 @@ export async function registerRoutes(
           const name = field.name.toUpperCase().trim();
           
           // Match exact Asana custom field names
-          if (name === 'PERFECT FIT DEALER' && field.type === 'text') {
+          if ((name === 'PERFECT FIT DEALER' || name === 'PF DEALER') && field.type === 'text') {
             if (project.dealer) customFields[field.gid] = project.dealer;
           } else if (name === 'ORDER DATE' && field.type === 'text') {
             if (project.date) customFields[field.gid] = project.date;
