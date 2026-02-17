@@ -378,3 +378,16 @@ export const insertAllowedUserSchema = createInsertSchema(allowedUsers).omit({
 
 export type AllowedUser = typeof allowedUsers.$inferSelect;
 export type InsertAllowedUser = z.infer<typeof insertAllowedUserSchema>;
+
+export const colorGrid = pgTable("color_grid", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  description: text("description").notNull(),
+});
+
+export const insertColorGridSchema = createInsertSchema(colorGrid).omit({
+  id: true,
+});
+
+export type ColorGridEntry = typeof colorGrid.$inferSelect;
+export type InsertColorGridEntry = z.infer<typeof insertColorGridSchema>;

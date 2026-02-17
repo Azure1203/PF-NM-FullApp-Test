@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer, Palette } from "lucide-react";
 import { printProjectLabel, printHardwareLabel, printPalletLabels } from "@/lib/qzTray";
 import pfcLogo from "@assets/logo-perfect-fit-closets-7_1768954555746.jpg";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -245,6 +245,11 @@ export default function OrderDetails() {
   const { mutate: deleteProject, isPending: isDeleting } = useDeleteOrder();
   const { data: adminStatus } = useIsAdmin();
   const isAdmin = adminStatus?.isAdmin === true;
+
+  const { data: colorBreakdown, isLoading: isLoadingColors } = useQuery<{ code: string; description: string; quantity: number }[]>({
+    queryKey: ['/api/projects', id, 'color-breakdown'],
+    enabled: !!id,
+  });
   
   // Query key used by useOrder hook - defined early for use in all mutations
   const orderQueryKey = [api.orders.get.path, id];
@@ -1481,6 +1486,44 @@ export default function OrderDetails() {
             </CollapsibleContent>
           </Card>
         </Collapsible>
+
+        {/* Color Breakdown Section */}
+        {isLoadingColors ? (
+          <Card className="mb-6 border-none shadow-md">
+            <CardContent className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : colorBreakdown && colorBreakdown.length > 0 ? (
+          <Card className="mb-6 border-none shadow-md" data-testid="color-breakdown-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Palette className="w-5 h-5 text-primary" />
+                Color Breakdown
+                <Badge variant="secondary" className="ml-1" data-testid="color-breakdown-total">{colorBreakdown.reduce((sum, c) => sum + c.quantity, 0)} parts</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {colorBreakdown.map((color) => (
+                  <div
+                    key={color.code}
+                    className="flex items-center justify-between p-2 sm:p-3 rounded-md bg-muted/30 border"
+                    data-testid={`color-item-${color.code}`}
+                  >
+                    <div className="min-w-0 flex-1 mr-2">
+                      <p className="font-semibold text-sm" data-testid={`color-code-${color.code}`}>{color.code}</p>
+                      <p className="text-xs text-muted-foreground truncate" data-testid={`color-desc-${color.code}`} title={color.description}>{color.description}</p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0" data-testid={`color-qty-${color.code}`}>
+                      {color.quantity}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Project Totals Summary - compact header */}
         {preview && (

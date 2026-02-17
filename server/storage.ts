@@ -31,7 +31,10 @@ import {
   type HardwareChecklistItem,
   type InsertHardwareChecklistItem,
   type AllowedUser,
-  type InsertAllowedUser
+  type InsertAllowedUser,
+  colorGrid,
+  type ColorGridEntry,
+  type InsertColorGridEntry
 } from "@shared/schema";
 import { eq, desc, and, or, inArray, sql, ilike } from "drizzle-orm";
 
@@ -119,6 +122,10 @@ export interface IStorage {
   isWhitelistEmpty(): Promise<boolean>;
   updateAllowedUserAdmin(id: number, isAdmin: boolean): Promise<boolean>;
   isUserAdmin(username: string): Promise<boolean>;
+
+  getColorGrid(): Promise<ColorGridEntry[]>;
+  getColorByCode(code: string): Promise<ColorGridEntry | undefined>;
+  replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -626,6 +633,24 @@ export class DatabaseStorage implements IStorage {
     if (!username) return false;
     const user = await this.getAllowedUserByUsername(username);
     return user?.isAdmin === true;
+  }
+
+  async getColorGrid(): Promise<ColorGridEntry[]> {
+    return await db.select().from(colorGrid).orderBy(colorGrid.code);
+  }
+
+  async getColorByCode(code: string): Promise<ColorGridEntry | undefined> {
+    const [entry] = await db.select().from(colorGrid).where(eq(colorGrid.code, code));
+    return entry;
+  }
+
+  async replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]> {
+    return await db.transaction(async (tx) => {
+      await tx.delete(colorGrid);
+      if (entries.length === 0) return [];
+      const inserted = await tx.insert(colorGrid).values(entries).returning();
+      return inserted;
+    });
   }
 }
 

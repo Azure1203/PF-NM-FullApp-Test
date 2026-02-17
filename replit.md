@@ -68,6 +68,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### February 2026 - Color Breakdown Feature
+- **Color Grid Database**: New `colorGrid` table storing material color codes and descriptions (45 entries: TFL, MT, HG, HPL series)
+- **Color Breakdown API**: GET /api/projects/:projectId/color-breakdown computes per-color part counts from stored CSV data
+  - Only counts component parts (rows where column B matches a known color code)
+  - Excludes hardware (M-, H., R-, S. prefixes), dovetails (DBX/SDBX), and glass items
+  - Case-insensitive matching, normalized to original color grid code
+- **Color Grid Import**: POST /api/color-grid/import allows CSV upload to replace color grid entries
+- **UI Section**: Color Breakdown card in OrderDetails page (between Order Status and Project Totals)
+  - Shows each color code with part count badge and full material description
+  - Responsive grid layout (1/2/3 columns), loading state, only renders when colors exist
+
 ### January 2026
 - **Admin-Only Delete System**: Implemented role-based access control for order deletion
   - Added `isAdmin` boolean field to `allowedUsers` table
