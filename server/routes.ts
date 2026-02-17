@@ -2402,9 +2402,9 @@ export async function registerRoutes(
             if (project.phone) customFields[field.gid] = project.phone;
           } else if ((name === 'PF TAX ID' || name === 'PF TAX ID:') && field.type === 'text') {
             if (project.taxId) customFields[field.gid] = project.taxId;
-          } else if (name === 'ORDER ID' && field.type === 'text') {
+          } else if ((name === 'ORDER ID' || name === 'PF ORDER ID') && field.type === 'text') {
             if (project.orderId) customFields[field.gid] = project.orderId;
-          } else if (name === 'ORDER ID' && field.type === 'number') {
+          } else if ((name === 'ORDER ID' || name === 'PF ORDER ID') && field.type === 'number') {
             if (project.orderId) customFields[field.gid] = parseInt(project.orderId) || 0;
           } else if ((name === 'PF POWER TAILGATE NEEDED' || name === 'PF POWER TAILGATE NEEDED?') && field.type === 'enum' && field.enum_options) {
             const option = field.enum_options.find((o: any) => 
