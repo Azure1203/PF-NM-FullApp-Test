@@ -18,6 +18,7 @@ import Products from "@/pages/Products";
 import HardwareImport from "@/pages/HardwareImport";
 import ComponentImport from "@/pages/ComponentImport";
 import AdminUsers from "@/pages/AdminUsers";
+import ColorGrid from "@/pages/ColorGrid";
 import HowItWorks from "@/pages/HowItWorks";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -72,6 +73,7 @@ function AppRouter() {
       <Route path="/products/import" component={HardwareImport} />
       <Route path="/products/import-components" component={ComponentImport} />
       <Route path="/admin/users" component={AdminUsers} />
+      <Route path="/admin/color-grid" component={ColorGrid} />
       <Route path="/how-it-works" component={HowItWorks} />
       <Route path="/orders/:id" component={OrderDetails} />
       <Route path="/files/:fileId/cts" component={CutToSize} />

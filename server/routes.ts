@@ -5446,7 +5446,7 @@ export async function registerRoutes(
   });
 
   // Get color breakdown for a project (computed from stored CSV data)
-  // Only counts component parts: rows with a valid color code from the color grid
+  // Returns per-file material breakdown: each file with its color/quantity list
   // Excludes: hardware (M-, H., R-, S. prefixes), dovetails (DBX/SDBX), glass items, empty color codes
   app.get('/api/projects/:projectId/color-breakdown', async (req, res) => {
     try {
@@ -5454,10 +5454,9 @@ export async function registerRoutes(
       const files = await storage.getProjectFiles(projectId);
       const colorGridEntries = await storage.getColorGrid();
 
-      // Build lookup maps with uppercase keys for case-insensitive matching
       const colorMap = new Map(colorGridEntries.map(e => [e.code.toUpperCase(), { originalCode: e.code, description: e.description }]));
 
-      const breakdown: Record<string, { quantity: number; description: string }> = {};
+      const fileBreakdowns: { fileId: number; fileName: string; totalParts: number; colors: { code: string; description: string; quantity: number }[] }[] = [];
 
       for (const file of files) {
         if (!file.rawContent) continue;
@@ -5472,6 +5471,8 @@ export async function registerRoutes(
         }
         if (dataStartIndex === -1) continue;
 
+        const fileColors: Record<string, { quantity: number; description: string }> = {};
+
         for (let i = dataStartIndex; i < records.length; i++) {
           const row = records[i];
           const sku = (row[0] || '').trim();
@@ -5480,40 +5481,42 @@ export async function registerRoutes(
 
           if (!sku || quantity <= 0 || !colorCode) continue;
 
-          // Exclude hardware items by SKU prefix
           const upperSku = sku.toUpperCase();
           if (upperSku.startsWith('H.') || upperSku.startsWith('M.') || upperSku.startsWith('M-') ||
               upperSku.startsWith('R-') || upperSku.startsWith('R.') || upperSku.startsWith('S.')) continue;
 
-          // Exclude dovetail drawer boxes
           if (upperSku.startsWith('DBX') || upperSku.startsWith('SDBX')) continue;
 
-          // Exclude glass items (color column says "Glass Inserts" or similar description)
           const upperColor = colorCode.toUpperCase();
           if (upperColor.includes('GLASS')) continue;
 
-          // Only count if color code exists in the color grid
           const colorEntry = colorMap.get(upperColor);
           if (!colorEntry) continue;
 
           const normalizedCode = colorEntry.originalCode;
-          if (!breakdown[normalizedCode]) {
-            breakdown[normalizedCode] = {
-              quantity: 0,
-              description: colorEntry.description
-            };
+          if (!fileColors[normalizedCode]) {
+            fileColors[normalizedCode] = { quantity: 0, description: colorEntry.description };
           }
-          breakdown[normalizedCode].quantity += quantity;
+          fileColors[normalizedCode].quantity += quantity;
+        }
+
+        const colors = Object.entries(fileColors).map(([code, data]) => ({
+          code,
+          description: data.description,
+          quantity: data.quantity
+        })).sort((a, b) => b.quantity - a.quantity);
+
+        if (colors.length > 0) {
+          fileBreakdowns.push({
+            fileId: file.id,
+            fileName: file.originalFilename,
+            totalParts: colors.reduce((sum, c) => sum + c.quantity, 0),
+            colors
+          });
         }
       }
 
-      const result = Object.entries(breakdown).map(([code, data]) => ({
-        code,
-        description: data.description,
-        quantity: data.quantity
-      })).sort((a, b) => b.quantity - a.quantity);
-
-      res.json(result);
+      res.json(fileBreakdowns);
     } catch (e: any) {
       res.status(500).json({ message: 'Failed to compute color breakdown', error: e.message });
     }

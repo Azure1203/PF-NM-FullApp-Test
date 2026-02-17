@@ -246,7 +246,7 @@ export default function OrderDetails() {
   const { data: adminStatus } = useIsAdmin();
   const isAdmin = adminStatus?.isAdmin === true;
 
-  const { data: colorBreakdown, isLoading: isLoadingColors } = useQuery<{ code: string; description: string; quantity: number }[]>({
+  const { data: colorBreakdown, isLoading: isLoadingColors } = useQuery<{ fileId: number; fileName: string; totalParts: number; colors: { code: string; description: string; quantity: number }[] }[]>({
     queryKey: ['/api/projects', id, 'color-breakdown'],
     enabled: !!id,
   });
@@ -1487,7 +1487,7 @@ export default function OrderDetails() {
           </Card>
         </Collapsible>
 
-        {/* Color Breakdown Section */}
+        {/* Material Summary Section - per-file color breakdown */}
         {isLoadingColors ? (
           <Card className="mb-6 border-none shadow-md">
             <CardContent className="flex items-center justify-center py-6">
@@ -1495,32 +1495,46 @@ export default function OrderDetails() {
             </CardContent>
           </Card>
         ) : colorBreakdown && colorBreakdown.length > 0 ? (
-          <Card className="mb-6 border-none shadow-md" data-testid="color-breakdown-card">
+          <Card className="mb-6 border-none shadow-md" data-testid="material-summary-card">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Palette className="w-5 h-5 text-primary" />
-                Color Breakdown
-                <Badge variant="secondary" className="ml-1" data-testid="color-breakdown-total">{colorBreakdown.reduce((sum, c) => sum + c.quantity, 0)} parts</Badge>
+                Material Summary
+                <Badge variant="secondary" className="ml-1" data-testid="material-summary-total">
+                  {colorBreakdown.reduce((sum, f) => sum + f.totalParts, 0)} parts
+                </Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {colorBreakdown.map((color) => (
-                  <div
-                    key={color.code}
-                    className="flex items-center justify-between p-2 sm:p-3 rounded-md bg-muted/30 border"
-                    data-testid={`color-item-${color.code}`}
-                  >
-                    <div className="min-w-0 flex-1 mr-2">
-                      <p className="font-semibold text-sm" data-testid={`color-code-${color.code}`}>{color.code}</p>
-                      <p className="text-xs text-muted-foreground truncate" data-testid={`color-desc-${color.code}`} title={color.description}>{color.description}</p>
-                    </div>
-                    <Badge variant="outline" className="shrink-0" data-testid={`color-qty-${color.code}`}>
-                      {color.quantity}
+            <CardContent className="space-y-4">
+              {colorBreakdown.map((fileBreakdown) => (
+                <div key={fileBreakdown.fileId} data-testid={`material-file-${fileBreakdown.fileId}`}>
+                  <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                    <p className="text-sm font-medium truncate" data-testid={`material-filename-${fileBreakdown.fileId}`} title={fileBreakdown.fileName}>
+                      {fileBreakdown.fileName}
+                    </p>
+                    <Badge variant="secondary" className="shrink-0" data-testid={`material-file-total-${fileBreakdown.fileId}`}>
+                      {fileBreakdown.totalParts} parts
                     </Badge>
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {fileBreakdown.colors.map((color) => (
+                      <div
+                        key={color.code}
+                        className="flex items-center justify-between p-2 sm:p-3 rounded-md bg-muted/30 border"
+                        data-testid={`material-item-${fileBreakdown.fileId}-${color.code}`}
+                      >
+                        <div className="min-w-0 flex-1 mr-2">
+                          <p className="font-semibold text-sm">{color.code}</p>
+                          <p className="text-xs text-muted-foreground truncate" title={color.description}>{color.description}</p>
+                        </div>
+                        <Badge variant="outline" className="shrink-0">
+                          {color.quantity}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         ) : null}

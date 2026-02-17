@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle, Database, ExternalLink } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle, Database, ExternalLink, Palette } from "lucide-react";
 import { PrinterSettings } from "@/components/PrinterSettings";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -258,6 +258,12 @@ export default function Dashboard() {
                 <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-products">
                   <Package className="w-4 h-4" />
                   Products
+                </Button>
+              </Link>
+              <Link href="/admin/color-grid">
+                <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-color-grid">
+                  <Palette className="w-4 h-4" />
+                  <span className="hidden sm:inline">Colors</span>
                 </Button>
               </Link>
               <PrinterSettings />
