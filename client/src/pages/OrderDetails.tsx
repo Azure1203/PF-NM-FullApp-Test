@@ -85,6 +85,7 @@ export default function OrderDetails() {
   const [projectDetailsOpen, setProjectDetailsOpen] = useState(false);
   const [orderStatusOpen, setOrderStatusOpen] = useState(false);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
+  const [materialSummaryOpen, setMaterialSummaryOpen] = useState(false);
   const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
   const [editingCienappsJobNumber, setEditingCienappsJobNumber] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
@@ -1487,7 +1488,7 @@ export default function OrderDetails() {
           </Card>
         </Collapsible>
 
-        {/* Material Summary Section - per-file color breakdown */}
+        {/* Material Summary Section - collapsible per-file color breakdown */}
         {isLoadingColors ? (
           <Card className="mb-6 border-none shadow-md">
             <CardContent className="flex items-center justify-center py-6">
@@ -1495,48 +1496,60 @@ export default function OrderDetails() {
             </CardContent>
           </Card>
         ) : colorBreakdown && colorBreakdown.length > 0 ? (
-          <Card className="mb-6 border-none shadow-md" data-testid="material-summary-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Palette className="w-5 h-5 text-primary" />
-                Material Summary
-                <Badge variant="secondary" className="ml-1" data-testid="material-summary-total">
-                  {colorBreakdown.reduce((sum, f) => sum + f.totalParts, 0)} parts
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {colorBreakdown.map((fileBreakdown) => (
-                <div key={fileBreakdown.fileId} data-testid={`material-file-${fileBreakdown.fileId}`}>
-                  <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                    <p className="text-sm font-medium truncate" data-testid={`material-filename-${fileBreakdown.fileId}`} title={fileBreakdown.fileName}>
-                      {fileBreakdown.fileName}
-                    </p>
-                    <Badge variant="secondary" className="shrink-0" data-testid={`material-file-total-${fileBreakdown.fileId}`}>
-                      {fileBreakdown.totalParts} parts
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {fileBreakdown.colors.map((color) => (
-                      <div
-                        key={color.code}
-                        className="flex items-center justify-between p-2 sm:p-3 rounded-md bg-muted/30 border"
-                        data-testid={`material-item-${fileBreakdown.fileId}-${color.code}`}
-                      >
-                        <div className="min-w-0 flex-1 mr-2">
-                          <p className="font-semibold text-sm">{color.code}</p>
-                          <p className="text-xs text-muted-foreground truncate" title={color.description}>{color.description}</p>
-                        </div>
-                        <Badge variant="outline" className="shrink-0">
-                          {color.quantity}
+          <Collapsible open={materialSummaryOpen} onOpenChange={setMaterialSummaryOpen}>
+            <Card className="mb-6 border-none shadow-md" data-testid="material-summary-card">
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer select-none hover-elevate rounded-md">
+                  <CardTitle className="flex items-center justify-between gap-2 text-lg flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Palette className="w-5 h-5 text-primary" />
+                      Material Summary Report
+                      {materialSummaryOpen && (
+                        <Badge variant="secondary" data-testid="material-summary-total">
+                          {colorBreakdown.reduce((sum, f) => sum + f.totalParts, 0)} parts
+                        </Badge>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${materialSummaryOpen ? '' : '-rotate-90'}`} />
+                  </CardTitle>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-6 pt-0">
+                  {colorBreakdown.map((fileBreakdown, idx) => (
+                    <div key={fileBreakdown.fileId} data-testid={`material-file-${fileBreakdown.fileId}`}>
+                      {idx > 0 && <hr className="mb-4 border-border" />}
+                      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                        <h4 className="text-sm font-semibold" data-testid={`material-filename-${fileBreakdown.fileId}`}>
+                          {fileBreakdown.fileName}
+                        </h4>
+                        <Badge variant="secondary" className="shrink-0" data-testid={`material-file-total-${fileBreakdown.fileId}`}>
+                          {fileBreakdown.totalParts} parts
                         </Badge>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                      <div className="space-y-2">
+                        {fileBreakdown.colors.map((color) => (
+                          <div
+                            key={color.code}
+                            className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-muted/30"
+                            data-testid={`material-item-${fileBreakdown.fileId}-${color.code}`}
+                          >
+                            <div className="flex items-baseline gap-3 min-w-0 flex-wrap">
+                              <span className="font-mono font-semibold text-sm whitespace-nowrap">{color.code}</span>
+                              <span className="text-sm text-muted-foreground break-words">{color.description}</span>
+                            </div>
+                            <Badge variant="outline" className="shrink-0">
+                              {color.quantity}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         ) : null}
 
         {/* Project Totals Summary - compact header */}
