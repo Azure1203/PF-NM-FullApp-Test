@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle, HardDrive, Database, Globe } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle, HardDrive, Database, Globe, Palette } from "lucide-react";
 
 export default function HowItWorks() {
   return (
@@ -139,13 +139,116 @@ export default function HowItWorks() {
               </CardHeader>
               <CardContent className="text-slate-600 dark:text-slate-400">
                 <p className="mb-3" data-testid="text-step5-description">When the order is ready, sync it to Asana for production tracking:</p>
-                <ul className="list-disc list-inside space-y-2" data-testid="list-step5-items">
+                <ul className="list-disc list-inside space-y-2 mb-4" data-testid="list-step5-items">
                   <li>Click "Sync to Asana" button on the order details page</li>
-                  <li>Creates a task in Asana with all order information</li>
-                  <li>Custom fields are populated (parts counts, shipping info, etc.)</li>
+                  <li>Creates a task in the Asana project with the order name as the task title</li>
+                  <li>All custom fields listed below are automatically populated</li>
                   <li>Status badges show production progress (IN PRODUCTION, SHIPPED)</li>
-                  <li>Asana section determines order status: JOB CONFIRMED → PACK HARDWARE → HARDWARE PACKED → PALLET PACKED → READY TO SUBMIT → READY TO LOAD → SHIPPED</li>
+                  <li>Asana section determines order status: JOB CONFIRMED, PACK HARDWARE, HARDWARE PACKED, PALLET PACKED, READY TO SUBMIT, READY TO LOAD, SHIPPED</li>
                 </ul>
+
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-2">How It Works Behind the Scenes</h4>
+                <ol className="list-decimal list-inside space-y-2 text-sm mb-4">
+                  <li>The system connects to Asana using OAuth (you logged in with your Asana account when setting up the app)</li>
+                  <li>It reads the list of custom fields configured on the Asana project</li>
+                  <li>For each custom field, it matches the field name (case-insensitive) against the known fields listed below</li>
+                  <li>If a match is found and the order has data for that field, the value is set on the new Asana task</li>
+                  <li>Some fields accept multiple name variations (listed as "also accepts" below) so renaming fields in Asana won't break the sync</li>
+                </ol>
+
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-3">Custom Fields Synced to Asana</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border dark:border-slate-700" data-testid="table-asana-fields">
+                    <thead>
+                      <tr className="bg-slate-100 dark:bg-slate-800">
+                        <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Asana Field Name</th>
+                        <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Type</th>
+                        <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">What Gets Synced</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF Dealer</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text</td>
+                        <td className="p-2 border-b dark:border-slate-700">Dealer name from the order. Also accepts: "Perfect Fit Dealer"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">Order Date</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text or Date</td>
+                        <td className="p-2 border-b dark:border-slate-700">The order date extracted from the CSV. Works with both text and date-type fields in Asana.</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF Address</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text</td>
+                        <td className="p-2 border-b dark:border-slate-700">Full shipping address from the order</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF Phone Number</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text</td>
+                        <td className="p-2 border-b dark:border-slate-700">Dealer phone number</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF Tax ID</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text</td>
+                        <td className="p-2 border-b dark:border-slate-700">Tax ID from the order. Also accepts: "PF Tax ID:"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF Order ID</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text or Number</td>
+                        <td className="p-2 border-b dark:border-slate-700">The order ID. Also accepts: "Order ID". Works with both text and number-type fields.</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF Power Tailgate Needed</td>
+                        <td className="p-2 border-b dark:border-slate-700">Dropdown (Yes/No)</td>
+                        <td className="p-2 border-b dark:border-slate-700">Whether a power tailgate is needed for delivery. Also accepts: "PF Power Tailgate Needed?"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF Phone Appt Needed</td>
+                        <td className="p-2 border-b dark:border-slate-700">Dropdown (Yes/No)</td>
+                        <td className="p-2 border-b dark:border-slate-700">Whether a phone appointment is needed before delivery. Also accepts: "PF Phone Appt Needed?"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF PO</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text</td>
+                        <td className="p-2 border-b dark:border-slate-700">PO number. If the order has multiple files, shows "X Orders, See below" instead. Also accepts: "PF PO:"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">PF 5106 Form Needed</td>
+                        <td className="p-2 border-b dark:border-slate-700">Dropdown (Yes/No)</td>
+                        <td className="p-2 border-b dark:border-slate-700">
+                          <strong>Automatically determined</strong> based on the shipping address. US addresses = "Yes", Canadian addresses = "No". 
+                          Canadian detection checks for: postal code pattern (A1A 1A1), province codes (AB, BC, ON, etc.), or the word "Canada" in the address. 
+                          Also accepts: "PF 5106 Form Needed?", "PF 5016 Form Needed", "PF 5016 Form Needed?"
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">Packaging Cost</td>
+                        <td className="p-2 border-b dark:border-slate-700">Number or Text</td>
+                        <td className="p-2 border-b dark:border-slate-700">Calculated automatically: number of pallets x $150</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">Cienapps Job Number</td>
+                        <td className="p-2 border-b dark:border-slate-700">Text</td>
+                        <td className="p-2 border-b dark:border-slate-700">The Cienapps job number if one has been entered on the order</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 font-medium">PF Production Status</td>
+                        <td className="p-2">Multi-select</td>
+                        <td className="p-2">
+                          Production status tags derived from the order data. Includes auto-detected statuses (like CTS, 5-PIECE DOORS, DOVETAILS) and buyout status (NO BO HARDWARE, WAITING FOR BO HARDWARE, BO HARDWARE ARRIVED).
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-2">Reading Status Back from Asana</h4>
+                <p className="text-sm">
+                  The system also reads the Asana task's section (column) to determine the order's production status. 
+                  When you move a task between sections in Asana (e.g., from "PACK HARDWARE" to "HARDWARE PACKED"), 
+                  the dashboard reflects this with status badges: a purple "IN PRODUCTION" badge for active sections, 
+                  and a teal "SHIPPED" badge when the task reaches the SHIPPED section.
+                </p>
               </CardContent>
             </Card>
 
@@ -567,6 +670,54 @@ export default function HowItWorks() {
               <li><strong>Bulk Import</strong> - Import products from CSV files</li>
               <li><strong>Images</strong> - Add product images for visual identification during packing</li>
             </ul>
+          </section>
+
+          <section className="mt-6 pt-6 border-t dark:border-slate-700" data-testid="section-color-grid">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2" data-testid="text-color-grid-title">
+              <Palette className="w-5 h-5" />
+              Material Summary &amp; Color Grid
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-4" data-testid="text-color-grid-description">
+              The system tracks which material colors are used in each order file. This helps you see at a glance what sheet materials are needed for production.
+            </p>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
+                <h3 className="font-semibold mb-2 dark:text-slate-100">How It Works</h3>
+                <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2">
+                  <li>When you upload a CSV order file, the system reads each row's material code (column B in the CSV)</li>
+                  <li>It compares each code against the Color Grid database, which contains all known material codes (TFL, MT, HG, HPL, etc.)</li>
+                  <li>Hardware items (codes starting with M-, H., R-, S.), dovetails (DBX/SDBX), and glass items are automatically excluded</li>
+                  <li>The remaining parts are grouped by color code and counted</li>
+                  <li>The result is shown as a collapsible "Material Summary Report" on the order details page</li>
+                </ol>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
+                <h3 className="font-semibold mb-2 dark:text-slate-100">Material Summary Report</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                  Found on the order details page (collapsed by default, click "Material Summary Report" to expand). It shows:
+                </p>
+                <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                  <li>Each file in the order listed separately with its name</li>
+                  <li>The total number of material parts in each file</li>
+                  <li>A breakdown of each color code used, with the full material description and part count</li>
+                </ul>
+              </div>
+
+              <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
+                <h3 className="font-semibold mb-2 dark:text-slate-100">Color Grid Management</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                  The Color Grid page (accessible from the "Colors" button on the Dashboard) manages the list of known material codes:
+                </p>
+                <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                  <li>View all color codes and their full descriptions in a table</li>
+                  <li>Import a new color grid from a CSV file (columns: code, description)</li>
+                  <li>Importing replaces the entire grid with the new data</li>
+                  <li>Currently includes TFL, MT, HG, and HPL material series</li>
+                </ul>
+              </div>
+            </div>
           </section>
         </div>
       </div>
