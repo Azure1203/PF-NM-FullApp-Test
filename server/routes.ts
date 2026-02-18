@@ -40,6 +40,82 @@ const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
 const ASANA_NEW_JOBS_PROJECT_GID = '1209262874404235';
 const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
 
+async function buildAsanaTaskNotes(projectId: number): Promise<string> {
+  const project = await storage.getProject(projectId);
+  if (!project) return '';
+
+  const customDomain = process.env.CUSTOM_APP_DOMAIN;
+  const publishedDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
+  const devDomain = process.env.REPLIT_DEV_DOMAIN;
+  const appDomain = customDomain || publishedDomain || devDomain || '';
+  const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
+
+  let notes = '';
+  if (projectAppUrl) {
+    notes += `Packaging Link: ${projectAppUrl}\n\n`;
+  }
+
+  const projectFiles = await storage.getProjectFiles(project.id);
+  const fileMap = new Map(projectFiles.map(f => [f.id, f]));
+
+  for (const file of projectFiles) {
+    let fileName = file.originalFilename || 'Unknown File';
+    if (fileName.toLowerCase().endsWith('.csv')) {
+      fileName = fileName.slice(0, -4);
+    }
+    const jobNumber = file.allmoxyJobNumber || 'N/A';
+    notes += `${fileName} - ${jobNumber}\n`;
+  }
+
+  const pallets = await storage.getPalletsForProject(project.id);
+  const palletsWithAssignments = pallets
+    .sort((a, b) => a.palletNumber - b.palletNumber);
+
+  const palletsWithFiles: { pallet: typeof pallets[0]; fileNames: string[] }[] = [];
+  for (const pallet of palletsWithAssignments) {
+    const assignments = await storage.getAssignmentsForPallet(pallet.id);
+    const fileNames = assignments.map(a => {
+      const file = fileMap.get(a.fileId);
+      if (!file) return 'Unknown';
+      let name = file.originalFilename || 'Unknown File';
+      if (name.toLowerCase().endsWith('.csv')) name = name.slice(0, -4);
+      return name;
+    });
+    if (assignments.length > 0) {
+      palletsWithFiles.push({ pallet, fileNames });
+    }
+  }
+
+  if (palletsWithFiles.length > 0) {
+    notes += '\nPALLETS:\n';
+    for (const { pallet, fileNames } of palletsWithFiles) {
+      const sizeLabel = pallet.finalSize || pallet.customSize || pallet.size;
+      notes += `Pallet ${pallet.palletNumber} (${sizeLabel}):\n`;
+      for (const name of fileNames) {
+        notes += `  - ${name}\n`;
+      }
+    }
+  }
+
+  return notes;
+}
+
+async function syncAsanaTaskNotes(projectId: number, context: string): Promise<void> {
+  const project = await storage.getProject(projectId);
+  if (!project?.asanaTaskId) return;
+
+  try {
+    const { tasksApi } = await getAsanaApiInstances();
+    const taskNotes = await buildAsanaTaskNotes(projectId);
+    if (taskNotes) {
+      await tasksApi.updateTask({ data: { notes: taskNotes } }, project.asanaTaskId, {});
+      console.log(`[Asana] Updated task notes for ${project.asanaTaskId} after ${context}`);
+    }
+  } catch (err: any) {
+    console.error(`[Asana] Failed to update task notes after ${context}:`, err.message);
+  }
+}
+
 
 
 
@@ -779,39 +855,7 @@ export async function registerRoutes(
 
       res.json(updated);
 
-      const project = await storage.getProject(updated.projectId);
-      if (project?.asanaTaskId) {
-        try {
-          const { tasksApi } = await getAsanaApiInstances();
-          const projectFiles = await storage.getProjectFiles(project.id);
-
-          const customDomain = process.env.CUSTOM_APP_DOMAIN;
-          const publishedDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
-          const devDomain = process.env.REPLIT_DEV_DOMAIN;
-          const appDomain = customDomain || publishedDomain || devDomain || '';
-          const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
-
-          let taskNotes = '';
-          if (projectAppUrl) {
-            taskNotes += `Packaging Link: ${projectAppUrl}\n\n`;
-          }
-          for (const file of projectFiles) {
-            let fileName = file.originalFilename || 'Unknown File';
-            if (fileName.toLowerCase().endsWith('.csv')) {
-              fileName = fileName.slice(0, -4);
-            }
-            const jobNumber = file.allmoxyJobNumber || 'N/A';
-            taskNotes += `${fileName} - ${jobNumber}\n`;
-          }
-
-          if (taskNotes) {
-            await tasksApi.updateTask({ data: { notes: taskNotes } }, project.asanaTaskId, {});
-            console.log(`[Asana] Updated task notes for ${project.asanaTaskId} after Allmoxy Job # change`);
-          }
-        } catch (asanaErr: any) {
-          console.error(`[Asana] Failed to update task notes after Allmoxy Job # change:`, asanaErr.message);
-        }
-      }
+      syncAsanaTaskNotes(updated.projectId, 'Allmoxy Job # change');
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -902,6 +946,10 @@ export async function registerRoutes(
         ...pallet,
         fileIds: assignedFileIds
       });
+
+      if (assignedFileIds.length > 0) {
+        syncAsanaTaskNotes(projectId, 'pallet creation with file assignments');
+      }
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -926,9 +974,11 @@ export async function registerRoutes(
       
       // Update file assignments if provided
       let assignedFileIds: number[] = [];
+      let fileAssignmentsChanged = false;
       if (fileIds !== undefined && Array.isArray(fileIds)) {
         const assignments = await storage.setAssignmentsForPallet(palletId, fileIds);
         assignedFileIds = assignments.map(a => a.fileId);
+        fileAssignmentsChanged = true;
       } else {
         const assignments = await storage.getAssignmentsForPallet(palletId);
         assignedFileIds = assignments.map(a => a.fileId);
@@ -938,6 +988,10 @@ export async function registerRoutes(
         ...pallet,
         fileIds: assignedFileIds
       });
+
+      if (fileAssignmentsChanged || size !== undefined || customSize !== undefined) {
+        syncAsanaTaskNotes(pallet.projectId, 'pallet update');
+      }
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -1068,6 +1122,8 @@ export async function registerRoutes(
         })),
         asanaSyncStatus
       });
+
+      syncAsanaTaskNotes(existingPallet.projectId, 'pallet final size change');
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
