@@ -66,6 +66,10 @@ export default function Dashboard() {
   const IN_PRODUCTION_SECTIONS = ["JOB CONFIRMED", "PACK HARDWARE", "HARDWARE PACKED", "PALLET PACKED", "READY TO SUBMIT", "READY TO LOAD"];
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticSearch, setDiagnosticSearch] = useState("");
+  const [importManageOpen, setImportManageOpen] = useState(false);
+  const [resettingImportId, setResettingImportId] = useState<number | null>(null);
+
+  const autoImportedProjects = (projects || []).filter(p => p.autoImported === true);
 
   const { mutate: backupToSheets, isPending: isBackingUp } = useMutation({
     mutationFn: async () => {
@@ -188,6 +192,24 @@ export default function Dashboard() {
         description: error.message,
         variant: "destructive"
       });
+    }
+  });
+
+  const { mutate: resetImportMutation } = useMutation({
+    mutationFn: async (projectId: number) => {
+      setResettingImportId(projectId);
+      return apiRequest('POST', `/api/asana-import/reset/${projectId}`, {});
+    },
+    onSuccess: () => {
+      toast({ title: "Import reset", description: "The order has been deleted and will be re-imported on the next cycle." });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/asana-import/status'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to reset import", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      setResettingImportId(null);
     }
   });
 
@@ -633,6 +655,126 @@ export default function Dashboard() {
             ))
           )}
         </div>
+
+        {/* Auto-Imported Orders Management - Admin Only */}
+        {isAdmin && (
+          <div className="mt-10">
+            <Collapsible open={importManageOpen} onOpenChange={setImportManageOpen}>
+              <CollapsibleTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-between text-muted-foreground"
+                  data-testid="button-toggle-import-management"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    <span className="text-sm">Manage Auto-Imported Orders ({autoImportedProjects.length})</span>
+                  </div>
+                  {importManageOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <Card className="mt-2">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground mb-4" data-testid="text-import-management-description">
+                      These orders were automatically imported from the Asana "READY TO IMPORT" section. Resetting an import will delete the order and allow it to be re-imported on the next cycle.
+                    </p>
+                    {autoImportedProjects.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-auto-imports">
+                        No auto-imported orders found.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse" data-testid="table-auto-imports">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left p-2">Order Name</th>
+                              <th className="text-left p-2">Dealer</th>
+                              <th className="text-left p-2">Imported</th>
+                              <th className="text-left p-2">Status</th>
+                              <th className="text-left p-2">Asana Task</th>
+                              <th className="text-right p-2">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {autoImportedProjects.map((project) => (
+                              <tr key={project.id} className="border-b" data-testid={`row-auto-import-${project.id}`}>
+                                <td className="p-2">
+                                  <Link href={`/orders/${project.id}`} className="font-medium underline">
+                                    {project.name}
+                                  </Link>
+                                </td>
+                                <td className="p-2 text-muted-foreground">{project.dealer || "N/A"}</td>
+                                <td className="p-2 text-muted-foreground">
+                                  {project.createdAt ? format(new Date(project.createdAt), 'MMM d, h:mm a') : 'N/A'}
+                                </td>
+                                <td className="p-2">
+                                  <StatusBadge status={project.status as "pending" | "synced" | "error"} />
+                                </td>
+                                <td className="p-2">
+                                  {project.asanaTaskId ? (
+                                    <a
+                                      href={`https://app.asana.com/0/0/${project.asanaTaskId}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                                      data-testid={`link-asana-task-${project.id}`}
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      View
+                                    </a>
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                                <td className="p-2 text-right">
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-destructive border-destructive/30"
+                                        data-testid={`button-reset-import-${project.id}`}
+                                      >
+                                        {resettingImportId === project.id ? (
+                                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                        ) : (
+                                          <RefreshCw className="w-3 h-3 mr-1" />
+                                        )}
+                                        Reset
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Reset this import?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          This will delete the order "{project.name}" and allow its Asana task to be re-imported on the next cycle.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => resetImportMutation(project.id)}
+                                          className="bg-destructive text-destructive-foreground"
+                                        >
+                                          Reset Import
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
 
         {/* Diagnostic Section - for debugging Outlook matching */}
         <div className="mt-10">

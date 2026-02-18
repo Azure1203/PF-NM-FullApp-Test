@@ -740,19 +740,6 @@ export default function OrderDetails() {
     });
   };
 
-  const { mutate: resetImport, isPending: isResettingImport } = useMutation({
-    mutationFn: async () => {
-      return apiRequest('POST', `/api/asana-import/reset/${id}`, {});
-    },
-    onSuccess: () => {
-      toast({ title: "Import reset", description: "The task will be re-imported on the next cycle." });
-      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
-      setLocation("/");
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to reset import", description: error.message, variant: "destructive" });
-    }
-  });
 
   const downloadFile = (file: { rawContent?: string | null; originalFilename: string }) => {
     if (!file.rawContent) return;
@@ -911,32 +898,6 @@ export default function OrderDetails() {
               </AlertDialog>
             )}
             
-            {isAdmin && project.autoImported && project.asanaTaskId && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" className="text-amber-600 border-amber-200" data-testid="button-reset-import">
-                    <RefreshCw className="w-4 h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Reset Import</span>
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Reset this import?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will delete this project and allow the Asana task to be re-imported on the next cycle. The task will remain in the READY TO IMPORT section in Asana.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => resetImport()} className="bg-amber-600 text-white">
-                      {isResettingImport ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                      Reset Import
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-
             {project.status === 'synced' && project.asanaTaskId && (
               <Button 
                 variant="outline"
