@@ -67,7 +67,7 @@ export default function Dashboard() {
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticSearch, setDiagnosticSearch] = useState("");
   const [importManageOpen, setImportManageOpen] = useState(false);
-  const [resettingImportId, setResettingImportId] = useState<number | null>(null);
+  const [resettingImportId, setResettingImportId] = useState<string | number | null>(null);
 
   const { data: autoImportedProjects = [] } = useQuery<any[]>({
     queryKey: ['/api/asana-import/projects'],
@@ -199,12 +199,17 @@ export default function Dashboard() {
   });
 
   const { mutate: resetImportMutation } = useMutation({
-    mutationFn: async (projectId: number) => {
+    mutationFn: async (projectId: string | number) => {
       setResettingImportId(projectId);
+      const isOrphan = typeof projectId === 'string' && String(projectId).startsWith('orphan-');
+      if (isOrphan) {
+        const processedTaskId = String(projectId).replace('orphan-', '');
+        return apiRequest('POST', `/api/asana-import/reset-orphan/${processedTaskId}`, {});
+      }
       return apiRequest('POST', `/api/asana-import/reset/${projectId}`, {});
     },
     onSuccess: () => {
-      toast({ title: "Import reset", description: "The order has been deleted and will be re-imported on the next cycle." });
+      toast({ title: "Import reset", description: "The task tracking has been cleared and it will be re-imported on the next cycle." });
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       queryClient.invalidateQueries({ queryKey: ['/api/asana-import/status'] });
       queryClient.invalidateQueries({ queryKey: ['/api/asana-import/projects'] });
@@ -701,12 +706,16 @@ export default function Dashboard() {
                             </tr>
                           </thead>
                           <tbody>
-                            {autoImportedProjects.map((project) => (
+                            {autoImportedProjects.map((project: any) => (
                               <tr key={project.id} className="border-b" data-testid={`row-auto-import-${project.id}`}>
                                 <td className="p-2">
-                                  <Link href={`/orders/${project.id}`} className="font-medium underline">
-                                    {project.name}
-                                  </Link>
+                                  {project.orphaned ? (
+                                    <span className="font-medium text-muted-foreground">{project.name} (no order created)</span>
+                                  ) : (
+                                    <Link href={`/orders/${project.id}`} className="font-medium underline">
+                                      {project.name}
+                                    </Link>
+                                  )}
                                 </td>
                                 <td className="p-2 text-muted-foreground">{project.dealer || "N/A"}</td>
                                 <td className="p-2 text-muted-foreground">
@@ -752,7 +761,10 @@ export default function Dashboard() {
                                       <AlertDialogHeader>
                                         <AlertDialogTitle>Reset this import?</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                          This will delete the order "{project.name}" and allow its Asana task to be re-imported on the next cycle.
+                                          {project.orphaned
+                                            ? `This will clear the tracking for "${project.name}" so it can be re-imported on the next cycle.`
+                                            : `This will delete the order "${project.name}" and allow its Asana task to be re-imported on the next cycle.`
+                                          }
                                         </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>

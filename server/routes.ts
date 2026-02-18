@@ -2649,11 +2649,55 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/asana-import/reset-orphan/:processedTaskId', isAuthenticated, async (req, res) => {
+    try {
+      const replitUser = (req as any).user;
+      const username = replitUser?.claims?.username || replitUser?.name;
+      if (!username) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+      const isAdmin = await storage.isUserAdmin(username);
+      if (!isAdmin) {
+        return res.status(403).json({ message: 'Only admins can reset imports' });
+      }
+
+      const processedTaskId = Number(req.params.processedTaskId);
+      await db.delete(processedAsanaTasks).where(eq(processedAsanaTasks.id, processedTaskId));
+
+      console.log(`[Asana Import] Reset orphaned processed task ${processedTaskId}`);
+      res.json({ message: 'Orphaned task tracking cleared. The task will be re-imported on the next cycle.' });
+    } catch (err: any) {
+      console.error('[Asana Import] Error resetting orphaned task:', err.message);
+      res.status(500).json({ message: 'Failed to reset orphaned task', error: err.message });
+    }
+  });
+
   app.get('/api/asana-import/projects', isAuthenticated, async (req, res) => {
     try {
       const allProjects = await storage.getProjects();
-      const autoImported = allProjects.filter(p => p.autoImported === true);
-      res.json(autoImported);
+      const processedTasks = await db.select().from(processedAsanaTasks);
+      const projectAsanaTaskIds = new Set(allProjects.filter(p => p.asanaTaskId).map(p => p.asanaTaskId));
+
+      const autoImported = allProjects.filter(p => {
+        if (p.autoImported === true) return true;
+        if (p.asanaTaskId) return true;
+        return false;
+      });
+
+      const orphanedTasks = processedTasks.filter(t => !projectAsanaTaskIds.has(t.taskGid));
+      const orphanedEntries = orphanedTasks.map(t => ({
+        id: `orphan-${t.id}`,
+        name: t.taskName || 'Unknown Task',
+        asanaTaskId: t.taskGid,
+        status: t.status === 'failed' ? 'error' : 'pending',
+        autoImported: true,
+        createdAt: t.processedAt,
+        dealer: null,
+        orphaned: true,
+        processedTaskId: t.id,
+      }));
+
+      res.json([...autoImported, ...orphanedEntries]);
     } catch (err: any) {
       console.error('[Asana Import] Error fetching auto-imported projects:', err.message);
       res.status(500).json({ message: 'Failed to fetch auto-imported projects' });
