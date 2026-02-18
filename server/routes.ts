@@ -2417,10 +2417,15 @@ export async function registerRoutes(
             );
             if (option) customFields[field.gid] = option.gid;
           } else if ((name === 'PF PO' || name === 'PF PO:') && field.type === 'text') {
-            if (projectFiles.length === 1) {
-              customFields[field.gid] = projectFiles[0].poNumber || project.name;
-            } else if (projectFiles.length > 1) {
-              customFields[field.gid] = `${projectFiles.length} Orders, See below`;
+            const fileNames = projectFiles.map(f => {
+              let name = f.originalFilename || 'Unknown File';
+              if (name.toLowerCase().endsWith('.csv')) {
+                name = name.slice(0, -4);
+              }
+              return name;
+            });
+            if (fileNames.length > 0) {
+              customFields[field.gid] = fileNames.join('\n');
             }
           } else if ((name === 'PF 5016 FORM NEEDED' || name === 'PF 5016 FORM NEEDED?' || name === 'PF 5106 FORM NEEDED' || name === 'PF 5106 FORM NEEDED?') && field.type === 'enum' && field.enum_options) {
             // Detect if address is Canadian or US

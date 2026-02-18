@@ -210,7 +210,7 @@ export default function HowItWorks() {
                       <tr>
                         <td className="p-2 border-b dark:border-slate-700 font-medium">PF PO</td>
                         <td className="p-2 border-b dark:border-slate-700">Text</td>
-                        <td className="p-2 border-b dark:border-slate-700">PO number. If the order has multiple files, shows "X Orders, See below" instead. Also accepts: "PF PO:"</td>
+                        <td className="p-2 border-b dark:border-slate-700">File names from the order (without .csv extension). If multiple files, each name appears on its own line. Also accepts: "PF PO:"</td>
                       </tr>
                       <tr>
                         <td className="p-2 border-b dark:border-slate-700 font-medium">PF 5106 Form Needed</td>
