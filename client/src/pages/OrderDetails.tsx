@@ -1622,9 +1622,10 @@ export default function OrderDetails() {
                       <p className="text-xl sm:text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
                       <p className="text-xs text-muted-foreground">mm Longest Part</p>
                     </div>
-                    <div className="text-center p-2 rounded-md border-2 border-blue-300 bg-blue-50 dark:bg-blue-950 dark:border-blue-700">
+                    <div className="text-center p-2 rounded-md border-2 border-blue-300 bg-blue-50 dark:bg-blue-950 dark:border-blue-700 col-span-2">
                       <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-300" data-testid="text-recommended-pallet">{preview.palletSize}</p>
                       <p className="text-xs text-muted-foreground">Recommended Pallet</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {preview.totals.maxLength}mm x {preview.totals.maxWidth}mm</p>
                     </div>
                   </div>
                 );
@@ -1800,17 +1801,19 @@ export default function OrderDetails() {
                                       { key: 'cts', value: previewFiles.reduce((sum, f) => sum + ((f as any).ctsPartsCount || 0), 0), label: 'Cut to Size Parts' },
                                       { key: 'wallRail', value: previewFiles.reduce((sum, f) => sum + ((f as any).wallRailPieces || 0), 0), label: 'Wall Rail Pieces' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
-                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm Longest Part' },
-                                      { key: 'recommendedPallet', value: preview?.palletSize || '', label: 'Recommended Pallet' }
+                                      { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm Longest Part' }
                                     ];
+
+                                    const palletMaxLength = Math.max(...previewFiles.map(f => f.maxLength || 0));
+                                    const palletMaxWidth = Math.max(...previewFiles.map(f => f.maxWidth || 0));
+                                    const palletRecommended = preview?.palletSize || '';
                                     
                                     return (
                                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-2">
                                         {metrics.map(({ key, value, label }) => {
                                           const isPackaged = status[key];
                                           const numValue = typeof value === 'number' ? value : parseInt(value) || 0;
-                                          const isInfoOnly = key === 'weight' || key === 'maxLength' || key === 'recommendedPallet';
-                                          // CTS button is auto-green when all CTS parts in all orders are cut
+                                          const isInfoOnly = key === 'weight' || key === 'maxLength';
                                           const isCtsAutoGreen = key === 'cts' && allCtsCut;
                                           const isAutoGreen = numValue === 0 || isInfoOnly || isCtsAutoGreen;
                                           const showGreen = isPackaged || isAutoGreen;
@@ -1834,6 +1837,14 @@ export default function OrderDetails() {
                                             </button>
                                           );
                                         })}
+                                        <div
+                                          className="col-span-2 text-center p-2 rounded-md border-2 border-blue-300 bg-blue-50 dark:bg-blue-950 dark:border-blue-700 cursor-default"
+                                          data-testid={`text-pallet-recommended-${pallet.id}`}
+                                        >
+                                          <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{palletRecommended}</p>
+                                          <p className="text-xs text-muted-foreground">Recommended Pallet</p>
+                                          <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {palletMaxLength}mm x {palletMaxWidth}mm</p>
+                                        </div>
                                       </div>
                                     );
                                   })()}
