@@ -46,8 +46,12 @@ Preferred communication style: Simple, everyday language.
 ### Asana Integration
 - **Library**: asana npm package for API communication
 - **Authentication**: OAuth via Replit Connectors (fetches tokens from REPLIT_CONNECTORS_HOSTNAME)
-- **Purpose**: Syncing orders as tasks to Asana projects
+- **Purpose**: Syncing orders as tasks to Asana projects + auto-importing orders from Asana
 - **Token Management**: Access tokens are refreshed dynamically, not cached
+- **Auto-Import**: server/asanaImportScheduler.ts polls NEW JOBS project's READY TO IMPORT section every 10 minutes
+- **Two Asana Projects**: NEW JOBS (GID: 1209262874404235) for import, PRODUCTION (GID: 1208263802564738) for tracking
+- **Deduplication**: Uses processedAsanaTasks table to avoid re-importing tasks
+- **Sync Behavior**: If order has asanaTaskId (from auto-import), sync updates existing task instead of creating new one
 
 ### Outlook Integration
 - **Library**: Microsoft Graph API via @microsoft/microsoft-graph-client

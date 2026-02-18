@@ -15,724 +15,34 @@ import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_inte
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
 import { getGoogleSheetsClient, getGoogleDriveClient } from "./googleSheets";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
+import { getAsanaImportStatus, triggerManualAsanaImport } from "./asanaImportScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import {
+  parseCSV,
+  findValue,
+  formatPONumber,
+  formatPhoneNumber,
+  countPartsFromCSV,
+  extractCTSParts,
+  computeAutoProductionStatuses,
+  generateHardwareChecklistForFile,
+  generatePackingSlipChecklistForFile,
+  updateProjectBoProductionStatus
+} from "./csvHelpers";
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Asana Perfect Fit Production Project GID - use this for all Asana operations
 const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
+const ASANA_NEW_JOBS_PROJECT_GID = '1209262874404235';
+const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
 
-// Helper to parse CSV file
-function parseCSV(fileContent: string): Promise<string[][]> {
-  return new Promise((resolve, reject) => {
-    parse(fileContent, {
-      relax_column_count: true,
-      skip_empty_lines: true,
-      trim: true
-    }, (err, records: string[][]) => {
-      if (err) reject(err);
-      else resolve(records);
-    });
-  });
-}
 
-// Helper to find value in CSV records
-function findValue(records: string[][], keyStart: string): string | undefined {
-  for (let i = 0; i < Math.min(records.length, 20); i++) {
-    const row = records[i];
-    if (row[0] && row[0].toLowerCase().trim().includes(keyStart.toLowerCase().trim())) {
-      return row[1]?.trim();
-    }
-  }
-  return undefined;
-}
 
-// Format phone number to xxx-xxx-xxxx
-function formatPhoneNumber(phone: string | undefined): string | undefined {
-  if (!phone) return undefined;
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return `${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
-  }
-  return phone;
-}
 
-// Format PO number - remove # and - but keep ( and )
-function formatPONumber(po: string | undefined): string | undefined {
-  if (!po) return undefined;
-  return po.replace(/[#\-]/g, '').replace(/\s+/g, ' ').trim();
-}
 
-// M&J door keywords to detect
-const MJ_DOOR_KEYWORDS = [
-  'DRSLIMLINE', 'DRVENICE', 'DRSUSSEX', 'DRLANCASTER', 'DRLANCASTER-VGROOVE', 'DRLANCASTER-GD'
-];
-
-// Richelieu door keywords to detect
-const RICHELIEU_DOOR_KEYWORDS = ['ALUMSHAKER-06', 'ALUMSLIMSHAKER-03'];
-
-// Glass Insert keywords to detect
-const GLASS_INSERT_KEYWORDS = [
-  'CLEAR', 'FROSTED', 'FLUTEX', 'CATHEDRAL', 'BAMBOO', 'MIRROR',
-  'CLEARSAFETY', 'FROSTEDSAFETY', 'FLUTEXSAFETY', 'CATHEDRALSAFETY', 'SAFETYBAMBOO', 'MIRRORSAFETY',
-  'ACID', 'SMOKED-GREY', 'EXTRA-CANNES', 'EXTRA-LINEN', 'SMOKED-BRONZE',
-  'PURE-WHITE', 'METALLIC-GREY', 'JET-BLACK', 'BEIGE', 'CHOCOLATE', 'BLUE-GREY', 'TURQUOISE-BLUE',
-  'ALBARIUM', 'NACRE', 'SIRIUS', 'BROMO'
-];
-
-// Glass Shelf keywords to detect
-const GLASS_SHELF_KEYWORDS = ['GLSHFA_6', 'GLSHFA_10'];
-
-// Wall Rail part numbers to count
-const WALL_RAIL_PARTS = [
-  'H.290.11.901.CTS', 'H.290.11.907.CTS', 'H.290.11.901', 'H.290.11.907',
-  'H.290.12.781.CTS', 'H.290.12.790.CTS', 'H.290.12.380.CTS', 'H.290.12.390.CTS',
-  'H.290.12.180.CTS', 'H.290.12.190.CTS', 'H.290.12.481.CTS', 'H.290.12.490.CTS',
-  'H.290.12.781', 'H.290.12.790', 'H.290.12.380', 'H.290.12.390',
-  'H.290.12.180', 'H.290.12.190', 'H.290.12.481', 'H.290.12.490'
-];
-
-// Compute auto-enabled production statuses based on order content
-function computeAutoProductionStatuses(params: {
-  hasCTSParts: boolean;
-  hasFivePiece: boolean;
-  hasDoubleThick: boolean;
-  hasDovetails: boolean;
-  hasAssembledDrawers: boolean;
-  hasGlassParts: boolean;
-  hasGlassShelves: boolean;
-}): string[] {
-  const statuses: string[] = [];
-  
-  // CTS Parts → CLOSET RODS NOT CUT
-  if (params.hasCTSParts) {
-    statuses.push('CLOSET RODS NOT CUT');
-  }
-  
-  // 5 Piece Shaker → WAITING FOR NETLEY SHAKER DOORS
-  if (params.hasFivePiece) {
-    statuses.push('WAITING FOR NETLEY SHAKER DOORS');
-  }
-  
-  // Double Thick Parts → DOUBLE UP PARTS AT CUSTOM
-  if (params.hasDoubleThick) {
-    statuses.push('DOUBLE UP PARTS AT CUSTOM');
-  }
-  
-  // Dovetails → WAITING FOR DOVETAIL
-  if (params.hasDovetails) {
-    statuses.push('WAITING FOR DOVETAIL');
-  }
-  
-  // Assembled Drawers → WAITING FOR NETLEY ASSEMBLED DRAWERS
-  if (params.hasAssembledDrawers) {
-    statuses.push('WAITING FOR NETLEY ASSEMBLED DRAWERS');
-  }
-  
-  // Glass Parts (inserts) → WAITING FOR GLASS FOR DOORS
-  if (params.hasGlassParts) {
-    statuses.push('WAITING FOR GLASS FOR DOORS');
-  }
-  
-  // Glass Shelves (GLSHFA_6, GLSHFA_10) → WAITING FOR GLASS SHELVES
-  if (params.hasGlassShelves) {
-    statuses.push('WAITING FOR GLASS SHELVES');
-  }
-  
-  return statuses;
-}
-
-// Extract CTS (Cut To Size) parts from CSV
-function extractCTSParts(records: string[][]): Array<{ partNumber: string; description: string; cutLength: number; quantity: number }> {
-  const ctsParts: Array<{ partNumber: string; description: string; cutLength: number; quantity: number }> = [];
-  
-  // Find the data section (starts after "Manuf code" header row)
-  let dataStartIndex = -1;
-  for (let i = 0; i < records.length; i++) {
-    if (records[i][0]?.toLowerCase().includes('manuf')) {
-      dataStartIndex = i + 1;
-      break;
-    }
-  }
-  
-  if (dataStartIndex === -1) return ctsParts;
-  
-  // Process each data row looking for .CTS parts
-  for (let i = dataStartIndex; i < records.length; i++) {
-    const row = records[i];
-    const sku = (row[0] || '').trim();
-    
-    // Check if this is a CTS part (ends with .CTS)
-    if (sku.toUpperCase().endsWith('.CTS')) {
-      const description = (row[1] || '').trim();
-      const quantity = parseInt(row[2] || '0') || 0;
-      // Length is in column 5 (index 5 = Length(L))
-      const cutLength = parseFloat(row[5] || '0') || 0;
-      
-      if (quantity > 0 && cutLength > 0) {
-        ctsParts.push({
-          partNumber: sku,
-          description,
-          cutLength: parseFloat(cutLength.toFixed(1)),
-          quantity
-        });
-      }
-    }
-  }
-  
-  return ctsParts;
-}
-
-// Hardware prefixes that identify hardware items in order CSV (fallback for items not in DB)
-const HARDWARE_PREFIXES = ['H.', 'M.', 'M-', 'R-', 'R.', 'S.'];
-
-interface CsvItemExtractionResult {
-  items: Array<{
-    rowIndex: number;
-    code: string;
-    name: string;
-    quantity: number;
-    height: number | null; // Height column (column 3)
-    width: number | null; // Width column (column 4)
-    length: number | null; // Length column (column 5) - used for CTS parts cutLength
-  }>;
-  invalidRows: Array<{
-    rowIndex: number;
-    code: string;
-    name: string;
-    reason: string;
-  }>;
-  headerFound: boolean;
-}
-
-// Extract ALL items from order CSV (not just hardware - we'll filter later based on product DB)
-function extractAllItemsFromCSV(records: string[][]): CsvItemExtractionResult {
-  const items: CsvItemExtractionResult['items'] = [];
-  const invalidRows: CsvItemExtractionResult['invalidRows'] = [];
-  
-  // Find the data section (starts after "Manuf code" header row)
-  let dataStartIndex = -1;
-  for (let i = 0; i < records.length; i++) {
-    if (records[i][0]?.toLowerCase().includes('manuf')) {
-      dataStartIndex = i + 1;
-      break;
-    }
-  }
-  
-  if (dataStartIndex === -1) {
-    return { items, invalidRows, headerFound: false };
-  }
-  
-  // Process each data row
-  // CSV columns: 0=Manuf code, 1=Color/Description, 2=Quantity, 3=Height, 4=Width, 5=Length
-  for (let i = dataStartIndex; i < records.length; i++) {
-    const row = records[i];
-    const originalCode = (row[0] || '').trim();
-    const description = (row[1] || '').trim();
-    const quantityStr = row[2] || '0';
-    const quantity = parseInt(quantityStr) || 0;
-    const heightStr = (row[3] || '').trim();
-    const widthStr = (row[4] || '').trim();
-    const lengthStr = (row[5] || '').trim();
-    const height = heightStr ? parseFloat(heightStr) : null;
-    const width = widthStr ? parseFloat(widthStr) : null;
-    const length = lengthStr ? parseFloat(lengthStr) : null;
-    
-    // Skip empty rows
-    if (!originalCode) continue;
-    
-    // Validate quantity
-    if (quantity <= 0) {
-      invalidRows.push({
-        rowIndex: i + 1,
-        code: originalCode,
-        name: description || '(empty)',
-        reason: `Invalid quantity: "${quantityStr}"`
-      });
-      continue;
-    }
-    
-    items.push({
-      rowIndex: i + 1,
-      code: originalCode,
-      name: description,
-      quantity,
-      height: height && !isNaN(height) ? height : null,
-      width: width && !isNaN(width) ? width : null,
-      length: length && !isNaN(length) ? length : null
-    });
-  }
-  
-  return { items, invalidRows, headerFound: true };
-}
-
-// Check if a code looks like hardware based on prefix (fallback for items not in DB)
-function hasHardwarePrefix(code: string): boolean {
-  const upperCode = code.trim().toUpperCase();
-  return HARDWARE_PREFIXES.some(prefix => upperCode.startsWith(prefix));
-}
-
-// Helper function to update project's pfProductionStatus based on all files' BO statuses
-// This is at module level so it can be called from generateHardwareChecklistForFile
-async function updateProjectBoProductionStatus(projectId: number) {
-  console.log(`[BO Sync] updateProjectBoProductionStatus called for projectId: ${projectId}`);
-  
-  const project = await storage.getProject(projectId);
-  if (!project) {
-    console.log(`[BO Sync] WARNING: Project ${projectId} not found`);
-    return;
-  }
-  
-  const files = await storage.getProjectFiles(projectId);
-  console.log(`[BO Sync] Project ${projectId} has ${files.length} files`);
-  
-  // Analyze BO status across all files
-  const fileBoStatuses = files.map(f => f.hardwareBoStatus).filter(Boolean) as string[];
-  console.log(`[BO Sync] File BO statuses:`, fileBoStatuses);
-  
-  const hasWaitingForBo = fileBoStatuses.some(s => s === 'WAITING FOR BO HARDWARE');
-  const hasBoHardware = fileBoStatuses.some(s => s === 'WAITING FOR BO HARDWARE' || s === 'BO HARDWARE ARRIVED');
-  const allBoArrived = hasBoHardware && fileBoStatuses.every(s => s === 'NO BO HARDWARE' || s === 'BO HARDWARE ARRIVED');
-  
-  console.log(`[BO Sync] Analysis: hasWaitingForBo=${hasWaitingForBo}, hasBoHardware=${hasBoHardware}, allBoArrived=${allBoArrived}`);
-  
-  // Get current production statuses
-  const currentStatuses = project.pfProductionStatus || [];
-  console.log(`[BO Sync] Current pfProductionStatus:`, currentStatuses);
-  
-  let newStatuses = [...currentStatuses];
-  
-  // Remove existing BO-related statuses first
-  newStatuses = newStatuses.filter(s => s !== 'WAITING FOR BO HARDWARE' && s !== 'BO HARDWARE ARRIVED');
-  
-  // Add the appropriate BO status based on file statuses
-  if (hasWaitingForBo) {
-    // At least one file is waiting for BO hardware
-    newStatuses.push('WAITING FOR BO HARDWARE');
-  } else if (allBoArrived && hasBoHardware) {
-    // All files that had BO hardware now have it arrived
-    newStatuses.push('BO HARDWARE ARRIVED');
-  }
-  // If no files have BO hardware (all 'NO BO HARDWARE'), don't add any BO status
-  
-  console.log(`[BO Sync] New pfProductionStatus will be:`, newStatuses);
-  
-  // Update project if statuses changed
-  const statusesChanged = 
-    newStatuses.length !== currentStatuses.length || 
-    newStatuses.some(s => !currentStatuses.includes(s)) ||
-    currentStatuses.some(s => !newStatuses.includes(s));
-  
-  console.log(`[BO Sync] Status changed: ${statusesChanged}`);
-  
-  if (statusesChanged) {
-    await storage.updateProject(projectId, { pfProductionStatus: newStatuses });
-    console.log(`[BO Status] Updated project ${projectId} pfProductionStatus:`, newStatuses);
-    
-    // Sync to Asana if project is linked
-    if (project.asanaTaskId) {
-      try {
-        const { tasksApi, projectsApi } = await getAsanaApiInstances();
-        const asanaProjectGid = ASANA_PERFECT_FIT_PROJECT_GID;
-        
-        // Get custom field settings to find PF PRODUCTION STATUS field
-        const projectDetails = await projectsApi.getProject(asanaProjectGid, { 
-          opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
-        });
-        
-        const customFieldSettings = projectDetails.data.custom_field_settings || [];
-        
-        for (const setting of customFieldSettings) {
-          const field = setting.custom_field;
-          const name = field.name?.toUpperCase().trim();
-          
-          if (name === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
-            // Map selected status names to their GIDs
-            const selectedGids = newStatuses.map((statusName: string) => {
-              const option = field.enum_options.find((o: any) => o.name === statusName);
-              return option?.gid;
-            }).filter(Boolean);
-            
-            // Update the task's custom field
-            await tasksApi.updateTask({ 
-              data: { 
-                custom_fields: { [field.gid]: selectedGids }
-              } 
-            }, project.asanaTaskId, {});
-            
-            console.log(`[BO Status] Synced pfProductionStatus to Asana task ${project.asanaTaskId}:`, newStatuses);
-            break;
-          }
-        }
-      } catch (asanaErr: any) {
-        console.error("[BO Status] Failed to sync to Asana:", asanaErr.response?.body || asanaErr);
-        // Don't fail - local update succeeded
-      }
-    }
-  }
-}
-
-// Auto-generate hardware checklist for an order file
-// This function is called automatically after CSV upload and can also be triggered manually
-async function generateHardwareChecklistForFile(fileId: number, rawContent: string): Promise<{ success: boolean; itemCount: number; error?: string }> {
-  try {
-    // Parse the CSV content
-    const records = await parseCSV(rawContent);
-    
-    // Extract ALL items from CSV (we'll filter based on products DB)
-    const { items: allItems, invalidRows, headerFound } = extractAllItemsFromCSV(records);
-    
-    if (!headerFound) {
-      console.log(`[Hardware Checklist Auto] File ${fileId}: No "Manuf code" header found`);
-      return { success: false, itemCount: 0, error: 'No header found' };
-    }
-    
-    if (allItems.length === 0) {
-      console.log(`[Hardware Checklist Auto] File ${fileId}: No items found in CSV`);
-      return { success: false, itemCount: 0, error: 'No items in CSV' };
-    }
-    
-    // Look up ALL codes in products database
-    const allCodes = allItems.map(item => item.code);
-    const productsFromDb = await storage.getProductsByCode(allCodes);
-    const productMap = new Map(productsFromDb.map(p => [p.code.toUpperCase(), p]));
-    
-    // Classify each item
-    const hardwareItems: Array<{
-      rowIndex: number;
-      code: string;
-      name: string;
-      quantity: number;
-      height: number | null;
-      width: number | null;
-      length: number | null;
-      product: typeof productsFromDb[0] | null;
-      classification: string;
-    }> = [];
-    
-    for (const item of allItems) {
-      const product = productMap.get(item.code.toUpperCase()) || null;
-      let classification: string;
-      
-      if (product) {
-        classification = product.category === 'HARDWARE' ? 'HARDWARE_IN_DB' : 'COMPONENT_IN_DB';
-      } else {
-        classification = hasHardwarePrefix(item.code) ? 'HARDWARE_PREFIX_NOT_IN_DB' : 'NOT_HARDWARE';
-      }
-      
-      // Only keep hardware items
-      if (classification === 'HARDWARE_IN_DB' || classification === 'HARDWARE_PREFIX_NOT_IN_DB') {
-        hardwareItems.push({ ...item, product, classification });
-      }
-    }
-    
-    if (hardwareItems.length === 0) {
-      console.log(`[Hardware Checklist Auto] File ${fileId}: No hardware items found (${allItems.length} items checked)`);
-      return { success: true, itemCount: 0 }; // Success but no hardware
-    }
-    
-    // Build checklist items to insert
-    const itemsToInsert = hardwareItems.map((item, index) => {
-      const isBuyout = item.product?.stockStatus === 'BUYOUT';
-      const notInDatabase = item.classification === 'HARDWARE_PREFIX_NOT_IN_DB';
-      const isCts = item.code.toUpperCase().includes('.CTS');
-      return {
-        fileId,
-        productId: item.product?.id || null,
-        productCode: item.code,
-        productName: item.name,
-        quantity: item.quantity,
-        cutLength: isCts ? item.length : null, // Only store cutLength for CTS parts
-        isBuyout,
-        buyoutArrived: false,
-        isPacked: false,
-        packedBy: null,
-        sortOrder: index,
-        notInDatabase
-      };
-    });
-    
-    // Insert items
-    const createdItems = await storage.replaceHardwareChecklist(fileId, itemsToInsert);
-    
-    // Calculate and update BO status (using same logic as recalculateBoStatus)
-    const buyoutItems = createdItems.filter(i => i.isBuyout);
-    const buyoutPacked = buyoutItems.filter(i => i.isPacked).length;
-    
-    let boStatus: 'NO BO HARDWARE' | 'WAITING FOR BO HARDWARE' | 'BO HARDWARE ARRIVED' = 'NO BO HARDWARE';
-    if (buyoutItems.length > 0) {
-      boStatus = buyoutPacked === buyoutItems.length ? 'BO HARDWARE ARRIVED' : 'WAITING FOR BO HARDWARE';
-    }
-    
-    // Update order file with BO status (using hardwareBoStatus field)
-    await storage.updateOrderFile(fileId, { hardwareBoStatus: boStatus });
-    
-    // Update pallet assignments with BO status
-    // Map to BuyoutHardwareOption format (NO BO HARDWARE -> NO BUYOUT HARDWARE)
-    const buyoutOption = boStatus === 'NO BO HARDWARE' ? 'NO BUYOUT HARDWARE' : boStatus;
-    const assignments = await storage.getAssignmentsForFile(fileId);
-    for (const assignment of assignments) {
-      await storage.updateAssignmentBuyoutStatuses(assignment.id, [buyoutOption]);
-    }
-    
-    // Update project-level pfProductionStatus based on all files' BO statuses
-    const orderFile = await storage.getOrderFile(fileId);
-    if (orderFile) {
-      console.log(`[Hardware Checklist Auto] File ${fileId}: Calling updateProjectBoProductionStatus for project ${orderFile.projectId}`);
-      await updateProjectBoProductionStatus(orderFile.projectId);
-    }
-    
-    console.log(`[Hardware Checklist Auto] File ${fileId}: Generated ${createdItems.length} items, BO status: ${boStatus}`);
-    return { success: true, itemCount: createdItems.length };
-    
-  } catch (e: any) {
-    console.error(`[Hardware Checklist Auto] File ${fileId}: Error generating:`, e);
-    return { success: false, itemCount: 0, error: e.message };
-  }
-}
-
-// Generate packing slip checklist items from order CSV
-// This creates a checklist item for every item in the CSV (not just hardware)
-async function generatePackingSlipChecklistForFile(fileId: number, rawContent: string): Promise<{ success: boolean; itemCount: number; error?: string }> {
-  try {
-    // Parse the CSV content
-    const records = await parseCSV(rawContent);
-    
-    // Extract ALL items from CSV
-    const { items: allItems, headerFound } = extractAllItemsFromCSV(records);
-    
-    if (!headerFound) {
-      console.log(`[Packing Slip Checklist] File ${fileId}: No "Manuf code" header found`);
-      return { success: false, itemCount: 0, error: 'No header found' };
-    }
-    
-    if (allItems.length === 0) {
-      console.log(`[Packing Slip Checklist] File ${fileId}: No items found in CSV`);
-      return { success: false, itemCount: 0, error: 'No items in CSV' };
-    }
-    
-    // Build packing slip checklist items from all CSV items
-    const itemsToInsert = allItems.map((item, index) => ({
-      fileId,
-      partCode: item.code,
-      color: null, // Color could be parsed from description if needed
-      quantity: item.quantity,
-      height: item.height,
-      width: item.width,
-      length: item.length, // This is the CTS cut length for CTS parts
-      thickness: null,
-      description: item.name,
-      imagePath: null,
-      isChecked: false,
-      sortOrder: index
-    }));
-    
-    // Replace existing items with new ones
-    const createdItems = await storage.replacePackingSlipItems(fileId, itemsToInsert);
-    
-    console.log(`[Packing Slip Checklist] File ${fileId}: Generated ${createdItems.length} items from CSV`);
-    return { success: true, itemCount: createdItems.length };
-    
-  } catch (e: any) {
-    console.error(`[Packing Slip Checklist] File ${fileId}: Error generating:`, e);
-    return { success: false, itemCount: 0, error: e.message };
-  }
-}
-
-// Count parts from actual CSV data rows
-// Now async to cross-reference with products DB for M&J Woodcraft and Richelieu counts
-async function countPartsFromCSV(records: string[][], productsMap?: Map<string, { category: string; supplier: string | null }>): Promise<{ coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; maxWidth: number; weightLbs: number; customParts: string[]; wallRailPieces: number }> {
-  let coreParts = 0;
-  let dovetails = 0;
-  let assembledDrawers = 0;
-  let fivePiece = 0;
-  let hasDoubleThick = false;
-  let doubleThickCount = 0;
-  let hasShakerDoors = false;
-  let hasGlassParts = false;
-  let glassInserts = 0;
-  let glassShelves = 0;
-  let hasMJDoors = false;
-  let hasRichelieuDoors = false;
-  let mjDoorsCount = 0;
-  let richelieuDoorsCount = 0;
-  let maxLength = 0;
-  let maxWidth = 0;
-  let weightLbs = 0;
-  let wallRailPieces = 0;
-  
-  // Weight constant: 3/4" melamine ~3 lbs per sq ft
-  const LBS_PER_SQFT = 3;
-  // Conversion: mm² to sq ft (1 sq ft = 92903.04 mm²)
-  const SQMM_TO_SQFT = 92903.04;
-
-  // Find the data section (starts after "Manuf code" header row)
-  let dataStartIndex = -1;
-  for (let i = 0; i < records.length; i++) {
-    if (records[i][0]?.toLowerCase().includes('manuf')) {
-      dataStartIndex = i + 1;
-      break;
-    }
-  }
-
-  if (dataStartIndex === -1) return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, maxWidth, weightLbs, customParts: [], wallRailPieces };
-
-  // If productsMap not provided, fetch products from database
-  // Collect all codes first so we can batch lookup
-  if (!productsMap) {
-    const allCodes: string[] = [];
-    for (let i = dataStartIndex; i < records.length; i++) {
-      const sku = (records[i][0] || '').trim();
-      if (sku) allCodes.push(sku);
-    }
-    
-    // Lookup all products at once
-    const productsFromDb = await storage.getProductsByCode(allCodes);
-    productsMap = new Map(productsFromDb.map(p => [
-      p.code.toUpperCase(), 
-      { category: p.category, supplier: p.supplier }
-    ]));
-  }
-
-  // Process each data row
-  for (let i = dataStartIndex; i < records.length; i++) {
-    const row = records[i];
-    const sku = (row[0] || '').trim().toUpperCase();
-    const quantity = parseInt(row[2] || '0') || 0;
-
-    if (!sku || quantity === 0) continue;
-
-    // Check for wall rail parts BEFORE skipping hardware (since wall rails start with H.)
-    if (WALL_RAIL_PARTS.some(part => sku === part.toUpperCase())) {
-      wallRailPieces += quantity;
-    }
-
-    // Skip hardware (starts with H., M., R-, S.)
-    if (sku.startsWith('H.') || sku.startsWith('M.') || sku.startsWith('M-') || 
-        sku.startsWith('R-') || sku.startsWith('R.') || sku.startsWith('S.')) {
-      continue;
-    }
-
-    // Check product database for COMPONENT items with specific suppliers
-    // M&J Woodcraft and Richelieu counts are now based on products DB
-    const productInfo = productsMap.get(sku);
-    if (productInfo && productInfo.category === 'COMPONENT') {
-      const supplier = (productInfo.supplier || '').toUpperCase();
-      if (supplier.includes('MJ WOODCRAFT') || supplier.includes('M&J WOODCRAFT')) {
-        hasMJDoors = true;
-        mjDoorsCount += quantity;
-      }
-      if (supplier.includes('RICHELIEU')) {
-        hasRichelieuDoors = true;
-        richelieuDoorsCount += quantity;
-      }
-    }
-
-    // MDRW parts (drawer parts)
-    if (sku.includes('MDRW')) {
-      if (sku.endsWith('ASS')) {
-        // Assembled drawers - counted separately
-        assembledDrawers += quantity;
-      } else {
-        // Regular drawer parts - multiply by 5
-        coreParts += quantity * 5;
-      }
-      continue;
-    }
-
-    // Dovetail drawers (starts with DBX or SDBX)
-    if (sku.startsWith('DBX') || sku.startsWith('SDBX')) {
-      dovetails += quantity;
-      continue;
-    }
-
-    // 5-piece shaker doors (all TFL90SHA parts including SHAGD)
-    if (sku.includes('TFL90SHA')) {
-      fivePiece += quantity;
-      hasShakerDoors = true;
-      continue;
-    }
-
-    // Check for double thick parts (starts with 15) and count them
-    if (sku.startsWith('15')) {
-      hasDoubleThick = true;
-      doubleThickCount += quantity;
-    }
-
-    // Check for glass inserts
-    if (GLASS_INSERT_KEYWORDS.some(keyword => sku.includes(keyword))) {
-      hasGlassParts = true;
-      glassInserts += quantity;
-    }
-    
-    // Check for glass shelves
-    if (GLASS_SHELF_KEYWORDS.some(keyword => sku.includes(keyword))) {
-      hasGlassParts = true;
-      glassShelves += quantity;
-    }
-
-    // Track max part height (column 3 is Height) and max part width (column 4 is Width)
-    const height = parseFloat(row[3] || '0') || 0;
-    const width = parseFloat(row[4] || '0') || 0;
-    if (height > maxLength) {
-      maxLength = height;
-    }
-    if (width > maxWidth) {
-      maxWidth = width;
-    }
-
-    // Calculate weight for this part (Height × Width in mm², then convert to sq ft)
-    if (height > 0 && width > 0) {
-      const areaSqMm = height * width * quantity;
-      const areaSqFt = areaSqMm / SQMM_TO_SQFT;
-      weightLbs += areaSqFt * LBS_PER_SQFT;
-    }
-
-    // Count valid part SKUs as core parts
-    // 34*, 15*, 14*, 1G* parts (panels, dividers, backs, shelves, etc.)
-    if (sku.startsWith('34') || sku.startsWith('15') || sku.startsWith('14') || sku.startsWith('1G')) {
-      coreParts += quantity;
-      continue;
-    }
-    
-    // Drawer fronts (DRWEURO, JDRWEURO, BDRWEURO, IDRWEURO variants)
-    if (sku.includes('DRWEURO')) {
-      coreParts += quantity;
-      continue;
-    }
-    
-    // Door parts - all EURO door variants (LIFTDREURO, BADREURO, etc.)
-    if (sku.includes('LIFTDREURO') || sku.includes('BADREURO') || sku.includes('HBADREURO') ||
-        sku.includes('DDREURO') || sku.includes('LDREURO') || sku.includes('RDREURO') ||
-        sku.includes('HDREURO') || sku.includes('KLDREURO') || sku.includes('KRDREURO') ||
-        sku.includes('GLDREURO') || sku.includes('GRDREURO')) {
-      coreParts += quantity;
-      continue;
-    }
-    
-    // Other known part prefixes (VAL, CLEAT, FILL, TK, SFLAT, SVAL)
-    if (sku.startsWith('VAL') || sku.startsWith('MTVAL') || sku.startsWith('HGVAL') ||
-        sku.startsWith('CLEAT') || sku.startsWith('MTCLEAT') || sku.startsWith('HGCLEAT') ||
-        sku.startsWith('FILL') || sku.startsWith('MTFILL') || sku.startsWith('HGFILL') ||
-        sku.startsWith('TK') || sku.startsWith('MTTK') || sku.startsWith('HGTK') ||
-        sku.startsWith('SFLAT') || sku.startsWith('MTSFLAT') || sku.startsWith('HGSFLAT') ||
-        sku.startsWith('SVAL')) {
-      coreParts += quantity;
-    }
-  }
-
-  // Build custom parts list for this file
-  const customParts: string[] = [];
-  if (hasDoubleThick) customParts.push('DOUBLE THICK PARTS');
-  if (hasShakerDoors) customParts.push('SHAKER DOORS');
-
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, maxWidth, weightLbs, customParts, wallRailPieces };
-}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -2313,15 +1623,23 @@ export async function registerRoutes(
 
       let newTaskGid: string;
 
-      if (templateTaskGid) {
-        // Duplicate the template task
+      if (project.asanaTaskId && project.status === 'synced') {
+        newTaskGid = project.asanaTaskId;
+        console.log('[Asana] Updating existing task:', newTaskGid);
+        
+        try {
+          await tasksApi.updateTask({ data: { name: taskName, ...(taskNotes && { notes: taskNotes }) } }, newTaskGid, {});
+        } catch (updateErr: any) {
+          console.error('[Asana] Failed to update existing task:', updateErr.message);
+          throw new Error('Failed to update existing Asana task: ' + updateErr.message);
+        }
+      } else if (templateTaskGid) {
         const duplicateResult = await tasksApi.duplicateTask(
           { data: { name: taskName, include: ['notes', 'subtasks', 'projects', 'tags'] } },
           templateTaskGid,
           {}
         );
 
-        // Wait for duplication job to complete (up to 30 seconds)
         const jobGid = duplicateResult.data.gid;
         let jobComplete = false;
         let attempts = 0;
@@ -2345,7 +1663,6 @@ export async function registerRoutes(
 
         newTaskGid = newTask.gid;
         
-        // Update the task with the project app link and file list
         if (taskNotes) {
           try {
             console.log('[Asana] Updating task notes:', taskNotes);
@@ -2353,12 +1670,10 @@ export async function registerRoutes(
             console.log('[Asana] Successfully updated notes');
           } catch (notesError: any) {
             console.error('[Asana] Failed to update notes:', notesError.message);
-            // Continue with the rest of the sync - don't fail the whole operation
           }
         }
 
       } else {
-        // Fallback: create task from scratch if template not found
         console.log('Template task not found, creating task from scratch');
         
         const taskData: any = {
@@ -3278,6 +2593,31 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[Outlook] Error processing Netley emails:', err.message);
       res.status(500).json({ message: 'Failed to process emails', error: err.message });
+    }
+  });
+
+  app.get('/api/asana-import/status', isAuthenticated, async (req, res) => {
+    try {
+      const status = await getAsanaImportStatus();
+      res.json({ status });
+    } catch (err: any) {
+      console.error('[Asana Import] Error getting status:', err.message);
+      res.status(500).json({ message: 'Failed to get Asana import status', error: err.message });
+    }
+  });
+
+  app.post('/api/asana-import/trigger', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[Asana Import] Manual import triggered...');
+      const result = await triggerManualAsanaImport();
+      res.json({
+        message: `Processed ${result.processed} tasks, imported ${result.imported} orders`,
+        processed: result.processed,
+        imported: result.imported
+      });
+    } catch (err: any) {
+      console.error('[Asana Import] Error triggering import:', err.message);
+      res.status(500).json({ message: 'Failed to trigger Asana import', error: err.message });
     }
   });
 

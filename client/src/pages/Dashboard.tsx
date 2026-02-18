@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle, Database, ExternalLink, Palette } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle, Database, ExternalLink, Palette, Download } from "lucide-react";
 import { PrinterSettings } from "@/components/PrinterSettings";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -89,6 +89,40 @@ export default function Dashboard() {
   const { data: outlookSyncStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; emailsProcessed: number; emailsMatched: number } | null }>({
     queryKey: ['/api/outlook/sync-status'],
     refetchInterval: 60000
+  });
+
+  const { data: asanaImportStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; tasksProcessed: number; tasksImported: number } | null }>({
+    queryKey: ['/api/asana-import/status'],
+    refetchInterval: 60000
+  });
+
+  const { mutate: triggerAsanaImport, isPending: isImportingAsana } = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/asana-import/trigger', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to trigger Asana import');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/asana-import/status'] });
+      toast({
+        title: "Asana import complete",
+        description: `Processed ${data.processed} tasks, imported ${data.imported} new orders.`
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to import from Asana",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const diagnosticQueryUrl = diagnosticSearch 
@@ -215,6 +249,39 @@ export default function Dashboard() {
           description="Manage and sync your closet order projects."
           actions={
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="gap-2 rounded-xl" 
+                    onClick={() => triggerAsanaImport()}
+                    disabled={isImportingAsana}
+                    data-testid="button-asana-import"
+                  >
+                    {isImportingAsana ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">Import from Asana</span>
+                    <span className="sm:hidden">Import</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">
+                    {asanaImportStatus?.status?.lastSuccessAt ? (
+                      <>
+                        <p>Last import: {format(new Date(asanaImportStatus.status.lastSuccessAt), 'MMM d, h:mm a')}</p>
+                        <p className="text-muted-foreground">Imported {asanaImportStatus.status.tasksImported} orders total</p>
+                        <p className="text-muted-foreground">Auto-imports every 10 min</p>
+                      </>
+                    ) : (
+                      <p>Auto-imports from Asana every 10 minutes</p>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button 
@@ -517,7 +584,14 @@ export default function Dashboard() {
                   </Link>
 
                   <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto">
-                    <StatusBadge status={project.status as any} />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {(project as any).autoImported && (
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs" data-testid={`badge-auto-imported-${project.id}`}>
+                          Auto-imported
+                        </Badge>
+                      )}
+                      <StatusBadge status={project.status as any} />
+                    </div>
                     
                     <div className="flex items-center gap-2">
                       {isAdmin && (

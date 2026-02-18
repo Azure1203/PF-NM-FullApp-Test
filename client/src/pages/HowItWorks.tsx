@@ -300,6 +300,54 @@ export default function HowItWorks() {
             </Card>
           </div>
 
+          <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-asana-auto-import">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-auto-import-title">Asana Auto-Import</h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-auto-import-description">
+              Orders can be automatically imported from Asana without manually uploading CSV files. The system polls an Asana project for new tasks and imports their CSV attachments.
+            </p>
+            <div className="space-y-6">
+              <Card data-testid="card-auto-import-workflow">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-auto-import-workflow-title">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                      <Download className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    How Auto-Import Works
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400">
+                  <ol className="list-decimal list-inside space-y-2 mb-4" data-testid="list-auto-import-steps">
+                    <li>An external system (e.g., Allmoxy) creates a task in the <strong>NEW JOBS</strong> Asana project</li>
+                    <li>The task is moved to the <strong>READY TO IMPORT</strong> section (either manually or automatically)</li>
+                    <li>The app polls the READY TO IMPORT section every <strong>10 minutes</strong></li>
+                    <li>For each new task, it downloads all CSV attachments from the task</li>
+                    <li>The CSVs are parsed and an order is created, just like a manual upload</li>
+                    <li>The Asana task ID is saved on the order for future syncing</li>
+                    <li>The task is marked as processed so it won't be imported again</li>
+                  </ol>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-2">Syncing Auto-Imported Orders</h4>
+                  <p className="text-sm mb-2">When you click "Sync to Asana" on an auto-imported order, the system <strong>updates the existing task</strong> rather than creating a new one. This means:</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    <li>All custom fields are populated on the original task</li>
+                    <li>The task stays linked across both the NEW JOBS and PRODUCTION projects</li>
+                    <li>No duplicate tasks are created</li>
+                  </ul>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-2">Manual Import Trigger</h4>
+                  <p className="text-sm">
+                    You can click the "Import from Asana" button on the Dashboard to trigger an immediate import instead of waiting for the next scheduled poll. The tooltip shows the last import time and total orders imported.
+                  </p>
+
+                  <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-2">Auto-Imported Badge</h4>
+                  <p className="text-sm">
+                    Orders that were auto-imported from Asana show an indigo "Auto-imported" badge on the Dashboard, so you can easily tell which orders came from Asana vs. manual upload.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
           <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-label-printing">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-labels-title">Label Printing</h2>
             <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-labels-description">

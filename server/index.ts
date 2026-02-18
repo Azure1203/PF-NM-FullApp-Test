@@ -139,6 +139,14 @@ app.use((req, res, next) => {
         }).catch(err => {
           log(`Failed to load backup scheduler: ${err}`, 'backup');
         });
+        
+        import('./asanaImportScheduler').then(({ startAsanaImportScheduler }) => {
+          setTimeout(() => {
+            startAsanaImportScheduler();
+          }, 120000);
+        }).catch(err => {
+          log(`Failed to load Asana import scheduler: ${err}`, 'asana-import');
+        });
       }, 60000);
     },
   );

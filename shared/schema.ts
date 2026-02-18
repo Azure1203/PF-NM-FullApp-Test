@@ -22,6 +22,7 @@ export const projects = pgTable("projects", {
   
   status: text("status").notNull().default('pending'), // pending, synced
   asanaTaskId: text("asana_task_id"),
+  autoImported: boolean("auto_imported").default(false), // true if order was auto-imported from Asana
   
   // Asana custom fields (synced)
   pfOrderStatus: text("pf_order_status"), // PF ORDER STATUS from Asana
@@ -391,3 +392,26 @@ export const insertColorGridSchema = createInsertSchema(colorGrid).omit({
 
 export type ColorGridEntry = typeof colorGrid.$inferSelect;
 export type InsertColorGridEntry = z.infer<typeof insertColorGridSchema>;
+
+export const processedAsanaTasks = pgTable("processed_asana_tasks", {
+  id: serial("id").primaryKey(),
+  taskGid: text("task_gid").notNull().unique(),
+  taskName: text("task_name"),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: 'set null' }),
+  processedAt: timestamp("processed_at").defaultNow(),
+  status: text("status").notNull().default('processed'),
+  error: text("error"),
+});
+
+export type ProcessedAsanaTask = typeof processedAsanaTasks.$inferSelect;
+
+export const asanaImportSyncStatus = pgTable("asana_import_sync_status", {
+  id: serial("id").primaryKey(),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastError: text("last_error"),
+  tasksProcessed: integer("tasks_processed").default(0),
+  tasksImported: integer("tasks_imported").default(0),
+});
+
+export type AsanaImportSyncStatus = typeof asanaImportSyncStatus.$inferSelect;
