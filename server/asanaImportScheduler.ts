@@ -18,6 +18,7 @@ import {
 } from './csvHelpers';
 
 const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
+const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
 const POLL_INTERVAL = 10 * 60 * 1000;
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -35,7 +36,7 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
 
   try {
     console.log('[Asana Import] Starting import cycle...');
-    const { tasksApi, attachmentsApi } = await getAsanaApiInstances();
+    const { tasksApi, attachmentsApi, projectsApi } = await getAsanaApiInstances();
 
     const tasksResponse = await tasksApi.getTasksForSection(ASANA_READY_TO_IMPORT_SECTION_GID, {
       opt_fields: 'name,gid,completed'
@@ -234,6 +235,142 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
         });
 
         console.log(`[Asana Import] Successfully imported task ${taskGid} "${taskName}" as project ${project.id}`);
+
+        // --- Update Asana task with notes and custom fields (matching manual sync) ---
+        try {
+          const projectFiles = await storage.getProjectFiles(project.id);
+          const updatedProject = await storage.getProject(project.id);
+
+          const customDomain = process.env.CUSTOM_APP_DOMAIN;
+          const publishedDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
+          const devDomain = process.env.REPLIT_DEV_DOMAIN;
+          const appDomain = customDomain || publishedDomain || devDomain || '';
+          const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
+
+          let taskNotes = '';
+          if (projectAppUrl) {
+            taskNotes += `Packaging Link: ${projectAppUrl}\n\n`;
+          }
+          for (const file of projectFiles) {
+            let fileName = file.originalFilename || 'Unknown File';
+            if (fileName.toLowerCase().endsWith('.csv')) {
+              fileName = fileName.slice(0, -4);
+            }
+            const jobNumber = file.allmoxyJobNumber || 'N/A';
+            taskNotes += `${fileName} - ${jobNumber}\n`;
+          }
+
+          if (taskNotes) {
+            await tasksApi.updateTask({ data: { notes: taskNotes } }, taskGid, {});
+            console.log(`[Asana Import] Updated task notes for ${taskGid}`);
+          }
+
+          const projectPallets = await storage.getPalletsForProject(project.id);
+          const palletCount = projectPallets.length;
+          const packagingCost = palletCount * 150;
+
+          const asanaProjectDetails = await projectsApi.getProject(ASANA_PERFECT_FIT_PROJECT_GID, {
+            opt_fields: 'custom_field_settings.custom_field.name,custom_field_settings.custom_field.gid,custom_field_settings.custom_field.type,custom_field_settings.custom_field.enum_options'
+          });
+          const customFieldSettings = asanaProjectDetails.data.custom_field_settings || [];
+          const customFields: Record<string, any> = {};
+
+          for (const setting of customFieldSettings) {
+            const field = setting.custom_field;
+            const name = field.name.toUpperCase().trim();
+
+            if ((name === 'PERFECT FIT DEALER' || name === 'PF DEALER') && field.type === 'text') {
+              if (updatedProject?.dealer) customFields[field.gid] = updatedProject.dealer;
+            } else if (name === 'ORDER DATE' && field.type === 'text') {
+              if (updatedProject?.date) customFields[field.gid] = updatedProject.date;
+            } else if (name === 'ORDER DATE' && field.type === 'date') {
+              if (updatedProject?.date) customFields[field.gid] = { date: updatedProject.date };
+            } else if (name === 'PF ADDRESS' && field.type === 'text') {
+              if (updatedProject?.shippingAddress) customFields[field.gid] = updatedProject.shippingAddress;
+            } else if (name === 'PF PHONE NUMBER' && field.type === 'text') {
+              if (updatedProject?.phone) customFields[field.gid] = updatedProject.phone;
+            } else if ((name === 'PF TAX ID' || name === 'PF TAX ID:') && field.type === 'text') {
+              if (updatedProject?.taxId) customFields[field.gid] = updatedProject.taxId;
+            } else if ((name === 'ORDER ID' || name === 'PF ORDER ID') && field.type === 'text') {
+              if (updatedProject?.orderId) customFields[field.gid] = updatedProject.orderId;
+            } else if ((name === 'ORDER ID' || name === 'PF ORDER ID') && field.type === 'number') {
+              if (updatedProject?.orderId) customFields[field.gid] = parseInt(updatedProject.orderId) || 0;
+            } else if ((name === 'PF POWER TAILGATE NEEDED' || name === 'PF POWER TAILGATE NEEDED?') && field.type === 'enum' && field.enum_options) {
+              const option = field.enum_options.find((o: any) =>
+                o.name.toLowerCase() === (updatedProject?.powerTailgate ? 'yes' : 'no')
+              );
+              if (option) customFields[field.gid] = option.gid;
+            } else if ((name === 'PF PHONE APPT NEEDED' || name === 'PF PHONE APPT NEEDED?') && field.type === 'enum' && field.enum_options) {
+              const option = field.enum_options.find((o: any) =>
+                o.name.toLowerCase() === (updatedProject?.phoneAppointment ? 'yes' : 'no')
+              );
+              if (option) customFields[field.gid] = option.gid;
+            } else if ((name === 'PF PO' || name === 'PF PO:') && field.type === 'text') {
+              const fileNames = projectFiles.map(f => {
+                let n = f.originalFilename || 'Unknown File';
+                if (n.toLowerCase().endsWith('.csv')) {
+                  n = n.slice(0, -4);
+                }
+                return n;
+              });
+              if (fileNames.length > 0) {
+                customFields[field.gid] = fileNames.join('\n');
+              }
+            } else if ((name === 'PF 5016 FORM NEEDED' || name === 'PF 5016 FORM NEEDED?' || name === 'PF 5106 FORM NEEDED' || name === 'PF 5106 FORM NEEDED?') && field.type === 'enum' && field.enum_options) {
+              const canadianPostalCodePattern = /[A-Z]\d[A-Z]\s?\d[A-Z]\d/i;
+              const canadianProvinces = ['AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT'];
+              let isCanadian = false;
+              if (updatedProject?.shippingAddress) {
+                const addr = updatedProject.shippingAddress.toUpperCase();
+                if (canadianPostalCodePattern.test(addr)) isCanadian = true;
+                for (const prov of canadianProvinces) {
+                  if (new RegExp(`\\b${prov}\\b`).test(addr)) { isCanadian = true; break; }
+                }
+                if (addr.includes('CANADA')) isCanadian = true;
+              }
+              const option = field.enum_options.find((o: any) =>
+                o.name.toLowerCase() === (isCanadian ? 'no' : 'yes')
+              );
+              if (option) customFields[field.gid] = option.gid;
+            } else if (name === 'PACKAGING COST' && field.type === 'number') {
+              customFields[field.gid] = packagingCost;
+            } else if (name === 'PACKAGING COST' && field.type === 'text') {
+              customFields[field.gid] = `$${packagingCost}`;
+            } else if (name === 'CIENAPPS JOB NUMBER' && field.type === 'text') {
+              if (updatedProject?.cienappsJobNumber) customFields[field.gid] = updatedProject.cienappsJobNumber;
+            }
+          }
+
+          const statusesToSync = updatedProject?.pfProductionStatus || [];
+          if (statusesToSync.length > 0) {
+            for (const setting of customFieldSettings) {
+              const field = setting.custom_field;
+              const cfName = field.name?.toUpperCase().trim();
+              if (cfName === 'PF PRODUCTION STATUS' && field.type === 'multi_enum' && field.enum_options) {
+                const selectedGids = statusesToSync
+                  .map((statusName: string) => {
+                    const option = field.enum_options.find((o: any) =>
+                      o.name?.toUpperCase().trim() === statusName.toUpperCase().trim()
+                    );
+                    return option?.gid;
+                  })
+                  .filter((gid: string | undefined) => gid);
+                if (selectedGids.length > 0) {
+                  customFields[field.gid] = selectedGids;
+                }
+                break;
+              }
+            }
+          }
+
+          if (Object.keys(customFields).length > 0) {
+            await tasksApi.updateTask({ data: { custom_fields: customFields } }, taskGid, {});
+            console.log(`[Asana Import] Updated custom fields for task ${taskGid}:`, Object.keys(customFields).length, 'fields');
+          }
+        } catch (updateErr: any) {
+          console.error(`[Asana Import] Failed to update Asana task ${taskGid} with notes/custom fields:`, updateErr.message);
+        }
+
         processed++;
         imported++;
 
