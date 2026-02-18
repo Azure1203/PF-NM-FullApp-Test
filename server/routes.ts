@@ -2422,7 +2422,7 @@ export async function registerRoutes(
             } else if (projectFiles.length > 1) {
               customFields[field.gid] = `${projectFiles.length} Orders, See below`;
             }
-          } else if ((name === 'PF 5016 FORM NEEDED' || name === 'PF 5016 FORM NEEDED?') && field.type === 'enum' && field.enum_options) {
+          } else if ((name === 'PF 5016 FORM NEEDED' || name === 'PF 5016 FORM NEEDED?' || name === 'PF 5106 FORM NEEDED' || name === 'PF 5106 FORM NEEDED?') && field.type === 'enum' && field.enum_options) {
             // Detect if address is Canadian or US
             // Canadian postal codes: A1A 1A1 pattern (letter-number-letter space number-letter-number)
             // Canadian provinces: AB, BC, MB, NB, NL, NS, NT, NU, ON, PE, QC, SK, YT
