@@ -29,7 +29,8 @@ import {
   computeAutoProductionStatuses,
   generateHardwareChecklistForFile,
   generatePackingSlipChecklistForFile,
-  updateProjectBoProductionStatus
+  updateProjectBoProductionStatus,
+  getRecommendedPalletSize
 } from "./csvHelpers";
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -288,17 +289,8 @@ export async function registerRoutes(
       });
     }
 
-    // Determine pallet size
-    let palletSize = '';
-    if (totalCoreParts < 100 && overallMaxLength <= 2550) {
-      palletSize = 'USE 34" WIDE PALLET CUT TO SIZE';
-    } else if (totalCoreParts >= 100 && overallMaxLength < 2400) {
-      palletSize = 'USE 96" LONG PALLET';
-    } else if (totalCoreParts >= 100 && overallMaxLength >= 2400 && overallMaxLength <= 2550) {
-      palletSize = 'USE 105" LONG PALLET';
-    } else if (totalCoreParts >= 100 && overallMaxLength > 2550) {
-      palletSize = 'USE 110" LONG PALLET';
-    }
+    // Determine recommended pallet size based on part dimensions
+    const palletSize = getRecommendedPalletSize(overallMaxLength, overallMaxWidth);
 
     // Build custom parts list
     const customParts: string[] = [];

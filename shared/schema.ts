@@ -147,7 +147,8 @@ export const PALLET_PACKAGING_METRICS = [
   'wallRail',
   'weight',
   'maxLength',
-  'maxWidth'
+  'maxWidth',
+  'recommendedPallet'
 ] as const;
 
 export type PalletPackagingMetric = typeof PALLET_PACKAGING_METRICS[number];
@@ -169,7 +170,8 @@ export const defaultPackagingStatus: PalletPackagingStatus = {
   wallRail: false,
   weight: false,
   maxLength: false,
-  maxWidth: false
+  maxWidth: false,
+  recommendedPallet: false
 };
 
 // Pallets table - packaging pallets for a project

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is an order management dashboard application for handling closet orders. Users can upload CSV files containing order data, which gets parsed and stored in a PostgreSQL database. The extracted order information can be reviewed, edited, and synced to Asana for project management purposes.
+This is an order management dashboard application designed for closet orders. It enables users to upload and parse CSV files containing order data, store this information in a PostgreSQL database, and then review and edit the extracted order details. A key feature is the synchronization of orders with Asana for project management, and automated integration with Outlook for fetching packing slips and hardware CSVs. The system also includes detailed inventory management for hardware and components, along with a comprehensive packing checklist system.
 
 ## User Preferences
 
@@ -10,203 +10,72 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React with TypeScript, built using Vite
-- **Routing**: Wouter for client-side routing (lightweight alternative to React Router)
-- **State Management**: TanStack React Query for server state management and caching
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with custom theme configuration and CSS variables for theming
-- **Forms**: React Hook Form with Zod validation via @hookform/resolvers
+### Frontend
+- **Framework**: React with TypeScript, using Vite
+- **Routing**: Wouter
+- **State Management**: TanStack React Query
+- **UI Components**: shadcn/ui (built on Radix UI)
+- **Styling**: Tailwind CSS
+- **Forms**: React Hook Form with Zod validation
 
-### Backend Architecture
+### Backend
 - **Framework**: Express.js with TypeScript
-- **API Design**: REST API with typed route definitions in shared/routes.ts
-- **File Handling**: Multer for multipart/form-data file uploads
-- **CSV Parsing**: csv-parse library for processing uploaded CSV files
-- **Development**: Vite dev server with HMR proxied through Express in development
+- **API Design**: REST API with typed routes
+- **File Handling**: Multer for uploads, csv-parse for CSV processing
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
-- **Schema Location**: shared/schema.ts contains table definitions
-- **Migrations**: Drizzle Kit for database migrations (output to ./migrations)
-- **Connection**: node-postgres (pg) Pool for database connections
+- **Schema**: Defined in `shared/schema.ts`
+- **Migrations**: Drizzle Kit
+- **Connection**: `node-postgres` Pool
 
 ### Code Organization
-- **client/**: React frontend application
-- **server/**: Express backend with routes, storage layer, and utilities
-- **shared/**: Shared TypeScript types, schemas, and route definitions used by both frontend and backend
-- **script/**: Build scripts for production bundling
+- `client/`: React frontend
+- `server/`: Express backend
+- `shared/`: Shared types, schemas, and route definitions
+- `script/`: Build and utility scripts
 
 ### Build System
-- Development: tsx for running TypeScript directly, Vite for frontend hot reloading
-- Production: Custom build script using esbuild for server and Vite for client, outputs to dist/
+- **Development**: `tsx` for backend, Vite for frontend
+- **Production**: Custom build script using esbuild for server, Vite for client
+
+### Core Features
+- **Pallet Size Recommendation**: Calculates optimal pallet size based on order dimensions.
+- **Color Breakdown**: Analyzes and displays part counts by material color, cross-referencing a stored color grid.
+- **Admin Roles**: Role-based access control for sensitive operations like order deletion.
+- **Order Status Tracking**: Displays production and shipping statuses derived from Asana.
+- **Product Management**: Comprehensive system for managing hardware and component products, including bulk import and image linking.
+- **Hardware Packing Checklist**: Generates and manages packing checklists based on uploaded hardware CSVs, cross-referencing a product database.
+- **Component Import**: Dedicated system for importing component products with specific CSV formats and validation.
+- **Supplier-Based Counting**: Accurately counts doors from specific suppliers (M&J Woodcraft, Richelieu) by cross-referencing the products database.
+- **Packing Slip Checklist**: Generates packing checklist items directly from order CSV data, including CTS cut lengths, eliminating PDF parsing.
+- **Mobile Optimization**: Full responsiveness across all application pages.
+- **Google Sheets Backup**: Daily automated and manual backup of all database data to Google Sheets, stored in a designated Google Drive folder.
 
 ## External Dependencies
 
-### Asana Integration
-- **Library**: asana npm package for API communication
-- **Authentication**: OAuth via Replit Connectors (fetches tokens from REPLIT_CONNECTORS_HOSTNAME)
-- **Purpose**: Syncing orders as tasks to Asana projects + auto-importing orders from Asana
-- **Token Management**: Access tokens are refreshed dynamically, not cached
-- **Auto-Import**: server/asanaImportScheduler.ts polls NEW JOBS project's READY TO IMPORT section every 10 minutes
-- **Two Asana Projects**: NEW JOBS (GID: 1209262874404235) for import, PRODUCTION (GID: 1208263802564738) for tracking
-- **Deduplication**: Uses processedAsanaTasks table to avoid re-importing tasks
-- **Sync Behavior**: If order has asanaTaskId (from auto-import), sync updates existing task instead of creating new one
+- **Asana Integration**:
+    - **Library**: `asana` npm package.
+    - **Authentication**: OAuth via Replit Connectors.
+    - **Purpose**: Syncs orders as tasks, auto-imports orders from specific Asana projects, and updates existing tasks.
+    - **Projects**: "NEW JOBS" (import source), "PRODUCTION" (tracking).
+    - **Scheduling**: Auto-import scheduler polls every 10 minutes.
 
-### Outlook Integration
-- **Library**: Microsoft Graph API via @microsoft/microsoft-graph-client
-- **Authentication**: OAuth via Replit Connectors
-- **Purpose**: Automatic fetching of Netley packing slip PDFs from "Perfect Fit Allmoxy Emails" folder
-- **Background Polling**: Runs every 10 minutes starting 2 minutes after server start
-- **Deduplication**: Uses processedOutlookEmails table to track processed message IDs
-- **Scheduler**: server/outlookScheduler.ts handles background polling and status tracking
+- **Outlook Integration**:
+    - **Library**: Microsoft Graph API via `@microsoft/microsoft-graph-client`.
+    - **Authentication**: OAuth via Replit Connectors.
+    - **Purpose**: Automatically fetches Netley packing slip PDFs and hardware CSV attachments from designated Outlook folders.
+    - **Scheduling**: Background polling runs every 10 minutes.
 
-### Database
-- **PostgreSQL**: Required, connection via DATABASE_URL environment variable
-- **Session Storage**: connect-pg-simple available for session persistence (if needed)
+- **Database**:
+    - **PostgreSQL**: Required for data storage.
+    - **Connection**: `DATABASE_URL` environment variable.
 
-### Environment Variables Required
-- `DATABASE_URL`: PostgreSQL connection string
-- `REPLIT_CONNECTORS_HOSTNAME`: For Asana and Outlook OAuth token retrieval
-- `REPL_IDENTITY` or `WEB_REPL_RENEWAL`: For Replit authentication headers
+- **Google Sheets / Google Drive Integration**:
+    - **Authentication**: OAuth via Replit Connectors.
+    - **Purpose**: Facilitates daily automated and manual backups of the entire database to Google Sheets, stored in a dedicated Google Drive folder.
 
-## Recent Changes
-
-### February 2026 - Color Breakdown Feature
-- **Color Grid Database**: New `colorGrid` table storing material color codes and descriptions (45 entries: TFL, MT, HG, HPL series)
-- **Color Breakdown API**: GET /api/projects/:projectId/color-breakdown computes per-color part counts from stored CSV data
-  - Only counts component parts (rows where column B matches a known color code)
-  - Excludes hardware (M-, H., R-, S. prefixes), dovetails (DBX/SDBX), and glass items
-  - Case-insensitive matching, normalized to original color grid code
-- **Color Grid Import**: POST /api/color-grid/import allows CSV upload to replace color grid entries
-- **UI Section**: Color Breakdown card in OrderDetails page (between Order Status and Project Totals)
-  - Shows each color code with part count badge and full material description
-  - Responsive grid layout (1/2/3 columns), loading state, only renders when colors exist
-
-### January 2026
-- **Admin-Only Delete System**: Implemented role-based access control for order deletion
-  - Added `isAdmin` boolean field to `allowedUsers` table
-  - Admin toggle switch in AdminUsers page (disabled for non-admins)
-  - Delete order endpoint (DELETE /api/orders/:id) requires admin status, returns 403 for non-admins
-  - Toggle admin endpoint (POST /api/admin/allowed-users/:id/toggle-admin) also requires admin status
-  - Delete buttons hidden in Dashboard and OrderDetails pages for non-admin users
-  - `useIsAdmin()` hook checks current user's admin status via GET /api/admin/is-admin
-- **Max Width Tracking**: Added maxWidth field to track the widest part in each order (from CSV column 4)
-  - Displayed alongside Max Length in project totals ("mm wide" label)
-  - Shown in pallet metrics grid as info-only metric
-  - Included in file breakdown cards and file details panel
-  - Full type safety with types in shared/routes.ts and shared/schema.ts
-- Added "IN PRODUCTION" and "SHIPPED" status badges to order cards based on Asana section
-  - Purple badge shows "IN PRODUCTION" for sections: JOB CONFIRMED, PACK HARDWARE, HARDWARE PACKED, PALLET PACKED, READY TO SUBMIT, READY TO LOAD
-  - Teal badge shows "SHIPPED" when order is in SHIPPED section
-  - These are display-only badges derived from Asana section data (no sync back to Asana)
-- Improved mobile responsiveness of Dashboard:
-  - Header buttons wrap and use compact text on small screens
-  - Stats grid shows 2 columns on mobile with smaller padding
-  - Filter buttons wrap with shorter labels on mobile
-  - Order cards more compact on mobile with truncated text
-  - PageHeader component responsive with smaller text on mobile
-- Products form now uses Weight (grams) instead of Length/Width/Height dimensions
-
-### Hardware Product Management & Packaging Checklist System
-- **Products Schema Extended**: Added stockStatus (IN_STOCK/BUYOUT), supplier, and importRowNumber fields
-- **Hardware CSV Import**: New /hardware-import page to bulk import products from CSV with preview
-  - Shows new/unchanged/changed items before committing changes
-  - Supports batch image linking by row numbers (e.g., "7,8,9" or "32-35")
-- **Hardware Packing Checklist**: New table (hardware_checklist_items) to track order hardware
-  - Links items to product database by code
-  - Tracks quantities, buyout status, buyout arrival, and packing status
-  - Auto-calculates BO status: NO BO HARDWARE / WAITING FOR BO HARDWARE / BO HARDWARE ARRIVED
-- **Order Details Integration**: 
-  - HardwareCsvUploadSection: Upload hardware CSV to generate packing checklist
-  - HardwarePackingChecklist: Shows items with product images, quantities, packed checkboxes, buyout arrival toggles
-- **API Endpoints**:
-  - POST /api/files/:fileId/generate-hardware-checklist - Generate checklist from CSV
-  - GET /api/files/:fileId/hardware-checklist - Get checklist items and progress
-  - POST /api/hardware-checklist/:itemId/toggle-packed - Toggle packed status
-  - POST /api/hardware-checklist/:itemId/toggle-buyout-arrived - Toggle buyout arrival
-
-### Database-First Hardware Checklist Generation
-- **Cross-Reference Approach**: Hardware checklist generation now cross-references ALL CSV items against the products database
-- **Classification Logic**:
-  - Items with category=HARDWARE in DB → added to checklist
-  - Items NOT in DB but with hardware prefix (H., M-, R-, S.) → added with `notInDatabase=true` warning flag
-  - Items with category=COMPONENT in DB → skipped (not hardware)
-  - Items NOT in DB and no hardware prefix → skipped (not recognizable as hardware)
-- **UI Warning Badges**: Hardware checklist shows "Not in DB" badge (red) for items not yet in the product database
-- **Schema Update**: Added `notInDatabase` boolean field to `hardware_checklist_items` table
-
-### Component Import System
-- **New Import Page**: `/products/import-components` for importing component products (doors, drawer boxes, etc.)
-- **CSV Format**: A=name, B=code, C=supplier (different from hardware CSV)
-- **Category Assignment**: All imported components automatically get category=COMPONENT, stockStatus=IN_STOCK
-- **Zod Validation**: Component import endpoints validate request data with Zod schemas
-- **API Endpoints**:
-  - POST /api/components/import/preview - Parse CSV and compare with existing products
-  - POST /api/components/import - Import new component products
-  - POST /api/components/import/update - Update existing products to COMPONENT category
-
-### M&J Woodcraft and Richelieu Door Counts
-- **Database-Driven Counts**: `countPartsFromCSV` is now async and cross-references products DB
-- **Supplier-Based Matching**: 
-  - M&J doors counted when product has category=COMPONENT AND supplier contains 'MJ Woodcraft' or 'M&J Woodcraft'
-  - Richelieu doors counted when product has category=COMPONENT AND supplier contains 'Richelieu'
-- **No More Keyword Matching**: Replaced hardcoded keyword arrays with database lookups
-
-### Outlook Integration - Netley Packing Slip PDF Support
-- **Auto-Detection**: Outlook scheduler now detects and matches "Netley Packing Slip" PDFs (e.g., `1892 - Netley Packing Slip.pdf`)
-- **Pattern Matching**: Matches filenames containing "Netley Packing Slip" or "Netley_Packing_Slip"
-- **Database Column**: `netleyPackingSlipPdfPath` stores the path to the PDF in object storage
-- **API Endpoints**:
-  - GET /api/files/:fileId/netley-packing-slip-pdf - Download the PDF
-  - DELETE /api/files/:fileId/netley-packing-slip-pdf - Delete the PDF
-- **UI**: Purple "Packing Slip" button displayed in Order Details when PDF is available
-
-### Outlook Integration - Automatic Hardware CSV Processing
-- **CSV Attachment Detection**: Outlook scheduler now detects CSV attachments (not just PDFs)
-- **Hardware CSV Matching**: Files with "HARDWARE" in filename are matched to orders by order number
-  - Format: `Test_Import_Order_-_1877_HARDWARE.csv` (order 1877)
-  - CSV format: col0=quantity, col1=code, col5=type (HARDWARE or COMPONENT)
-- **Auto-Generated Checklist**: When hardware CSV is matched:
-  - CSV stored in object storage at `.private/hardware-csvs/`
-  - Checklist items auto-generated with product lookups
-  - Duplicate codes aggregated (quantities summed)
-  - BO status calculated and stored on order file
-
-### Packing Slip Checklist from CSV (No PDF Parsing)
-- **CSV-Based Data**: Packing checklist items are generated from the order CSV file during import
-- **Data Source**: All checklist data comes from CSV columns: code (0), description (1), quantity (2), height (3), width (4), length (5)
-- **CTS Parts**: CTS cut length stored directly on packing slip items from CSV length column
-- **No PDF Parsing**: Removed all packing slip PDF parsing code - packingSlipParser.ts deleted
-- **Regenerate Button**: PackingChecklist page can regenerate items from stored CSV content
-
-### CTS Cut Length on Packing Checklist
-- **API Enhancement**: `/api/files/:fileId/checklist` now includes `ctsCutLength` for CTS parts
-- **UI Display**: Packing Checklist page shows amber "Cut: X.X mm" badge for items with .CTS suffix
-- **Data Source**: Cut lengths stored directly on packing slip items from CSV import
-
-### Full Mobile Optimization (February 2026)
-- **Scope**: All 10+ pages optimized for mobile responsiveness
-- **Pattern**: CSS-only changes using Tailwind responsive prefixes (sm:, md:, lg:)
-- **Common Changes**: px-3 sm:px-6 containers, responsive grids (grid-cols-1 sm:grid-cols-2), flex-wrap on button rows, overflow-x-auto on tables, text-xl sm:text-2xl scaling, w-full sm:w-auto buttons
-- **OrderDetails**: Icon-only buttons on mobile, 2-col project totals grid, shorter button text, responsive pallet metrics, smaller PDF buttons
-- **Checklists**: Stacked layouts on mobile (flex-col sm:flex-row), responsive image/checkbox sizes, text scaling
-- **Import/Admin Pages**: overflow-x-auto on tables, responsive padding and title sizes
-- **HowItWorks**: break-all on code blocks, full-width download button on mobile
-
-### Google Sheets Backup (February 2026)
-- **Integration**: Google Sheets + Google Drive via Replit Connectors OAuth
-- **Client**: server/googleSheets.ts - Google Sheets and Drive clients with OAuth token from Replit connectors
-- **Endpoint**: POST /api/backup/google-sheets - Creates a new spreadsheet with all database data
-- **Tabs**: Orders, Order Files, Products, Pallets, Hardware Checklist, Packing Checklist
-- **Folder**: All backups stored in "Perfect Fit Orders Replit Backup" folder in Google Drive (auto-created)
-- **Features**: Formatted blue headers, complete column export, auto-opens spreadsheet URL
-- **UI**: "Backup" button in Dashboard header, shows loading spinner during export, success toast with stats
-- **Daily Auto-Backup**: server/backupScheduler.ts runs at 3:00 AM daily, same export logic as manual backup
-- **Scheduler**: Uses setTimeout chain to schedule next run at 3 AM, started from server/index.ts alongside Outlook scheduler
-
-### Data Fix Scripts
-- **script/fix-drawer-slide-skus.sql**: One-time script to fix drawer slide SKU codes
-  - Removes extra dash: M-105-DS10-XXX → M-105-DS10XXX
-  - Updates both products and hardware_checklist_items tables
-  - Run manually in production database
+- **Environment Variables**:
+    - `DATABASE_URL`: PostgreSQL connection string.
+    - `REPLIT_CONNECTORS_HOSTNAME`: For Asana, Outlook, and Google OAuth token retrieval.
+    - `REPL_IDENTITY` or `WEB_REPL_RENEWAL`: For Replit authentication headers.

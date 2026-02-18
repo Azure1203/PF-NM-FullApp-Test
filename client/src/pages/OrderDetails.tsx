@@ -1622,9 +1622,9 @@ export default function OrderDetails() {
                       <p className="text-xl sm:text-2xl font-bold" data-testid="text-max-length">{preview.totals.maxLength}</p>
                       <p className="text-xs text-muted-foreground">mm Longest Part</p>
                     </div>
-                    <div className={`text-center p-2 rounded-md border-2 ${getBoxStyle(preview.totals.maxWidth || 0)}`}>
-                      <p className="text-xl sm:text-2xl font-bold" data-testid="text-max-width">{preview.totals.maxWidth || 0}</p>
-                      <p className="text-xs text-muted-foreground">mm Widest Part</p>
+                    <div className="text-center p-2 rounded-md border-2 border-blue-300 bg-blue-50 dark:bg-blue-950 dark:border-blue-700">
+                      <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-300" data-testid="text-recommended-pallet">{preview.palletSize}</p>
+                      <p className="text-xs text-muted-foreground">Recommended Pallet</p>
                     </div>
                   </div>
                 );
@@ -1801,7 +1801,7 @@ export default function OrderDetails() {
                                       { key: 'wallRail', value: previewFiles.reduce((sum, f) => sum + ((f as any).wallRailPieces || 0), 0), label: 'Wall Rail Pieces' },
                                       { key: 'weight', value: Math.round(palletWeight), label: 'lbs' },
                                       { key: 'maxLength', value: Math.max(...previewFiles.map(f => f.maxLength || 0)), label: 'mm Longest Part' },
-                                      { key: 'maxWidth', value: Math.max(...previewFiles.map(f => f.maxWidth || 0)), label: 'mm Widest Part' }
+                                      { key: 'recommendedPallet', value: preview?.palletSize || '', label: 'Recommended Pallet' }
                                     ];
                                     
                                     return (
@@ -1809,7 +1809,7 @@ export default function OrderDetails() {
                                         {metrics.map(({ key, value, label }) => {
                                           const isPackaged = status[key];
                                           const numValue = typeof value === 'number' ? value : parseInt(value) || 0;
-                                          const isInfoOnly = key === 'weight' || key === 'maxLength' || key === 'maxWidth';
+                                          const isInfoOnly = key === 'weight' || key === 'maxLength' || key === 'recommendedPallet';
                                           // CTS button is auto-green when all CTS parts in all orders are cut
                                           const isCtsAutoGreen = key === 'cts' && allCtsCut;
                                           const isAutoGreen = numValue === 0 || isInfoOnly || isCtsAutoGreen;

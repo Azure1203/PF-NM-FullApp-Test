@@ -240,7 +240,9 @@ export async function countPartsFromCSV(records: string[][], productsMap?: Map<s
     const height = parseFloat(row[3] || '0') || 0;
     const width = parseFloat(row[4] || '0') || 0;
     if (height > maxLength) maxLength = height;
-    if (width > maxWidth) maxWidth = width;
+    if (height > 600 && width > 600) {
+      if (width > maxWidth) maxWidth = width;
+    }
 
     if (height > 0 && width > 0) {
       const areaSqMm = height * width * quantity;
@@ -281,6 +283,18 @@ export async function countPartsFromCSV(records: string[][], productsMap?: Map<s
   if (hasShakerDoors) customParts.push('SHAKER DOORS');
 
   return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, maxWidth, weightLbs, customParts, wallRailPieces };
+}
+
+export function getRecommendedPalletSize(maxLength: number, maxWidth: number): string {
+  const needsWidePallet = maxWidth > 864;
+
+  if (needsWidePallet) {
+    if (maxLength <= 2388) return '44" x 96"';
+    if (maxLength <= 2592) return '44" x 104"';
+    return '44" x 110"';
+  }
+
+  return '34" x 104"';
 }
 
 interface CsvItemExtractionResult {
