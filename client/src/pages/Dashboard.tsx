@@ -69,7 +69,10 @@ export default function Dashboard() {
   const [importManageOpen, setImportManageOpen] = useState(false);
   const [resettingImportId, setResettingImportId] = useState<number | null>(null);
 
-  const autoImportedProjects = (projects || []).filter(p => p.autoImported === true);
+  const { data: autoImportedProjects = [] } = useQuery<any[]>({
+    queryKey: ['/api/asana-import/projects'],
+    enabled: isAdmin,
+  });
 
   const { mutate: backupToSheets, isPending: isBackingUp } = useMutation({
     mutationFn: async () => {
@@ -204,6 +207,7 @@ export default function Dashboard() {
       toast({ title: "Import reset", description: "The order has been deleted and will be re-imported on the next cycle." });
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       queryClient.invalidateQueries({ queryKey: ['/api/asana-import/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/asana-import/projects'] });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to reset import", description: error.message, variant: "destructive" });

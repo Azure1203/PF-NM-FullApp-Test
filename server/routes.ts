@@ -2649,6 +2649,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/asana-import/projects', isAuthenticated, async (req, res) => {
+    try {
+      const allProjects = await storage.getProjects();
+      const autoImported = allProjects.filter(p => p.autoImported === true);
+      res.json(autoImported);
+    } catch (err: any) {
+      console.error('[Asana Import] Error fetching auto-imported projects:', err.message);
+      res.status(500).json({ message: 'Failed to fetch auto-imported projects' });
+    }
+  });
+
   // Diagnostic endpoint for debugging Outlook matching
   // Returns all order files with their Allmoxy Job # and packing slip status
   app.get('/api/diagnostic/order-files', isAuthenticated, async (req, res) => {
