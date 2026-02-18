@@ -35,9 +35,9 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
 
   try {
     console.log('[Asana Import] Starting import cycle...');
-    const { sectionsApi, attachmentsApi } = await getAsanaApiInstances();
+    const { tasksApi, attachmentsApi } = await getAsanaApiInstances();
 
-    const tasksResponse = await sectionsApi.getTasksForSection(ASANA_READY_TO_IMPORT_SECTION_GID, {
+    const tasksResponse = await tasksApi.getTasksForSection(ASANA_READY_TO_IMPORT_SECTION_GID, {
       opt_fields: 'name,gid,completed'
     });
 
