@@ -17,7 +17,7 @@ import { getGoogleSheetsClient, getGoogleDriveClient } from "./googleSheets";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { getAsanaImportStatus, triggerManualAsanaImport } from "./asanaImportScheduler";
 import { db } from "./db";
-import { packingSlipItems, insertProductSchema, BuyoutHardwareOption } from "@shared/schema";
+import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
   parseCSV,
@@ -2610,6 +2610,42 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[Asana Import] Error triggering import:', err.message);
       res.status(500).json({ message: 'Failed to trigger Asana import', error: err.message });
+    }
+  });
+
+  app.post('/api/asana-import/reset/:projectId', isAuthenticated, async (req, res) => {
+    try {
+      const replitUser = (req as any).user;
+      const username = replitUser?.claims?.username || replitUser?.name;
+      if (!username) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+      const isAdmin = await storage.isUserAdmin(username);
+      if (!isAdmin) {
+        return res.status(403).json({ message: 'Only admins can reset imports' });
+      }
+
+      const projectId = Number(req.params.projectId);
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
+      }
+      if (!project.asanaTaskId) {
+        return res.status(400).json({ message: 'Project has no associated Asana task' });
+      }
+
+      await db.delete(processedAsanaTasks).where(eq(processedAsanaTasks.taskGid, project.asanaTaskId));
+      
+      const deleted = await storage.deleteProject(projectId);
+      if (!deleted) {
+        return res.status(500).json({ message: 'Failed to delete project during reset' });
+      }
+
+      console.log(`[Asana Import] Reset import for project ${projectId}, cleared task ${project.asanaTaskId}`);
+      res.json({ message: 'Import reset successfully. The task will be re-imported on the next cycle.' });
+    } catch (err: any) {
+      console.error('[Asana Import] Error resetting import:', err.message);
+      res.status(500).json({ message: 'Failed to reset import', error: err.message });
     }
   });
 
