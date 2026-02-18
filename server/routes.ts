@@ -776,7 +776,42 @@ export async function registerRoutes(
       if (!updated) {
         return res.status(404).json({ message: 'File not found' });
       }
+
       res.json(updated);
+
+      const project = await storage.getProject(updated.projectId);
+      if (project?.asanaTaskId) {
+        try {
+          const { tasksApi } = await getAsanaApiInstances();
+          const projectFiles = await storage.getProjectFiles(project.id);
+
+          const customDomain = process.env.CUSTOM_APP_DOMAIN;
+          const publishedDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
+          const devDomain = process.env.REPLIT_DEV_DOMAIN;
+          const appDomain = customDomain || publishedDomain || devDomain || '';
+          const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
+
+          let taskNotes = '';
+          if (projectAppUrl) {
+            taskNotes += `Packaging Link: ${projectAppUrl}\n\n`;
+          }
+          for (const file of projectFiles) {
+            let fileName = file.originalFilename || 'Unknown File';
+            if (fileName.toLowerCase().endsWith('.csv')) {
+              fileName = fileName.slice(0, -4);
+            }
+            const jobNumber = file.allmoxyJobNumber || 'N/A';
+            taskNotes += `${fileName} - ${jobNumber}\n`;
+          }
+
+          if (taskNotes) {
+            await tasksApi.updateTask({ data: { notes: taskNotes } }, project.asanaTaskId, {});
+            console.log(`[Asana] Updated task notes for ${project.asanaTaskId} after Allmoxy Job # change`);
+          }
+        } catch (asanaErr: any) {
+          console.error(`[Asana] Failed to update task notes after Allmoxy Job # change:`, asanaErr.message);
+        }
+      }
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
