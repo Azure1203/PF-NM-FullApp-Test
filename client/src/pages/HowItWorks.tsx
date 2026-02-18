@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle, HardDrive, Database, Globe, Palette } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle, HardDrive, Database, Globe, Palette, Ruler } from "lucide-react";
 
 export default function HowItWorks() {
   return (
@@ -121,6 +121,85 @@ export default function HowItWorks() {
                   <li><strong>PDF Downloads</strong> - Download attached PDFs for printing</li>
                   <li><strong>Allmoxy Job Number</strong> - Link orders to job numbers for email matching</li>
                   <li><strong>Packaging Link</strong> - Add link to Adobe Acrobat packaging document</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-pallet-recommendation">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-pallet-rec-title">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                    <Ruler className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <span className="text-blue-600 dark:text-blue-400 text-sm font-medium">Pallet Sizing</span>
+                    <div>Recommended Pallet Size Logic</div>
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-slate-600 dark:text-slate-400">
+                <p className="mb-3" data-testid="text-pallet-rec-description">
+                  The system automatically recommends a pallet size based on the largest qualifying parts in the order. This is shown in both the Project Totals section and in each pallet's metrics grid.
+                </p>
+
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">What is a "Qualifying Part"?</h4>
+                <p className="mb-3">
+                  Only parts where <strong>both</strong> the length AND width are greater than 600mm are considered when determining pallet width. This filters out small or narrow pieces (like edge banding, trim strips, etc.) that would otherwise cause the system to incorrectly recommend a wider pallet.
+                </p>
+
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">How the Recommendation Works</h4>
+                <p className="mb-3">The system looks at two measurements from qualifying parts:</p>
+                <ul className="list-disc list-inside space-y-1 mb-4">
+                  <li><strong>Max Width</strong> - The widest qualifying part across all files in the project</li>
+                  <li><strong>Max Length</strong> - The longest part across all files in the project</li>
+                </ul>
+
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Decision Logic</h4>
+                <p className="mb-2">First, the system checks if a wide (44") pallet is needed:</p>
+                <ul className="list-disc list-inside space-y-1 mb-4">
+                  <li>If the widest qualifying part is <strong>864mm (34") or less</strong> &rarr; use a <strong>34" wide</strong> pallet</li>
+                  <li>If the widest qualifying part is <strong>over 864mm (34")</strong> &rarr; use a <strong>44" wide</strong> pallet</li>
+                </ul>
+
+                <p className="mb-2">Then, pallet length is determined based on the longest part (with a 2" buffer built into thresholds):</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border dark:border-slate-700 mb-4" data-testid="table-pallet-sizes">
+                    <thead>
+                      <tr className="bg-slate-100 dark:bg-slate-800">
+                        <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Widest Part</th>
+                        <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Longest Part</th>
+                        <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Recommended Pallet</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700">Up to 864mm (34")</td>
+                        <td className="p-2 border-b dark:border-slate-700">Any length</td>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">34" x 104"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700">Over 864mm (34")</td>
+                        <td className="p-2 border-b dark:border-slate-700">Up to 2388mm (94")</td>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">44" x 96"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700">Over 864mm (34")</td>
+                        <td className="p-2 border-b dark:border-slate-700">2389mm - 2592mm (94" - 102")</td>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">44" x 104"</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2 border-b dark:border-slate-700">Over 864mm (34")</td>
+                        <td className="p-2 border-b dark:border-slate-700">Over 2592mm (102")</td>
+                        <td className="p-2 border-b dark:border-slate-700 font-medium">44" x 110"</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-2">Where It's Displayed</h4>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><strong>Project Totals</strong> - Blue tile showing the recommended pallet and the largest part dimensions</li>
+                  <li><strong>Pallet Metrics Grid</strong> - Blue tile at the end of each pallet's packing buttons, with largest part dimensions</li>
                 </ul>
               </CardContent>
             </Card>
