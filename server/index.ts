@@ -117,6 +117,13 @@ app.use((req, res, next) => {
         }
       };
       
+      // Run backfill migration for existing orders (runs once on startup)
+      import('./backfillMigration').then(({ runBackfillMigration }) => {
+        runBackfillMigration();
+      }).catch(err => {
+        log(`Failed to run backfill migration: ${err}`, 'migration');
+      });
+      
       // Run initial sync after 1 minute (to let server fully initialize)
       setTimeout(() => {
         runBackgroundSync();

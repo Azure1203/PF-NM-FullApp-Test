@@ -315,7 +315,7 @@ export async function registerRoutes(
 
     for (const file of projectFiles) {
       // Backfill largestPartWidth/widestPartLength for files that don't have them yet
-      if ((file.maxLength || 0) > 0 && !file.largestPartWidth && file.rawContent) {
+      if ((file.maxLength || 0) > 0 && (!file.largestPartWidth || !file.widestPartLength) && file.rawContent) {
         try {
           const records = parseSync(file.rawContent, { relax_column_count: true, skip_empty_lines: true });
           let longestHeight = 0;
