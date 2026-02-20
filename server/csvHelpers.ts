@@ -126,7 +126,7 @@ export function extractCTSParts(records: string[][]): Array<{ partNumber: string
   return ctsParts;
 }
 
-export async function countPartsFromCSV(records: string[][], productsMap?: Map<string, { category: string; supplier: string | null }>): Promise<{ coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; maxWidth: number; weightLbs: number; customParts: string[]; wallRailPieces: number }> {
+export async function countPartsFromCSV(records: string[][], productsMap?: Map<string, { category: string; supplier: string | null }>): Promise<{ coreParts: number; dovetails: number; assembledDrawers: number; fivePiece: number; hasDoubleThick: boolean; doubleThickCount: number; hasShakerDoors: boolean; hasGlassParts: boolean; glassInserts: number; glassShelves: number; hasMJDoors: boolean; hasRichelieuDoors: boolean; mjDoorsCount: number; richelieuDoorsCount: number; maxLength: number; maxWidth: number; largestPartWidth: number; weightLbs: number; customParts: string[]; wallRailPieces: number }> {
   let coreParts = 0;
   let dovetails = 0;
   let assembledDrawers = 0;
@@ -143,6 +143,7 @@ export async function countPartsFromCSV(records: string[][], productsMap?: Map<s
   let richelieuDoorsCount = 0;
   let maxLength = 0;
   let maxWidth = 0;
+  let largestPartWidth = 0;
   let weightLbs = 0;
   let wallRailPieces = 0;
   
@@ -239,8 +240,11 @@ export async function countPartsFromCSV(records: string[][], productsMap?: Map<s
 
     const height = parseFloat(row[3] || '0') || 0;
     const width = parseFloat(row[4] || '0') || 0;
-    if (height > maxLength) maxLength = height;
-    if (height > 600 && width > 600) {
+    if (height > maxLength) {
+      maxLength = height;
+      largestPartWidth = width;
+    }
+    if (height > 600 && width > 1092) {
       if (width > maxWidth) maxWidth = width;
     }
 
@@ -282,7 +286,7 @@ export async function countPartsFromCSV(records: string[][], productsMap?: Map<s
   if (hasDoubleThick) customParts.push('DOUBLE THICK PARTS');
   if (hasShakerDoors) customParts.push('SHAKER DOORS');
 
-  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, maxWidth, weightLbs, customParts, wallRailPieces };
+  return { coreParts, dovetails, assembledDrawers, fivePiece, hasDoubleThick, doubleThickCount, hasShakerDoors, hasGlassParts, glassInserts, glassShelves, hasMJDoors, hasRichelieuDoors, mjDoorsCount, richelieuDoorsCount, maxLength, maxWidth, largestPartWidth, weightLbs, customParts, wallRailPieces };
 }
 
 export function getRecommendedPalletSize(maxLength: number, maxWidth: number): string {

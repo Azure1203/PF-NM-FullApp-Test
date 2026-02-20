@@ -1627,7 +1627,10 @@ export default function OrderDetails() {
                     <div className="text-center p-2 rounded-md border-2 border-blue-300 bg-blue-50 dark:bg-blue-950 dark:border-blue-700 col-span-2">
                       <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-300" data-testid="text-recommended-pallet">{preview.palletSize}</p>
                       <p className="text-xs text-muted-foreground">Recommended Pallet</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {preview.totals.maxLength}mm x {preview.totals.maxWidth}mm</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {preview.totals.maxLength}mm x {preview.totals.largestPartWidth}mm</p>
+                      {preview.totals.maxWidth > 0 && (
+                        <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold mt-0.5">Wide part detected: {preview.totals.maxWidth}mm wide (needs wider pallet)</p>
+                      )}
                     </div>
                   </div>
                 );
@@ -1808,6 +1811,8 @@ export default function OrderDetails() {
 
                                     const palletMaxLength = Math.max(...previewFiles.map(f => f.maxLength || 0));
                                     const palletMaxWidth = Math.max(...previewFiles.map(f => f.maxWidth || 0));
+                                    const longestFile = previewFiles.reduce((best, f) => (f.maxLength || 0) > (best.maxLength || 0) ? f : best, previewFiles[0]);
+                                    const palletLargestPartWidth = (longestFile as any)?.largestPartWidth || 0;
                                     const palletRecommended = preview?.palletSize || '';
                                     
                                     return (
@@ -1845,7 +1850,10 @@ export default function OrderDetails() {
                                         >
                                           <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{palletRecommended}</p>
                                           <p className="text-xs text-muted-foreground">Recommended Pallet</p>
-                                          <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {palletMaxLength}mm x {palletMaxWidth}mm</p>
+                                          <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {palletMaxLength}mm x {palletLargestPartWidth}mm</p>
+                                          {palletMaxWidth > 0 && (
+                                            <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold mt-0.5">Wide part: {palletMaxWidth}mm wide</p>
+                                          )}
                                         </div>
                                       </div>
                                     );

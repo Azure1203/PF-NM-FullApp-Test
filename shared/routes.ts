@@ -33,6 +33,7 @@ export interface SyncPreview {
     weightLbs: number;
     maxLength: number;
     maxWidth: number;
+    largestPartWidth: number;
     fileCount: number;
     wallRailPieces: number;
   };
@@ -54,6 +55,7 @@ export interface SyncPreview {
     weightLbs: number;
     maxLength: number;
     maxWidth: number;
+    largestPartWidth: number;
     hasGlassParts: boolean;
     glassInserts: number;
     glassShelves: number;
