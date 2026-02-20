@@ -53,6 +53,7 @@ export const orderFiles = pgTable("order_files", {
   maxLength: integer("max_length").default(0),
   maxWidth: integer("max_width").default(0),
   largestPartWidth: integer("largest_part_width").default(0),
+  widestPartLength: integer("widest_part_length").default(0),
   hasGlassParts: boolean("has_glass_parts").default(false),
   glassInserts: integer("glass_inserts").default(0),
   glassShelves: integer("glass_shelves").default(0),

@@ -34,6 +34,7 @@ export interface SyncPreview {
     maxLength: number;
     maxWidth: number;
     largestPartWidth: number;
+    widestPartLength: number;
     fileCount: number;
     wallRailPieces: number;
   };
@@ -56,6 +57,7 @@ export interface SyncPreview {
     maxLength: number;
     maxWidth: number;
     largestPartWidth: number;
+    widestPartLength: number;
     hasGlassParts: boolean;
     glassInserts: number;
     glassShelves: number;

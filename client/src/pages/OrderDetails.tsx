@@ -1629,7 +1629,12 @@ export default function OrderDetails() {
                       <p className="text-xs text-muted-foreground">Recommended Pallet</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {preview.totals.maxLength}mm x {preview.totals.largestPartWidth}mm</p>
                       {preview.totals.maxWidth > 0 && (
-                        <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold mt-0.5">Wide part detected: {preview.totals.maxWidth}mm wide (needs wider pallet)</p>
+                        <>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Widest part: {preview.totals.maxWidth}mm x {preview.totals.widestPartLength || 0}mm</p>
+                          {preview.totals.maxWidth > 1092 && (
+                            <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold mt-0.5">Wide part detected: {preview.totals.maxWidth}mm wide (needs wider pallet)</p>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -1852,7 +1857,12 @@ export default function OrderDetails() {
                                           <p className="text-xs text-muted-foreground">Recommended Pallet</p>
                                           <p className="text-[10px] text-muted-foreground mt-0.5">Largest part: {palletMaxLength}mm x {palletLargestPartWidth}mm</p>
                                           {palletMaxWidth > 0 && (
-                                            <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold mt-0.5">Wide part: {palletMaxWidth}mm wide</p>
+                                            <>
+                                              <p className="text-[10px] text-muted-foreground mt-0.5">Widest part: {palletMaxWidth}mm x {Math.max(...previewFiles.map(f => f.widestPartLength || 0))}mm</p>
+                                              {palletMaxWidth > 1092 && (
+                                                <p className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold mt-0.5">Wide part: {palletMaxWidth}mm wide</p>
+                                              )}
+                                            </>
                                           )}
                                         </div>
                                       </div>
@@ -2547,8 +2557,8 @@ export default function OrderDetails() {
                         <div className="flex items-center gap-3 p-2 sm:p-3 bg-muted/20 rounded-lg">
                           <Ruler className="w-5 h-5 text-muted-foreground" />
                           <div>
-                            <p className="font-semibold" data-testid="text-file-maxwidth">{preview.fileBreakdowns[selectedFileIndex].maxWidth || 0} mm</p>
-                            <p className="text-xs text-muted-foreground">mm Widest Part</p>
+                            <p className="font-semibold" data-testid="text-file-maxwidth">{preview.fileBreakdowns[selectedFileIndex].maxWidth || 0} mm x {preview.fileBreakdowns[selectedFileIndex].widestPartLength || 0} mm</p>
+                            <p className="text-xs text-muted-foreground">Widest Part (W x L)</p>
                           </div>
                         </div>
                       </div>

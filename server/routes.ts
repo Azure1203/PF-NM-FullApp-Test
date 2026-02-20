@@ -282,6 +282,7 @@ export async function registerRoutes(
     let overallMaxLength = 0;
     let overallMaxWidth = 0;
     let overallLargestPartWidth = 0;
+    let overallWidestPartLength = 0;
 
     interface FileBreakdown {
       name: string;
@@ -293,6 +294,7 @@ export async function registerRoutes(
       maxLength: number;
       maxWidth: number;
       largestPartWidth: number;
+      widestPartLength: number;
       hasGlassParts: boolean;
       glassInserts: number;
       glassShelves: number;
@@ -312,13 +314,14 @@ export async function registerRoutes(
     let totalCtsPartsCount = 0;
 
     for (const file of projectFiles) {
-      // Backfill largestPartWidth for files that don't have it yet
+      // Backfill largestPartWidth/widestPartLength for files that don't have them yet
       if ((file.maxLength || 0) > 0 && !file.largestPartWidth && file.rawContent) {
         try {
           const records = parseSync(file.rawContent, { relax_column_count: true, skip_empty_lines: true });
           let longestHeight = 0;
           let widthOfLongest = 0;
           let newMaxWidth = 0;
+          let newWidestPartLength = 0;
           let dataStart = -1;
           for (let i = 0; i < records.length; i++) {
             if (records[i][0]?.toLowerCase().includes('manuf')) { dataStart = i + 1; break; }
@@ -328,12 +331,13 @@ export async function registerRoutes(
               const h = parseFloat(records[i][3] || '0') || 0;
               const w = parseFloat(records[i][4] || '0') || 0;
               if (h > longestHeight) { longestHeight = h; widthOfLongest = w; }
-              if (h > 600 && w > 1092) { if (w > newMaxWidth) newMaxWidth = w; }
+              if (h > 600 && w > newMaxWidth) { newMaxWidth = w; newWidestPartLength = h; }
             }
           }
           file.largestPartWidth = Math.round(widthOfLongest);
           file.maxWidth = Math.round(newMaxWidth);
-          await storage.updateOrderFile(file.id, { largestPartWidth: file.largestPartWidth, maxWidth: file.maxWidth });
+          file.widestPartLength = Math.round(newWidestPartLength);
+          await storage.updateOrderFile(file.id, { largestPartWidth: file.largestPartWidth, maxWidth: file.maxWidth, widestPartLength: file.widestPartLength });
         } catch (e) {
           console.error(`Backfill error for file ${file.id}:`, e);
         }
@@ -362,7 +366,10 @@ export async function registerRoutes(
           overallLargestPartWidth = file.largestPartWidth || 0;
         }
       }
-      if ((file.maxWidth || 0) > overallMaxWidth) overallMaxWidth = file.maxWidth || 0;
+      if ((file.maxWidth || 0) > overallMaxWidth) {
+        overallMaxWidth = file.maxWidth || 0;
+        overallWidestPartLength = file.widestPartLength || 0;
+      }
 
       // Get CTS parts count and cut status for this file
       const fileCtsPartsCount = await storage.getCtsPartsCountForFile(file.id);
@@ -384,6 +391,7 @@ export async function registerRoutes(
         maxLength: file.maxLength || 0,
         maxWidth: file.maxWidth || 0,
         largestPartWidth: file.largestPartWidth || 0,
+        widestPartLength: file.widestPartLength || 0,
         hasGlassParts: file.hasGlassParts || false,
         glassInserts: file.glassInserts || 0,
         glassShelves: file.glassShelves || 0,
@@ -425,6 +433,7 @@ export async function registerRoutes(
         maxLength: overallMaxLength,
         maxWidth: overallMaxWidth,
         largestPartWidth: overallLargestPartWidth,
+        widestPartLength: overallWidestPartLength,
         fileCount: projectFiles.length,
         wallRailPieces: totalWallRailPieces
       },
@@ -531,6 +540,7 @@ export async function registerRoutes(
           maxLength: Math.round(partCounts.maxLength),
           maxWidth: Math.round(partCounts.maxWidth),
           largestPartWidth: Math.round(partCounts.largestPartWidth),
+          widestPartLength: Math.round(partCounts.widestPartLength),
           hasGlassParts: partCounts.hasGlassParts,
           glassInserts: partCounts.glassInserts,
           glassShelves: partCounts.glassShelves,
@@ -2940,6 +2950,7 @@ export async function registerRoutes(
               maxLength: Math.round(counts.maxLength),
               maxWidth: Math.round(counts.maxWidth),
               largestPartWidth: Math.round(counts.largestPartWidth),
+              widestPartLength: Math.round(counts.widestPartLength),
               hasGlassParts: counts.hasGlassParts,
               glassInserts: counts.glassInserts,
               glassShelves: counts.glassShelves,
