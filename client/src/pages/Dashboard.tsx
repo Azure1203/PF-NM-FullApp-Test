@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle, Database, ExternalLink, Palette, Download } from "lucide-react";
+import { Plus, ArrowRight, FolderOpen, Search, Trash2, Loader2, LogOut, Mail, RefreshCw, ChevronDown, ChevronUp, Bug, Package, Shield, HelpCircle, Database, ExternalLink, Palette, Download, RotateCcw } from "lucide-react";
 import { PrinterSettings } from "@/components/PrinterSettings";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -232,6 +232,34 @@ export default function Dashboard() {
     }
   });
 
+  const { mutate: resetAgentMailEmails, isPending: isResettingAgentMail } = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/agentmail/processed-emails', {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to reset AgentMail emails');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/agentmail/sync-status'] });
+      toast({
+        title: "AgentMail records reset",
+        description: data.message
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to reset AgentMail emails",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   const { mutate: resetImportMutation } = useMutation({
     mutationFn: async (projectId: string | number) => {
       setResettingImportId(projectId);
@@ -409,6 +437,28 @@ export default function Dashboard() {
                       <p>Auto-syncs every 30 minutes</p>
                     )}
                   </div>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-foreground"
+                    onClick={() => resetAgentMailEmails()}
+                    disabled={isResettingAgentMail}
+                    data-testid="button-reset-agentmail-emails"
+                  >
+                    {isResettingAgentMail ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RotateCcw className="w-4 h-4" />
+                    )}
+                    <span className="sr-only">Reset AgentMail records</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Reset AgentMail processed records (allows reprocessing emails)</p>
                 </TooltipContent>
               </Tooltip>
               <Link href="/how-it-works">

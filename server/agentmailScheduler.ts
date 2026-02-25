@@ -9,6 +9,7 @@ const POLL_INTERVAL_MS = 30 * 60 * 1000;
 const AGENTMAIL_ID_PREFIX = 'agentmail:';
 
 let isPolling = false;
+let isFetching = false;
 let pollIntervalId: NodeJS.Timeout | null = null;
 
 const objectStorageService = new ObjectStorageService();
@@ -124,6 +125,12 @@ export async function getAgentMailSyncStatus(): Promise<{
 }
 
 async function processAgentMailEmails(): Promise<{ processed: number; matched: number }> {
+  if (isFetching) {
+    log('Already fetching AgentMail emails, skipping concurrent run', 'agentmail-scheduler');
+    return { processed: 0, matched: 0 };
+  }
+
+  isFetching = true;
   log('Starting scheduled AgentMail email fetch...', 'agentmail-scheduler');
 
   let processed = 0;
@@ -228,8 +235,13 @@ async function processAgentMailEmails(): Promise<{ processed: number; matched: n
           });
 
           if (matchingFile) {
+            log(`Fetching attachment detail for "${filename}" (attachmentId: ${attachment.attachment_id})...`, 'agentmail-scheduler');
             const attachmentDetail = await getAgentMailAttachment(message.id, attachment.attachment_id);
+            log(`Got download_url: ${attachmentDetail.download_url}`, 'agentmail-scheduler');
+
+            log('Downloading PDF from URL...', 'agentmail-scheduler');
             const pdfBuffer = await downloadAgentMailAttachment(attachmentDetail.download_url);
+            log(`Downloaded PDF: ${pdfBuffer.length} bytes`, 'agentmail-scheduler');
 
             const baseFilename = matchingFile.filename.replace(/\.csv$/i, '');
             const jobNumber = matchingFile.allmoxyJobNumber || orderNumber;
@@ -239,7 +251,9 @@ async function processAgentMailEmails(): Promise<{ processed: number; matched: n
               .trim();
             const storagePath = `.private/packing-slips/${sanitizedFilename}`;
 
+            log(`Uploading to object storage: ${storagePath}`, 'agentmail-scheduler');
             await objectStorageService.uploadBuffer(pdfBuffer, storagePath, 'application/pdf');
+            log('Upload complete', 'agentmail-scheduler');
 
             const updateData: Record<string, string> = {};
             updateData[pdfConfig.dbColumn] = storagePath;
@@ -247,6 +261,7 @@ async function processAgentMailEmails(): Promise<{ processed: number; matched: n
             await db.update(orderFiles)
               .set(updateData)
               .where(eq(orderFiles.id, matchingFile.fileId));
+            log(`DB updated for file ${matchingFile.fileId}`, 'agentmail-scheduler');
 
             await markMessageProcessed(key, subject, 'processed', matchingFile.fileId);
 
@@ -261,7 +276,7 @@ async function processAgentMailEmails(): Promise<{ processed: number; matched: n
             log(`No match yet for order ${orderNumber} (${pdfType}): "${subject}" - will retry later`, 'agentmail-scheduler');
           }
         } catch (attachErr: any) {
-          log(`Error processing attachment "${filename}": ${attachErr.message}`, 'agentmail-scheduler');
+          log(`Error processing attachment "${filename}": ${attachErr.message} | stack: ${attachErr.stack?.split('\n')[0]}`, 'agentmail-scheduler');
           await markMessageProcessed(key, subject, 'failed');
         }
       }
@@ -273,6 +288,8 @@ async function processAgentMailEmails(): Promise<{ processed: number; matched: n
   } catch (err: any) {
     log(`AgentMail scheduler error: ${err.message}`, 'agentmail-scheduler');
     await updateSyncStatus(false, processed, matched, err.message);
+  } finally {
+    isFetching = false;
   }
 
   return { processed, matched };
