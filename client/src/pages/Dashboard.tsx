@@ -98,6 +98,11 @@ export default function Dashboard() {
     refetchInterval: 60000
   });
 
+  const { data: agentmailSyncStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; emailsProcessed: number; emailsMatched: number } | null }>({
+    queryKey: ['/api/agentmail/sync-status'],
+    refetchInterval: 60000
+  });
+
   const { data: asanaImportStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; tasksProcessed: number; tasksImported: number } | null }>({
     queryKey: ['/api/asana-import/status'],
     refetchInterval: 60000
@@ -192,6 +197,35 @@ export default function Dashboard() {
     onError: (error: Error) => {
       toast({
         title: "Failed to fetch emails",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const { mutate: fetchAgentMailEmails, isPending: isFetchingAgentMail } = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/agentmail/process-emails', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Failed to fetch AgentMail emails');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agentmail/sync-status'] });
+      toast({
+        title: "AgentMail emails processed",
+        description: `Processed ${data.processed} emails, matched ${data.matched} packing slips to orders.`
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to fetch AgentMail emails",
         description: error.message,
         variant: "destructive"
       });
@@ -337,6 +371,38 @@ export default function Dashboard() {
                     {outlookSyncStatus?.status?.lastSuccessAt ? (
                       <>
                         <p>Last sync: {format(new Date(outlookSyncStatus.status.lastSuccessAt), 'MMM d, h:mm a')}</p>
+                        <p className="text-muted-foreground">Auto-syncs every 30 min</p>
+                      </>
+                    ) : (
+                      <p>Auto-syncs every 30 minutes</p>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 rounded-xl"
+                    onClick={() => fetchAgentMailEmails()}
+                    disabled={isFetchingAgentMail}
+                    data-testid="button-fetch-agentmail-emails"
+                  >
+                    {isFetchingAgentMail ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Mail className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">Fetch AgentMail</span>
+                    <span className="sm:hidden">AgentMail</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-sm">
+                    {agentmailSyncStatus?.status?.lastSuccessAt ? (
+                      <>
+                        <p>Last sync: {format(new Date(agentmailSyncStatus.status.lastSuccessAt), 'MMM d, h:mm a')}</p>
                         <p className="text-muted-foreground">Auto-syncs every 30 min</p>
                       </>
                     ) : (
