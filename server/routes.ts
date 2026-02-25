@@ -16,6 +16,8 @@ import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_inte
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
 import { getGoogleSheetsClient, getGoogleDriveClient } from "./googleSheets";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
+import { getAgentMailSyncStatus, triggerManualAgentMailFetch, clearAgentMailProcessedEmails } from "./agentmailScheduler";
+import { testAgentMailConnection } from "./agentmail";
 import { getAsanaImportStatus, triggerManualAsanaImport } from "./asanaImportScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks } from "@shared/schema";
@@ -2922,6 +2924,64 @@ export async function registerRoutes(
       res.status(500).json({ message: 'Failed to clear processed emails', error: err.message });
     }
   });
+
+  // ─── AgentMail routes ────────────────────────────────────────────────────────
+
+  // Test AgentMail connection
+  app.get('/api/agentmail/test', isAuthenticated, async (req, res) => {
+    try {
+      const result = await testAgentMailConnection();
+      res.json(result);
+    } catch (err: any) {
+      console.error('[AgentMail] Connection test failed:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get AgentMail sync status
+  app.get('/api/agentmail/sync-status', isAuthenticated, async (req, res) => {
+    try {
+      const status = await getAgentMailSyncStatus();
+      res.json(status);
+    } catch (err: any) {
+      console.error('[AgentMail] Error getting sync status:', err.message);
+      res.status(500).json({ message: 'Failed to get AgentMail sync status', error: err.message });
+    }
+  });
+
+  // Manually trigger AgentMail email processing
+  app.post('/api/agentmail/process-emails', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[AgentMail] Manual email processing triggered...');
+      const result = await triggerManualAgentMailFetch();
+      res.json({
+        message: `Processing complete. Processed ${result.processed} attachments, matched ${result.matched} to orders.`,
+        processed: result.processed,
+        matched: result.matched
+      });
+    } catch (err: any) {
+      console.error('[AgentMail] Error processing emails:', err.message);
+      res.status(500).json({ message: 'Failed to process AgentMail emails', error: err.message });
+    }
+  });
+
+  // Reset processed AgentMail emails - allows reprocessing of emails
+  app.delete('/api/agentmail/processed-emails', isAuthenticated, async (req, res) => {
+    try {
+      console.log('[AgentMail] Resetting processed email records...');
+      const result = await clearAgentMailProcessedEmails();
+      console.log(`[AgentMail] Cleared ${result} processed email records`);
+      res.json({
+        message: `Cleared ${result} processed AgentMail records. Emails will be reprocessed on next fetch.`,
+        cleared: result
+      });
+    } catch (err: any) {
+      console.error('[AgentMail] Error clearing processed emails:', err.message);
+      res.status(500).json({ message: 'Failed to clear AgentMail processed emails', error: err.message });
+    }
+  });
+
+  // ─── End AgentMail routes ────────────────────────────────────────────────────
 
   // Admin endpoint to backfill stored calculated values for existing files
   app.post('/api/admin/backfill-file-metrics', isAuthenticated, async (req, res) => {

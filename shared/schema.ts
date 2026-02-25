@@ -265,6 +265,18 @@ export const outlookSyncStatus = pgTable("outlook_sync_status", {
 
 export type OutlookSyncStatus = typeof outlookSyncStatus.$inferSelect;
 
+// AgentMail sync status - tracks the last sync time and status for AgentMail processing
+export const agentmailSyncStatus = pgTable("agentmail_sync_status", {
+  id: serial("id").primaryKey(),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastError: text("last_error"),
+  emailsProcessed: integer("emails_processed").default(0),
+  emailsMatched: integer("emails_matched").default(0),
+});
+
+export type AgentMailSyncStatus = typeof agentmailSyncStatus.$inferSelect;
+
 // Packing slip checklist items - parsed from Netley Packing Slip PDFs
 export const packingSlipItems = pgTable("packing_slip_items", {
   id: serial("id").primaryKey(),

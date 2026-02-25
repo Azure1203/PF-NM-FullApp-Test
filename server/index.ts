@@ -140,6 +140,14 @@ app.use((req, res, next) => {
         }).catch(err => {
           log(`Failed to load Outlook scheduler: ${err}`, 'outlook');
         });
+
+        if (process.env.AGENTMAIL_API_KEY) {
+          import('./agentmailScheduler').then(({ startAgentMailScheduler }) => {
+            startAgentMailScheduler();
+          }).catch(err => {
+            log(`Failed to load AgentMail scheduler: ${err}`, 'agentmail');
+          });
+        }
         
         import('./backupScheduler').then(({ startBackupScheduler }) => {
           startBackupScheduler();
