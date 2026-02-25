@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle, HardDrive, Database, Globe, Palette, Ruler } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors, ClipboardList, Printer, Tag, ShieldCheck, Download, Monitor, RefreshCw, AlertTriangle, HardDrive, Database, Globe, Palette, Ruler, RotateCcw, Inbox, Link2, AlertCircle } from "lucide-react";
 
 export default function HowItWorks() {
   return (
@@ -84,20 +84,52 @@ export default function HowItWorks() {
                   </div>
                   <div>
                     <span className="text-teal-600 dark:text-teal-400 text-sm font-medium">Step 3</span>
-                    <div>Automatic Email Integration</div>
+                    <div>Automatic Email Integration (AgentMail)</div>
                   </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-slate-600 dark:text-slate-400">
-                <p className="mb-3" data-testid="text-step3-description">The system automatically checks Outlook for emails in the "Perfect Fit Allmoxy Emails" folder every 30 minutes:</p>
-                <ul className="list-disc list-inside space-y-2" data-testid="list-step3-items">
-                  <li><strong>Netley Packing Slip PDF</strong> - Matched to orders by job number</li>
-                  <li><strong>Cut To Size PDF</strong> - For CTS parts cutting instructions</li>
-                  <li><strong>Elias Dovetail PDF</strong> - For dovetail drawer specifications</li>
-                  <li><strong>Netley 5 Piece Shaker Door PDF</strong> - For door specifications</li>
-                  <li><strong>Hardware CSV</strong> - Automatically generates hardware checklist</li>
+                <div className="mb-4 p-3 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 rounded-lg" data-testid="section-step3-agentmail-active">
+                  <p className="text-sm font-semibold text-teal-800 dark:text-teal-200 mb-1 flex items-center gap-2">
+                    <Inbox className="w-4 h-4" /> Active Integration: AgentMail
+                  </p>
+                  <p className="text-sm text-teal-700 dark:text-teal-300">
+                    Allmoxy automatically sends order emails to <code className="bg-teal-100 dark:bg-teal-900 px-1 rounded">allmoxyreplit@agentmail.to</code>. The system polls this inbox every <strong>30 minutes</strong> and captures PDF and CSV attachments.
+                  </p>
+                </div>
+
+                <p className="mb-3 font-medium text-slate-700 dark:text-slate-300">What gets captured from each email:</p>
+                <ul className="list-disc list-inside space-y-2 mb-4" data-testid="list-step3-items">
+                  <li><strong>Netley Packing Slip PDF</strong> — filename contains "Packing Slip" or "Packing List"</li>
+                  <li><strong>Cut To Size PDF</strong> — filename contains "Cut To File", "Cut To Size", or "Cut to Size"</li>
+                  <li><strong>Elias Dovetail PDF</strong> — filename contains "Elias" or "Dovetail"</li>
+                  <li><strong>Netley 5 Piece Shaker Door PDF</strong> — filename contains "5 Piece", "5-Piece", or "Shaker"</li>
+                  <li><strong>Hardware CSV</strong> — matched by file extension; used to generate the hardware checklist</li>
                 </ul>
-                <p className="mt-3 text-sm" data-testid="text-step3-note">Click "Fetch Netley Emails" to manually trigger email sync.</p>
+
+                <p className="mb-3 font-medium text-slate-700 dark:text-slate-300">How orders are matched:</p>
+                <ol className="list-decimal list-inside space-y-2 text-sm mb-4" data-testid="list-step3-matching">
+                  <li>The Allmoxy job number is extracted from the email subject line or attachment filename (any 3–6 digit number)</li>
+                  <li>The system searches all order files in the database for a matching <strong>Allmoxy Job Number</strong> field</li>
+                  <li>If a match is found and the file doesn't already have that PDF type, the file is downloaded and saved</li>
+                  <li>The order file record is updated with the storage path so the PDF appears in the order view</li>
+                  <li>Each email attachment is marked as processed so it won't be downloaded again on the next poll</li>
+                </ol>
+
+                <p className="mb-3 font-medium text-slate-700 dark:text-slate-300">Manual controls on the dashboard:</p>
+                <ul className="list-disc list-inside space-y-2 text-sm mb-4" data-testid="list-step3-controls">
+                  <li><strong>Fetch AgentMail</strong> — immediately triggers a sync instead of waiting for the next scheduled poll. The tooltip shows the last sync time.</li>
+                  <li><strong>Reset AgentMail</strong> <span className="inline-flex items-center gap-1">(<RotateCcw className="w-3 h-3 inline" /> circular arrow icon)</span> — clears all processed-email records so the system will reprocess every email on the next fetch. Use this if an attachment failed to download and you want to retry.</li>
+                </ul>
+
+                <div className="mt-4 p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg" data-testid="section-step3-outlook-preserved">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2">
+                    <Mail className="w-4 h-4" /> Outlook Integration (Preserved)
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    The original Microsoft Outlook connector (which monitored the "Perfect Fit Allmoxy Emails" folder) is preserved in the codebase but not currently active. It can be reconnected in the future by renewing the Outlook OAuth token. AgentMail was introduced as a more reliable replacement.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -378,6 +410,164 @@ export default function HowItWorks() {
               </CardContent>
             </Card>
           </div>
+
+          <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-agentmail-technical">
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-agentmail-tech-title">AgentMail Integration — Technical Details</h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-agentmail-tech-description">
+              This section documents exactly how the AgentMail integration works under the hood — useful for debugging, understanding why something did or didn't match, or reconnecting after changes.
+            </p>
+
+            <div className="space-y-6">
+
+              <Card data-testid="card-agentmail-inbox">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-agentmail-inbox-title">
+                    <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900 flex items-center justify-center">
+                      <Inbox className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                    </div>
+                    Inbox Setup
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400 space-y-3" data-testid="content-agentmail-inbox">
+                  <p>AgentMail provides a dedicated hosted email inbox. Allmoxy is configured to BCC or forward order emails to this address:</p>
+                  <code className="block bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">allmoxyreplit@agentmail.to</code>
+                  <p>The inbox is accessed via the AgentMail REST API using the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">AGENTMAIL_API_KEY</code> secret stored in the environment. No OAuth token or browser login is required — the API key is stable and does not expire.</p>
+                  <p>The base API endpoint is:</p>
+                  <code className="block bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">https://api.agentmail.to/v0/inboxes/allmoxyreplit%40agentmail.to/messages</code>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-agentmail-scheduler">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-agentmail-scheduler-title">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                      <RefreshCw className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    Scheduler &amp; Concurrency
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400 space-y-3" data-testid="content-agentmail-scheduler">
+                  <ul className="list-disc list-inside space-y-2">
+                    <li>The scheduler runs automatically every <strong>30 minutes</strong> from the moment the server starts</li>
+                    <li>A <strong>concurrency guard</strong> (<code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">isFetching</code> flag) prevents two runs overlapping — if a manual trigger fires while the auto-poll is still running, the second call exits immediately with no side effects</li>
+                    <li>The "Fetch AgentMail" button on the dashboard triggers an immediate run outside the normal 30-minute schedule</li>
+                    <li>Last sync time, emails processed, and emails matched are stored in the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">agentmail_sync_status</code> database table and shown in the button tooltip</li>
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-agentmail-api-flow">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-agentmail-api-flow-title">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                      <Link2 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    API Call Flow &amp; Key Quirks
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400 space-y-4" data-testid="content-agentmail-api-flow">
+                  <p>Each sync run makes the following API calls in sequence:</p>
+                  <ol className="list-decimal list-inside space-y-3">
+                    <li>
+                      <strong>List messages</strong> — <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">GET /messages?limit=100</code><br />
+                      <span className="text-sm mt-1 block ml-5">Returns all messages in the inbox. Each message includes attachment metadata (filename, size, content type, attachment ID) but <em>not</em> a download URL.</span>
+                    </li>
+                    <li>
+                      <strong>Get attachment detail</strong> — <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">GET /messages/{"{message_id}"}/attachments/{"{attachment_id}"}</code><br />
+                      <span className="text-sm mt-1 block ml-5">Called once per matched attachment to retrieve a signed <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">download_url</code> (hosted on <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">cdn.agentmail.to</code>).</span>
+                    </li>
+                    <li>
+                      <strong>Download the file</strong> — direct <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">GET</code> to the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">download_url</code><br />
+                      <span className="text-sm mt-1 block ml-5">The file is downloaded into memory as a Buffer.</span>
+                    </li>
+                    <li>
+                      <strong>Upload to Object Storage</strong> — saves the buffer to <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">.private/packing-slips/</code><br />
+                      <span className="text-sm mt-1 block ml-5">Filename format: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">{"{Order Name}"} {"{Job #}"} - {"{PDF Type}"}.pdf</code></span>
+                    </li>
+                    <li>
+                      <strong>Update database</strong> — writes the storage path to the matching column on the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">order_files</code> record<br />
+                      <span className="text-sm mt-1 block ml-5">Columns: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">netleyPackingSlipPdfPath</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">cutToFilePdfPath</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">eliasDovetailPdfPath</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">netley5PiecePdfPath</code></span>
+                    </li>
+                  </ol>
+
+                  <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg" data-testid="section-agentmail-message-id-quirk">
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" /> Important: The message_id field quirk
+                    </p>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-2">
+                      AgentMail's list endpoint returns each message with a field called <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">message_id</code> (not <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">id</code>). Its value is a full RFC 5322 email Message-ID header, for example:
+                    </p>
+                    <code className="block bg-amber-100 dark:bg-amber-900 px-3 py-2 rounded text-xs font-mono mb-2 break-all">
+                      {"<jSX6VHUZbiLXnprSej3ibOvKQsdqblL5eLGqsJXrGpM@netleymillwork.allmoxy.com>"}
+                    </code>
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      The angle brackets <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">{"< >"}</code> and the <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">@</code> symbol must all be URL-encoded before this value is used in an API path. The server uses <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">encodeURIComponent()</code> on the message ID when constructing every URL. Without this encoding, every API call returns <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">404 Message not found</code>.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-agentmail-processed-records">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-agentmail-processed-title">
+                    <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                      <Database className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    Processed Records &amp; Deduplication
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400 space-y-3" data-testid="content-agentmail-processed">
+                  <p>To prevent downloading the same attachment twice, each processed attachment is recorded in the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">processed_outlook_emails</code> database table using a composite key:</p>
+                  <code className="block bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">agentmail:{"{message_id}"}:{"{attachment_id}"}</code>
+                  <p>Each record stores the subject, processing status (<code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">processed</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">skipped</code>, or <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">failed</code>), and the matched file ID if applicable.</p>
+                  <p>Attachments with no matching order file are <em>not</em> marked as processed — they will be retried on every future poll until a matching order appears in the system.</p>
+
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg" data-testid="section-agentmail-reset">
+                    <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+                      <RotateCcw className="w-4 h-4" /> Reset AgentMail Button
+                    </p>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      The small circular-arrow icon next to "Fetch AgentMail" on the dashboard calls <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">DELETE /api/agentmail/processed-emails</code>, which deletes all <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">agentmail:</code>-prefixed records from the processed table. On the next fetch, every attachment in the inbox is treated as new and reprocessed from scratch. Use this when an attachment was previously marked as failed and you want to retry it.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-agentmail-troubleshooting">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-agentmail-troubleshoot-title">
+                    <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    Troubleshooting
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-slate-600 dark:text-slate-400 space-y-4" data-testid="content-agentmail-troubleshoot">
+                  <div>
+                    <p className="font-medium text-slate-700 dark:text-slate-300">"Processed 3 emails, matched 0 to orders"</p>
+                    <p className="text-sm mt-1">The email was received and the attachment type was recognized, but no order file in the database had a matching Allmoxy Job Number. Check that the job number is filled in on the order file's detail page. Then click Reset AgentMail and Fetch AgentMail to retry.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700 dark:text-slate-300">Email attachment is stuck as "failed" and won't retry</p>
+                    <p className="text-sm mt-1">Failed attachments are recorded and skipped on future polls. Click the <strong>Reset AgentMail</strong> button (circular arrow) on the dashboard to clear all processed records, then click <strong>Fetch AgentMail</strong> to reprocess.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700 dark:text-slate-300">PDF doesn't appear on the order even though Fetch AgentMail succeeded</p>
+                    <p className="text-sm mt-1">Check that the Allmoxy Job Number on the order file matches the number in the email subject or filename exactly (leading zeros are stripped when comparing). Also confirm the order file doesn't already have a PDF of that type — the system skips attachments for file types that are already filled in.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700 dark:text-slate-300">No emails found in the inbox</p>
+                    <p className="text-sm mt-1">Confirm that Allmoxy is still configured to send emails to <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">allmoxyreplit@agentmail.to</code>. The AgentMail inbox only stores emails that are sent to it — it does not connect to any external email account.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700 dark:text-slate-300">AGENTMAIL_API_KEY error on startup</p>
+                    <p className="text-sm mt-1">The API key is stored as a Replit secret named <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">AGENTMAIL_API_KEY</code>. If it is missing or incorrect, the scheduler will fail to start. Verify the secret value in the Replit environment settings.</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+            </div>
+          </section>
 
           <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-asana-auto-import">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-auto-import-title">Asana Auto-Import</h2>
