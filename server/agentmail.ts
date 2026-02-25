@@ -41,6 +41,42 @@ export interface AgentMailAttachment {
   content_id: string | null;
 }
 
+export interface AgentMailMessageDetail {
+  id: string;
+  subject: string | null;
+  timestamp: string;
+  from: string | null;
+  attachments: AgentMailAttachment[];
+}
+
+export async function getAgentMailMessage(messageId: string): Promise<AgentMailMessageDetail> {
+  const url = `${AGENTMAIL_BASE_URL}/inboxes/${AGENTMAIL_INBOX_ENCODED}/messages/${encodeURIComponent(messageId)}`;
+  const res = await fetch(url, { headers: agentMailHeaders() });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`AgentMail getMessage failed (${res.status}): ${body}`);
+  }
+
+  const msg = await res.json();
+  return {
+    id: msg.id,
+    subject: msg.subject || null,
+    timestamp: msg.timestamp,
+    from: msg.from?.address || msg.from || null,
+    attachments: (msg.attachments || []).map((att: any) => ({
+      attachment_id: att.attachment_id || att.id,
+      filename: att.filename || null,
+      content_type: att.content_type || null,
+      size: att.size || 0,
+      download_url: att.download_url || '',
+      expires_at: att.expires_at || '',
+      content_disposition: att.content_disposition || null,
+      content_id: att.content_id || null
+    }))
+  };
+}
+
 export async function listAgentMailMessages(): Promise<AgentMailMessage[]> {
   const url = `${AGENTMAIL_BASE_URL}/inboxes/${AGENTMAIL_INBOX_ENCODED}/messages?limit=100`;
   const res = await fetch(url, { headers: agentMailHeaders() });

@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { processedOutlookEmails, agentmailSyncStatus, orderFiles } from "@shared/schema";
 import { eq, like } from "drizzle-orm";
-import { listAgentMailMessages, getAgentMailAttachment, downloadAgentMailAttachment } from "./agentmail";
+import { listAgentMailMessages, getAgentMailMessage, downloadAgentMailAttachment } from "./agentmail";
 import { ObjectStorageService } from "./replit_integrations/object_storage";
 import { log } from "./index";
 
@@ -176,6 +176,40 @@ async function processAgentMailEmails(): Promise<{ processed: number; matched: n
         continue;
       }
 
+      // Check if any attachments in this message need processing before fetching full detail
+      const hasUnprocessed = await (async () => {
+        for (const att of message.attachments) {
+          const k = makeKey(message.id, att.attachment_id);
+          if (!(await isMessageProcessed(k))) return true;
+        }
+        return false;
+      })();
+
+      if (!hasUnprocessed) {
+        log(`All attachments already processed for: "${subject}"`, 'agentmail-scheduler');
+        continue;
+      }
+
+      // Fetch full message detail — this includes download_url on each attachment
+      log(`Fetching full message detail for: "${subject}"`, 'agentmail-scheduler');
+      let fullMessage: Awaited<ReturnType<typeof getAgentMailMessage>>;
+      try {
+        fullMessage = await getAgentMailMessage(message.id);
+        log(`Got full message with ${fullMessage.attachments.length} attachments`, 'agentmail-scheduler');
+      } catch (msgErr: any) {
+        log(`Failed to fetch full message detail: ${msgErr.message}`, 'agentmail-scheduler');
+        continue;
+      }
+
+      // Build a lookup map: attachment_id -> download_url from full message
+      const downloadUrlMap: Record<string, string> = {};
+      for (const att of fullMessage.attachments) {
+        if (att.download_url) {
+          downloadUrlMap[att.attachment_id] = att.download_url;
+        }
+      }
+      log(`Download URLs available for attachment IDs: ${Object.keys(downloadUrlMap).join(', ')}`, 'agentmail-scheduler');
+
       for (const attachment of message.attachments) {
         const filename = attachment.filename || '';
         const contentType = attachment.content_type || '';
@@ -235,12 +269,16 @@ async function processAgentMailEmails(): Promise<{ processed: number; matched: n
           });
 
           if (matchingFile) {
-            log(`Fetching attachment detail for "${filename}" (attachmentId: ${attachment.attachment_id})...`, 'agentmail-scheduler');
-            const attachmentDetail = await getAgentMailAttachment(message.id, attachment.attachment_id);
-            log(`Got download_url: ${attachmentDetail.download_url}`, 'agentmail-scheduler');
+            const downloadUrl = downloadUrlMap[attachment.attachment_id];
+            if (!downloadUrl) {
+              log(`No download_url found for attachment "${filename}" (id: ${attachment.attachment_id}) — skipping`, 'agentmail-scheduler');
+              await markMessageProcessed(key, subject, 'failed');
+              continue;
+            }
+            log(`Got download_url for "${filename}": ${downloadUrl}`, 'agentmail-scheduler');
 
             log('Downloading PDF from URL...', 'agentmail-scheduler');
-            const pdfBuffer = await downloadAgentMailAttachment(attachmentDetail.download_url);
+            const pdfBuffer = await downloadAgentMailAttachment(downloadUrl);
             log(`Downloaded PDF: ${pdfBuffer.length} bytes`, 'agentmail-scheduler');
 
             const baseFilename = matchingFile.filename.replace(/\.csv$/i, '');
