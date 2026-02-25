@@ -90,7 +90,7 @@ export async function listAgentMailMessages(): Promise<AgentMailMessage[]> {
   const raw: any[] = data.messages || [];
 
   return raw.map((msg: any) => ({
-    id: msg.id,
+    id: msg.message_id,
     subject: msg.subject || null,
     timestamp: msg.timestamp,
     from: msg.from?.address || msg.from || null,
