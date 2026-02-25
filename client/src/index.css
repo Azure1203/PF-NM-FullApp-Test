@@ -8,34 +8,35 @@
   --font-sans: 'Plus Jakarta Sans', sans-serif;
   --font-display: 'Outfit', sans-serif;
 
-  /* Orange & Black Theme */
-  --background: 30 10% 97%;
-  --foreground: 0 0% 9%;
+  /* Netley Millwork Brand Theme */
+  /* Gold: #CDAB4A | Charcoal: #2E2E2E | Brown: #807161 | Off-white: #F7F4F2 */
+  --background: 24 24% 96%;
+  --foreground: 0 0% 18%;
   
-  --primary: 24 95% 53%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 44 57% 55%;
+  --primary-foreground: 0 0% 18%;
   
-  --secondary: 30 15% 93%;
-  --secondary-foreground: 0 0% 9%;
+  --secondary: 31 10% 91%;
+  --secondary-foreground: 0 0% 18%;
   
-  --muted: 30 15% 93%;
-  --muted-foreground: 30 10% 40%;
+  --muted: 31 10% 91%;
+  --muted-foreground: 31 14% 44%;
   
-  --accent: 24 95% 53%;
-  --accent-foreground: 0 0% 100%;
+  --accent: 44 57% 55%;
+  --accent-foreground: 0 0% 18%;
   
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 30 15% 88%;
-  --input: 30 15% 88%;
-  --ring: 24 95% 53%;
+  --border: 31 14% 82%;
+  --input: 31 14% 82%;
+  --ring: 44 57% 55%;
   
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 9%;
+  --card-foreground: 0 0% 18%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 9%;
+  --popover-foreground: 0 0% 18%;
 
   --radius: 0.75rem;
 }
