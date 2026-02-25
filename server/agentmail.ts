@@ -107,7 +107,7 @@ export async function getAgentMailAttachment(
   messageId: string,
   attachmentId: string
 ): Promise<AgentMailAttachment> {
-  const url = `${AGENTMAIL_BASE_URL}/inboxes/${AGENTMAIL_INBOX_ENCODED}/messages/${messageId}/attachments/${attachmentId}`;
+  const url = `${AGENTMAIL_BASE_URL}/inboxes/${AGENTMAIL_INBOX_ENCODED}/messages/${encodeURIComponent(messageId)}/attachments/${attachmentId}`;
   const res = await fetch(url, { headers: agentMailHeaders() });
 
   if (!res.ok) {
