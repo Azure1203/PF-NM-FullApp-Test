@@ -21,6 +21,7 @@ import AdminUsers from "@/pages/AdminUsers";
 import ColorGrid from "@/pages/ColorGrid";
 import HowItWorks from "@/pages/HowItWorks";
 import DynamicGridManager from "@/pages/admin/DynamicGridManager";
+import ProxyVariableManager from "@/pages/admin/ProxyVariableManager";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 
@@ -76,6 +77,7 @@ function AppRouter() {
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/color-grid" component={ColorGrid} />
       <Route path="/admin/attribute-grids" component={DynamicGridManager} />
+      <Route path="/admin/proxy-variables" component={ProxyVariableManager} />
       <Route path="/how-it-works" component={HowItWorks} />
       <Route path="/orders/:id" component={OrderDetails} />
       <Route path="/files/:fileId/cts" component={CutToSize} />
