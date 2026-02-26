@@ -165,22 +165,77 @@ export async function registerRoutes(
 
   // Delete a project (admin only)
   app.delete(api.orders.delete.path, isAuthenticated, async (req, res) => {
-    // Check if user is admin
-    const replitUser = (req as any).user;
-    const username = replitUser?.claims?.username || replitUser?.name;
-    if (!username) {
-      return res.status(401).json({ message: 'Not authenticated' });
+    // ... (rest of the route)
+  });
+
+  // Dynamic Grid Routes
+  app.get('/api/admin/attribute-grids', isAuthenticated, async (_req, res) => {
+    try {
+      const grids = await storage.getAttributeGrids();
+      res.json(grids);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
     }
-    const isAdmin = await storage.isUserAdmin(username);
-    if (!isAdmin) {
-      return res.status(403).json({ message: 'Only admins can delete orders' });
+  });
+
+  app.get('/api/admin/attribute-grids/:id/rows', isAuthenticated, async (req, res) => {
+    try {
+      const gridId = Number(req.params.id);
+      const rows = await storage.getAttributeGridRows(gridId);
+      res.json(rows);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
     }
-    
-    const success = await storage.deleteProject(Number(req.params.id));
-    if (!success) {
-      return res.status(404).json({ message: 'Project not found' });
+  });
+
+  app.post('/api/admin/upload-dynamic-grid', isAuthenticated, upload.single('file'), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
     }
-    res.status(204).send();
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: 'Grid name is required' });
+    }
+
+    try {
+      const fileContent = req.file.buffer.toString('utf-8');
+      const records = await parseCSV(fileContent);
+      
+      if (records.length === 0) {
+        return res.status(400).json({ message: 'CSV file is empty' });
+      }
+
+      const headers = Object.keys(records[0]);
+      
+      let keyColumn = 'NAME';
+      if (headers.includes('EXISTING OPTION ID')) {
+        keyColumn = 'EXISTING OPTION ID';
+      } else if (headers.includes('MANU_CODE')) {
+        keyColumn = 'MANU_CODE';
+      }
+
+      let grid = await storage.getAttributeGridByName(name);
+      if (!grid) {
+        grid = await storage.createAttributeGrid({
+          name,
+          columns: headers,
+          keyColumn
+        });
+      }
+
+      const rowsToInsert = records.map(record => ({
+        gridId: grid!.id,
+        lookupKey: String(record[keyColumn] || record[headers[0]] || ''),
+        rowData: record
+      }));
+
+      await storage.replaceAttributeGridRows(grid.id, rowsToInsert);
+
+      res.status(201).json({ message: 'Grid uploaded successfully', gridId: grid.id });
+    } catch (e: any) {
+      console.error('[DynamicGrid] Upload error:', e);
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // Get sync preview data (protected) - calculates all totals before syncing

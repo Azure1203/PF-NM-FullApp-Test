@@ -20,6 +20,7 @@ import ComponentImport from "@/pages/ComponentImport";
 import AdminUsers from "@/pages/AdminUsers";
 import ColorGrid from "@/pages/ColorGrid";
 import HowItWorks from "@/pages/HowItWorks";
+import DynamicGridManager from "@/pages/admin/DynamicGridManager";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 
@@ -74,6 +75,7 @@ function AppRouter() {
       <Route path="/products/import-components" component={ComponentImport} />
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/color-grid" component={ColorGrid} />
+      <Route path="/admin/attribute-grids" component={DynamicGridManager} />
       <Route path="/how-it-works" component={HowItWorks} />
       <Route path="/orders/:id" component={OrderDetails} />
       <Route path="/files/:fileId/cts" component={CutToSize} />
