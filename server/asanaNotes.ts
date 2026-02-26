@@ -52,6 +52,9 @@ export async function buildAsanaTaskNotes(projectId: number): Promise<string> {
     for (const { pallet, fileNames } of palletsWithFiles) {
       const sizeLabel = pallet.finalSize || pallet.customSize || pallet.size;
       notes += `Pallet ${pallet.palletNumber} (${sizeLabel}):\n`;
+      if (pallet.notes) {
+        notes += `  Notes: ${pallet.notes}\n`;
+      }
       for (const name of fileNames) {
         notes += `  - ${name}\n`;
       }
