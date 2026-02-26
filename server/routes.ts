@@ -19,6 +19,8 @@ import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { getAgentMailSyncStatus, triggerManualAgentMailFetch, clearAgentMailProcessedEmails } from "./agentmailScheduler";
 import { testAgentMailConnection } from "./agentmail";
 import { getAsanaImportStatus, triggerManualAsanaImport } from "./asanaImportScheduler";
+import { buildAsanaTaskNotes, syncAsanaTaskNotes } from "./asanaNotes";
+import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -43,81 +45,6 @@ const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
 const ASANA_NEW_JOBS_PROJECT_GID = '1209262874404235';
 const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
 
-async function buildAsanaTaskNotes(projectId: number): Promise<string> {
-  const project = await storage.getProject(projectId);
-  if (!project) return '';
-
-  const customDomain = process.env.CUSTOM_APP_DOMAIN;
-  const publishedDomain = process.env.REPLIT_DOMAINS?.split(',')[0];
-  const devDomain = process.env.REPLIT_DEV_DOMAIN;
-  const appDomain = customDomain || publishedDomain || devDomain || '';
-  const projectAppUrl = appDomain ? `https://${appDomain}/orders/${project.id}` : '';
-
-  let notes = '';
-  if (projectAppUrl) {
-    notes += `Packaging Link: ${projectAppUrl}\n\n`;
-  }
-
-  const projectFiles = await storage.getProjectFiles(project.id);
-  const fileMap = new Map(projectFiles.map(f => [f.id, f]));
-
-  for (const file of projectFiles) {
-    let fileName = file.originalFilename || 'Unknown File';
-    if (fileName.toLowerCase().endsWith('.csv')) {
-      fileName = fileName.slice(0, -4);
-    }
-    const jobNumber = file.allmoxyJobNumber || 'N/A';
-    notes += `${fileName} - ${jobNumber}\n`;
-  }
-
-  const pallets = await storage.getPalletsForProject(project.id);
-  const palletsWithAssignments = pallets
-    .sort((a, b) => a.palletNumber - b.palletNumber);
-
-  const palletsWithFiles: { pallet: typeof pallets[0]; fileNames: string[] }[] = [];
-  for (const pallet of palletsWithAssignments) {
-    const assignments = await storage.getAssignmentsForPallet(pallet.id);
-    const fileNames = assignments.map(a => {
-      const file = fileMap.get(a.fileId);
-      if (!file) return 'Unknown';
-      let name = file.originalFilename || 'Unknown File';
-      if (name.toLowerCase().endsWith('.csv')) name = name.slice(0, -4);
-      return name;
-    });
-    if (assignments.length > 0) {
-      palletsWithFiles.push({ pallet, fileNames });
-    }
-  }
-
-  if (palletsWithFiles.length > 0) {
-    notes += '\nPALLETS:\n';
-    for (const { pallet, fileNames } of palletsWithFiles) {
-      const sizeLabel = pallet.finalSize || pallet.customSize || pallet.size;
-      notes += `Pallet ${pallet.palletNumber} (${sizeLabel}):\n`;
-      for (const name of fileNames) {
-        notes += `  - ${name}\n`;
-      }
-    }
-  }
-
-  return notes;
-}
-
-async function syncAsanaTaskNotes(projectId: number, context: string): Promise<void> {
-  const project = await storage.getProject(projectId);
-  if (!project?.asanaTaskId) return;
-
-  try {
-    const { tasksApi } = await getAsanaApiInstances();
-    const taskNotes = await buildAsanaTaskNotes(projectId);
-    if (taskNotes) {
-      await tasksApi.updateTask({ data: { notes: taskNotes } }, project.asanaTaskId, {});
-      console.log(`[Asana] Updated task notes for ${project.asanaTaskId} after ${context}`);
-    }
-  } catch (err: any) {
-    console.error(`[Asana] Failed to update task notes after ${context}:`, err.message);
-  }
-}
 
 
 
@@ -2736,6 +2663,27 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[Asana Import] Error getting status:', err.message);
       res.status(500).json({ message: 'Failed to get Asana import status', error: err.message });
+    }
+  });
+
+  app.post('/api/asana/sync-all-notes', isAuthenticated, async (req, res) => {
+    try {
+      const replitUser = (req as any).user;
+      const username = replitUser?.claims?.username || replitUser?.name;
+      const isAdmin = username ? await storage.isUserAdmin(username) : false;
+      if (!isAdmin) {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      const result = await triggerManualAsanaNoteSync();
+      res.json({
+        message: `Synced ${result.synced} of ${result.total} Asana task descriptions`,
+        synced: result.synced,
+        failed: result.failed,
+        total: result.total
+      });
+    } catch (err: any) {
+      console.error('[Asana Notes] Error triggering sync:', err.message);
+      res.status(500).json({ message: 'Failed to sync Asana task notes', error: err.message });
     }
   });
 

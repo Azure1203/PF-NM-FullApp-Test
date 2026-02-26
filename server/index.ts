@@ -162,6 +162,12 @@ app.use((req, res, next) => {
         }).catch(err => {
           log(`Failed to load Asana import scheduler: ${err}`, 'asana-import');
         });
+
+        import('./asanaNotesScheduler').then(({ startAsanaNotesScheduler }) => {
+          startAsanaNotesScheduler();
+        }).catch(err => {
+          log(`Failed to load Asana notes scheduler: ${err}`, 'asana-notes');
+        });
       }, 60000);
     },
   );

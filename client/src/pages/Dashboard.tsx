@@ -284,6 +284,26 @@ export default function Dashboard() {
     }
   });
 
+  const { mutate: syncAsanaNotes, isPending: isSyncingAsanaNotes } = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/asana/sync-all-notes');
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Asana descriptions synced",
+        description: `Synced ${data.synced} of ${data.total} Asana task descriptions.`
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   const filteredProjects = projects?.filter(project => {
     // Apply search filter
     const term = search.toLowerCase();
@@ -502,6 +522,30 @@ export default function Dashboard() {
                   <span className="hidden sm:inline">Users</span>
                 </Button>
               </Link>
+              {isAdmin && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 rounded-xl"
+                      data-testid="button-sync-asana-notes"
+                      onClick={() => syncAsanaNotes()}
+                      disabled={isSyncingAsanaNotes}
+                    >
+                      {isSyncingAsanaNotes ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                      <span className="hidden sm:inline">{isSyncingAsanaNotes ? 'Syncing...' : 'Sync Asana'}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Sync pallet &amp; job info to all Asana task descriptions (runs daily automatically)</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
               <Link href="/upload">
                 <Button size="sm" className="btn-primary gap-2 rounded-xl" data-testid="button-upload-new">
                   <Plus className="w-4 h-4" />
