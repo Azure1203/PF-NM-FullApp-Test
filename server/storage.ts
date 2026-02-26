@@ -38,12 +38,12 @@ import {
   allmoxyProducts,
   type AllmoxyProduct,
   type InsertAllmoxyProduct,
-  allmoxyItemAttributes,
-  type AllmoxyItemAttribute,
-  type InsertAllmoxyItemAttribute,
-  allmoxyGroupAttributes,
-  type AllmoxyGroupAttribute,
-  type InsertAllmoxyGroupAttribute,
+  attributeGrids,
+  type AttributeGrid,
+  type InsertAttributeGrid,
+  attributeGridRows,
+  type AttributeGridRow,
+  type InsertAttributeGridRow,
   proxyVariables,
   type ProxyVariable,
   type InsertProxyVariable,
@@ -142,13 +142,13 @@ export interface IStorage {
   getAllmoxyProducts(): Promise<AllmoxyProduct[]>;
   replaceAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]>;
 
-  getAllmoxyItemAttributes(): Promise<AllmoxyItemAttribute[]>;
-  getAllmoxyItemAttributesByGroup(groupName: string): Promise<AllmoxyItemAttribute[]>;
-  replaceAllmoxyItemAttributes(attrs: InsertAllmoxyItemAttribute[]): Promise<AllmoxyItemAttribute[]>;
+  getAttributeGrids(): Promise<AttributeGrid[]>;
+  getAttributeGridByName(name: string): Promise<AttributeGrid | undefined>;
+  createAttributeGrid(grid: InsertAttributeGrid): Promise<AttributeGrid>;
 
-  getAllmoxyGroupAttributes(): Promise<AllmoxyGroupAttribute[]>;
-  getAllmoxyGroupAttributeByName(name: string): Promise<AllmoxyGroupAttribute | undefined>;
-  replaceAllmoxyGroupAttributes(attrs: InsertAllmoxyGroupAttribute[]): Promise<AllmoxyGroupAttribute[]>;
+  getAttributeGridRows(gridId: number): Promise<AttributeGridRow[]>;
+  getAttributeGridRowByKey(gridId: number, lookupKey: string): Promise<AttributeGridRow | undefined>;
+  replaceAttributeGridRows(gridId: number, rows: InsertAttributeGridRow[]): Promise<AttributeGridRow[]>;
 
   getProxyVariables(): Promise<ProxyVariable[]>;
   getProxyVariableByName(name: string): Promise<ProxyVariable | undefined>;
@@ -693,37 +693,39 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getAllmoxyItemAttributes(): Promise<AllmoxyItemAttribute[]> {
-    return await db.select().from(allmoxyItemAttributes).orderBy(allmoxyItemAttributes.name);
+  async getAttributeGrids(): Promise<AttributeGrid[]> {
+    return await db.select().from(attributeGrids).orderBy(attributeGrids.name);
   }
 
-  async getAllmoxyItemAttributesByGroup(groupName: string): Promise<AllmoxyItemAttribute[]> {
-    return await db.select().from(allmoxyItemAttributes).where(eq(allmoxyItemAttributes.attributeGroupName, groupName));
+  async getAttributeGridByName(name: string): Promise<AttributeGrid | undefined> {
+    const [grid] = await db.select().from(attributeGrids).where(eq(attributeGrids.name, name));
+    return grid;
   }
 
-  async replaceAllmoxyItemAttributes(attrs: InsertAllmoxyItemAttribute[]): Promise<AllmoxyItemAttribute[]> {
+  async createAttributeGrid(grid: InsertAttributeGrid): Promise<AttributeGrid> {
+    const [created] = await db.insert(attributeGrids).values(grid).returning();
+    return created;
+  }
+
+  async getAttributeGridRows(gridId: number): Promise<AttributeGridRow[]> {
+    return await db.select().from(attributeGridRows).where(eq(attributeGridRows.gridId, gridId));
+  }
+
+  async getAttributeGridRowByKey(gridId: number, lookupKey: string): Promise<AttributeGridRow | undefined> {
+    const [row] = await db.select().from(attributeGridRows).where(
+      and(
+        eq(attributeGridRows.gridId, gridId),
+        eq(attributeGridRows.lookupKey, lookupKey)
+      )
+    );
+    return row;
+  }
+
+  async replaceAttributeGridRows(gridId: number, rows: InsertAttributeGridRow[]): Promise<AttributeGridRow[]> {
     return await db.transaction(async (tx) => {
-      await tx.delete(allmoxyItemAttributes);
-      if (attrs.length === 0) return [];
-      const inserted = await tx.insert(allmoxyItemAttributes).values(attrs).returning();
-      return inserted;
-    });
-  }
-
-  async getAllmoxyGroupAttributes(): Promise<AllmoxyGroupAttribute[]> {
-    return await db.select().from(allmoxyGroupAttributes).orderBy(allmoxyGroupAttributes.name);
-  }
-
-  async getAllmoxyGroupAttributeByName(name: string): Promise<AllmoxyGroupAttribute | undefined> {
-    const [entry] = await db.select().from(allmoxyGroupAttributes).where(eq(allmoxyGroupAttributes.name, name));
-    return entry;
-  }
-
-  async replaceAllmoxyGroupAttributes(attrs: InsertAllmoxyGroupAttribute[]): Promise<AllmoxyGroupAttribute[]> {
-    return await db.transaction(async (tx) => {
-      await tx.delete(allmoxyGroupAttributes);
-      if (attrs.length === 0) return [];
-      const inserted = await tx.insert(allmoxyGroupAttributes).values(attrs).returning();
+      await tx.delete(attributeGridRows).where(eq(attributeGridRows.gridId, gridId));
+      if (rows.length === 0) return [];
+      const inserted = await tx.insert(attributeGridRows).values(rows).returning();
       return inserted;
     });
   }
