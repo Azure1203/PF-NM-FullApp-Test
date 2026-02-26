@@ -34,7 +34,19 @@ import {
   type InsertAllowedUser,
   colorGrid,
   type ColorGridEntry,
-  type InsertColorGridEntry
+  type InsertColorGridEntry,
+  allmoxyProducts,
+  type AllmoxyProduct,
+  type InsertAllmoxyProduct,
+  allmoxyItemAttributes,
+  type AllmoxyItemAttribute,
+  type InsertAllmoxyItemAttribute,
+  allmoxyGroupAttributes,
+  type AllmoxyGroupAttribute,
+  type InsertAllmoxyGroupAttribute,
+  proxyVariables,
+  type ProxyVariable,
+  type InsertProxyVariable,
 } from "@shared/schema";
 import { eq, desc, and, or, inArray, sql, ilike } from "drizzle-orm";
 
@@ -126,6 +138,21 @@ export interface IStorage {
   getColorGrid(): Promise<ColorGridEntry[]>;
   getColorByCode(code: string): Promise<ColorGridEntry | undefined>;
   replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]>;
+
+  getAllmoxyProducts(): Promise<AllmoxyProduct[]>;
+  replaceAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]>;
+
+  getAllmoxyItemAttributes(): Promise<AllmoxyItemAttribute[]>;
+  getAllmoxyItemAttributesByGroup(groupName: string): Promise<AllmoxyItemAttribute[]>;
+  replaceAllmoxyItemAttributes(attrs: InsertAllmoxyItemAttribute[]): Promise<AllmoxyItemAttribute[]>;
+
+  getAllmoxyGroupAttributes(): Promise<AllmoxyGroupAttribute[]>;
+  getAllmoxyGroupAttributeByName(name: string): Promise<AllmoxyGroupAttribute | undefined>;
+  replaceAllmoxyGroupAttributes(attrs: InsertAllmoxyGroupAttribute[]): Promise<AllmoxyGroupAttribute[]>;
+
+  getProxyVariables(): Promise<ProxyVariable[]>;
+  getProxyVariableByName(name: string): Promise<ProxyVariable | undefined>;
+  replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -649,6 +676,72 @@ export class DatabaseStorage implements IStorage {
       await tx.delete(colorGrid);
       if (entries.length === 0) return [];
       const inserted = await tx.insert(colorGrid).values(entries).returning();
+      return inserted;
+    });
+  }
+
+  async getAllmoxyProducts(): Promise<AllmoxyProduct[]> {
+    return await db.select().from(allmoxyProducts).orderBy(allmoxyProducts.name);
+  }
+
+  async replaceAllmoxyProducts(items: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]> {
+    return await db.transaction(async (tx) => {
+      await tx.delete(allmoxyProducts);
+      if (items.length === 0) return [];
+      const inserted = await tx.insert(allmoxyProducts).values(items).returning();
+      return inserted;
+    });
+  }
+
+  async getAllmoxyItemAttributes(): Promise<AllmoxyItemAttribute[]> {
+    return await db.select().from(allmoxyItemAttributes).orderBy(allmoxyItemAttributes.name);
+  }
+
+  async getAllmoxyItemAttributesByGroup(groupName: string): Promise<AllmoxyItemAttribute[]> {
+    return await db.select().from(allmoxyItemAttributes).where(eq(allmoxyItemAttributes.attributeGroupName, groupName));
+  }
+
+  async replaceAllmoxyItemAttributes(attrs: InsertAllmoxyItemAttribute[]): Promise<AllmoxyItemAttribute[]> {
+    return await db.transaction(async (tx) => {
+      await tx.delete(allmoxyItemAttributes);
+      if (attrs.length === 0) return [];
+      const inserted = await tx.insert(allmoxyItemAttributes).values(attrs).returning();
+      return inserted;
+    });
+  }
+
+  async getAllmoxyGroupAttributes(): Promise<AllmoxyGroupAttribute[]> {
+    return await db.select().from(allmoxyGroupAttributes).orderBy(allmoxyGroupAttributes.name);
+  }
+
+  async getAllmoxyGroupAttributeByName(name: string): Promise<AllmoxyGroupAttribute | undefined> {
+    const [entry] = await db.select().from(allmoxyGroupAttributes).where(eq(allmoxyGroupAttributes.name, name));
+    return entry;
+  }
+
+  async replaceAllmoxyGroupAttributes(attrs: InsertAllmoxyGroupAttribute[]): Promise<AllmoxyGroupAttribute[]> {
+    return await db.transaction(async (tx) => {
+      await tx.delete(allmoxyGroupAttributes);
+      if (attrs.length === 0) return [];
+      const inserted = await tx.insert(allmoxyGroupAttributes).values(attrs).returning();
+      return inserted;
+    });
+  }
+
+  async getProxyVariables(): Promise<ProxyVariable[]> {
+    return await db.select().from(proxyVariables).orderBy(proxyVariables.name);
+  }
+
+  async getProxyVariableByName(name: string): Promise<ProxyVariable | undefined> {
+    const [entry] = await db.select().from(proxyVariables).where(eq(proxyVariables.name, name));
+    return entry;
+  }
+
+  async replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]> {
+    return await db.transaction(async (tx) => {
+      await tx.delete(proxyVariables);
+      if (vars.length === 0) return [];
+      const inserted = await tx.insert(proxyVariables).values(vars).returning();
       return inserted;
     });
   }

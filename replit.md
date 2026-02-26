@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
 - **Packing Slip Checklist**: Generates packing checklist items directly from order CSV data, including CTS cut lengths, eliminating PDF parsing.
 - **Mobile Optimization**: Full responsiveness across all application pages.
 - **Google Sheets Backup**: Daily automated and manual backup of all database data to Google Sheets, stored in a designated Google Drive folder.
+- **Allmoxy Migration**: Database tables mirroring Allmoxy product/attribute exports (`allmoxy_products`, `allmoxy_item_attributes`, `allmoxy_group_attributes`, `proxy_variables`), with a `PricingEngineService` (`server/services/pricingEngine.ts`) that evaluates proxy variable formulas using `mathjs`. The service strips comments from formulas, builds a scope from order item dimensions and attribute data, and evaluates pricing expressions.
 
 ## External Dependencies
 

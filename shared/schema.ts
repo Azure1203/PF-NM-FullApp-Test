@@ -1,4 +1,4 @@
-import { pgTable, text, serial, boolean, timestamp, integer, real, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp, integer, real, jsonb, decimal, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -431,3 +431,55 @@ export const asanaImportSyncStatus = pgTable("asana_import_sync_status", {
 });
 
 export type AsanaImportSyncStatus = typeof asanaImportSyncStatus.$inferSelect;
+
+export const allmoxyProducts = pgTable("allmoxy_products", {
+  id: integer("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  status: varchar("status", { length: 50 }),
+});
+
+export const insertAllmoxyProductSchema = createInsertSchema(allmoxyProducts);
+export type AllmoxyProduct = typeof allmoxyProducts.$inferSelect;
+export type InsertAllmoxyProduct = z.infer<typeof insertAllmoxyProductSchema>;
+
+export const allmoxyItemAttributes = pgTable("allmoxy_item_attributes", {
+  optionId: integer("option_id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  manuCode: varchar("manu_code", { length: 100 }).unique(),
+  basePrice: decimal("base_price", { precision: 12, scale: 4 }),
+  sqFtPrice: decimal("sq_ft_price", { precision: 12, scale: 4 }),
+  margin: decimal("margin", { precision: 8, scale: 4 }),
+  pricingId: integer("pricing_id"),
+  attributeGroupName: varchar("attribute_group_name", { length: 255 }),
+});
+
+export const insertAllmoxyItemAttributeSchema = createInsertSchema(allmoxyItemAttributes);
+export type AllmoxyItemAttribute = typeof allmoxyItemAttributes.$inferSelect;
+export type InsertAllmoxyItemAttribute = z.infer<typeof insertAllmoxyItemAttributeSchema>;
+
+export const allmoxyGroupAttributes = pgTable("allmoxy_group_attributes", {
+  optionId: integer("option_id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  sqftPrice: decimal("sqft_price", { precision: 12, scale: 4 }),
+  levelPercentUpcharge: decimal("level_percent_upcharge", { precision: 8, scale: 4 }),
+  panelExport: varchar("panel_export", { length: 255 }),
+  doorExport: varchar("door_export", { length: 255 }),
+  drawerBoxExport: varchar("drawer_box_export", { length: 255 }),
+  tfl90DoorSqftCost: decimal("tfl90_door_sqft_cost", { precision: 12, scale: 4 }),
+  poly45DoorSqftCost: decimal("poly45_door_sqft_cost", { precision: 12, scale: 4 }),
+});
+
+export const insertAllmoxyGroupAttributeSchema = createInsertSchema(allmoxyGroupAttributes);
+export type AllmoxyGroupAttribute = typeof allmoxyGroupAttributes.$inferSelect;
+export type InsertAllmoxyGroupAttribute = z.infer<typeof insertAllmoxyGroupAttributeSchema>;
+
+export const proxyVariables = pgTable("proxy_variables", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  type: varchar("type", { length: 50 }).notNull(),
+  formula: text("formula").notNull(),
+});
+
+export const insertProxyVariableSchema = createInsertSchema(proxyVariables).omit({ id: true });
+export type ProxyVariable = typeof proxyVariables.$inferSelect;
+export type InsertProxyVariable = z.infer<typeof insertProxyVariableSchema>;
