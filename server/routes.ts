@@ -6,6 +6,8 @@ import { z } from "zod";
 import multer from 'multer';
 import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
+import { evaluatePrice } from "./services/pricingEngine";
+import { generateOrdItemBlock } from "./services/ordExporter";
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import path from 'path';
@@ -463,6 +465,15 @@ export async function registerRoutes(
 
       const project = await storage.createProject(projectData);
 
+      let totalProjectPrice = 0;
+      let combinedOrdText = "";
+
+      // Fetch all proxy variables and grids for the pipeline
+      const allProxyVars = await storage.getProxyVariables();
+      const pricingProxy = allProxyVars.find(v => v.type === 'pricing');
+      const exportProxy = allProxyVars.find(v => v.type === 'export');
+      const grids = await storage.getAttributeGrids();
+
       // Aggregate counts for auto-derived production statuses
       let totalDovetails = 0;
       let totalFivePiece = 0;
@@ -511,6 +522,28 @@ export async function registerRoutes(
           doubleThickCount: partCounts.doubleThickCount,
           wallRailPieces: partCounts.wallRailPieces,
         });
+
+        // Pipeline: Calculate Price and Generate ORD for each item in the file
+        for (const item of pf.records.slice(1)) { // Assuming first row is header or metadata handled elsewhere
+           // Simple matching logic: find SKU and Color rows in dynamic grids
+           const contextScope: any = {};
+           for (const grid of grids) {
+             const row = await storage.getAttributeGridRowByKey(grid.id, item.SKU || item.Color || '');
+             if (row) {
+               contextScope[grid.name.toLowerCase().replace(/\s+/g, '')] = row.rowData;
+             }
+           }
+
+           if (pricingProxy) {
+             const price = evaluatePrice(pricingProxy.formula, item, contextScope);
+             totalProjectPrice += price;
+           }
+
+           if (exportProxy) {
+             const block = generateOrdItemBlock(item, contextScope, exportProxy.formula);
+             combinedOrdText += block + "\n";
+           }
+        }
         
         // Extract and save CTS parts for this file
         const ctsParts = extractCTSParts(pf.records);
@@ -560,7 +593,11 @@ export async function registerRoutes(
       
       // Return the updated project with all statuses
       const updatedProject = await storage.getProject(project.id);
-      res.status(201).json(updatedProject || project);
+      res.status(201).json({
+        ...(updatedProject || project),
+        totalPrice: totalProjectPrice,
+        ordExport: combinedOrdText
+      });
 
     } catch (e: any) {
       res.status(500).json({ message: e.message });
