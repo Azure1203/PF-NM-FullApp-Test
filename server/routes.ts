@@ -167,7 +167,20 @@ export async function registerRoutes(
 
   // Delete a project (admin only)
   app.delete(api.orders.delete.path, isAuthenticated, async (req, res) => {
-    // ... (rest of the route)
+    const replitUser = (req as any).user;
+    const username = replitUser?.claims?.username || replitUser?.name;
+    if (!username) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    const isAdmin = await storage.isUserAdmin(username);
+    if (!isAdmin) {
+      return res.status(403).json({ message: 'Only admins can delete orders' });
+    }
+    const success = await storage.deleteProject(Number(req.params.id));
+    if (!success) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    res.status(204).send();
   });
 
   // Dynamic Grid Routes
@@ -191,7 +204,41 @@ export async function registerRoutes(
   });
 
   app.post('/api/admin/upload-dynamic-grid', isAuthenticated, upload.single('file'), async (req, res) => {
-    // ... (existing implementation)
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    const { name } = req.body;
+    if (!name) {
+      return res.status(400).json({ message: 'Grid name is required' });
+    }
+    try {
+      const fileContent = req.file.buffer.toString('utf-8');
+      const records: any[] = parseSync(fileContent, { columns: true, skip_empty_lines: true });
+      if (records.length === 0) {
+        return res.status(400).json({ message: 'CSV file is empty or has no data rows' });
+      }
+      const headers = Object.keys(records[0]);
+      let keyColumn = 'NAME';
+      if (headers.includes('EXISTING OPTION ID')) {
+        keyColumn = 'EXISTING OPTION ID';
+      } else if (headers.includes('MANU_CODE')) {
+        keyColumn = 'MANU_CODE';
+      }
+      let grid = await storage.getAttributeGridByName(name);
+      if (!grid) {
+        grid = await storage.createAttributeGrid({ name, columns: headers, keyColumn });
+      }
+      const rowsToInsert = records.map(record => ({
+        gridId: grid!.id,
+        lookupKey: String(record[keyColumn] || record[headers[0]] || ''),
+        rowData: record,
+      }));
+      await storage.replaceAttributeGridRows(grid.id, rowsToInsert);
+      res.status(201).json({ message: 'Grid uploaded successfully', gridId: grid.id, rowCount: rowsToInsert.length });
+    } catch (e: any) {
+      console.error('[DynamicGrid] Upload error:', e);
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // Proxy Variable Routes
@@ -207,8 +254,11 @@ export async function registerRoutes(
   app.post('/api/admin/proxy-variables', isAuthenticated, async (req, res) => {
     try {
       const { name, type, formula } = req.body;
-      const vars = await storage.replaceProxyVariables([{ name, type, formula }]);
-      res.json(vars[0]);
+      if (!name || !type || !formula) {
+        return res.status(400).json({ message: 'name, type, and formula are required' });
+      }
+      const saved = await storage.upsertProxyVariable({ name, type, formula });
+      res.json(saved);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -524,25 +574,28 @@ export async function registerRoutes(
         });
 
         // Pipeline: Calculate Price and Generate ORD for each item in the file
-        for (const item of pf.records.slice(1)) { // Assuming first row is header or metadata handled elsewhere
-           // Simple matching logic: find SKU and Color rows in dynamic grids
-           const contextScope: any = {};
-           for (const grid of grids) {
-             const row = await storage.getAttributeGridRowByKey(grid.id, item.SKU || item.Color || '');
-             if (row) {
-               contextScope[grid.name.toLowerCase().replace(/\s+/g, '')] = row.rowData;
-             }
-           }
-
-           if (pricingProxy) {
-             const price = evaluatePrice(pricingProxy.formula, item, contextScope);
-             totalProjectPrice += price;
-           }
-
-           if (exportProxy) {
-             const block = generateOrdItemBlock(item, contextScope, exportProxy.formula);
-             combinedOrdText += block + "\n";
-           }
+        // Re-parse with columns:true to get named-property objects
+        if (pricingProxy || exportProxy) {
+          const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+          for (const item of itemObjects) {
+            const contextScope: any = {};
+            for (const grid of grids) {
+              const lookupValue = item.SKU || item.MANU_CODE || item.Color || item.NAME || '';
+              const row = await storage.getAttributeGridRowByKey(grid.id, lookupValue);
+              if (row) {
+                const gridKey = grid.name.toLowerCase().replace(/\s+/g, '');
+                contextScope[gridKey] = row.rowData;
+              }
+            }
+            if (pricingProxy) {
+              const price = evaluatePrice(pricingProxy.formula, item, contextScope);
+              totalProjectPrice += price;
+            }
+            if (exportProxy) {
+              const block = generateOrdItemBlock(item, contextScope, exportProxy.formula);
+              combinedOrdText += block + "\n";
+            }
+          }
         }
         
         // Extract and save CTS parts for this file

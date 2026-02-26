@@ -152,6 +152,7 @@ export interface IStorage {
 
   getProxyVariables(): Promise<ProxyVariable[]>;
   getProxyVariableByName(name: string): Promise<ProxyVariable | undefined>;
+  upsertProxyVariable(variable: InsertProxyVariable): Promise<ProxyVariable>;
   replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]>;
 }
 
@@ -737,6 +738,18 @@ export class DatabaseStorage implements IStorage {
   async getProxyVariableByName(name: string): Promise<ProxyVariable | undefined> {
     const [entry] = await db.select().from(proxyVariables).where(eq(proxyVariables.name, name));
     return entry;
+  }
+
+  async upsertProxyVariable(variable: InsertProxyVariable): Promise<ProxyVariable> {
+    const [result] = await db
+      .insert(proxyVariables)
+      .values(variable)
+      .onConflictDoUpdate({
+        target: proxyVariables.name,
+        set: { type: variable.type, formula: variable.formula },
+      })
+      .returning();
+    return result;
   }
 
   async replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]> {
