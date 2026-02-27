@@ -40,7 +40,8 @@ export async function buildAsanaTaskNotes(projectId: number): Promise<string> {
       if (!file) return 'Unknown';
       let name = file.originalFilename || 'Unknown File';
       if (name.toLowerCase().endsWith('.csv')) name = name.slice(0, -4);
-      return name;
+      const jobNumber = file.allmoxyJobNumber;
+      return jobNumber ? `${name} - #${jobNumber}` : name;
     });
     if (assignments.length > 0) {
       palletsWithFiles.push({ pallet, fileNames });
