@@ -29,6 +29,13 @@
       "when": 1771386986089,
       "tag": "0003_magenta_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772242800000,
+      "tag": "0004_allmoxy_tables",
+      "breakpoints": true
     }
   ]
 }
