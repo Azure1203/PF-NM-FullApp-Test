@@ -523,28 +523,26 @@ export default function Dashboard() {
                 </Button>
               </Link>
               {isAdmin && (
-                <Link href="/admin/attribute-grids">
-                  <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-attribute-grids">
-                    <Grid3X3 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Attr Grids</span>
-                  </Button>
-                </Link>
-              )}
-              {isAdmin && (
-                <Link href="/admin/proxy-variables">
-                  <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-proxy-variables">
-                    <Code2 className="w-4 h-4" />
-                    <span className="hidden sm:inline">Proxies</span>
-                  </Button>
-                </Link>
-              )}
-              {isAdmin && (
-                <Link href="/admin/allmoxy-products">
-                  <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-allmoxy-products">
-                    <Box className="w-4 h-4" />
-                    <span className="hidden sm:inline">Products</span>
-                  </Button>
-                </Link>
+                <>
+                  <Link href="/admin/attribute-grids">
+                    <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-attribute-grids">
+                      <Grid3X3 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Attr Grids</span>
+                    </Button>
+                  </Link>
+                  <Link href="/admin/proxy-variables">
+                    <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-proxy-variables">
+                      <Code2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Proxies</span>
+                    </Button>
+                  </Link>
+                  <Link href="/admin/allmoxy-products">
+                    <Button size="sm" variant="outline" className="gap-2 rounded-xl" data-testid="button-allmoxy-products">
+                      <Box className="w-4 h-4" />
+                      <span className="hidden sm:inline">Allmoxy</span>
+                    </Button>
+                  </Link>
+                </>
               )}
               {isAdmin && (
                 <Tooltip>

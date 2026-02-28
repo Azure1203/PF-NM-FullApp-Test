@@ -291,6 +291,31 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/admin/upload-allmoxy-products', isAuthenticated, upload.single('file'), async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    try {
+      const fileContent = req.file.buffer.toString('utf-8');
+      const records: any[] = parseSync(fileContent, { columns: true, skip_empty_lines: true });
+      if (records.length === 0) {
+        return res.status(400).json({ message: 'CSV file is empty' });
+      }
+
+      const productsToInsert = records.map(record => ({
+        name: record.NAME || record.name || '',
+        status: 'active',
+        pricingProxyId: null,
+        exportProxyId: null,
+      })).filter(p => p.name);
+
+      await storage.replaceAllmoxyProducts(productsToInsert);
+      res.json({ message: 'Products imported successfully', count: productsToInsert.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/proxy-variables', isAuthenticated, async (req, res) => {
     try {
       const { name, type, formula } = req.body;
