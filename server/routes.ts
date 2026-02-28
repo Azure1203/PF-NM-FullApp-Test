@@ -304,6 +304,18 @@ export async function registerRoutes(
     }
   });
 
+  app.delete('/api/admin/proxy-variables/:id', isAuthenticated, async (req, res) => {
+    try {
+      const success = await storage.deleteProxyVariable(Number(req.params.id));
+      if (!success) {
+        return res.status(404).json({ message: 'Variable not found' });
+      }
+      res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // Get sync preview data (protected) - calculates all totals before syncing
   app.get('/api/orders/:id/preview', isAuthenticated, async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));

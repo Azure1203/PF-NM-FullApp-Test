@@ -155,6 +155,7 @@ export interface IStorage {
   getProxyVariables(): Promise<ProxyVariable[]>;
   getProxyVariableByName(name: string): Promise<ProxyVariable | undefined>;
   upsertProxyVariable(variable: InsertProxyVariable): Promise<ProxyVariable>;
+  deleteProxyVariable(id: number): Promise<boolean>;
   replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]>;
 }
 
@@ -773,6 +774,11 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return result;
+  }
+
+  async deleteProxyVariable(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(proxyVariables).where(eq(proxyVariables.id, id)).returning();
+    return !!deleted;
   }
 
   async replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]> {
