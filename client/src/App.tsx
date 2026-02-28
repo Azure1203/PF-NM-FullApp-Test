@@ -25,6 +25,7 @@ import ProxyVariableManager from "@/pages/admin/ProxyVariableManager";
 import AllmoxyProductManager from "@/pages/admin/AllmoxyProductManager";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
+import AppLayout from "@/components/AppLayout";
 
 function AccessDenied({ onLogout }: { onLogout: () => void }) {
   return (
@@ -69,24 +70,26 @@ function AppRouter() {
   }
 
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/upload" component={UploadOrder} />
-      <Route path="/products" component={Products} />
-      <Route path="/products/import" component={HardwareImport} />
-      <Route path="/products/import-components" component={ComponentImport} />
-      <Route path="/admin/users" component={AdminUsers} />
-      <Route path="/admin/color-grid" component={ColorGrid} />
-      <Route path="/admin/attribute-grids" component={DynamicGridManager} />
-      <Route path="/admin/proxy-variables" component={ProxyVariableManager} />
-      <Route path="/admin/allmoxy-products" component={AllmoxyProductManager} />
-      <Route path="/how-it-works" component={HowItWorks} />
-      <Route path="/orders/:id" component={OrderDetails} />
-      <Route path="/files/:fileId/cts" component={CutToSize} />
-      <Route path="/files/:fileId/checklist" component={PackingChecklist} />
-      <Route path="/files/:fileId/hardware-checklist" component={HardwareChecklist} />
-      <Route component={NotFound} />
-    </Switch>
+    <AppLayout>
+      <Switch>
+        <Route path="/" component={Dashboard} />
+        <Route path="/upload" component={UploadOrder} />
+        <Route path="/products" component={Products} />
+        <Route path="/products/import" component={HardwareImport} />
+        <Route path="/products/import-components" component={ComponentImport} />
+        <Route path="/admin/users" component={AdminUsers} />
+        <Route path="/admin/color-grid" component={ColorGrid} />
+        <Route path="/admin/attribute-grids" component={DynamicGridManager} />
+        <Route path="/admin/proxy-variables" component={ProxyVariableManager} />
+        <Route path="/admin/allmoxy-products" component={AllmoxyProductManager} />
+        <Route path="/how-it-works" component={HowItWorks} />
+        <Route path="/orders/:id" component={OrderDetails} />
+        <Route path="/files/:fileId/cts" component={CutToSize} />
+        <Route path="/files/:fileId/checklist" component={PackingChecklist} />
+        <Route path="/files/:fileId/hardware-checklist" component={HardwareChecklist} />
+        <Route component={NotFound} />
+      </Switch>
+    </AppLayout>
   );
 }
 
