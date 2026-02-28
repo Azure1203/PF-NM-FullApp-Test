@@ -433,7 +433,7 @@ export const asanaImportSyncStatus = pgTable("asana_import_sync_status", {
 export type AsanaImportSyncStatus = typeof asanaImportSyncStatus.$inferSelect;
 
 export const allmoxyProducts = pgTable("allmoxy_products", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: varchar("name", { length: 255 }).notNull().unique(),
   status: varchar("status", { length: 50 }),
   pricingProxyId: integer("pricing_proxy_id").references(() => proxyVariables.id),
@@ -445,7 +445,7 @@ export type AllmoxyProduct = typeof allmoxyProducts.$inferSelect;
 export type InsertAllmoxyProduct = z.infer<typeof insertAllmoxyProductSchema>;
 
 export const attributeGrids = pgTable("attribute_grids", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: varchar("name", { length: 255 }).notNull().unique(),
   columns: jsonb("columns").$type<string[]>().notNull(),
   keyColumn: varchar("key_column", { length: 255 }).notNull(),
@@ -456,7 +456,7 @@ export type AttributeGrid = typeof attributeGrids.$inferSelect;
 export type InsertAttributeGrid = z.infer<typeof insertAttributeGridSchema>;
 
 export const attributeGridRows = pgTable("attribute_grid_rows", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   gridId: integer("grid_id").references(() => attributeGrids.id, { onDelete: 'cascade' }).notNull(),
   lookupKey: varchar("lookup_key", { length: 255 }).notNull(),
   rowData: jsonb("row_data").notNull(),
@@ -467,7 +467,7 @@ export type AttributeGridRow = typeof attributeGridRows.$inferSelect;
 export type InsertAttributeGridRow = z.infer<typeof insertAttributeGridRowSchema>;
 
 export const proxyVariables = pgTable("proxy_variables", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: varchar("name", { length: 255 }).notNull().unique(),
   type: varchar("type", { length: 50 }).notNull(),
   formula: text("formula").notNull(),
