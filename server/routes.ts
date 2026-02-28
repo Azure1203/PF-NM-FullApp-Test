@@ -721,12 +721,41 @@ export async function registerRoutes(
       console.log(`[Upload] Updating project ${project.id} aggregated BO status after all files processed`);
       await updateProjectBoProductionStatus(project.id);
       
-      // Return the updated project with all statuses
+      // Return the updated project with all statuses and detailed item info for preview
       const updatedProject = await storage.getProject(project.id);
+      
+      // Re-parse all items for the frontend preview
+      const allItems: any[] = [];
+      for (const pf of parsedFiles) {
+        const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+        for (const item of itemObjects) {
+          const contextScope: any = {};
+          for (const grid of grids) {
+            const lookupValue = item.SKU || item.MANU_CODE || item.Color || item.NAME || '';
+            const row = await storage.getAttributeGridRowByKey(grid.id, lookupValue);
+            if (row) {
+              const gridKey = grid.name.toLowerCase().replace(/\s+/g, '');
+              contextScope[gridKey] = row.rowData;
+            }
+          }
+          let price = 0;
+          let error = null;
+          if (pricingProxy) {
+            try {
+              price = evaluatePrice(pricingProxy.formula, item, contextScope);
+            } catch (e: any) {
+              error = e.message;
+            }
+          }
+          allItems.push({ ...item, price, error });
+        }
+      }
+
       res.status(201).json({
         ...(updatedProject || project),
         totalPrice: totalProjectPrice,
-        ordExport: combinedOrdText
+        ordExport: combinedOrdText,
+        items: allItems
       });
 
     } catch (e: any) {

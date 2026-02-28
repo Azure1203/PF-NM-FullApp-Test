@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import Dashboard from "@/pages/Dashboard";
+import OrderProcessingDashboard from "@/pages/daily/OrderProcessingDashboard";
 import UploadOrder from "@/pages/UploadOrder";
 import OrderDetails from "@/pages/OrderDetails";
 import CutToSize from "@/pages/CutToSize";
@@ -72,7 +73,8 @@ function AppRouter() {
   return (
     <AppLayout>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={OrderProcessingDashboard} />
+        <Route path="/orders" component={Dashboard} />
         <Route path="/upload" component={UploadOrder} />
         <Route path="/products" component={Products} />
         <Route path="/products/import" component={HardwareImport} />
