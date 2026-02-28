@@ -251,6 +251,46 @@ export async function registerRoutes(
     }
   });
 
+  // Allmoxy Product Routes
+  app.get('/api/admin/allmoxy-products', isAuthenticated, async (_req, res) => {
+    try {
+      const products = await storage.getAllmoxyProducts();
+      res.json(products);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/allmoxy-products', isAuthenticated, async (req, res) => {
+    try {
+      const { name, status, pricingProxyId, exportProxyId } = req.body;
+      if (!name) {
+        return res.status(400).json({ message: 'name is required' });
+      }
+      const product = await storage.upsertAllmoxyProduct({
+        name,
+        status: status ?? 'active',
+        pricingProxyId: pricingProxyId ?? null,
+        exportProxyId: exportProxyId ?? null,
+      });
+      res.json(product);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete('/api/admin/allmoxy-products/:id', isAuthenticated, async (req, res) => {
+    try {
+      const success = await storage.deleteAllmoxyProduct(Number(req.params.id));
+      if (!success) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+      res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/proxy-variables', isAuthenticated, async (req, res) => {
     try {
       const { name, type, formula } = req.body;

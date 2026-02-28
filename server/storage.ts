@@ -140,6 +140,8 @@ export interface IStorage {
   replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]>;
 
   getAllmoxyProducts(): Promise<AllmoxyProduct[]>;
+  upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct>;
+  deleteAllmoxyProduct(id: number): Promise<boolean>;
   replaceAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]>;
 
   getAttributeGrids(): Promise<AttributeGrid[]>;
@@ -683,6 +685,27 @@ export class DatabaseStorage implements IStorage {
 
   async getAllmoxyProducts(): Promise<AllmoxyProduct[]> {
     return await db.select().from(allmoxyProducts).orderBy(allmoxyProducts.name);
+  }
+
+  async upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct> {
+    const [result] = await db
+      .insert(allmoxyProducts)
+      .values(product)
+      .onConflictDoUpdate({
+        target: allmoxyProducts.name,
+        set: {
+          status: product.status,
+          pricingProxyId: product.pricingProxyId,
+          exportProxyId: product.exportProxyId,
+        },
+      })
+      .returning();
+    return result;
+  }
+
+  async deleteAllmoxyProduct(id: number): Promise<boolean> {
+    const result = await db.delete(allmoxyProducts).where(eq(allmoxyProducts.id, id)).returning();
+    return result.length > 0;
   }
 
   async replaceAllmoxyProducts(items: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]> {

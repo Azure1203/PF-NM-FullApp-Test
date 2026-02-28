@@ -433,8 +433,8 @@ export const asanaImportSyncStatus = pgTable("asana_import_sync_status", {
 export type AsanaImportSyncStatus = typeof asanaImportSyncStatus.$inferSelect;
 
 export const allmoxyProducts = pgTable("allmoxy_products", {
-  id: integer("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
   status: varchar("status", { length: 50 }),
   pricingProxyId: integer("pricing_proxy_id").references(() => proxyVariables.id),
   exportProxyId: integer("export_proxy_id").references(() => proxyVariables.id),
