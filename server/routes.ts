@@ -21,7 +21,7 @@ import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { getAgentMailSyncStatus, triggerManualAgentMailFetch, clearAgentMailProcessedEmails } from "./agentmailScheduler";
 import { testAgentMailConnection } from "./agentmail";
 import { getAsanaImportStatus, triggerManualAsanaImport } from "./asanaImportScheduler";
-import { buildAsanaTaskNotes, syncAsanaTaskNotes } from "./asanaNotes";
+import { buildAsanaTaskNotes, syncAsanaTaskNotes, syncAsanaOrderType } from "./asanaNotes";
 import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks } from "@shared/schema";
@@ -1151,6 +1151,7 @@ export async function registerRoutes(
 
       if (assignedFileIds.length > 0) {
         syncAsanaTaskNotes(projectId, 'pallet creation with file assignments');
+        syncAsanaOrderType(projectId).catch(err => console.error('[Asana] PF ORDER TYPE sync failed after pallet creation:', err.message));
       }
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1193,6 +1194,7 @@ export async function registerRoutes(
 
       if (fileAssignmentsChanged || size !== undefined || customSize !== undefined) {
         syncAsanaTaskNotes(pallet.projectId, 'pallet update');
+        syncAsanaOrderType(pallet.projectId).catch(err => console.error('[Asana] PF ORDER TYPE sync failed after pallet update:', err.message));
       }
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1326,6 +1328,7 @@ export async function registerRoutes(
       });
 
       syncAsanaTaskNotes(existingPallet.projectId, 'pallet final size change');
+      syncAsanaOrderType(existingPallet.projectId).catch(err => console.error('[Asana] PF ORDER TYPE sync failed after pallet final size change:', err.message));
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

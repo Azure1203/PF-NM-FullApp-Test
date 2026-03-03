@@ -1,5 +1,5 @@
 import { storage } from "./storage";
-import { syncAsanaTaskNotes } from "./asanaNotes";
+import { syncAsanaTaskNotes, syncAsanaOrderType } from "./asanaNotes";
 import { log } from "./index";
 
 const NOTES_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -34,6 +34,11 @@ async function syncAllProjectsAsanaNotes(): Promise<{ synced: number; failed: nu
       } catch (err: any) {
         log(`Failed to sync notes for project ${project.id} (${project.name}): ${err.message}`, 'asana-notes');
         failed++;
+      }
+      try {
+        await syncAsanaOrderType(project.id);
+      } catch (err: any) {
+        log(`Failed to sync PF ORDER TYPE for project ${project.id} (${project.name}): ${err.message}`, 'asana-notes');
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
