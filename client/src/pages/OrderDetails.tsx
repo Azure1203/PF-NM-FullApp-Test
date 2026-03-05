@@ -1774,15 +1774,19 @@ export default function OrderDetails() {
                           </div>
                         </div>
                         
+                        {/* Pallet Notes - always visible when present */}
+                        {pallet.notes && (
+                          <div className="flex items-start gap-2 px-4 py-3 border-t border-l-4 border-l-[#CDAB4A] bg-amber-50 dark:bg-amber-950/30">
+                            <StickyNote className="w-4 h-4 mt-0.5 shrink-0 text-[#CDAB4A]" />
+                            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                              <span className="font-bold">Notes: </span>{pallet.notes}
+                            </p>
+                          </div>
+                        )}
+
                         {/* Pallet Details - expanded */}
                         {isExpanded && (
                           <div className="p-4 border-t space-y-4">
-                            {pallet.notes && (
-                              <div className="text-sm bg-muted/20 rounded p-2">
-                                <span className="text-muted-foreground">Notes:</span> {pallet.notes}
-                              </div>
-                            )}
-                            
                             {assignedFiles.length === 0 ? (
                               <p className="text-sm text-muted-foreground italic">No files assigned to this pallet</p>
                             ) : (
