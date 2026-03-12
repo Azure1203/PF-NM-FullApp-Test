@@ -438,6 +438,9 @@ export const allmoxyProducts = pgTable("allmoxy_products", {
   status: varchar("status", { length: 50 }),
   pricingProxyId: integer("pricing_proxy_id").references(() => proxyVariables.id),
   exportProxyId: integer("export_proxy_id").references(() => proxyVariables.id),
+  skuPrefix: varchar("sku_prefix", { length: 100 }),
+  description: text("description"),
+  notes: text("notes"),
 });
 
 export const insertAllmoxyProductSchema = createInsertSchema(allmoxyProducts);
@@ -476,3 +479,38 @@ export const proxyVariables = pgTable("proxy_variables", {
 export const insertProxyVariableSchema = createInsertSchema(proxyVariables).omit({ id: true });
 export type ProxyVariable = typeof proxyVariables.$inferSelect;
 export type InsertProxyVariable = z.infer<typeof insertProxyVariableSchema>;
+
+export const productGridBindings = pgTable("product_grid_bindings", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => allmoxyProducts.id, { onDelete: 'cascade' }).notNull(),
+  gridId: integer("grid_id").references(() => attributeGrids.id, { onDelete: 'cascade' }).notNull(),
+  alias: varchar("alias", { length: 100 }).notNull(),
+  lookupColumn: varchar("lookup_column", { length: 100 }).notNull(),
+});
+
+export const insertProductGridBindingSchema = createInsertSchema(productGridBindings).omit({ id: true });
+export type ProductGridBinding = typeof productGridBindings.$inferSelect;
+export type InsertProductGridBinding = z.infer<typeof insertProductGridBindingSchema>;
+
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  fileId: integer("file_id").references(() => orderFiles.id, { onDelete: 'cascade' }).notNull(),
+  productId: integer("product_id").references(() => allmoxyProducts.id, { onDelete: 'set null' }),
+  sku: text("sku"),
+  description: text("description"),
+  width: real("width"),
+  height: real("height"),
+  depth: real("depth"),
+  quantity: integer("quantity").default(1),
+  unitPrice: real("unit_price").default(0),
+  totalPrice: real("total_price").default(0),
+  exportText: text("export_text"),
+  pricingError: text("pricing_error"),
+  rawRowData: jsonb("raw_row_data"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOrderItemSchema = createInsertSchema(orderItems).omit({ id: true, createdAt: true });
+export type OrderItem = typeof orderItems.$inferSelect;
+export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;

@@ -1,0 +1,76 @@
+We are building a new order management application. The current codebase already has a working database schema in shared/schema.ts with tables for allmoxy_products, attribute_grids, attribute_grid_rows, proxy_variables, color_grid, projects, order_files, and others.
+We need to make three schema additions. Do not change or remove anything that already exists. Only add the following:
+1. Add three new columns to the existing allmoxy_products table:
+
+sku_prefix — varchar(100), nullable. This is the SKU prefix string used to match CSV line items to this product (e.g. "34SHFF", "TK", "FILL"). A line item whose SKU starts with this prefix belongs to this product.
+description — text, nullable. A plain-language description of what this product is, for documentation purposes.
+notes — text, nullable. Internal notes about the product's pricing logic or special handling.
+
+2. Create a new product_grid_bindings table:
+This table links a product to the attribute grids it uses when evaluating its pricing formula. Each binding has:
+
+id — serial primary key
+product_id — integer, foreign key to allmoxy_products(id), ON DELETE CASCADE, not null
+grid_id — integer, foreign key to attribute_grids(id), ON DELETE CASCADE, not null
+alias — varchar(100), not null. The variable name used in the formula scope for this grid's data (e.g. "color", "mjdoors", "shelves"). When the pricing engine runs, the matched row from this grid will be available in the formula as alias.COLUMN_NAME.
+lookup_column — varchar(100), not null. The column name in the CSV order row that provides the lookup key for this grid (e.g. "Color", "MANU_CODE", "SKU").
+
+3. Create a new order_items table:
+This stores the per-line-item pricing results after an order CSV is processed. Each row represents one line item from the CSV:
+
+id — serial primary key
+project_id — integer, foreign key to projects(id), ON DELETE CASCADE, not null
+file_id — integer, foreign key to order_files(id), ON DELETE CASCADE, not null
+product_id — integer, foreign key to allmoxy_products(id), ON DELETE SET NULL, nullable. Null if no product matched.
+sku — text, nullable. The SKU/MANU_CODE from the CSV row.
+description — text, nullable. The item name/description from the CSV row.
+width — real, nullable.
+height — real, nullable.
+depth — real, nullable.
+quantity — integer, default 1.
+unit_price — real, default 0.
+total_price — real, default 0.
+export_text — text, nullable. The generated Cabinet Vision .ORD block for this item.
+pricing_error — text, nullable. If pricing failed, store the error message here so it can be displayed in the UI.
+raw_row_data — jsonb, nullable. The full original CSV row stored as JSON for reference and re-processing.
+created_at — timestamp, default now().
+
+Steps to complete:
+
+Update shared/schema.ts:
+
+Add the three new columns to the allmoxyProducts pgTable definition
+Add them to the upsertAllmoxyProduct conflict update set in server/storage.ts
+Add the new productGridBindings pgTable definition with proper foreign key references
+Add the new orderItems pgTable definition with proper foreign key references
+Export insertProductGridBindingSchema, ProductGridBinding, InsertProductGridBinding types
+Export insertOrderItemSchema, OrderItem, InsertOrderItem types
+
+
+Update server/storage.ts:
+
+Import the new tables and types
+Add these methods to the IStorage interface and DatabaseStorage class:
+
+getProductGridBindings(productId: number): Promise<ProductGridBinding[]>
+createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding>
+deleteProductGridBinding(id: number): Promise<boolean>
+replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]>
+createOrderItem(item: InsertOrderItem): Promise<OrderItem>
+getOrderItemsByProject(projectId: number): Promise<OrderItem[]>
+getOrderItemsByFile(fileId: number): Promise<OrderItem[]>
+deleteOrderItemsByFile(fileId: number): Promise<void>
+
+
+
+
+Generate and run the Drizzle migration:
+
+Run npx drizzle-kit generate to create the migration SQL file
+Run npx drizzle-kit migrate to apply it to the database
+Confirm the migration succeeded without errors
+
+
+Verify the app still starts and the existing pages (Products, Attribute Grids, Proxy Variables, Order Processing) still work correctly after the migration. Do not change any existing UI or API behavior — this prompt is schema-only.
+
+After completing, confirm: which migration file was created, that all three changes are present in shared/schema.ts, that the storage methods are implemented, and that the app is running without errors.

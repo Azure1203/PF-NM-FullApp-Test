@@ -47,6 +47,12 @@ import {
   proxyVariables,
   type ProxyVariable,
   type InsertProxyVariable,
+  productGridBindings,
+  type ProductGridBinding,
+  type InsertProductGridBinding,
+  orderItems,
+  type OrderItem,
+  type InsertOrderItem,
 } from "@shared/schema";
 import { eq, desc, and, or, inArray, sql, ilike } from "drizzle-orm";
 
@@ -157,6 +163,16 @@ export interface IStorage {
   upsertProxyVariable(variable: InsertProxyVariable): Promise<ProxyVariable>;
   deleteProxyVariable(id: number): Promise<boolean>;
   replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]>;
+
+  getProductGridBindings(productId: number): Promise<ProductGridBinding[]>;
+  createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding>;
+  deleteProductGridBinding(id: number): Promise<boolean>;
+  replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]>;
+
+  createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
+  getOrderItemsByProject(projectId: number): Promise<OrderItem[]>;
+  getOrderItemsByFile(fileId: number): Promise<OrderItem[]>;
+  deleteOrderItemsByFile(fileId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -698,6 +714,9 @@ export class DatabaseStorage implements IStorage {
           status: product.status,
           pricingProxyId: product.pricingProxyId,
           exportProxyId: product.exportProxyId,
+          skuPrefix: product.skuPrefix,
+          description: product.description,
+          notes: product.notes,
         },
       })
       .returning();
@@ -788,6 +807,46 @@ export class DatabaseStorage implements IStorage {
       const inserted = await tx.insert(proxyVariables).values(vars).returning();
       return inserted;
     });
+  }
+
+  async getProductGridBindings(productId: number): Promise<ProductGridBinding[]> {
+    return await db.select().from(productGridBindings).where(eq(productGridBindings.productId, productId));
+  }
+
+  async createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding> {
+    const [created] = await db.insert(productGridBindings).values(binding).returning();
+    return created;
+  }
+
+  async deleteProductGridBinding(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(productGridBindings).where(eq(productGridBindings.id, id)).returning();
+    return !!deleted;
+  }
+
+  async replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]> {
+    return await db.transaction(async (tx) => {
+      await tx.delete(productGridBindings).where(eq(productGridBindings.productId, productId));
+      if (bindings.length === 0) return [];
+      const inserted = await tx.insert(productGridBindings).values(bindings).returning();
+      return inserted;
+    });
+  }
+
+  async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {
+    const [created] = await db.insert(orderItems).values(item).returning();
+    return created;
+  }
+
+  async getOrderItemsByProject(projectId: number): Promise<OrderItem[]> {
+    return await db.select().from(orderItems).where(eq(orderItems.projectId, projectId)).orderBy(orderItems.id);
+  }
+
+  async getOrderItemsByFile(fileId: number): Promise<OrderItem[]> {
+    return await db.select().from(orderItems).where(eq(orderItems.fileId, fileId)).orderBy(orderItems.id);
+  }
+
+  async deleteOrderItemsByFile(fileId: number): Promise<void> {
+    await db.delete(orderItems).where(eq(orderItems.fileId, fileId));
   }
 }
 
