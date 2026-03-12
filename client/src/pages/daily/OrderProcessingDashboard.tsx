@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -22,6 +22,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { 
   Loader2, 
   Upload, 
   CheckCircle2, 
@@ -29,7 +35,10 @@ import {
   FileText, 
   ArrowRight,
   Download,
-  Share2
+  Share2,
+  Mail,
+  RefreshCw,
+  RotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,17 +61,71 @@ interface ProcessedOrder {
   items: ProcessedItem[];
 }
 
+function formatSyncTime(ts: string | null | undefined): string {
+  if (!ts) return "Never synced";
+  const d = new Date(ts);
+  return d.toLocaleString();
+}
+
 export default function OrderProcessingDashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [processedOrder, setProcessedOrder] = useState<ProcessedOrder | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  const { data: agentmailStatus } = useQuery<any>({
+    queryKey: ['/api/agentmail/status'],
+    refetchInterval: 60_000,
+  });
+
+  const { data: outlookStatus } = useQuery<any>({
+    queryKey: ['/api/outlook/status'],
+    refetchInterval: 60_000,
+  });
+
+  const agentmailFetchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/agentmail/fetch", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "AgentMail Fetch Complete",
+        description: `Processed: ${data.processed ?? 0}, Matched: ${data.matched ?? 0}`,
+      });
+    },
+    onError: (e: Error) => toast({ title: "AgentMail Fetch Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const agentmailClearMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/agentmail/clear", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "AgentMail Reset", description: `Cleared ${data.cleared ?? 0} processed records. Emails will be reprocessed on next fetch.` });
+    },
+    onError: (e: Error) => toast({ title: "Reset Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const outlookFetchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/outlook/fetch", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Outlook Fetch Complete",
+        description: `Processed: ${data.processed ?? 0}, Matched: ${data.matched ?? 0}`,
+      });
+    },
+    onError: (e: Error) => toast({ title: "Outlook Fetch Failed", description: e.message, variant: "destructive" }),
+  });
+
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("files", file);
-      // We use the existing project upload route which handles the pipeline
       const res = await fetch("/api/orders/upload", {
         method: "POST",
         body: formData,
@@ -101,7 +164,6 @@ export default function OrderProcessingDashboard() {
         description: "Order has been successfully synced to the production board." 
       });
       
-      // Trigger .ORD download
       if (processedOrder?.ordExport) {
         const blob = new Blob([processedOrder.ordExport], { type: "text/plain" });
         const url = window.URL.createObjectURL(blob);
@@ -138,7 +200,95 @@ export default function OrderProcessingDashboard() {
   });
 
   return (
+    <TooltipProvider>
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Email Sync Controls */}
+      <Card className="border border-slate-200">
+        <CardHeader className="py-3 px-4 border-b">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-muted-foreground uppercase tracking-wide">
+            <Mail className="h-4 w-4" />
+            Email Sync
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 flex flex-wrap items-center gap-4">
+          {/* AgentMail controls */}
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-2"
+                  disabled={agentmailFetchMutation.isPending}
+                  onClick={() => agentmailFetchMutation.mutate()}
+                  data-testid="button-fetch-agentmail"
+                >
+                  {agentmailFetchMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Fetch AgentMail
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Last sync: {formatSyncTime(agentmailStatus?.lastSuccessAt)}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  disabled={agentmailClearMutation.isPending}
+                  onClick={() => agentmailClearMutation.mutate()}
+                  data-testid="button-reset-agentmail"
+                >
+                  {agentmailClearMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3 w-3" />
+                  )}
+                  Reset
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Clear processed records so emails are reprocessed</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="h-6 w-px bg-slate-200" />
+
+          {/* Outlook controls (secondary) */}
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-muted-foreground"
+                  disabled={outlookFetchMutation.isPending}
+                  onClick={() => outlookFetchMutation.mutate()}
+                  data-testid="button-fetch-outlook"
+                >
+                  {outlookFetchMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Fetch Outlook
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Last sync: {formatSyncTime(outlookStatus?.lastSuccessAt)}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Step 1: Upload */}
       {!processedOrder && (
         <div className="max-w-3xl mx-auto py-12">
@@ -317,5 +467,6 @@ export default function OrderProcessingDashboard() {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }

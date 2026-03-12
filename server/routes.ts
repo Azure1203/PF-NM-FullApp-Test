@@ -1487,6 +1487,19 @@ export async function registerRoutes(
     }
   });
 
+  // Spec-required path alias for allmoxy job number
+  app.patch('/api/files/:fileId/allmoxy-job-number', isAuthenticated, async (req, res) => {
+    try {
+      const fileId = Number(req.params.fileId);
+      const { allmoxyJobNumber } = req.body;
+      if (typeof allmoxyJobNumber !== 'string') return res.status(400).json({ message: 'allmoxyJobNumber must be a string' });
+      const updated = await storage.updateOrderFile(fileId, { allmoxyJobNumber });
+      if (!updated) return res.status(404).json({ message: 'File not found' });
+      res.json(updated);
+      syncAsanaTaskNotes(updated.projectId, 'Allmoxy Job # change');
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // Update file Packaging Link (protected)
   app.patch('/api/files/:fileId/packaging-link', isAuthenticated, async (req, res) => {
     try {
@@ -3600,6 +3613,31 @@ export async function registerRoutes(
     }
   });
 
+  // Spec-required path aliases ─────────────────────────────────────────────────
+  app.get('/api/agentmail/status', isAuthenticated, async (_req, res) => {
+    try { res.json(await getAgentMailSyncStatus()); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+  app.post('/api/agentmail/fetch', isAuthenticated, async (_req, res) => {
+    try { res.json(await triggerManualAgentMailFetch()); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+  app.post('/api/agentmail/clear', isAuthenticated, async (_req, res) => {
+    try { const n = await clearAgentMailProcessedEmails(); res.json({ cleared: n }); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+  app.post('/api/agentmail/test', isAuthenticated, async (_req, res) => {
+    try { res.json(await testAgentMailConnection()); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+  app.get('/api/outlook/status', isAuthenticated, async (_req, res) => {
+    try { res.json(await getSyncStatus()); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+  app.post('/api/outlook/fetch', isAuthenticated, async (_req, res) => {
+    try { res.json(await triggerManualFetch()); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+  app.post('/api/outlook/test', isAuthenticated, async (_req, res) => {
+    try { res.json(await testOutlookConnection()); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+  app.post('/api/outlook/list-folders', isAuthenticated, async (_req, res) => {
+    try { res.json({ folders: await listMailFolders() }); } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
   // ─── End AgentMail routes ────────────────────────────────────────────────────
 
   // Admin endpoint to backfill stored calculated values for existing files

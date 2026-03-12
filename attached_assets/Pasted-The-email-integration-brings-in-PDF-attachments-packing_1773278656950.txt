@@ -1,0 +1,185 @@
+The email integration brings in PDF attachments (packing slips, cut-to-size sheets, dovetail specs, 5-piece door specs) and hardware CSVs from Allmoxy automatically. The production app has two email systems: AgentMail (primary, currently active) and Outlook (legacy, kept as fallback). Both need to be ported into the new app.
+This prompt is primarily a port — copy the logic from the production app exactly. Do not redesign or simplify the attachment matching or storage logic.
+
+Schema additions
+In shared/schema.ts, verify these columns exist on the orderFiles table. Add any that are missing:
+typescriptallmoxyJobNumber: text("allmoxy_job_number"),
+cutToFilePdfPath: text("cut_to_file_pdf_path"),
+eliasDovetailPdfPath: text("elias_dovetail_pdf_path"),
+netley5PiecePdfPath: text("netley_5_piece_pdf_path"),
+netleyPackingSlipPdfPath: text("netley_packing_slip_pdf_path"),
+hardwareCsvPath: text("hardware_csv_path"),
+hardwareBoStatus: text("hardware_bo_status"),
+packagingLink: text("packaging_link"),
+Also verify these tables exist (added in Prompt 8's schema section):
+
+processedOutlookEmails — tracks messageId, subject, status ('processed'|'failed'|'skipped'), matchedFileId
+agentmailSyncStatus — tracks lastSyncAt, lastSuccessAt, lastError, emailsProcessed, emailsMatched
+outlookSyncStatus — same shape as agentmailSyncStatus
+
+If any are missing, add them and run npm run db:push.
+
+Part 1 — server/agentmail.ts
+This file already exists in the production app. Port it exactly. It provides:
+
+listAgentMailMessages() — calls GET /v0/inboxes/{encoded_inbox}/messages?limit=100, returns array of AgentMailMessage (id, subject, timestamp, from, attachments metadata)
+getAgentMailMessage(messageId) — calls GET /v0/inboxes/{encoded_inbox}/messages/{messageId}, returns full message including attachment download URLs
+getAgentMailAttachment(messageId, attachmentId) — calls GET .../attachments/{attachmentId}, returns attachment detail with download_url
+downloadAgentMailAttachment(downloadUrl) — fetches the download URL directly, returns Buffer
+testAgentMailConnection() — tries to list messages, returns { ok: boolean, error?: string }
+
+Constants:
+typescriptconst AGENTMAIL_BASE_URL = 'https://api.agentmail.to/v0';
+const AGENTMAIL_INBOX_ID = 'allmoxyreplit@agentmail.to';
+Auth: Authorization: Bearer {process.env.AGENTMAIL_API_KEY} header on all requests.
+
+Part 2 — server/agentmailScheduler.ts
+Port from production exactly. Key behaviour:
+PDF type identification — identifyPdfType(filename) matches filename against these patterns (case-insensitive):
+typescriptconst PDF_TYPES = {
+  cutToFile:        { patterns: ['Cut To File', 'Cut to File', 'Cut To Size', 'Cut to Size'],               dbColumn: 'cutToFilePdfPath',          suffix: 'Cut To File' },
+  eliasDovetail:    { patterns: ['Elias PF Dovetail Drawers', 'Elias Dovetail', 'Dovetail Drawers'],        dbColumn: 'eliasDovetailPdfPath',       suffix: 'Elias PF Dovetail Drawers' },
+  netley5Piece:     { patterns: ['Netley 5 Piece Shaker Door', '5 Piece Shaker Door', 'Netley 5 Piece'],    dbColumn: 'netley5PiecePdfPath',        suffix: 'Netley 5 Piece Shaker Door' },
+  netleyPackingSlip:{ patterns: ['Netley Packing Slip', 'Netley_Packing_Slip'],                             dbColumn: 'netleyPackingSlipPdfPath',   suffix: 'Netley Packing Slip' },
+}
+Message processing loop:
+
+Call listAgentMailMessages() to get all messages
+Build a allFiles cache from db.select().from(orderFiles) — each entry holds fileId, filename, allmoxyJobNumber (normalized), and hasPdfs flags for each PDF type
+For each message's attachments:
+
+Skip non-PDF and non-CSV files
+Build a deduplication key: agentmail:{messageId}:{attachmentId}
+Skip if key already in processedOutlookEmails
+Identify PDF type using identifyPdfType; mark as 'skipped' if unknown
+Extract order number from subject or filename using /(\d{3,6})/
+Match against allFiles using normalizeOrderNumber (strips leading zeros): find a file whose normalized allmoxyJobNumber matches the extracted order number AND whose hasPdfs[pdfType] is false
+If matched:
+
+Call getAgentMailAttachment(messageId, attachmentId) to get download URL
+Call downloadAgentMailAttachment(downloadUrl) to get Buffer
+Build storage path: .private/packing-slips/{sanitized project+job filename}.pdf
+Upload via objectStorageService.uploadBuffer(buffer, path, 'application/pdf')
+Update orderFiles record: set the dbColumn to the storage path
+Mark as 'processed' in processedOutlookEmails
+Set hasPdfs[pdfType] = true in cache to prevent duplicate processing within same run
+
+
+If NOT matched: log "No match yet for order {n}" — do NOT mark as processed (will retry on next poll)
+On error: mark as 'failed', log the error
+
+
+
+Deduplication key format must use agentmail: prefix to distinguish from Outlook-processed records that share the same processedOutlookEmails table.
+Exported functions:
+
+startAgentMailScheduler() — starts 30-minute poll interval, runs one pass immediately
+stopAgentMailScheduler() — clears interval
+triggerManualAgentMailFetch() — runs one pass immediately, returns { processed, matched }
+getAgentMailSyncStatus() — returns latest agentmailSyncStatus row
+clearAgentMailProcessedEmails() — deletes all rows from processedOutlookEmails where messageId LIKE 'agentmail:%'
+
+
+Part 3 — server/outlookScheduler.ts
+Port from production exactly. This is the legacy email integration using Microsoft Graph API. It uses the same PDF_TYPES object and the same matching/storage logic as AgentMail but sources emails differently.
+Key differences from AgentMail:
+
+Uses searchNetleyEmails() from server/outlook.ts to fetch emails from the "Perfect Fit Allmoxy Emails" Outlook folder
+Deduplication key is {emailId}:{attachmentId} (no agentmail: prefix)
+Polls every 30 minutes via its own pollIntervalId
+
+Exported functions:
+
+startOutlookScheduler() — starts polling
+stopOutlookScheduler() — stops polling
+triggerManualFetch() — manual trigger, returns { processed, matched }
+getSyncStatus() — returns latest outlookSyncStatus row
+
+The Outlook scheduler is secondary to AgentMail. If AgentMail is working, Outlook acts as a fallback. Both can run simultaneously — the hasPdfs check prevents the same PDF type from being saved twice for the same file.
+
+Part 4 — server/outlook.ts
+Port from production exactly. Provides:
+
+testOutlookConnection() — tests the Graph API token
+searchNetleyEmails() — searches the "Perfect Fit Allmoxy Emails" folder, returns emails with attachment metadata
+downloadEmailAttachment(emailId, attachmentId) — downloads attachment content as Buffer
+listMailFolders() — lists available mail folders (diagnostic use)
+
+Uses Replit Connectors OAuth to get a Microsoft Graph access token. The token fetch pattern is the same as the Google Sheets integration — use REPLIT_CONNECTORS_HOSTNAME and REPL_IDENTITY / WEB_REPL_RENEWAL headers.
+
+Part 5 — Start schedulers from server/index.ts
+After the server starts, import and start both schedulers:
+typescriptimport { startAgentMailScheduler } from './agentmailScheduler';
+import { startOutlookScheduler } from './outlookScheduler';
+
+// After server starts:
+startAgentMailScheduler();
+startOutlookScheduler();
+Wrap each in a try-catch so a missing API key doesn't crash the server:
+typescripttry {
+  startAgentMailScheduler();
+} catch (e: any) {
+  console.error('[AgentMail] Failed to start scheduler:', e.message);
+}
+try {
+  startOutlookScheduler();
+} catch (e: any) {
+  console.error('[Outlook] Failed to start scheduler:', e.message);
+}
+```
+
+---
+
+### Part 6 — API routes in `server/routes.ts`
+
+Add or verify these routes:
+```
+GET  /api/agentmail/status          → getAgentMailSyncStatus()
+POST /api/agentmail/fetch           → triggerManualAgentMailFetch()
+POST /api/agentmail/clear           → clearAgentMailProcessedEmails()
+POST /api/agentmail/test            → testAgentMailConnection()
+
+GET  /api/outlook/status            → getSyncStatus()
+POST /api/outlook/fetch             → triggerManualFetch()
+POST /api/outlook/test              → testOutlookConnection()
+POST /api/outlook/list-folders      → listMailFolders()
+```
+
+All require `isAuthenticated`.
+
+Also add a route to update the Allmoxy job number on an order file (needed by the frontend to link files to emails):
+```
+PATCH /api/files/:fileId/allmoxy-job-number
+Body: { allmoxyJobNumber: string }
+Updates orderFiles.allmoxyJobNumber where id = fileId. Requires isAuthenticated.
+
+Part 7 — Frontend: Email sync controls on Order Processing Dashboard
+In client/src/pages/daily/OrderProcessingDashboard.tsx, add a row of email sync controls. The production app shows these as icon buttons in the dashboard header area:
+AgentMail controls:
+
+"Fetch AgentMail" button — calls POST /api/agentmail/fetch, shows spinner while pending, shows toast with { processed, matched } result
+Tooltip showing last sync time from GET /api/agentmail/status
+"Reset AgentMail" icon button (circular arrow) — calls POST /api/agentmail/clear, shows confirmation toast
+
+Outlook controls (smaller, secondary):
+
+"Fetch Outlook" button — calls POST /api/outlook/fetch
+Tooltip showing last sync time
+
+Place these in a small "Email Sync" card or row near the top of the dashboard, below the drag-drop zone.
+
+Part 8 — Frontend: Allmoxy Job Number on Order Detail
+In client/src/pages/OrderDetails.tsx, inside the per-file section (where each file's details are shown), add an editable "Allmoxy Job #" field:
+
+An <Input> showing file.allmoxyJobNumber || ''
+An "Update" button that calls PATCH /api/files/:fileId/allmoxy-job-number
+On success, invalidate the project query and show a toast: "Job number updated"
+Helper text: "This number links the file to email attachments. Enter the 3–6 digit Allmoxy job number."
+
+
+After completing, confirm:
+
+App starts with both scheduler log lines appearing
+POST /api/agentmail/fetch can be called and returns { processed, matched } in the response
+The dashboard shows the Fetch AgentMail button
+The Order Detail page shows the Allmoxy Job Number field per file
