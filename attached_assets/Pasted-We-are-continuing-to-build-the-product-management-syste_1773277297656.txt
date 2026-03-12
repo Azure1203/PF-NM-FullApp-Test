@@ -1,0 +1,61 @@
+We are continuing to build the product management system. The database already has the new columns (sku_prefix, description, notes on allmoxy_products) and the new product_grid_bindings table from the previous migration. Now we need to wire those into the UI and API.
+This prompt has three parts: update the API, update the product form, and add the grid bindings editor.
+
+Part 1 — Update the API
+In server/routes.ts, update the existing POST /api/admin/allmoxy-products route to also accept and save skuPrefix, description, and notes from the request body. Pass them to storage.upsertAllmoxyProduct(). Also update the upsertAllmoxyProduct conflict update set in server/storage.ts to include these three new fields so they actually get saved on update.
+Add these new routes in server/routes.ts after the existing allmoxy-products routes:
+GET  /api/admin/allmoxy-products/:id/grid-bindings
+  → calls storage.getProductGridBindings(id)
+  → returns array of ProductGridBinding
+
+POST /api/admin/allmoxy-products/:id/grid-bindings
+  → body: { bindings: Array<{ gridId: number, alias: string, lookupColumn: string }> }
+  → calls storage.replaceProductGridBindings(id, bindings)
+  → returns the new array of ProductGridBinding
+Both routes require isAuthenticated.
+
+Part 2 — Update the Product Form
+In client/src/pages/admin/AllmoxyProductManager.tsx, make the following changes:
+Update the Zod schema to add:
+
+skuPrefix: z.string().nullable() — optional, can be empty string or null
+description: z.string().nullable()
+notes: z.string().nullable()
+
+Update form.reset() calls in handleEdit and handleNew to include the three new fields. When editing, populate from the product data. When creating new, default to empty string or null.
+Update the saveMutation to pass skuPrefix, description, and notes in the request body.
+In the form JSX, inside the existing "Basic Information" section, add these fields:
+
+SKU Prefix input — full width below the existing Name/Status row. Add helper text beneath it: "The prefix used to match CSV line items to this product. E.g. if a line item SKU starts with '34SHFF', enter '34SHFF' here. Leave blank if this product is not matched by SKU."
+Description textarea (3 rows) — below SKU Prefix. Label: "Description". Placeholder: "Plain-language description of this product."
+Notes textarea (3 rows) — below Description. Label: "Internal Notes". Placeholder: "Notes about pricing logic, special handling, edge cases, etc."
+
+Use <Textarea> from @/components/ui/textarea for the two textarea fields.
+
+Part 3 — Grid Bindings Editor
+Still in AllmoxyProductManager.tsx, add a new "Grid Bindings" section below the existing "Logic Binding" section in the right panel. This section only renders when editingId is not null (i.e. a product has been saved and has an ID).
+State and data loading:
+Add a local state variable: bindings: Array<{ gridId: number | null, alias: string, lookupColumn: string }> initialized as [].
+When editingId changes to a non-null value, fetch GET /api/admin/allmoxy-products/:id/grid-bindings using TanStack Query with query key ["/api/admin/allmoxy-products", editingId, "grid-bindings"]. When the data loads, set the local bindings state to the fetched array (mapping to { gridId, alias, lookupColumn }).
+Saving bindings:
+Add a separate saveBindingsMutation that calls POST /api/admin/allmoxy-products/:id/grid-bindings with the current bindings array. Add a "Save Bindings" button that triggers this mutation. On success, show a toast "Grid bindings saved" and invalidate the bindings query. This is intentionally separate from the main product save so users can update bindings independently.
+The bindings UI:
+Render the current bindings array as a list of rows. Each row has:
+
+Grid selector — a <Select> that lists all available attribute grids (fetched from /api/admin/attribute-grids, already used elsewhere). Shows the grid name. On change, update that binding's gridId in state.
+Alias input — a text <Input>. Label: "Alias". Placeholder: color. Helper text beneath: "Variable name in formula (e.g. color.SQFT_PRICE)". On change, update that binding's alias in state. Auto-populate with the grid's name lowercased when a grid is first selected (if alias is still empty).
+Lookup Column input — a text <Input>. Label: "CSV Column". Placeholder: Color. Helper text beneath: "Column in the order CSV used as the lookup key for this grid". On change, update that binding's lookupColumn in state.
+Remove button — a small <Button variant="ghost" size="icon"> with a Trash2 icon. Removes that row from the bindings state.
+
+Below the list, an "+ Add Grid Binding" button (outline style) that appends a blank row { gridId: null, alias: "", lookupColumn: "" } to the bindings state.
+Below that, the "Save Bindings" button (primary, full width).
+Visual treatment: wrap the entire Grid Bindings section in a distinct card or bordered box with a subtle background, clearly separated from the Logic Binding dropdowns above it. Use the same section header style as "Logic Binding" — small uppercase label with a bottom border.
+
+Important notes
+
+Do not remove or change any existing functionality — the product list, the Logic Binding dropdowns for pricing/export proxy variables, the delete flow, and the bulk import modal must all continue to work exactly as before.
+The grid bindings are saved separately from the main product save. This is intentional — a user can update the product name or formula binding and save, then separately manage which grids are bound.
+If editingId is null (new product not yet saved), show a placeholder message in the Grid Bindings section: "Save the product first to manage grid bindings."
+All three new text fields (skuPrefix, description, notes) should be included in the upsertAllmoxyProduct API handler and stored correctly.
+
+After completing, confirm the Products admin page loads correctly, the new fields appear in the form, and the grid bindings section renders with add/remove/save functionality working end to end.

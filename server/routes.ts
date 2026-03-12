@@ -263,7 +263,7 @@ export async function registerRoutes(
 
   app.post('/api/admin/allmoxy-products', isAuthenticated, async (req, res) => {
     try {
-      const { name, status, pricingProxyId, exportProxyId } = req.body;
+      const { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes } = req.body;
       if (!name) {
         return res.status(400).json({ message: 'name is required' });
       }
@@ -272,6 +272,9 @@ export async function registerRoutes(
         status: status ?? 'active',
         pricingProxyId: pricingProxyId ?? null,
         exportProxyId: exportProxyId ?? null,
+        skuPrefix: skuPrefix ?? null,
+        description: description ?? null,
+        notes: notes ?? null,
       });
       res.json(product);
     } catch (e: any) {
@@ -286,6 +289,30 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Product not found' });
       }
       res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get('/api/admin/allmoxy-products/:id/grid-bindings', isAuthenticated, async (req, res) => {
+    try {
+      const bindings = await storage.getProductGridBindings(Number(req.params.id));
+      res.json(bindings);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/allmoxy-products/:id/grid-bindings', isAuthenticated, async (req, res) => {
+    try {
+      const productId = Number(req.params.id);
+      const { bindings } = req.body as { bindings: Array<{ gridId: number; alias: string; lookupColumn: string }> };
+      if (!Array.isArray(bindings)) {
+        return res.status(400).json({ message: 'bindings must be an array' });
+      }
+      const mapped = bindings.map(b => ({ productId, gridId: b.gridId, alias: b.alias, lookupColumn: b.lookupColumn }));
+      const result = await storage.replaceProductGridBindings(productId, mapped);
+      res.json(result);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

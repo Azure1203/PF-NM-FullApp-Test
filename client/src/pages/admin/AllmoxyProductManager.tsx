@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -40,8 +41,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, FileText, X } from "lucide-react";
-import type { AllmoxyProduct, ProxyVariable } from "@shared/schema";
+import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, FileText, Link2 } from "lucide-react";
+import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
@@ -57,9 +58,18 @@ const productSchema = z.object({
   status: z.enum(["active", "inactive"]),
   pricingProxyId: z.number().nullable(),
   exportProxyId: z.number().nullable(),
+  skuPrefix: z.string().nullable(),
+  description: z.string().nullable(),
+  notes: z.string().nullable(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
+
+type LocalBinding = {
+  gridId: number | null;
+  alias: string;
+  lookupColumn: string;
+};
 
 export default function AllmoxyProductManager() {
   const { toast } = useToast();
@@ -67,6 +77,7 @@ export default function AllmoxyProductManager() {
   const [search, setSearch] = useState("");
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [bindings, setBindings] = useState<LocalBinding[]>([]);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -75,6 +86,9 @@ export default function AllmoxyProductManager() {
       status: "active",
       pricingProxyId: null,
       exportProxyId: null,
+      skuPrefix: "",
+      description: "",
+      notes: "",
     },
   });
 
@@ -86,9 +100,33 @@ export default function AllmoxyProductManager() {
     queryKey: ["/api/admin/proxy-variables"],
   });
 
+  const { data: attributeGrids } = useQuery<AttributeGrid[]>({
+    queryKey: ["/api/admin/attribute-grids"],
+  });
+
+  const { data: fetchedBindings } = useQuery<ProductGridBinding[]>({
+    queryKey: ["/api/admin/allmoxy-products", editingId, "grid-bindings"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/allmoxy-products/${editingId}/grid-bindings`);
+      if (!res.ok) throw new Error("Failed to fetch bindings");
+      return res.json();
+    },
+    enabled: editingId !== null,
+  });
+
+  useEffect(() => {
+    if (fetchedBindings) {
+      setBindings(fetchedBindings.map(b => ({
+        gridId: b.gridId,
+        alias: b.alias,
+        lookupColumn: b.lookupColumn,
+      })));
+    }
+  }, [fetchedBindings]);
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    return products.filter(p => 
+    return products.filter(p =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
   }, [products, search]);
@@ -121,6 +159,23 @@ export default function AllmoxyProductManager() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
       toast({ title: "Deleted", description: "Product removed" });
       handleNew();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const saveBindingsMutation = useMutation({
+    mutationFn: async () => {
+      const validBindings = bindings.filter(b => b.gridId !== null);
+      const res = await apiRequest("POST", `/api/admin/allmoxy-products/${editingId}/grid-bindings`, {
+        bindings: validBindings,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products", editingId, "grid-bindings"] });
+      toast({ title: "Grid bindings saved" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -163,27 +218,47 @@ export default function AllmoxyProductManager() {
 
   const handleEdit = (product: AllmoxyProduct) => {
     setEditingId(product.id);
+    setBindings([]);
     form.reset({
       id: product.id,
       name: product.name,
       status: (product.status as "active" | "inactive") ?? "active",
       pricingProxyId: product.pricingProxyId ?? null,
       exportProxyId: product.exportProxyId ?? null,
+      skuPrefix: product.skuPrefix ?? "",
+      description: product.description ?? "",
+      notes: product.notes ?? "",
     });
   };
 
   const handleNew = () => {
     setEditingId(null);
+    setBindings([]);
     form.reset({
       name: "",
       status: "active",
       pricingProxyId: null,
       exportProxyId: null,
+      skuPrefix: "",
+      description: "",
+      notes: "",
     });
   };
 
   const onSubmit = (values: ProductFormValues) => {
     saveMutation.mutate(values);
+  };
+
+  const updateBinding = (index: number, patch: Partial<LocalBinding>) => {
+    setBindings(prev => prev.map((b, i) => i === index ? { ...b, ...patch } : b));
+  };
+
+  const removeBinding = (index: number) => {
+    setBindings(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addBinding = () => {
+    setBindings(prev => [...prev, { gridId: null, alias: "", lookupColumn: "" }]);
   };
 
   return (
@@ -230,8 +305,8 @@ export default function AllmoxyProductManager() {
                             <p className="text-sm text-muted-foreground">Click or drag Allmoxy CSV here</p>
                           )}
                         </div>
-                        <Button 
-                          className="w-full" 
+                        <Button
+                          className="w-full"
                           disabled={!importFile || importMutation.isPending}
                           onClick={() => importFile && importMutation.mutate(importFile)}
                         >
@@ -274,7 +349,7 @@ export default function AllmoxyProductManager() {
                         <span className="text-sm font-medium truncate">{p.name}</span>
                         <span className={cn(
                           "text-[10px] uppercase px-1.5 py-0.5 rounded-full font-bold",
-                          p.status === "active" 
+                          p.status === "active"
                             ? (editingId === p.id ? "bg-primary-foreground/20 text-white" : "bg-green-100 text-green-700")
                             : (editingId === p.id ? "bg-primary-foreground/10 text-white/70" : "bg-slate-100 text-slate-500")
                         )}>
@@ -299,107 +374,271 @@ export default function AllmoxyProductManager() {
           <div className="h-full flex flex-col bg-background">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="h-full flex flex-col">
-                <div className="p-6 space-y-8 flex-1 overflow-y-auto">
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">Basic Information</h3>
-                    <div className="grid grid-cols-2 gap-6">
+                <ScrollArea className="flex-1">
+                  <div className="p-6 space-y-8">
+                    {/* Basic Information */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">Basic Information</h3>
+                      <div className="grid grid-cols-2 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Product Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="e.g. Slab Door" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Status</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="active">Active</SelectItem>
+                                  <SelectItem value="inactive">Discontinued</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
                       <FormField
                         control={form.control}
-                        name="name"
+                        name="skuPrefix"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Product Name</FormLabel>
+                            <FormLabel>SKU Prefix</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="e.g. Slab Door" />
+                              <Input {...field} value={field.value ?? ""} placeholder="e.g. 34SHFF" />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground">
+                              The prefix used to match CSV line items to this product. E.g. if a line item SKU starts with &quot;34SHFF&quot;, enter &quot;34SHFF&quot; here. Leave blank if this product is not matched by SKU.
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                value={field.value ?? ""}
+                                rows={3}
+                                placeholder="Plain-language description of this product."
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
                       <FormField
                         control={form.control}
-                        name="status"
+                        name="notes"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Status</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="active">Active</SelectItem>
-                                <SelectItem value="inactive">Discontinued</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormLabel>Internal Notes</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                value={field.value ?? ""}
+                                rows={3}
+                                placeholder="Notes about pricing logic, special handling, edge cases, etc."
+                              />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                  </div>
 
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">Logic Binding</h3>
-                    <div className="grid grid-cols-2 gap-6">
-                      <FormField
-                        control={form.control}
-                        name="pricingProxyId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Pricing Proxy Variable</FormLabel>
-                            <Select
-                              onValueChange={(val) => field.onChange(val === "none" ? null : Number(val))}
-                              value={field.value != null ? String(field.value) : "none"}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="None" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">None (Zero Price)</SelectItem>
-                                {pricingProxies.map((v) => (
-                                  <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="exportProxyId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Export Proxy Variable</FormLabel>
-                            <Select
-                              onValueChange={(val) => field.onChange(val === "none" ? null : Number(val))}
-                              value={field.value != null ? String(field.value) : "none"}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="None" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="none">None (Skip Export)</SelectItem>
-                                {exportProxies.map((v) => (
-                                  <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                    {/* Logic Binding */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">Logic Binding</h3>
+                      <div className="grid grid-cols-2 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="pricingProxyId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Pricing Proxy Variable</FormLabel>
+                              <Select
+                                onValueChange={(val) => field.onChange(val === "none" ? null : Number(val))}
+                                value={field.value != null ? String(field.value) : "none"}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="None" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">None (Zero Price)</SelectItem>
+                                  {pricingProxies.map((v) => (
+                                    <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="exportProxyId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Export Proxy Variable</FormLabel>
+                              <Select
+                                onValueChange={(val) => field.onChange(val === "none" ? null : Number(val))}
+                                value={field.value != null ? String(field.value) : "none"}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="None" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">None (Skip Export)</SelectItem>
+                                  {exportProxies.map((v) => (
+                                    <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Grid Bindings */}
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-2 flex items-center gap-2">
+                        <Link2 className="h-3.5 w-3.5" />
+                        Grid Bindings
+                      </h3>
+
+                      {editingId === null ? (
+                        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground bg-muted/20">
+                          Save the product first to manage grid bindings.
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                          {bindings.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-2">No grid bindings yet. Add one below.</p>
+                          )}
+
+                          {bindings.map((binding, idx) => (
+                            <div key={idx} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-start p-3 rounded-md border bg-background">
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">Grid</p>
+                                <Select
+                                  value={binding.gridId !== null ? String(binding.gridId) : "none"}
+                                  onValueChange={(val) => {
+                                    const gridId = val === "none" ? null : Number(val);
+                                    const grid = attributeGrids?.find(g => g.id === gridId);
+                                    const autoAlias = (!binding.alias && grid) ? grid.name.toLowerCase().replace(/\s+/g, "_") : binding.alias;
+                                    updateBinding(idx, { gridId, alias: autoAlias });
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue placeholder="Select grid…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">— select —</SelectItem>
+                                    {(attributeGrids ?? []).map(g => (
+                                      <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">Alias</p>
+                                <Input
+                                  className="h-8 text-sm"
+                                  placeholder="color"
+                                  value={binding.alias}
+                                  onChange={(e) => updateBinding(idx, { alias: e.target.value })}
+                                />
+                                <p className="text-[10px] text-muted-foreground leading-tight">Variable name in formula (e.g. color.SQFT_PRICE)</p>
+                              </div>
+
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">CSV Column</p>
+                                <Input
+                                  className="h-8 text-sm"
+                                  placeholder="Color"
+                                  value={binding.lookupColumn}
+                                  onChange={(e) => updateBinding(idx, { lookupColumn: e.target.value })}
+                                />
+                                <p className="text-[10px] text-muted-foreground leading-tight">Column in the order CSV used as the lookup key</p>
+                              </div>
+
+                              <div className="pt-5">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => removeBinding(idx)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={addBinding}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Grid Binding
+                          </Button>
+
+                          <Button
+                            type="button"
+                            className="w-full"
+                            onClick={() => saveBindingsMutation.mutate()}
+                            disabled={saveBindingsMutation.isPending}
+                          >
+                            {saveBindingsMutation.isPending
+                              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              : <Save className="mr-2 h-4 w-4" />
+                            }
+                            Save Bindings
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                </ScrollArea>
 
-                <div className="p-4 border-t flex justify-between bg-muted/30">
+                <div className="p-4 border-t flex justify-between bg-muted/30 shrink-0">
                   <Button type="submit" disabled={saveMutation.isPending}>
                     {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     {editingId ? "Save Product" : "Create Product"}
