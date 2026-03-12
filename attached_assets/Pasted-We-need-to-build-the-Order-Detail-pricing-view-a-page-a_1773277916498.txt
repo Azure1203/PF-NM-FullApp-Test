@@ -1,0 +1,118 @@
+We need to build the Order Detail pricing view — a page accessible from the Order Processing Dashboard that shows a saved order's line items with per-item prices, matched products, error flags, totals, and a .ORD download button. This is the primary place to review and validate a processed order.
+This prompt adds two backend API endpoints and updates one existing frontend page (OrderDetails.tsx). It does NOT replace the existing OrderDetails.tsx — it adds a new collapsible "Pricing & Export" section to the existing page.
+
+Part 1 — Backend API endpoints
+Add these two routes to server/routes.ts:
+Route 1 — Get order items for a project:
+GET /api/orders/:id/items
+This should:
+
+Call storage.getOrderItemsByProject(projectId) where projectId = parseInt(req.params.id)
+Also load all allmoxy_products and build a name lookup map so each item can include productName
+Return an array of items, each shaped as:
+
+typescript{
+  id: number,
+  fileId: number,
+  productId: number | null,
+  productName: string | null,   // joined from allmoxy_products
+  sku: string,
+  description: string | null,
+  width: number | null,
+  height: number | null,
+  depth: number | null,
+  quantity: number,
+  unitPrice: number,
+  totalPrice: number,
+  exportText: string | null,
+  pricingError: string | null,
+}
+```
+Require `isAuthenticated`.
+
+**Route 2 — Re-run pricing for a project:**
+```
+POST /api/orders/:id/reprice
+This should run the same product-driven pricing pipeline from Prompt 3 against the already-saved order files. Specifically:
+
+Load the project's order files from storage
+For each file, re-parse rawContent using parseSync with columns: true
+Delete existing order items for that file: storage.deleteOrderItemsByFile(file.id)
+Run the same matching + pricing + saving loop from the upload handler (reuse the same matchProductToSku helper, productBindingsMap, etc.)
+Return the new items array in the same shape as the GET endpoint above, plus { totalPrice: number, repriced: true }
+
+Require isAuthenticated.
+
+Part 2 — Frontend: Add Pricing section to OrderDetails.tsx
+The existing OrderDetails.tsx page already has multiple collapsible sections (Project Details, Order Status, etc.). Add a new collapsible section called "Pricing & Export" that appears near the top of the page, right after the project header card and before the existing sections.
+Fetch the order items:
+Add a TanStack Query fetch inside OrderDetails:
+typescriptconst { data: orderItems, isLoading: itemsLoading, refetch: refetchItems } = useQuery({
+  queryKey: ['/api/orders', id, 'items'],
+  enabled: !!id && id > 0,
+});
+The Pricing & Export section UI:
+The section should have a card with a header row containing:
+
+Section title: "Pricing & Export" with a DollarSign icon
+Total price badge on the right: $X,XXX.XX total (sum of all totalPrice values, formatted as currency)
+Two buttons: "Re-run Pricing" (with a RefreshCw icon) and "Download .ORD" (with a Download icon)
+
+Re-run Pricing button:
+
+On click, calls POST /api/orders/:id/reprice
+Shows a spinner while loading
+On success: invalidates the items query, shows a toast: "Pricing updated — X items repriced"
+On error: shows an error toast
+
+Download .ORD button:
+
+On click, collects all exportText values from the current orderItems where exportText is not null
+Joins them with "\n" and triggers a browser download of the result as {projectName}.ord
+Use this download helper pattern:
+
+typescriptconst blob = new Blob([ordContent], { type: 'text/plain' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = `${projectName}.ord`;
+a.click();
+URL.revokeObjectURL(url);
+
+If there are no items with export text, show a toast warning: "No export text available — run pricing first or check product export formulas"
+
+The items table:
+Below the header row, render a table with these columns:
+ColumnSourceSKUitem.skuProductitem.productName or a red badge "No Match" if item.productId === nullDescriptionitem.descriptionW × H{item.width} × {item.height} in mmQtyitem.quantityUnit Price$X.XXTotal$X.XXStatusGreen ✓ badge if no error, red "Error" badge if pricingError is set
+
+Clicking the "Error" badge expands a row below it showing the pricingError message in a <code> block
+Rows with pricingError should have a subtle red background tint (bg-red-50)
+Rows with productId === null should have a subtle amber background tint (bg-amber-50)
+A summary row at the bottom of the table (sticky or separated by a divider) shows: total item count, count of errors, count of unmatched SKUs, and the grand total price
+The table should be inside a ScrollArea with a max height of 500px
+
+Loading states:
+
+While itemsLoading is true, show a skeleton table (3 rows of skeleton cells)
+If orderItems is an empty array, show: "No pricing data yet. Click Re-run Pricing to process this order."
+
+
+Part 3 — Link from Order Processing Dashboard
+In client/src/pages/daily/OrderProcessingDashboard.tsx, after a successful upload, the current UI shows the processed order's items table. Add a "View Order Detail" link button at the top of the results card header that navigates to /orders/{processedOrder.id}. Use useLocation from wouter to navigate:
+typescriptimport { useLocation } from "wouter";
+// ...
+const [, setLocation] = useLocation();
+// In the results card header:
+<Button variant="outline" size="sm" onClick={() => setLocation(`/orders/${processedOrder.id}`)}>
+  View Order Detail
+</Button>
+
+Important notes
+
+The existing OrderDetails.tsx page already has a lot of content — pallets, status badges, project details form, etc. The new Pricing & Export section should slot in cleanly without displacing any existing functionality.
+The getOrderItemsByProject storage method was added in Prompt 1. If it's not already in storage.ts, add it now: query order_items where project_id = projectId, ordered by id ascending.
+The reprice endpoint is a convenience feature — it's important for when formulas change and you need to re-evaluate an already-saved order without re-uploading the CSV.
+Keep the .ORD download purely client-side — no new download endpoint needed, just collect exportText values and trigger a browser download.
+
+
+After completing, confirm: the Order Processing Dashboard shows a "View Order Detail" link after upload, the Order Detail page shows the new Pricing & Export section with the items table, totals, and both buttons work correctly.

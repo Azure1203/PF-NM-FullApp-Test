@@ -1,0 +1,195 @@
+Good — I have a clear picture. Here is Prompt 7:
+Prompt 7 — Port Production Workflow Features
+
+Paste this entire prompt into Replit:
+
+The new app already has the pricing pipeline from Prompts 3–6. Now we need to make sure all the production workflow features from the existing production app are working correctly in the new app. These features already exist in the codebase but need to be verified and connected to the new product-driven pipeline. This prompt is primarily a verification and integration pass — fix what's broken, wire up what's disconnected, and confirm end-to-end functionality.
+Context: What should already exist
+
+The following features were ported from the production app and should already be in the new app's codebase. We are NOT rewriting them — just verifying they work correctly with the new pipeline:
+
+    server/csvHelpers.ts — countPartsFromCSV, extractCTSParts, formatPONumber, computeAutoProductionStatuses, generateHardwareChecklistForFile, generatePackingSlipChecklistForFile, extractAllItemsFromCSV
+    Hardware checklist auto-generation on upload (calls generateHardwareChecklistForFile)
+    Packing slip checklist auto-generation on upload (calls generatePackingSlipChecklistForFile)
+    CTS parts extraction on upload (calls extractCTSParts)
+    Part counting on upload (calls countPartsFromCSV) — saves coreParts, dovetails, assembledDrawers, fivePieceDoors, weightLbs, maxLength, maxWidth, etc. on the order_files record
+    Auto-production status derivation (calls computeAutoProductionStatuses) — saves to pfProductionStatus on the project
+
+If any of these are missing from the new app, port them now from the production app's server/csvHelpers.ts exactly as written.
+Step 1 — Verify the upload handler calls all helpers in the correct order
+
+In server/routes.ts, inside the POST /api/orders/upload handler, the per-file processing block should call these in order for EACH file:
+
+1. countPartsFromCSV(pf.records)              → used to populate order_files fields
+2. storage.createOrderFile(...)               → saves the file with all part counts
+3. [new product-driven pricing loop]          → from Prompt 3, saves to order_items
+4. extractCTSParts(pf.records)                → saves cts_parts rows
+5. generateHardwareChecklistForFile(...)      → saves hardware_checklist_items rows
+6. generatePackingSlipChecklistForFile(...)   → saves packing_slip_items rows
+
+After all files are processed:
+
+7. computeAutoProductionStatuses({...})       → derives production status tags
+8. storage.updateProject(project.id, { pfProductionStatus: autoStatuses })
+9. updateProjectBoProductionStatus(project.id)
+
+If the order in the current codebase is different or any step is missing, fix it now.
+Step 2 — Verify countPartsFromCSV has access to the products database
+
+countPartsFromCSV in csvHelpers.ts takes an optional productsMap parameter. When called from routes.ts, it should be passed the products map so it can correctly identify MJ Woodcraft doors and Richelieu doors by supplier. Verify this is happening:
+typescript
+
+// In routes.ts, before the file loop:
+const allProductsForCounting = await storage.getProducts();
+const productsMapForCounting = new Map(allProductsForCounting.map(p => [p.code.toUpperCase(), p]));
+
+// Then in the file loop:
+const partCounts = await countPartsFromCSV(pf.records, productsMapForCounting);
+
+If productsMapForCounting is not currently being passed, add it.
+Step 3 — Verify the reprice endpoint regenerates checklists
+
+In POST /api/orders/:id/reprice (added in Prompt 5), after the pricing loop re-runs for each file, also re-run the checklist generators:
+typescript
+
+// After the pricing loop for each file:
+await generateHardwareChecklistForFile(file.id, file.rawContent!);
+await generatePackingSlipChecklistForFile(file.id, file.rawContent!);
+
+This ensures that repricing an order also refreshes the checklists, since the same CSV is still available in rawContent.
+Step 4 — Add a GET /api/orders/:id/files endpoint
+
+This endpoint is needed by the Order Detail .ORD download (added in Prompt 6) and possibly other pages. Add it if it doesn't already exist:
+typescript
+
+app.get('/api/orders/:id/files', isAuthenticated, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const files = await storage.getProjectFiles(projectId);
+    res.json(files);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+Step 5 — Verify hardware SKU prefix filtering in generateHardwareChecklistForFile
+
+The hardware checklist generator in csvHelpers.ts uses SKU prefixes to identify hardware items when a product isn't found in the database. The hardware prefixes used in the production app are:
+typescript
+
+const HARDWARE_PREFIXES = ['H.', 'M.', 'M-', 'R-', 'R.', 'S.'];
+
+Items are included in the hardware checklist if:
+
+    They are found in the products database with category = 'HARDWARE'
+    OR they are NOT in the database but their SKU starts with one of the hardware prefixes
+
+Items are EXCLUDED if:
+
+    They are found in the database with category = 'COMPONENT'
+    OR they are NOT in the database and their SKU does NOT start with a hardware prefix
+
+Verify this filtering logic is intact in the new app's generateHardwareChecklistForFile. If it is missing or different, restore it to match the production app logic above.
+Step 6 — Add a POST /api/orders/:id/regenerate-checklists endpoint
+
+This is a convenience endpoint to regenerate all checklists for a project without re-uploading the CSV. Add it:
+typescript
+
+app.post('/api/orders/:id/regenerate-checklists', isAuthenticated, async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.id);
+    const files = await storage.getProjectFiles(projectId);
+    
+    let totalHardwareItems = 0;
+    let totalPackingItems = 0;
+    let errors: string[] = [];
+    
+    for (const file of files) {
+      if (!file.rawContent) continue;
+      
+      const hwResult = await generateHardwareChecklistForFile(file.id, file.rawContent);
+      const psResult = await generatePackingSlipChecklistForFile(file.id, file.rawContent);
+      
+      if (hwResult.success) totalHardwareItems += hwResult.itemCount;
+      else errors.push(`File ${file.id} hardware: ${hwResult.error}`);
+      
+      if (psResult.success) totalPackingItems += psResult.itemCount;
+      else errors.push(`File ${file.id} packing slip: ${psResult.error}`);
+    }
+    
+    res.json({ 
+      success: errors.length === 0, 
+      totalHardwareItems, 
+      totalPackingItems,
+      errors 
+    });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+Step 7 — Add "Regenerate Checklists" button to Order Detail page
+
+In client/src/pages/OrderDetails.tsx, add a small "Regenerate Checklists" button in the order detail header area (near the existing action buttons). On click, call POST /api/orders/:id/regenerate-checklists and show a toast with the result counts.
+typescript
+
+const regenerateChecklistsMutation = useMutation({
+  mutationFn: async () => {
+    const res = await apiRequest('POST', `/api/orders/${id}/regenerate-checklists`, {});
+    return res.json();
+  },
+  onSuccess: (data) => {
+    toast({ 
+      title: 'Checklists regenerated', 
+      description: `${data.totalHardwareItems} hardware items, ${data.totalPackingItems} packing items` 
+    });
+    queryClient.invalidateQueries({ queryKey: ['/api/orders', id, 'items'] });
+  },
+  onError: (err: Error) => {
+    toast({ title: 'Error', description: err.message, variant: 'destructive' });
+  }
+});
+
+Button:
+tsx
+
+<Button 
+  variant="outline" 
+  size="sm" 
+  onClick={() => regenerateChecklistsMutation.mutate()}
+  disabled={regenerateChecklistsMutation.isPending}
+>
+  {regenerateChecklistsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+  Regenerate Checklists
+</Button>
+
+Step 8 — Verify the Order Processing Dashboard response shape
+
+After all the changes in Prompts 3–7, confirm the POST /api/orders/upload response still includes these fields that the dashboard uses:
+typescript
+
+{
+  id: number,              // project id
+  name: string,            // project name
+  totalPrice: number,      // sum of all item totalPrice values
+  ordExport: string,       // the combined .ORD text (header + item blocks per file)
+  items: ProcessedItem[],  // mapped array: { SKU, NAME, Qty, Width, Height, price, error, productMatched }
+  // ... other project fields
+}
+
+If any of these are missing from the current response, add them.
+What NOT to change
+
+    Do not change the hardware checklist UI pages (/files/:fileId/hardware-checklist)
+    Do not change the packing slip checklist UI pages (/files/:fileId/checklist)
+    Do not change the CTS parts UI pages (/files/:fileId/cts)
+    Do not change pallet management logic
+    Do not change Asana sync logic
+
+After completing, upload a test CSV and confirm in the server logs that all six steps of the per-file pipeline fire in order. Check that:
+
+    order_items rows are created with prices (or error messages for unmatched SKUs)
+    hardware_checklist_items rows are created
+    packing_slip_items rows are created
+    cts_parts rows are created (for any .CTS items)
+    order_files record has non-zero coreParts, dovetails, etc.

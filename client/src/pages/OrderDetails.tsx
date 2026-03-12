@@ -17,7 +17,10 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer, Palette } from "lucide-react";
+import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer, Palette, DollarSign } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { printProjectLabel, printHardwareLabel, printPalletLabels } from "@/lib/qzTray";
 import pfcLogo from "@assets/logo-perfect-fit-closets-7_1768954555746.jpg";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal, DialogOverlay } from "@/components/ui/dialog";
@@ -88,6 +91,8 @@ export default function OrderDetails() {
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [materialSummaryOpen, setMaterialSummaryOpen] = useState(false);
   const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
+  const [pricingOpen, setPricingOpen] = useState(true);
+  const [expandedPricingErrors, setExpandedPricingErrors] = useState<Set<number>>(new Set());
   const [editingCienappsJobNumber, setEditingCienappsJobNumber] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
@@ -624,6 +629,58 @@ export default function OrderDetails() {
     refetchInterval: 60000,
   });
 
+  // ── Pricing section ────────────────────────────────────────────────
+  type OrderItemRow = {
+    id: number;
+    fileId: number;
+    productId: number | null;
+    productName: string | null;
+    sku: string;
+    description: string | null;
+    width: number | null;
+    height: number | null;
+    depth: number | null;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    exportText: string | null;
+    pricingError: string | null;
+  };
+
+  const { data: orderItems, isLoading: itemsLoading, refetch: refetchItems } = useQuery<OrderItemRow[]>({
+    queryKey: ['/api/orders', id, 'items'],
+    enabled: !!id && id > 0,
+  });
+
+  const repriceMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/orders/${id}/reprice`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders', id, 'items'] });
+      toast({ title: 'Pricing updated', description: `${data.items?.length ?? 0} items repriced` });
+    },
+    onError: (e: Error) => {
+      toast({ title: 'Reprice failed', description: e.message, variant: 'destructive' });
+    },
+  });
+
+  const downloadOrd = () => {
+    const lines = (orderItems ?? []).filter(i => i.exportText).map(i => i.exportText!);
+    if (lines.length === 0) {
+      toast({ title: 'No export text available', description: 'Run pricing first or check product export formulas', variant: 'destructive' });
+      return;
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${project?.name ?? 'order'}.ord`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Auto-select first file when preview loads
   useEffect(() => {
     if (preview && preview.fileBreakdowns.length > 0 && selectedFileIndex === null) {
@@ -1109,6 +1166,188 @@ export default function OrderDetails() {
             </div>
           }
         />
+
+        {/* Pricing & Export - Collapsible */}
+        <Collapsible open={pricingOpen} onOpenChange={setPricingOpen}>
+          <Card className="mb-6 border-none shadow-md" data-testid="pricing-export-card">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-lg">
+                <CardTitle className="flex items-center justify-between gap-2 text-lg">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-primary" />
+                    Pricing &amp; Export
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {orderItems && orderItems.length > 0 && (
+                      <span className="text-base font-bold text-primary">
+                        ${orderItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
+                      </span>
+                    )}
+                    {pricingOpen ? (
+                      <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </div>
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                {/* Action buttons */}
+                <div className="flex gap-2 mb-4">
+                  <Button
+                    data-testid="button-reprice"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => repriceMutation.mutate()}
+                    disabled={repriceMutation.isPending}
+                  >
+                    {repriceMutation.isPending
+                      ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      : <RefreshCw className="w-4 h-4 mr-1.5" />
+                    }
+                    Re-run Pricing
+                  </Button>
+                  <Button
+                    data-testid="button-download-ord"
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadOrd}
+                  >
+                    <Download className="w-4 h-4 mr-1.5" />
+                    Download .ORD
+                  </Button>
+                </div>
+
+                {/* Loading skeleton */}
+                {itemsLoading && (
+                  <div className="space-y-2">
+                    {[0,1,2].map(i => (
+                      <div key={i} className="flex gap-3">
+                        <Skeleton className="h-8 w-24" />
+                        <Skeleton className="h-8 w-40" />
+                        <Skeleton className="h-8 flex-1" />
+                        <Skeleton className="h-8 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {!itemsLoading && (!orderItems || orderItems.length === 0) && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No pricing data yet. Click <strong>Re-run Pricing</strong> to process this order.
+                  </div>
+                )}
+
+                {/* Items table */}
+                {!itemsLoading && orderItems && orderItems.length > 0 && (
+                  <>
+                    <ScrollArea className="max-h-[500px] rounded-md border">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                          <TableRow>
+                            <TableHead className="font-bold">SKU</TableHead>
+                            <TableHead className="font-bold">Product</TableHead>
+                            <TableHead className="font-bold">Description</TableHead>
+                            <TableHead className="font-bold text-center">W × H</TableHead>
+                            <TableHead className="font-bold text-center">Qty</TableHead>
+                            <TableHead className="font-bold text-right">Unit Price</TableHead>
+                            <TableHead className="font-bold text-right">Total</TableHead>
+                            <TableHead className="font-bold text-center">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {orderItems.map((item) => {
+                            const hasError = !!item.pricingError;
+                            const noMatch = item.productId === null;
+                            return (
+                              <>
+                                <TableRow
+                                  key={item.id}
+                                  data-testid={`row-order-item-${item.id}`}
+                                  className={hasError ? 'bg-red-50 dark:bg-red-950/20' : noMatch ? 'bg-amber-50 dark:bg-amber-950/20' : ''}
+                                >
+                                  <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                  <TableCell>
+                                    {item.productName ? (
+                                      <span className="text-sm">{item.productName}</span>
+                                    ) : (
+                                      <Badge variant="destructive" className="text-[10px]">No Match</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">{item.description || '—'}</TableCell>
+                                  <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap">
+                                    {item.width ?? '?'} × {item.height ?? '?'}
+                                  </TableCell>
+                                  <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                                  <TableCell className="text-right font-mono text-sm">
+                                    ${(item.unitPrice ?? 0).toFixed(2)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm font-semibold">
+                                    ${(item.totalPrice ?? 0).toFixed(2)}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {hasError ? (
+                                      <button
+                                        data-testid={`badge-error-${item.id}`}
+                                        onClick={() => setExpandedPricingErrors(prev => {
+                                          const next = new Set(prev);
+                                          next.has(item.id) ? next.delete(item.id) : next.add(item.id);
+                                          return next;
+                                        })}
+                                      >
+                                        <Badge variant="destructive" className="cursor-pointer gap-1 text-[10px]">
+                                          <AlertTriangle className="h-3 w-3" /> Error
+                                        </Badge>
+                                      </button>
+                                    ) : (
+                                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-1 text-[10px]">
+                                        <Check className="h-3 w-3" /> OK
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                                {hasError && expandedPricingErrors.has(item.id) && (
+                                  <TableRow key={`err-${item.id}`} className="bg-red-50 dark:bg-red-950/20">
+                                    <TableCell colSpan={8} className="py-2 px-4">
+                                      <code className="text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950/40 rounded px-2 py-1 block">
+                                        {item.pricingError}
+                                      </code>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+
+                    {/* Summary row */}
+                    <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t text-sm text-muted-foreground">
+                      <span><strong>{orderItems.length}</strong> items</span>
+                      {orderItems.filter(i => !!i.pricingError).length > 0 && (
+                        <span className="text-red-500">
+                          <strong>{orderItems.filter(i => !!i.pricingError).length}</strong> errors
+                        </span>
+                      )}
+                      {orderItems.filter(i => !i.productId).length > 0 && (
+                        <span className="text-amber-500">
+                          <strong>{orderItems.filter(i => !i.productId).length}</strong> unmatched SKUs
+                        </span>
+                      )}
+                      <span className="ml-auto font-bold text-foreground">
+                        Grand Total: ${orderItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Project Notes - Collapsible */}
         <Collapsible open={projectNotesOpen} onOpenChange={setProjectNotesOpen}>

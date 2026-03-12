@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
+import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +54,7 @@ interface ProcessedOrder {
 
 export default function OrderProcessingDashboard() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [processedOrder, setProcessedOrder] = useState<ProcessedOrder | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -187,9 +189,19 @@ export default function OrderProcessingDashboard() {
                   </CardTitle>
                   <CardDescription>Review item pricing and logic before syncing</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setProcessedOrder(null)}>
-                  Upload New
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    data-testid="button-view-order-detail"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setLocation(`/orders/${processedOrder.id}`)}
+                  >
+                    View Order Detail
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setProcessedOrder(null)}>
+                    Upload New
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-[500px]">

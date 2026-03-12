@@ -483,6 +483,157 @@ export async function registerRoutes(
   });
 
   // Get sync preview data (protected) - calculates all totals before syncing
+  // GET order items for a project (with product name join)
+  app.get('/api/orders/:id/items', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const allProducts = await storage.getAllmoxyProducts();
+      const productNameMap = new Map(allProducts.map(p => [p.id, p.name]));
+      res.json(items.map(item => ({
+        id: item.id,
+        fileId: item.fileId,
+        productId: item.productId,
+        productName: item.productId ? (productNameMap.get(item.productId) ?? null) : null,
+        sku: item.sku,
+        description: item.description,
+        width: item.width,
+        height: item.height,
+        depth: item.depth,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        exportText: item.exportText,
+        pricingError: item.pricingError,
+      })));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // POST re-run pricing pipeline for an already-saved project
+  app.post('/api/orders/:id/reprice', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      // Pre-load the same pipeline data as the upload handler
+      const allProxyVars = await storage.getProxyVariables();
+      const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
+      const allProducts = await storage.getAllmoxyProducts();
+      const activeProducts = allProducts.filter(
+        (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
+      );
+      const productBindingsMap = new Map<number, ProductGridBinding[]>();
+      for (const product of activeProducts) {
+        const bindings = await storage.getProductGridBindings(product.id);
+        productBindingsMap.set(product.id, bindings);
+      }
+      const allGrids = await storage.getAttributeGrids();
+      const gridMap = new Map(allGrids.map(g => [g.id, g]));
+
+      const files = await storage.getProjectFiles(projectId);
+      let totalProjectPrice = 0;
+
+      for (const file of files) {
+        if (!file.rawContent) continue;
+        await storage.deleteOrderItemsByFile(file.id);
+
+        const itemObjects: any[] = parseSync(file.rawContent, { columns: true, skip_empty_lines: true });
+        for (const item of itemObjects) {
+          const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
+          if (!sku) continue;
+
+          const product = matchProductToSku(sku, activeProducts);
+          console.log(`[Reprice] SKU: ${sku} → ${product ? `matched: ${product.name}` : 'NO MATCH'}`);
+
+          const contextScope: any = {};
+          if (product) {
+            const bindings = productBindingsMap.get(product.id) ?? [];
+            for (const binding of bindings) {
+              const grid = gridMap.get(binding.gridId);
+              if (!grid) continue;
+              const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
+              if (!lookupValue) continue;
+              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
+              if (row) contextScope[binding.alias] = row.rowData;
+            }
+          }
+
+          let unitPrice = 0;
+          let pricingError: string | null = null;
+          if (product && product.pricingProxyId != null) {
+            const proxy = proxyVarMap.get(product.pricingProxyId);
+            if (proxy) {
+              try { unitPrice = evaluatePrice(proxy.formula, item, contextScope); }
+              catch (e: any) { pricingError = e.message; unitPrice = 0; }
+            }
+          } else if (!product) {
+            pricingError = `No product matched SKU prefix for: ${sku}`;
+          }
+
+          let exportText: string | null = null;
+          if (product && product.exportProxyId != null) {
+            const proxy = proxyVarMap.get(product.exportProxyId);
+            if (proxy) {
+              try { exportText = generateOrdItemBlock(item, contextScope, proxy.formula); }
+              catch { exportText = null; }
+            }
+          }
+
+          const qty = parseInt(item.Qty || item.qty || item.Quantity || '1') || 1;
+          const totalPrice = unitPrice * qty;
+
+          await storage.createOrderItem({
+            projectId,
+            fileId: file.id,
+            productId: product?.id ?? null,
+            sku,
+            description: item.NAME || item['Part Name'] || item.Description || '',
+            width: parseFloat(item.Width || item.width || '0') || null,
+            height: parseFloat(item.Height || item.height || '0') || null,
+            depth: parseFloat(item.Thickness || item.thickness || item.Depth || '0') || null,
+            quantity: qty,
+            unitPrice,
+            totalPrice,
+            exportText,
+            pricingError,
+            rawRowData: item,
+          });
+          totalProjectPrice += totalPrice;
+        }
+      }
+
+      const savedItems = await storage.getOrderItemsByProject(projectId);
+      const allProductsFull = await storage.getAllmoxyProducts();
+      const productNameMap = new Map(allProductsFull.map(p => [p.id, p.name]));
+
+      res.json({
+        repriced: true,
+        totalPrice: totalProjectPrice,
+        items: savedItems.map(item => ({
+          id: item.id,
+          fileId: item.fileId,
+          productId: item.productId,
+          productName: item.productId ? (productNameMap.get(item.productId) ?? null) : null,
+          sku: item.sku,
+          description: item.description,
+          width: item.width,
+          height: item.height,
+          depth: item.depth,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          exportText: item.exportText,
+          pricingError: item.pricingError,
+        })),
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.get('/api/orders/:id/preview', isAuthenticated, async (req, res) => {
     const project = await storage.getProject(Number(req.params.id));
     if (!project) {

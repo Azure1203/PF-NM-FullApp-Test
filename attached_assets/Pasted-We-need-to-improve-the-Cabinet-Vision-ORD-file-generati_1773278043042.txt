@@ -1,0 +1,211 @@
+We need to improve the Cabinet Vision .ORD file generation so that:
+
+Each per-file export starts with the proper [Header] block (not just a stream of [Catalog] blocks)
+The ordExporter.ts service is aware of both the file-level header context (PO number, project name) and the item-level context (dimensions, material, banding)
+An ord_header_template setting is stored in the database and editable in the UI, so the header format can be adjusted without code changes
+
+Study the reference .ORD files carefully before proceeding. The correct structure of a Cabinet Vision .ORD file is:
+[Header]
+Version=4
+Unit=1
+Name="<design name>"
+Description="<design name>"
+PurchaseOrder="<PO number>"
+Comment=""
+Customer="Perfect Fit Closets"
+Address1="100-111 5 Avenue Southwest"
+<item block 1>
+<item block 2>
+...
+Where each item block looks like:
+[Catalog]
+Name="Perfect Fit"
+CabinetConstruction="X-Perfect Fit"
+DrawerBoxConstruction="X-Perfect Fit Drawer 19"
+RollOutConstruction="X-Perfect Fit Roll Out 19"
+Materials="{{color.panel_export}}"
+
+[Parameters]
+Attribute="Banding","xPFC_BAND","text","{{edge_left.export}}{{edge_right.export}}{{edge_top.export}}{{edge_bottom.export}}"
+
+[Cabinets]
+1,"{{product_name}}",{{width}},{{height}},{{thickness}},"*","N",{{quantity}}
+;
+The [Header] block appears exactly once per file at the very top. Every item block follows it with no second [Header].
+
+Part 1 — Add an app_settings table to the schema
+In shared/schema.ts, add a simple key-value settings table:
+typescriptexport const appSettings = pgTable("app_settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value"),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AppSetting = typeof appSettings.$inferSelect;
+export type InsertAppSetting = typeof appSettings.$inferInsert;
+Run npm run db:push to create the table (no migration file needed, just push).
+In server/storage.ts, add these methods to IStorage and DatabaseStorage:
+typescript// App settings
+getSetting(key: string): Promise<string | null>
+setSetting(key: string, value: string, description?: string): Promise<void>
+getAllSettings(): Promise<AppSetting[]>
+Implementations:
+
+getSetting: query appSettings where key = key, return value or null if not found
+setSetting: upsert on key conflict — update value, updatedAt = now; insert if not exists
+getAllSettings: return all rows ordered by key
+
+
+Part 2 — Seed the default ORD header template
+In server/routes.ts, after the app is initialized (near the top of registerRoutes, after storage is confirmed working), add a one-time seed call:
+typescript// Seed default ORD header template if not set
+const existingHeader = await storage.getSetting('ord_header_template');
+if (!existingHeader) {
+  await storage.setSetting(
+    'ord_header_template',
+    `[Header]
+Version=4
+Unit=1
+Name="{{design_name}}"
+Description="{{design_name}}"
+PurchaseOrder="{{po_number}}"
+Comment=""
+Customer="Perfect Fit Closets"
+Address1="100-111 5 Avenue Southwest"`,
+    'Cabinet Vision .ORD file header block. Use {{design_name}} and {{po_number}} as placeholders.'
+  );
+}
+
+Part 3 — Update ordExporter.ts
+Add a new exported function generateOrdHeader:
+typescript/**
+ * Generates the [Header] block for a Cabinet Vision .ORD file.
+ * Called once per file, before all item blocks.
+ */
+export function generateOrdHeader(
+  headerTemplate: string,
+  fileContext: {
+    designName: string;   // e.g. "H Holtermann (Holtermann V2)"
+    poNumber: string;     // e.g. "1919"
+  }
+): string {
+  return headerTemplate
+    .replace(/\{\{design_name\}\}/g, fileContext.designName)
+    .replace(/\{\{po_number\}\}/g, fileContext.poNumber);
+}
+Also update generateOrdItemBlock to accept an optional itemNumber parameter (currently unused but useful for future multi-cabinet blocks):
+typescriptexport function generateOrdItemBlock(
+  itemData: any,
+  contextScope: any,
+  templateString: string,
+  itemNumber: number = 1  // default to 1, Cabinet Vision uses 1-based item numbers
+): string { ... }
+No other changes to this function's logic.
+
+Part 4 — Update the pipeline to prepend the header
+In server/routes.ts, inside the upload handler and the reprice handler, update the per-file export assembly:
+Before the per-item loop for each file, load the header template and generate the header block:
+typescriptconst headerTemplate = await storage.getSetting('ord_header_template') || '';
+const ordHeader = generateOrdHeader(headerTemplate, {
+  designName: pf.poNumber || pf.filename.replace('.csv', ''),
+  poNumber: (pf.poNumber || '').replace(/[^0-9]/g, '') || '0000',
+});
+let fileOrdText = ordHeader + "\n";
+Then as items are processed, append each exportText to fileOrdText instead of combinedOrdText directly:
+typescriptif (exportText) fileOrdText += exportText + "\n";
+After all items for this file are done, append fileOrdText to combinedOrdText:
+typescriptcombinedOrdText += fileOrdText;
+This ensures each file gets exactly one [Header] block at the top, followed by all its item blocks.
+Also update the order_items exportText saving: each item's exportText should be just the item block (no header). The header is assembled at download time by concatenating per-file item blocks with a header prepended. This is already the case if the item's export proxy formula only contains the [Catalog]...[Cabinets] block — confirm this matches the existing export proxy formulas (e.g. parts_export.txt, 1_material_to_CV_1GSHFF.txt).
+
+Part 5 — Update the Order Detail .ORD download
+In client/src/pages/OrderDetails.tsx, update the Download .ORD button logic to reconstruct the correct per-file structure:
+Instead of just joining all exportText values together, group items by fileId and prepend a header for each file:
+typescriptconst handleDownloadOrd = async () => {
+  if (!orderItems || orderItems.length === 0) {
+    toast({ title: "No export data", description: "Run pricing first.", variant: "destructive" });
+    return;
+  }
+  
+  // Group items by fileId
+  const byFile = new Map<number, typeof orderItems>();
+  for (const item of orderItems) {
+    if (!item.exportText) continue;
+    if (!byFile.has(item.fileId)) byFile.set(item.fileId, []);
+    byFile.get(item.fileId)!.push(item);
+  }
+  
+  if (byFile.size === 0) {
+    toast({ title: "No export text", description: "No items have export text. Check product export formulas.", variant: "destructive" });
+    return;
+  }
+  
+  // Fetch the project's order files to get PO numbers and filenames
+  const filesRes = await fetch(`/api/orders/${id}/files`);
+  const files: OrderFile[] = await filesRes.json();
+  const fileMap = new Map(files.map(f => [f.id, f]));
+  
+  // Fetch the header template setting
+  const settingRes = await fetch('/api/admin/settings/ord_header_template');
+  const { value: headerTemplate } = await settingRes.json();
+  
+  let ordContent = '';
+  for (const [fileId, items] of byFile) {
+    const file = fileMap.get(fileId);
+    const designName = file?.poNumber || file?.originalFilename?.replace('.csv', '') || 'Unknown';
+    const poNumber = (file?.poNumber || '').replace(/[^0-9]/g, '') || '0000';
+    
+    // Build header
+    const header = (headerTemplate || '')
+      .replace(/\{\{design_name\}\}/g, designName)
+      .replace(/\{\{po_number\}\}/g, poNumber);
+    
+    ordContent += header + '\n';
+    for (const item of items) {
+      ordContent += item.exportText + '\n';
+    }
+  }
+  
+  const blob = new Blob([ordContent], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${project?.name || 'order'}.ord`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+```
+
+---
+
+### Part 6 — API endpoints for settings
+
+Add these routes to `server/routes.ts`:
+```
+GET  /api/admin/settings              → returns all settings as array
+GET  /api/admin/settings/:key         → returns { key, value, description }
+PUT  /api/admin/settings/:key         → body: { value: string }, upserts the setting
+All require isAuthenticated.
+
+Part 7 — ORD Header Template editor in the UI
+In client/src/pages/admin/AllmoxyProductManager.tsx (or create a new simple page — your choice), add a small "ORD Header Template" card at the bottom of the Settings section. Alternatively, add it as a new section in the existing Settings page (/admin/color-grid).
+The UI for the ORD Header Template editor is simple:
+
+A <textarea> (or Monaco editor if one is already imported) showing the current template value from GET /api/admin/settings/ord_header_template
+A "Save" button that calls PUT /api/admin/settings/ord_header_template
+A helper note: "Use {{design_name}} for the PO/design name and {{po_number}} for the numeric PO number. This block appears once at the top of each .ORD file."
+Show the available placeholders as code badges: {{design_name}} and {{po_number}}
+
+Place this editor on the existing Settings page (/admin/color-grid) as a second card below the color grid card. Update that page's title from "Color Grid" to "Settings" in the sidebar nav item.
+
+Also update the OrderProcessingDashboard .ORD download
+The OrderProcessingDashboard currently assembles combinedOrdText in the upload response and downloads it directly. After this prompt, the upload response's ordExport field will already contain the correctly-structured content (header + items per file) since the pipeline now prepends headers. No frontend change needed — this should just work.
+
+After completing, confirm:
+
+npm run db:push ran successfully and app_settings table exists
+Uploading an order CSV produces a .ORD file with a proper [Header] block at the top of each file's section
+The Settings page shows the ORD Header Template editor and saving it updates the stored template
+Downloading .ORD from the Order Detail page produces correctly structured output
