@@ -1,0 +1,147 @@
+We are rewriting the order processing pipeline to be product-driven. Right now the pipeline uses a single global pricing proxy and export proxy for all items in an order. We need to change it so each CSV line item is matched to a specific product by SKU prefix, then that product's own pricing formula and grid bindings are used. Results must be saved to the order_items table.
+This prompt changes only server/routes.ts and server/storage.ts. Do not touch any frontend files.
+
+Background: How the CSV is structured
+The customer order CSV has a header section at the top (dealer info, shipping address, PO number, etc.), followed by a data section. The data section starts on the row after the row whose first column contains the word "Manuf" (case-insensitive). Each data row has this column layout:
+
+Column 0 (row[0]): SKU / MANU_CODE — the part code, e.g. 34SHFF, TK, DBX..., H.801.43...
+Column 1 (row[1]): Color code — e.g. 300, K79, MT52
+Column 2 (row[2]): Quantity
+Column 3 (row[3]): Height (in mm)
+Column 4 (row[4]): Width (in mm)
+Column 5 (row[5]): Thickness / Depth (in mm)
+
+When the CSV is parsed with columns: true, the named columns used by the pricing engine are whatever the header row says — typically MANU_CODE, Color, Qty, Height, Width, Thickness.
+
+What needs to change
+Step 1 — Pre-load all products and their bindings before the file loop
+Before the per-file loop in the upload handler, load all active products and their grid bindings in one go:
+typescriptconst allProducts = await storage.getAllmoxyProducts();
+const activeProducts = allProducts.filter(p => p.status === 'active' && p.skuPrefix);
+
+// Pre-load grid bindings for all active products
+const productBindingsMap = new Map<number, ProductGridBinding[]>();
+for (const product of activeProducts) {
+  const bindings = await storage.getProductGridBindings(product.id);
+  productBindingsMap.set(product.id, bindings);
+}
+
+// Pre-load proxy variables indexed by id for fast lookup
+const allProxyVars = await storage.getProxyVariables();
+const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
+
+// Pre-load all attribute grids indexed by id
+const allGrids = await storage.getAttributeGrids();
+const gridMap = new Map(allGrids.map(g => [g.id, g]));
+Remove the old code that found a single global pricingProxy, exportProxy, and grids array.
+Step 2 — Write a matchProductToSku helper function
+Add this function inside routes.ts (above the route handler, not exported):
+typescriptfunction matchProductToSku(sku: string, activeProducts: AllmoxyProduct[]): AllmoxyProduct | null {
+  if (!sku) return null;
+  const upperSku = sku.toUpperCase().trim();
+  // Find the product whose skuPrefix is the longest match at the start of the SKU
+  // This handles cases where one prefix is a substring of another (e.g. "34SHF" vs "34SHFF")
+  let bestMatch: AllmoxyProduct | null = null;
+  let bestLength = 0;
+  for (const product of activeProducts) {
+    const prefix = (product.skuPrefix || '').toUpperCase().trim();
+    if (prefix && upperSku.startsWith(prefix) && prefix.length > bestLength) {
+      bestMatch = product;
+      bestLength = prefix.length;
+    }
+  }
+  return bestMatch;
+}
+```
+
+**Step 3 — Rewrite the per-item pricing block inside the file loop**
+
+Replace the existing pricing block (the one that iterates `itemObjects` and uses the global `pricingProxy`, `exportProxy`, and `grids`) with the following logic. This should go in the same place, after the `orderFile` is created and the CTS parts are extracted:
+```
+For each parsed file (pf):
+  Re-parse with columns:true to get named-property objects → itemObjects
+  Delete any existing order_items for this file (in case of re-upload)
+  
+  For each item in itemObjects:
+    Get the SKU from item.MANU_CODE or item.SKU or item['Manuf Code'] (try all variants)
+    Skip rows where SKU is empty
+    
+    Match the SKU to a product using matchProductToSku()
+    
+    Build contextScope:
+      If product was found and has bindings:
+        For each binding in productBindingsMap.get(product.id):
+          Look up the grid from gridMap
+          Get the lookup value from item[binding.lookupColumn]
+          Call storage.getAttributeGridRowByKey(binding.gridId, lookupValue)
+          If a row is found: contextScope[binding.alias] = row.rowData
+      
+    Calculate price:
+      unitPrice = 0, pricingError = null
+      If product found and product.pricingProxyId is set:
+        Look up the proxy from proxyVarMap
+        Try evaluatePrice(proxy.formula, item, contextScope)
+        Catch any error → set pricingError = error.message, unitPrice = 0
+      Else if no product matched:
+        pricingError = `No product matched SKU prefix for: ${sku}`
+      
+    Generate export text:
+      exportText = null
+      If product found and product.exportProxyId is set:
+        Look up the proxy from proxyVarMap
+        Try generateOrdItemBlock(item, contextScope, proxy.formula)
+        Catch any error → exportText = null
+    
+    Save to order_items:
+      await storage.createOrderItem({
+        projectId: project.id,
+        fileId: orderFile.id,
+        productId: product?.id ?? null,
+        sku: sku,
+        description: item.NAME || item['Part Name'] || item.Description || '',
+        width: parseFloat(item.Width || item.width || '0') || null,
+        height: parseFloat(item.Height || item.height || '0') || null,
+        depth: parseFloat(item.Thickness || item.thickness || item.Depth || '0') || null,
+        quantity: parseInt(item.Qty || item.qty || item.Quantity || '1') || 1,
+        unitPrice: unitPrice,
+        totalPrice: unitPrice * (parseInt(item.Qty || item.qty || '1') || 1),
+        exportText: exportText,
+        pricingError: pricingError,
+        rawRowData: item,
+      })
+    
+    Add unitPrice * quantity to totalProjectPrice
+    If exportText: append to combinedOrdText
+Step 4 — Update the response to include per-item data
+After the file loop, the route already builds a response object. Update it so the items array in the response now comes from the saved order_items rather than the transient allItems array. Fetch them with:
+typescriptconst savedItems = await storage.getOrderItemsByProject(project.id);
+Return them in the response as items: savedItems. Each saved item already has sku, description, width, height, quantity, unitPrice, totalPrice, pricingError, exportText.
+Step 5 — Update the response shape
+The OrderProcessingDashboard frontend expects items with these fields: SKU, NAME, Qty, Width, Height, price, error. Map the saved OrderItem fields to match this shape before returning, so the existing UI doesn't break:
+typescriptitems: savedItems.map(item => ({
+  SKU: item.sku,
+  NAME: item.description,
+  Qty: item.quantity,
+  Width: item.width,
+  Height: item.height,
+  price: item.totalPrice,
+  error: item.pricingError,
+  productMatched: item.productId !== null,
+}))
+
+Storage additions needed
+In server/storage.ts, add deleteOrderItemsByFile to the DatabaseStorage class if it wasn't added in Prompt 1. It should delete all order_items rows where file_id = fileId:
+typescriptasync deleteOrderItemsByFile(fileId: number): Promise<void> {
+  await db.delete(orderItems).where(eq(orderItems.fileId, fileId));
+}
+Also make sure getAllmoxyProducts is imported and used (it already exists). Make sure getProductGridBindings is also imported — it was added in Prompt 1.
+
+Important notes
+
+The old pipeline tried to price ALL items with the same global formula. The new pipeline prices each item with its matched product's formula. Items with no matching product will have pricingError set and price = 0. This is the correct, expected behaviour — it will show as an error badge in the UI so you know which products still need to be configured.
+Keep all other parts of the upload handler unchanged: project creation, countPartsFromCSV, createOrderFile, extractCTSParts, hardware checklist generation, packing slip generation, Asana sync — none of that changes.
+The combinedOrdText accumulation and the totalProjectPrice accumulation logic stays, just now driven per-product instead of globally.
+Make sure to import AllmoxyProduct and ProductGridBinding types from @shared/schema at the top of routes.ts if they aren't already imported.
+Add console logging at the item level so we can see what's happening during development: log [Pipeline] SKU: X → matched product: Y or [Pipeline] SKU: X → NO MATCH for each item.
+
+After completing, confirm the app still starts, an order CSV can be uploaded, the console shows per-item matching logs, and the order preview table still displays correctly with prices (or error badges for unmatched items).

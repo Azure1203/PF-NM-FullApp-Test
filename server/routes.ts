@@ -25,6 +25,7 @@ import { buildAsanaTaskNotes, syncAsanaTaskNotes, syncAsanaOrderType } from "./a
 import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks } from "@shared/schema";
+import type { AllmoxyProduct, ProductGridBinding } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
   parseCSV,
@@ -41,6 +42,22 @@ import {
 } from "./csvHelpers";
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+// Match a raw SKU string to the best-fitting active product by longest-prefix
+function matchProductToSku(sku: string, activeProducts: AllmoxyProduct[]): AllmoxyProduct | null {
+  if (!sku) return null;
+  const upperSku = sku.toUpperCase().trim();
+  let bestMatch: AllmoxyProduct | null = null;
+  let bestLength = 0;
+  for (const product of activeProducts) {
+    const prefix = (product.skuPrefix || '').toUpperCase().trim();
+    if (prefix && upperSku.startsWith(prefix) && prefix.length > bestLength) {
+      bestMatch = product;
+      bestLength = prefix.length;
+    }
+  }
+  return bestMatch;
+}
 
 // Asana Perfect Fit Production Project GID - use this for all Asana operations
 const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
@@ -622,11 +639,23 @@ export async function registerRoutes(
       let totalProjectPrice = 0;
       let combinedOrdText = "";
 
-      // Fetch all proxy variables and grids for the pipeline
+      // ── Product-driven pipeline pre-load ──────────────────────────────
       const allProxyVars = await storage.getProxyVariables();
-      const pricingProxy = allProxyVars.find(v => v.type === 'pricing');
-      const exportProxy = allProxyVars.find(v => v.type === 'export');
-      const grids = await storage.getAttributeGrids();
+      const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
+
+      const allProducts = await storage.getAllmoxyProducts();
+      const activeProducts = allProducts.filter(
+        (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
+      );
+
+      const productBindingsMap = new Map<number, ProductGridBinding[]>();
+      for (const product of activeProducts) {
+        const bindings = await storage.getProductGridBindings(product.id);
+        productBindingsMap.set(product.id, bindings);
+      }
+
+      const allGrids = await storage.getAttributeGrids();
+      const gridMap = new Map(allGrids.map(g => [g.id, g]));
 
       // Aggregate counts for auto-derived production statuses
       let totalDovetails = 0;
@@ -677,29 +706,96 @@ export async function registerRoutes(
           wallRailPieces: partCounts.wallRailPieces,
         });
 
-        // Pipeline: Calculate Price and Generate ORD for each item in the file
-        // Re-parse with columns:true to get named-property objects
-        if (pricingProxy || exportProxy) {
-          const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
-          for (const item of itemObjects) {
-            const contextScope: any = {};
-            for (const grid of grids) {
-              const lookupValue = item.SKU || item.MANU_CODE || item.Color || item.NAME || '';
-              const row = await storage.getAttributeGridRowByKey(grid.id, lookupValue);
+        // ── Product-driven per-item pricing ──────────────────────────────
+        // Delete any stale order_items for this file (safe for re-uploads)
+        await storage.deleteOrderItemsByFile(orderFile.id);
+
+        const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+        for (const item of itemObjects) {
+          // Resolve SKU from common column name variants
+          const sku: string = (
+            item.MANU_CODE || item.SKU || item['Manuf Code'] || ''
+          ).toString().trim();
+
+          if (!sku) continue; // skip blank rows
+
+          const product = matchProductToSku(sku, activeProducts);
+
+          if (product) {
+            console.log(`[Pipeline] SKU: ${sku} → matched product: ${product.name} (id=${product.id})`);
+          } else {
+            console.log(`[Pipeline] SKU: ${sku} → NO MATCH`);
+          }
+
+          // Build contextScope from this product's grid bindings
+          const contextScope: any = {};
+          if (product) {
+            const bindings = productBindingsMap.get(product.id) ?? [];
+            for (const binding of bindings) {
+              const grid = gridMap.get(binding.gridId);
+              if (!grid) continue;
+              const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
+              if (!lookupValue) continue;
+              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
               if (row) {
-                const gridKey = grid.name.toLowerCase().replace(/\s+/g, '');
-                contextScope[gridKey] = row.rowData;
+                contextScope[binding.alias] = row.rowData;
               }
             }
+          }
+
+          // Calculate unit price
+          let unitPrice = 0;
+          let pricingError: string | null = null;
+          if (product && product.pricingProxyId != null) {
+            const pricingProxy = proxyVarMap.get(product.pricingProxyId);
             if (pricingProxy) {
-              const price = evaluatePrice(pricingProxy.formula, item, contextScope);
-              totalProjectPrice += price;
+              try {
+                unitPrice = evaluatePrice(pricingProxy.formula, item, contextScope);
+              } catch (e: any) {
+                pricingError = e.message;
+                unitPrice = 0;
+              }
             }
+          } else if (!product) {
+            pricingError = `No product matched SKU prefix for: ${sku}`;
+          }
+
+          // Generate export block
+          let exportText: string | null = null;
+          if (product && product.exportProxyId != null) {
+            const exportProxy = proxyVarMap.get(product.exportProxyId);
             if (exportProxy) {
-              const block = generateOrdItemBlock(item, contextScope, exportProxy.formula);
-              combinedOrdText += block + "\n";
+              try {
+                exportText = generateOrdItemBlock(item, contextScope, exportProxy.formula);
+              } catch {
+                exportText = null;
+              }
             }
           }
+
+          const qty = parseInt(item.Qty || item.qty || item.Quantity || '1') || 1;
+          const totalPrice = unitPrice * qty;
+
+          // Persist to order_items
+          await storage.createOrderItem({
+            projectId: project.id,
+            fileId: orderFile.id,
+            productId: product?.id ?? null,
+            sku,
+            description: item.NAME || item['Part Name'] || item.Description || '',
+            width: parseFloat(item.Width || item.width || '0') || null,
+            height: parseFloat(item.Height || item.height || '0') || null,
+            depth: parseFloat(item.Thickness || item.thickness || item.Depth || '0') || null,
+            quantity: qty,
+            unitPrice,
+            totalPrice,
+            exportText,
+            pricingError,
+            rawRowData: item,
+          });
+
+          totalProjectPrice += totalPrice;
+          if (exportText) combinedOrdText += exportText + "\n";
         }
         
         // Extract and save CTS parts for this file
@@ -751,38 +847,23 @@ export async function registerRoutes(
       // Return the updated project with all statuses and detailed item info for preview
       const updatedProject = await storage.getProject(project.id);
       
-      // Re-parse all items for the frontend preview
-      const allItems: any[] = [];
-      for (const pf of parsedFiles) {
-        const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
-        for (const item of itemObjects) {
-          const contextScope: any = {};
-          for (const grid of grids) {
-            const lookupValue = item.SKU || item.MANU_CODE || item.Color || item.NAME || '';
-            const row = await storage.getAttributeGridRowByKey(grid.id, lookupValue);
-            if (row) {
-              const gridKey = grid.name.toLowerCase().replace(/\s+/g, '');
-              contextScope[gridKey] = row.rowData;
-            }
-          }
-          let price = 0;
-          let error = null;
-          if (pricingProxy) {
-            try {
-              price = evaluatePrice(pricingProxy.formula, item, contextScope);
-            } catch (e: any) {
-              error = e.message;
-            }
-          }
-          allItems.push({ ...item, price, error });
-        }
-      }
+      // Fetch persisted order items and map to the shape the frontend expects
+      const savedItems = await storage.getOrderItemsByProject(project.id);
 
       res.status(201).json({
         ...(updatedProject || project),
         totalPrice: totalProjectPrice,
         ordExport: combinedOrdText,
-        items: allItems
+        items: savedItems.map(item => ({
+          SKU: item.sku,
+          NAME: item.description,
+          Qty: item.quantity,
+          Width: item.width,
+          Height: item.height,
+          price: item.totalPrice,
+          error: item.pricingError,
+          productMatched: item.productId !== null,
+        })),
       });
 
     } catch (e: any) {
