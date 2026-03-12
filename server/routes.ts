@@ -335,6 +335,103 @@ export async function registerRoutes(
     }
   });
 
+  // Formula tester / pricing sandbox
+  app.post('/api/admin/formula-test', isAuthenticated, async (req, res) => {
+    try {
+      const { productId, inputs } = req.body as {
+        productId: number;
+        inputs: Record<string, any>;
+      };
+
+      const allProducts = await storage.getAllmoxyProducts();
+      const product = allProducts.find(p => p.id === productId);
+      if (!product) return res.status(404).json({ message: 'Product not found' });
+
+      const bindings = await storage.getProductGridBindings(productId);
+      const allGrids = await storage.getAttributeGrids();
+      const gridMap = new Map(allGrids.map(g => [g.id, g]));
+      const allProxyVars = await storage.getProxyVariables();
+      const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
+
+      // Resolve grid bindings into contextScope
+      const contextScope: Record<string, any> = {};
+      const gridLookupResults: Array<{
+        alias: string;
+        gridName: string;
+        lookupColumn: string;
+        lookupValue: string;
+        matched: boolean;
+        rowData: any | null;
+      }> = [];
+
+      for (const binding of bindings) {
+        const grid = gridMap.get(binding.gridId);
+        if (!grid) continue;
+        const lookupValue = (inputs[binding.lookupColumn] ?? '').toString().trim();
+        const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue) : undefined;
+        contextScope[binding.alias] = row ? row.rowData : null;
+        gridLookupResults.push({
+          alias: binding.alias,
+          gridName: grid.name,
+          lookupColumn: binding.lookupColumn,
+          lookupValue,
+          matched: !!row,
+          rowData: row ? row.rowData : null,
+        });
+      }
+
+      const finalScope = {
+        width: inputs.width ?? 0,
+        height: inputs.height ?? 0,
+        depth: inputs.depth ?? 0,
+        quantity: inputs.quantity ?? 1,
+        ...contextScope,
+      };
+
+      // Pricing evaluation
+      let unitPrice = 0;
+      let pricingError: string | null = null;
+      const pricingProxy = product.pricingProxyId ? proxyVarMap.get(product.pricingProxyId) : null;
+      if (pricingProxy) {
+        try {
+          unitPrice = evaluatePrice(pricingProxy.formula, finalScope, contextScope);
+        } catch (e: any) {
+          pricingError = e.message;
+        }
+      }
+
+      // Export evaluation
+      let exportText: string | null = null;
+      let exportError: string | null = null;
+      const exportProxy = product.exportProxyId ? proxyVarMap.get(product.exportProxyId) : null;
+      if (exportProxy) {
+        try {
+          exportText = generateOrdItemBlock(finalScope, contextScope, exportProxy.formula);
+        } catch (e: any) {
+          exportError = e.message;
+        }
+      }
+
+      const quantity = inputs.quantity ?? 1;
+
+      res.json({
+        productName: product.name,
+        skuPrefix: product.skuPrefix,
+        pricingFormulaName: pricingProxy?.name ?? null,
+        exportFormulaName: exportProxy?.name ?? null,
+        finalScope,
+        gridLookupResults,
+        unitPrice,
+        totalPrice: unitPrice * quantity,
+        pricingError,
+        exportText,
+        exportError,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/upload-allmoxy-products', isAuthenticated, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });

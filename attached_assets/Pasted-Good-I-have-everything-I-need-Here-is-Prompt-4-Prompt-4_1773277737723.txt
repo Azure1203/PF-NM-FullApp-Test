@@ -1,0 +1,179 @@
+Good — I have everything I need. Here is Prompt 4:
+Prompt 4 — Formula Tester / Pricing Sandbox
+
+Paste this entire prompt into Replit:
+
+We need to build a Formula Tester page — a sandbox where you can pick any product, enter sample dimensions and attribute values, and see the pricing formula evaluate in real time with a full breakdown of what went into the calculation. This is a critical debugging tool for building and validating pricing formulas.
+
+This prompt creates one new backend API endpoint, one new frontend page, and adds it to the sidebar navigation.
+Part 1 — Backend API endpoint
+
+Add this route to server/routes.ts:
+
+POST /api/admin/formula-test
+
+Request body:
+typescript
+
+{
+  productId: number,
+  inputs: {
+    width: number,
+    height: number,
+    depth: number,
+    quantity: number,
+    // Plus any extra key-value pairs the user wants to inject into the scope
+    [key: string]: any
+  }
+}
+
+This route should:
+
+    Load the product by ID from storage.getAllmoxyProducts() (filter by id), including its pricingProxyId and exportProxyId
+    Load the product's grid bindings via storage.getProductGridBindings(productId)
+    Load all attribute grids via storage.getAttributeGrids() and build a gridMap
+    Load all proxy variables and build a proxyVarMap
+    Build the contextScope object by iterating the bindings:
+        For each binding, look up the matching grid row using inputs[binding.lookupColumn] as the key (the user provides the lookup values directly in the inputs object)
+        If a row is found: contextScope[binding.alias] = row.rowData
+        If no row is found: contextScope[binding.alias] = null and note it as a warning
+    Build the final scope that the pricing engine would use:
+
+typescript
+
+   const finalScope = {
+     width: inputs.width || 0,
+     height: inputs.height || 0,
+     depth: inputs.depth || 0,
+     quantity: inputs.quantity || 1,
+     ...contextScope
+   }
+
+    Evaluate the pricing formula using evaluatePrice() — but for the tester, also catch and return the error if it fails
+    Evaluate the export formula using generateOrdItemBlock() if an export proxy is set
+    Return this response object:
+
+typescript
+
+   {
+     productName: string,
+     skuPrefix: string | null,
+     pricingFormulaName: string | null,
+     exportFormulaName: string | null,
+     finalScope: Record<string, any>,   // the full scope passed to the formula
+     gridLookupResults: Array<{         // what each binding resolved to
+       alias: string,
+       gridName: string,
+       lookupColumn: string,
+       lookupValue: string,
+       matched: boolean,
+       rowData: any | null
+     }>,
+     unitPrice: number,
+     totalPrice: number,               // unitPrice * quantity
+     pricingError: string | null,
+     exportText: string | null,
+     exportError: string | null,
+   }
+
+Require isAuthenticated on this route.
+Part 2 — Frontend page
+
+Create a new file client/src/pages/admin/FormulaTester.tsx.
+
+Layout: Two-column layout. Left column (40% width) contains all the inputs. Right column (60% width) shows the results. On narrow screens, stack vertically.
+
+Left column — Inputs:
+
+Product selector (at the top, full width):
+
+    A <Select> that lists all products from GET /api/admin/allmoxy-products
+    Shows product name and SKU prefix in the option: "34SHFF — Wall Panel" format (or just the name if no SKU prefix)
+    When a product is selected, load its grid bindings from GET /api/admin/allmoxy-products/:id/grid-bindings, then also load the full grid details to know what lookupColumn each binding expects
+
+Dimension inputs (grid of 4):
+
+    Width (mm) — number input, default 300
+    Height (mm) — number input, default 600
+    Depth (mm) — number input, default 19
+    Quantity — number input, default 1
+
+Grid lookup inputs (dynamic, shown after product is selected):
+
+    For each grid binding on the selected product, render a labeled text input
+    Label: "{alias}" lookup ({lookupColumn} column) — e.g. "color" lookup (Color column)
+    Placeholder: the binding's lookupColumn value, e.g. Color
+    Helper text beneath: "Enter the value from the {lookupColumn} column of your CSV for this item"
+    These inputs feed into inputs[binding.lookupColumn] in the API request
+
+Run Test button — full width, primary style, labeled "Run Pricing Test". Triggers the API call. Shows a spinner while loading.
+
+Left column also shows — a small info box beneath the button explaining: "This tester simulates exactly what happens when an order CSV is processed. Enter the same values you'd see in an actual CSV row to verify the price is calculated correctly."
+
+Right column — Results:
+
+The right column starts empty with a placeholder message: "Select a product and enter dimensions, then click Run Pricing Test."
+
+After a successful test, show four sections:
+
+Section 1 — Price Result (prominent, at the top):
+
+    Large display of the unit price: $XX.XX per unit
+    Total price below it: Total (qty N): $XX.XX
+    If pricingError is set: show a red error banner instead with the error message
+    Show which formula was used: "Evaluated using: {pricingFormulaName}"
+
+Section 2 — Grid Lookup Results (collapsible, open by default):
+
+    Header: "Grid Lookups"
+    For each entry in gridLookupResults:
+        Show a row with: alias badge, grid name, lookup column → lookup value, and a green ✓ or red ✗ for whether it matched
+        If matched, show a "View Row Data" toggle that expands to show the full rowData as a formatted JSON block
+        If not matched, show a warning: "No row found in '{gridName}' for {lookupColumn} = '{lookupValue}'"
+
+Section 3 — Full Scope Dump (collapsible, collapsed by default):
+
+    Header: "Full Formula Scope" with a small label "(everything the formula can see)"
+    Shows finalScope as a formatted, syntax-highlighted JSON block
+    Use a <pre> tag with bg-slate-900 text-green-400 styling (monospace, dark background)
+    This is the most important debugging tool — it shows exactly what variables were available when the formula ran
+
+Section 4 — Export Text Preview (only shown if product has an export formula):
+
+    Header: "Cabinet Vision Export Block"
+    Shows exportText in a <pre> block with monospace styling
+    If exportError is set, show the error in red instead
+
+Part 3 — Wire it up
+
+Add the route to client/src/App.tsx:
+
+Import FormulaTester and add the route:
+tsx
+
+<Route path="/admin/formula-tester" component={FormulaTester} />
+
+Add it to the sidebar in client/src/components/AppLayout.tsx:
+
+Add to the SYSTEM ADMINISTRATION section, after "Proxy Variables" and before "Settings":
+typescript
+
+{ name: "Formula Tester", href: "/admin/formula-tester", icon: FlaskConical },
+
+Import FlaskConical from lucide-react.
+
+Also update getPageTitle() to handle the new path:
+typescript
+
+if (location === "/admin/formula-tester") return "Formula Tester";
+
+UX notes
+
+    The test should re-run automatically if the user presses Enter in any input field (add onKeyDown handler to call the test on Enter key)
+    The Run Test button should be disabled if no product is selected
+    After a test runs, the results panel should scroll to the top smoothly
+    Show the product's skuPrefix, description, and notes fields in a small info card at the top of the right column once a product is selected, so the user can see the product's documentation while testing
+    If the product has no pricingProxyId set, show a warning in the left column: "This product has no pricing formula assigned. Assign a Pricing Proxy Variable first."
+    If a grid binding has a lookupColumn but the user hasn't entered a value for it yet, highlight that input in amber to indicate it's needed
+
+After completing, confirm the Formula Tester page is accessible from the sidebar, a product can be selected, dimensions entered, and the test runs end-to-end — showing the price result, grid lookups, and scope dump in the results panel.

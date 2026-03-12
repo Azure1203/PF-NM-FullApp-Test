@@ -8,7 +8,8 @@ import {
   Settings, 
   User, 
   LogOut,
-  ChevronRight
+  ChevronRight,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ const navItems = [
       { name: "Products", href: "/admin/allmoxy-products", icon: Package },
       { name: "Attribute Grids", href: "/admin/attribute-grids", icon: Grid3X3 },
       { name: "Proxy Variables", href: "/admin/proxy-variables", icon: Code },
+      { name: "Formula Tester", href: "/admin/formula-tester", icon: FlaskConical },
       { name: "Settings", href: "/admin/color-grid", icon: Settings },
     ]
   }
