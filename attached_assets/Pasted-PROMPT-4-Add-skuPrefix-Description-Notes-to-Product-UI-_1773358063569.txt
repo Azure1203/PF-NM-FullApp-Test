@@ -1,0 +1,167 @@
+PROMPT 4 — Add skuPrefix, Description, Notes to Product UI + API
+Files: client/src/pages/admin/AllmoxyProductManager.tsx, server/routes.ts, server/storage.ts
+The allmoxyProducts table already has skuPrefix, description, and notes columns but none are exposed in the UI form, save route, or upsert.
+4A — Update Zod schema in AllmoxyProductManager.tsx
+Find:
+tsconst productSchema = z.object({
+  id: z.number().optional(),
+  name: z.string().min(1, "Name is required"),
+  status: z.enum(["active", "inactive"]),
+  pricingProxyId: z.number().nullable(),
+  exportProxyId: z.number().nullable(),
+});
+Replace with:
+tsconst productSchema = z.object({
+  id: z.number().optional(),
+  name: z.string().min(1, "Name is required"),
+  skuPrefix: z.string().nullable(),
+  description: z.string().nullable(),
+  notes: z.string().nullable(),
+  status: z.enum(["active", "inactive"]),
+  pricingProxyId: z.number().nullable(),
+  exportProxyId: z.number().nullable(),
+});
+4B — Update form.reset() in handleEdit
+Find:
+tsform.reset({
+  id: product.id,
+  name: product.name,
+  status: (product.status as "active" | "inactive") ?? "active",
+  pricingProxyId: product.pricingProxyId ?? null,
+  exportProxyId: product.exportProxyId ?? null,
+});
+Replace with:
+tsform.reset({
+  id: product.id,
+  name: product.name,
+  skuPrefix: product.skuPrefix ?? null,
+  description: product.description ?? null,
+  notes: product.notes ?? null,
+  status: (product.status as "active" | "inactive") ?? "active",
+  pricingProxyId: product.pricingProxyId ?? null,
+  exportProxyId: product.exportProxyId ?? null,
+});
+4C — Update form.reset() in handleNew
+Find:
+tsform.reset({
+  name: "",
+  status: "active",
+  pricingProxyId: null,
+  exportProxyId: null,
+});
+Replace with:
+tsform.reset({
+  name: "",
+  skuPrefix: null,
+  description: null,
+  notes: null,
+  status: "active",
+  pricingProxyId: null,
+  exportProxyId: null,
+});
+4D — Add three form fields to "Basic Information" section
+After the existing name and status fields, add:
+tsx<FormField
+  control={form.control}
+  name="skuPrefix"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>SKU Prefix</FormLabel>
+      <FormControl>
+        <Input
+          {...field}
+          value={field.value ?? ""}
+          onChange={(e) => field.onChange(e.target.value || null)}
+          placeholder="e.g. 34SHFF, 34MDRWB, MJDOOR"
+        />
+      </FormControl>
+      <p className="text-xs text-muted-foreground">
+        CSV rows whose SKU starts with this prefix will use this product's pricing formula.
+        Must match the start of the actual SKU exactly (case-insensitive).
+      </p>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
+<FormField
+  control={form.control}
+  name="description"
+  render={({ field }) => (
+    <FormItem className="col-span-2">
+      <FormLabel>Description</FormLabel>
+      <FormControl>
+        <Input
+          {...field}
+          value={field.value ?? ""}
+          onChange={(e) => field.onChange(e.target.value || null)}
+          placeholder="Short description of this product type"
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
+<FormField
+  control={form.control}
+  name="notes"
+  render={({ field }) => (
+    <FormItem className="col-span-2">
+      <FormLabel>Notes</FormLabel>
+      <FormControl>
+        <textarea
+          className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          {...field}
+          value={field.value ?? ""}
+          onChange={(e) => field.onChange(e.target.value || null)}
+          placeholder="Internal notes about pricing logic, special cases, formula variable names used, etc."
+        />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+4E — Update save route in server/routes.ts
+Find:
+tsconst { name, status, pricingProxyId, exportProxyId } = req.body;
+if (!name) {
+  return res.status(400).json({ message: 'name is required' });
+}
+const product = await storage.upsertAllmoxyProduct({
+  name,
+  status: status ?? 'active',
+  pricingProxyId: pricingProxyId ?? null,
+  exportProxyId: exportProxyId ?? null,
+});
+Replace with:
+tsconst { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes } = req.body;
+if (!name) {
+  return res.status(400).json({ message: 'name is required' });
+}
+const product = await storage.upsertAllmoxyProduct({
+  name,
+  status: status ?? 'active',
+  pricingProxyId: pricingProxyId ?? null,
+  exportProxyId: exportProxyId ?? null,
+  skuPrefix: skuPrefix ?? null,
+  description: description ?? null,
+  notes: notes ?? null,
+});
+4F — Update upsertAllmoxyProduct in server/storage.ts
+Find the onConflictDoUpdate set block:
+tsset: {
+  status: product.status,
+  pricingProxyId: product.pricingProxyId,
+  exportProxyId: product.exportProxyId,
+},
+Replace with:
+tsset: {
+  status: product.status,
+  pricingProxyId: product.pricingProxyId,
+  exportProxyId: product.exportProxyId,
+  skuPrefix: product.skuPrefix,
+  description: product.description,
+  notes: product.notes,
+},
+Note: upsertAllmoxyProduct conflicts on name — this is intentional. Do not change the conflict target.

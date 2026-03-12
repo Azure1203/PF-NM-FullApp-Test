@@ -86,9 +86,9 @@ export default function AllmoxyProductManager() {
       status: "active",
       pricingProxyId: null,
       exportProxyId: null,
-      skuPrefix: "",
-      description: "",
-      notes: "",
+      skuPrefix: null,
+      description: null,
+      notes: null,
     },
   });
 
@@ -225,9 +225,9 @@ export default function AllmoxyProductManager() {
       status: (product.status as "active" | "inactive") ?? "active",
       pricingProxyId: product.pricingProxyId ?? null,
       exportProxyId: product.exportProxyId ?? null,
-      skuPrefix: product.skuPrefix ?? "",
-      description: product.description ?? "",
-      notes: product.notes ?? "",
+      skuPrefix: product.skuPrefix ?? null,
+      description: product.description ?? null,
+      notes: product.notes ?? null,
     });
   };
 
@@ -239,9 +239,9 @@ export default function AllmoxyProductManager() {
       status: "active",
       pricingProxyId: null,
       exportProxyId: null,
-      skuPrefix: "",
-      description: "",
-      notes: "",
+      skuPrefix: null,
+      description: null,
+      notes: null,
     });
   };
 
