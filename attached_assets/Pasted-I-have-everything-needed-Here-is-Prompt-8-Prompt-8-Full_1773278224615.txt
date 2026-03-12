@@ -1,0 +1,201 @@
+I have everything needed. Here is Prompt 8:
+Prompt 8 — Full Asana Sync
+
+Paste this entire prompt into Replit:
+
+The Asana integration needs to be fully ported from the production app. All the logic already exists in the production codebase — this prompt is about porting it cleanly into the new app and wiring it to the new product-driven pipeline. Do not invent new logic; replicate what's already working in the production app exactly.
+
+This prompt touches: server/asanaImportScheduler.ts (new file), server/lib/asana.ts (verify), server/routes.ts (Asana route handlers), shared/schema.ts (schema additions if needed), and the Order Detail frontend page.
+Background: What the Asana integration does
+
+Manual sync (Sync to Asana button):
+
+    Creates a new Asana task in the PERFECT FIT PRODUCTION project, or updates an existing one if the project was auto-imported
+    Sets the task name to the project name
+    Populates all custom fields (see full list below)
+    Writes task notes with the app URL and per-file job numbers
+    Saves the Asana task GID to the local project record
+
+Status sync (pull from Asana):
+
+    Reads PF ORDER STATUS, PF PRODUCTION STATUS (multi-select), CIENAPPS JOB NUMBER, and the task's current section back into the local project record
+    Called on demand and by the background sync-all job
+
+Auto-import scheduler:
+
+    Polls the READY TO IMPORT section of the NEW JOBS Asana project every 10 minutes
+    For each unprocessed task with CSV attachments, downloads the CSVs and creates a project exactly like a manual upload
+    Runs the full pipeline: countPartsFromCSV, createOrderFile, pricing loop, extractCTSParts, generateHardwareChecklistForFile, generatePackingSlipChecklistForFile, computeAutoProductionStatuses
+    After creating the project, updates the Asana task with notes and custom fields
+    Records the task GID in processed_asana_tasks to avoid re-importing
+
+Asana GIDs (hardcoded constants — copy exactly)
+typescript
+
+const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
+const ASANA_NEW_JOBS_PROJECT_GID    = '1209262874404235';
+const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
+
+Schema additions needed
+
+In shared/schema.ts, add these two tables if they don't already exist:
+typescript
+
+export const processedAsanaTasks = pgTable("processed_asana_tasks", {
+  id: serial("id").primaryKey(),
+  taskGid: text("task_gid").notNull().unique(),
+  taskName: text("task_name"),
+  projectId: integer("project_id").references(() => projects.id, { onDelete: 'set null' }),
+  status: text("status").notNull().default('processed'), // 'processed' | 'failed'
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const asanaImportSyncStatus = pgTable("asana_import_sync_status", {
+  id: serial("id").primaryKey(),
+  lastSyncAt: timestamp("last_sync_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastError: text("last_error"),
+  tasksProcessed: integer("tasks_processed").default(0),
+  tasksImported: integer("tasks_imported").default(0),
+});
+
+export type AsanaImportSyncStatus = typeof asanaImportSyncStatus.$inferSelect;
+
+Run npm run db:push after adding these.
+Part 1 — server/lib/asana.ts
+
+Verify this file exists and exports getAsanaApiInstances(). It should use Replit Connectors OAuth to get an Asana access token and return { tasksApi, projectsApi, attachmentsApi, sectionsApi } from the asana npm package. If the file is missing or incomplete, create it by copying from the production app exactly.
+Part 2 — server/asanaImportScheduler.ts
+
+This file should already exist from the production app port. Verify it has all of the following and fix/add anything missing:
+
+Exported functions:
+
+    startAsanaImportScheduler() — starts the 10-minute polling interval, runs one pass immediately on startup
+    stopAsanaImportScheduler() — clears the interval
+    triggerManualAsanaImport() — runs one pass immediately, returns { processed, imported }
+    getAsanaImportStatus() — returns the latest asana_import_sync_status row
+
+processAsanaImportTasks() internal function must:
+
+    Call tasksApi.getTasksForSection(ASANA_READY_TO_IMPORT_SECTION_GID, ...) to get tasks
+    Skip completed tasks and tasks already in processed_asana_tasks
+    For each unprocessed task, download all CSV attachments
+    Parse CSVs and create project (same logic as the upload handler)
+    Run the FULL pipeline per file: countPartsFromCSV → createOrderFile → product-driven pricing loop (same as POST /api/orders/upload from Prompt 3) → extractCTSParts → generateHardwareChecklistForFile → generatePackingSlipChecklistForFile
+    Run computeAutoProductionStatuses and updateProjectBoProductionStatus after all files
+    Mark task as processed in processed_asana_tasks
+    Update the Asana task with notes (packaging link + per-file job numbers) and all custom fields
+    Update asana_import_sync_status with latest counts
+
+The pricing loop inside the scheduler must reuse the same matchProductToSku helper and product/grid/proxy loading pattern established in Prompt 3. Load active products, their bindings, and proxy variables before the file loop, then match and price each item exactly the same way.
+Part 3 — Asana route handlers in server/routes.ts
+
+Verify these routes exist and are correct. Port from production if missing:
+
+POST /api/orders/:id/sync — Manual sync to Asana:
+
+    Load project, files, pallets
+    Build task notes: app URL on line 1, then one line per file: {filename without .csv} - {allmoxyJobNumber || 'N/A'}
+    Create task in ASANA_PERFECT_FIT_PROJECT_GID with project name as title, OR update existing task if project.asanaTaskId is set
+    Set ALL custom fields listed in Part 4 below
+    Save asanaTaskId and set status = 'synced' on the project
+    Return updated project
+
+POST /api/orders/:id/sync-asana-status — Pull status from Asana:
+
+    Fetch task with opt_fields: 'memberships.section.name,memberships.project.gid,custom_fields.name,custom_fields.display_value,custom_fields.multi_enum_values.name'
+    Extract section from the membership matching ASANA_PERFECT_FIT_PROJECT_GID
+    Extract PF ORDER STATUS, PF PRODUCTION STATUS (multi_enum), CIENAPPS JOB NUMBER
+    Update project locally, return updated project
+
+POST /api/sync-all-asana-status — Background batch sync (no auth required, called by scheduler):
+
+    Fetch all projects where status = 'synced' and asanaTaskId is set
+    For each, fetch latest Asana data and update local record
+    Return { updated: number }
+
+POST /api/orders/:id/asana-task-id — Set task ID manually:
+
+    Body: { asanaTaskId: string }
+    Update project record, set status to synced
+
+PATCH /api/orders/:id/production-status — Update production status both locally and in Asana:
+
+    Body: { pfProductionStatus: string[] }
+    Update locally first
+    If asanaTaskId exists, push to Asana PF PRODUCTION STATUS multi-enum field
+
+Part 4 — Custom fields synced to Asana
+
+When syncing (both manual and auto-import), iterate the project's custom field settings and set these fields by name match (case-insensitive). Use the exact same matching logic as the production app:
+Asana Field Name	Also Accepts	Type	Value
+PF DEALER	PERFECT FIT DEALER	text	project.dealer
+ORDER DATE	—	text or date	project.date
+PF ADDRESS	—	text	project.shippingAddress
+PF PHONE NUMBER	—	text	project.phone
+PF TAX ID	PF TAX ID:	text	project.taxId
+PF ORDER ID	ORDER ID	text or number	project.orderId
+PF POWER TAILGATE NEEDED	PF POWER TAILGATE NEEDED?	enum yes/no	project.powerTailgate
+PF PHONE APPT NEEDED	PF PHONE APPT NEEDED?	enum yes/no	project.phoneAppointment
+PF DOVETAILS	—	number	sum of dovetails across all files
+PF 5 PIECE	—	number	sum of fivePieceDoors across all files
+PF ASSEMBLED DRAWERS	—	number	sum of assembledDrawers across all files
+PF PARTS	—	number	sum of coreParts across all files
+PF WEIGHT	—	number	sum of weightLbs across all files
+HARDWARE PACKED	—	enum yes/no	whether all pallet assignments have hardware packed
+PACKAGING COST	—	number or text	palletCount * 150
+CIENAPPS JOB NUMBER	—	text	project.cienappsJobNumber
+PF PRODUCTION STATUS	—	multi_enum	project.pfProductionStatus array, matched by name to GIDs
+Part 5 — Start the scheduler from server/index.ts
+
+In server/index.ts (or wherever the app is bootstrapped), import and start the scheduler:
+typescript
+
+import { startAsanaImportScheduler } from './asanaImportScheduler';
+// After the server starts:
+startAsanaImportScheduler();
+
+If it's already there, verify it.
+Part 6 — Frontend: Sync button and status display
+
+In client/src/pages/OrderDetails.tsx, verify the "Sync to Asana" button works and calls POST /api/orders/:id/sync. It should:
+
+    Show a spinner while syncing
+    On success, show a toast and display the Asana task link: https://app.asana.com/0/{ASANA_PERFECT_FIT_PROJECT_GID}/{taskGid}
+    On error, show an error toast with the message
+
+Also verify the "Sync Status from Asana" button calls POST /api/orders/:id/sync-asana-status and refreshes the displayed pfOrderStatus, pfProductionStatus, and asanaSection.
+
+In client/src/pages/daily/OrderProcessingDashboard.tsx, verify the "Import from Asana" button calls POST /api/admin/trigger-asana-import (or whatever the manual trigger endpoint is) and shows last import time from GET /api/admin/asana-import-status.
+Part 7 — Manual trigger endpoint
+
+Add if missing:
+typescript
+
+app.post('/api/admin/trigger-asana-import', isAuthenticated, async (_req, res) => {
+  try {
+    const result = await triggerManualAsanaImport();
+    res.json(result);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.get('/api/admin/asana-import-status', isAuthenticated, async (_req, res) => {
+  try {
+    const status = await getAsanaImportStatus();
+    res.json(status);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+After completing, confirm:
+
+    App starts without errors
+    startAsanaImportScheduler log line appears in the server console
+    Manual "Import from Asana" button triggers a run and logs appear
+    "Sync to Asana" on an order detail page creates/updates the Asana task and saves the task GID
+    "Sync Status" button pulls the section and custom field values back from Asana

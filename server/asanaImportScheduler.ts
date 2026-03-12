@@ -2,8 +2,11 @@ import { getAsanaApiInstances } from './lib/asana';
 import { storage } from './storage';
 import { db } from './db';
 import { processedAsanaTasks, asanaImportSyncStatus } from '@shared/schema';
-import type { AsanaImportSyncStatus } from '@shared/schema';
+import type { AsanaImportSyncStatus, AllmoxyProduct, ProductGridBinding } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { parse as parseSync } from 'csv-parse/sync';
+import { evaluatePrice } from './services/pricingEngine';
+import { generateOrdItemBlock } from './services/ordExporter';
 import {
   parseCSV,
   findValue,
@@ -16,6 +19,22 @@ import {
   generatePackingSlipChecklistForFile,
   updateProjectBoProductionStatus
 } from './csvHelpers';
+
+// Same longest-prefix matching logic as the upload handler in routes.ts
+function matchProductToSku(sku: string, activeProducts: AllmoxyProduct[]): AllmoxyProduct | null {
+  if (!sku) return null;
+  const upperSku = sku.toUpperCase().trim();
+  let bestMatch: AllmoxyProduct | null = null;
+  let bestLength = 0;
+  for (const product of activeProducts) {
+    const prefix = (product.skuPrefix || '').toUpperCase().trim();
+    if (prefix && upperSku.startsWith(prefix) && prefix.length > bestLength) {
+      bestMatch = product;
+      bestLength = prefix.length;
+    }
+  }
+  return bestMatch;
+}
 
 const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
 const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
@@ -148,6 +167,21 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
           autoImported: true
         });
 
+        // ── Product-driven pipeline pre-load (mirrors upload handler) ──
+        const allProxyVars = await storage.getProxyVariables();
+        const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
+        const allProducts = await storage.getAllmoxyProducts();
+        const activeProducts = allProducts.filter(
+          (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
+        );
+        const productBindingsMap = new Map<number, ProductGridBinding[]>();
+        for (const prod of activeProducts) {
+          const binds = await storage.getProductGridBindings(prod.id);
+          productBindingsMap.set(prod.id, binds);
+        }
+        const allGrids = await storage.getAttributeGrids();
+        const gridMap = new Map(allGrids.map(g => [g.id, g]));
+
         let totalDovetails = 0;
         let totalFivePiece = 0;
         let totalAssembledDrawers = 0;
@@ -208,6 +242,69 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
 
           const packingSlipResult = await generatePackingSlipChecklistForFile(orderFile.id, pf.content);
           console.log(`[Asana Import] Order ${orderFile.id}: Packing slip checklist - ${packingSlipResult.itemCount} items`);
+
+          // ── Product-driven pricing loop (same as upload handler) ──
+          await storage.deleteOrderItemsByFile(orderFile.id);
+          const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+          for (const item of itemObjects) {
+            const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
+            if (!sku) continue;
+
+            const product = matchProductToSku(sku, activeProducts);
+            console.log(`[Asana Import Pipeline] SKU: ${sku} → ${product ? `matched: ${product.name}` : 'NO MATCH'}`);
+
+            const contextScope: any = {};
+            if (product) {
+              const bindings = productBindingsMap.get(product.id) ?? [];
+              for (const binding of bindings) {
+                const grid = gridMap.get(binding.gridId);
+                if (!grid) continue;
+                const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
+                if (!lookupValue) continue;
+                const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
+                if (row) contextScope[binding.alias] = row.rowData;
+              }
+            }
+
+            let unitPrice = 0;
+            let pricingError: string | null = null;
+            if (product && product.pricingProxyId != null) {
+              const proxy = proxyVarMap.get(product.pricingProxyId);
+              if (proxy) {
+                try { unitPrice = evaluatePrice(proxy.formula, item, contextScope); }
+                catch (e: any) { pricingError = e.message; unitPrice = 0; }
+              }
+            } else if (!product) {
+              pricingError = `No product matched SKU prefix for: ${sku}`;
+            }
+
+            let exportText: string | null = null;
+            if (product && product.exportProxyId != null) {
+              const proxy = proxyVarMap.get(product.exportProxyId);
+              if (proxy) {
+                try { exportText = generateOrdItemBlock(item, contextScope, proxy.formula); }
+                catch { exportText = null; }
+              }
+            }
+
+            const qty = parseInt(item.Qty || item.qty || item.Quantity || '1') || 1;
+            await storage.createOrderItem({
+              projectId: project.id,
+              fileId: orderFile.id,
+              productId: product?.id ?? null,
+              sku,
+              description: item.NAME || item['Part Name'] || item.Description || '',
+              width: parseFloat(item.Width || item.width || '0') || null,
+              height: parseFloat(item.Height || item.height || '0') || null,
+              depth: parseFloat(item.Thickness || item.thickness || item.Depth || '0') || null,
+              quantity: qty,
+              unitPrice,
+              totalPrice: unitPrice * qty,
+              exportText,
+              pricingError,
+              rawRowData: item,
+            });
+          }
         }
 
         const autoStatuses = computeAutoProductionStatuses({

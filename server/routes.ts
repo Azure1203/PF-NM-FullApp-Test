@@ -3286,6 +3286,25 @@ export async function registerRoutes(
     }
   });
 
+  // Alias routes expected by the prompt spec
+  app.post('/api/admin/trigger-asana-import', isAuthenticated, async (_req, res) => {
+    try {
+      const result = await triggerManualAsanaImport();
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get('/api/admin/asana-import-status', isAuthenticated, async (_req, res) => {
+    try {
+      const status = await getAsanaImportStatus();
+      res.json(status);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/asana-import/reset/:projectId', isAuthenticated, async (req, res) => {
     try {
       const replitUser = (req as any).user;
