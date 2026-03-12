@@ -1,0 +1,142 @@
+PROMPT 6 — Grid Bindings UI Panel in Product Manager
+File: client/src/pages/admin/AllmoxyProductManager.tsx
+How bindings work: Each binding has three parts — Grid (which attribute grid), Alias (the variable prefix used in the formula, e.g. color → color.level_percent_upcharge), and Lookup Column (the order CSV column name whose value selects the grid row, e.g. Color).
+6A — Add imports
+tsimport type { AttributeGrid, ProductGridBinding } from "@shared/schema";
+import { useEffect } from "react";
+(Add useEffect to the existing React import if not already present.)
+6B — Add state and queries (after existing proxyVars query)
+tsconst { data: allGrids = [] } = useQuery<AttributeGrid[]>({
+  queryKey: ["/api/admin/attribute-grids"],
+});
+
+const { data: savedBindings = [], refetch: refetchBindings } = useQuery<ProductGridBinding[]>({
+  queryKey: ["/api/admin/allmoxy-products", editingId, "bindings"],
+  enabled: editingId !== null,
+  queryFn: () =>
+    fetch(`/api/admin/allmoxy-products/${editingId}/bindings`)
+      .then(r => r.json()),
+});
+
+const [editingBindings, setEditingBindings] = useState<
+  Array<{ gridId: number | null; alias: string; lookupColumn: string }>
+>([]);
+
+useEffect(() => {
+  setEditingBindings(
+    savedBindings.map(b => ({
+      gridId: b.gridId,
+      alias: b.alias,
+      lookupColumn: b.lookupColumn,
+    }))
+  );
+}, [savedBindings]);
+
+const saveBindingsMutation = useMutation({
+  mutationFn: async () => {
+    const res = await fetch(`/api/admin/allmoxy-products/${editingId}/bindings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bindings: editingBindings.filter(b => b.gridId !== null && b.alias.trim() !== ''),
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to save bindings');
+    return res.json();
+  },
+  onSuccess: () => {
+    refetchBindings();
+    toast({ title: "Grid bindings saved" });
+  },
+  onError: (e: Error) => {
+    toast({ title: "Error saving bindings", description: e.message, variant: "destructive" });
+  },
+});
+6C — Add Grid Bindings section to form (after "Logic Binding" section)
+tsx{editingId && (
+  <div className="space-y-4">
+    <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">
+      Grid Bindings
+    </h3>
+    <p className="text-xs text-muted-foreground">
+      Declare which attribute grids this product's formula reads from.{" "}
+      <strong>Alias</strong> = the variable prefix used in the formula (e.g. <code>color</code> → <code>color.level_percent_upcharge</code>).{" "}
+      <strong>Lookup Column</strong> = the order CSV column name whose value selects the row (e.g. <code>Color</code>).
+    </p>
+    <div className="space-y-2">
+      {editingBindings.map((binding, index) => (
+        <div key={index} className="flex gap-2 items-center">
+          <div className="flex-1">
+            <Select
+              value={binding.gridId !== null ? String(binding.gridId) : "none"}
+              onValueChange={(val) => {
+                const updated = [...editingBindings];
+                updated[index] = { ...updated[index], gridId: val === "none" ? null : Number(val) };
+                setEditingBindings(updated);
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select grid..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— Select grid —</SelectItem>
+                {allGrids.map(g => (
+                  <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Input
+            className="flex-1 h-8 text-xs"
+            placeholder="Alias (e.g. color)"
+            value={binding.alias}
+            onChange={(e) => {
+              const updated = [...editingBindings];
+              updated[index] = { ...updated[index], alias: e.target.value };
+              setEditingBindings(updated);
+            }}
+          />
+          <Input
+            className="flex-1 h-8 text-xs"
+            placeholder="CSV Column (e.g. Color)"
+            value={binding.lookupColumn}
+            onChange={(e) => {
+              const updated = [...editingBindings];
+              updated[index] = { ...updated[index], lookupColumn: e.target.value };
+              setEditingBindings(updated);
+            }}
+          />
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 shrink-0"
+            onClick={() => setEditingBindings(editingBindings.filter((_, i) => i !== index))}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      ))}
+    </div>
+    <div className="flex gap-2">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => setEditingBindings([...editingBindings, { gridId: null, alias: "", lookupColumn: "" }])}
+      >
+        <Plus className="h-3 w-3 mr-1" /> Add Binding
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => saveBindingsMutation.mutate()}
+        disabled={saveBindingsMutation.isPending}
+      >
+        {saveBindingsMutation.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+        Save Bindings
+      </Button>
+    </div>
+  </div>
+)}
+Add X and Plus to the lucide-react import if not already present.
