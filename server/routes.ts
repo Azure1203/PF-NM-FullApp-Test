@@ -17,6 +17,7 @@ import crypto from 'crypto';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
 import { getGoogleSheetsClient, getGoogleDriveClient } from "./googleSheets";
+import { getBackupSchedulerStatus } from "./backupScheduler";
 import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
 import { getAgentMailSyncStatus, triggerManualAgentMailFetch, clearAgentMailProcessedEmails } from "./agentmailScheduler";
 import { testAgentMailConnection } from "./agentmail";
@@ -5664,6 +5665,8 @@ export async function registerRoutes(
       };
       
       res.json({ 
+        success: true,
+        url: spreadsheetUrl,
         message: 'Backup completed successfully', 
         spreadsheetUrl,
         spreadsheetId,
@@ -5672,7 +5675,15 @@ export async function registerRoutes(
       });
     } catch (e: any) {
       console.error('[Backup] Google Sheets backup failed:', e);
-      res.status(500).json({ message: 'Backup failed', error: e.message });
+      res.status(500).json({ success: false, error: e.message, message: 'Backup failed' });
+    }
+  });
+
+  app.get('/api/backup/status', isAuthenticated, async (_req, res) => {
+    try {
+      res.json(getBackupSchedulerStatus());
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
     }
   });
 

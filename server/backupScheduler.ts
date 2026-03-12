@@ -22,16 +22,16 @@ function getMsUntilNext(): number {
   return getNextRunTime().getTime() - Date.now();
 }
 
-async function runScheduledBackup(): Promise<void> {
+export async function runScheduledBackup(): Promise<{ url: string; title: string }> {
   log('Starting scheduled daily backup...', 'backup-scheduler');
 
+  const sheets = await getGoogleSheetsClient();
+  const drive = await getGoogleDriveClient();
+
+  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const title = `PF Order Backup - ${timestamp}`;
+
   try {
-    const sheets = await getGoogleSheetsClient();
-    const drive = await getGoogleDriveClient();
-
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const title = `PF Order Backup - ${timestamp}`;
-
     const spreadsheet = await sheets.spreadsheets.create({
       requestBody: {
         properties: { title },
@@ -47,6 +47,7 @@ async function runScheduledBackup(): Promise<void> {
     });
 
     const spreadsheetId = spreadsheet.data.spreadsheetId!;
+    const spreadsheetUrl = spreadsheet.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 
     const folderSearch = await drive.files.list({
       q: `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`,
@@ -223,11 +224,13 @@ async function runScheduledBackup(): Promise<void> {
     lastBackupStatus = 'success';
     lastBackupError = null;
     log(`Scheduled backup complete: ${totalRecords} records exported to "${title}"`, 'backup-scheduler');
+    return { url: spreadsheetUrl, title };
   } catch (err: any) {
     lastBackupTime = new Date().toISOString();
     lastBackupStatus = 'error';
     lastBackupError = err.message || String(err);
     log(`Scheduled backup failed: ${err.message}`, 'backup-scheduler');
+    throw err;
   }
 }
 
@@ -237,7 +240,7 @@ function scheduleNext(): void {
   log(`Next backup scheduled for ${nextRun.toLocaleString()} (in ${Math.round(ms / 60000)} minutes)`, 'backup-scheduler');
 
   schedulerTimeout = setTimeout(async () => {
-    await runScheduledBackup();
+    try { await runScheduledBackup(); } catch { /* already logged inside */ }
     scheduleNext();
   }, ms);
 }

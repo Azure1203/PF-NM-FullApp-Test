@@ -38,7 +38,8 @@ import {
   Share2,
   Mail,
   RefreshCw,
-  RotateCcw
+  RotateCcw,
+  Sheet
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -83,6 +84,11 @@ export default function OrderProcessingDashboard() {
     refetchInterval: 60_000,
   });
 
+  const { data: backupStatus } = useQuery<any>({
+    queryKey: ['/api/backup/status'],
+    refetchInterval: 60_000,
+  });
+
   const agentmailFetchMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/agentmail/fetch", {});
@@ -120,6 +126,19 @@ export default function OrderProcessingDashboard() {
       });
     },
     onError: (e: Error) => toast({ title: "Outlook Fetch Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const backupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/backup/google-sheets", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Backup Complete", description: data.title || "Spreadsheet created successfully" });
+      const url = data.url || data.spreadsheetUrl;
+      if (url) window.open(url, '_blank');
+    },
+    onError: (e: Error) => toast({ title: "Backup Failed", description: e.message, variant: "destructive" }),
   });
 
   const uploadMutation = useMutation({
@@ -285,6 +304,32 @@ export default function OrderProcessingDashboard() {
                 <p className="text-xs">Last sync: {formatSyncTime(outlookStatus?.lastSuccessAt)}</p>
               </TooltipContent>
             </Tooltip>
+          </div>
+
+          <div className="h-6 w-px bg-slate-200" />
+
+          {/* Backup to Sheets */}
+          <div className="flex flex-col gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              disabled={backupMutation.isPending}
+              onClick={() => backupMutation.mutate()}
+              data-testid="button-backup-to-sheets"
+            >
+              {backupMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sheet className="h-4 w-4" />
+              )}
+              {backupMutation.isPending ? "Backing up..." : "Backup to Sheets"}
+            </Button>
+            {backupStatus?.nextRun && (
+              <p className="text-xs text-muted-foreground pl-1">
+                Next auto-backup: {new Date(backupStatus.nextRun).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
