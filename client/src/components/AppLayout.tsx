@@ -5,11 +5,12 @@ import {
   Package, 
   Grid3X3, 
   Code, 
-  Settings, 
-  User, 
   LogOut,
   ChevronRight,
   FlaskConical,
+  ClipboardList,
+  Users,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ const navItems = [
     section: "DAILY OPERATIONS",
     items: [
       { name: "Order Processing", href: "/", icon: ShoppingCart },
+      { name: "All Orders", href: "/orders", icon: ClipboardList },
     ]
   },
   {
@@ -39,7 +41,8 @@ const navItems = [
       { name: "Attribute Grids", href: "/admin/attribute-grids", icon: Grid3X3 },
       { name: "Proxy Variables", href: "/admin/proxy-variables", icon: Code },
       { name: "Formula Tester", href: "/admin/formula-tester", icon: FlaskConical },
-      { name: "Settings", href: "/admin/color-grid", icon: Settings },
+      { name: "Color Grid & Settings", href: "/admin/color-grid", icon: Palette },
+      { name: "Users", href: "/admin/users", icon: Users },
     ]
   }
 ];
