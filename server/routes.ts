@@ -5768,49 +5768,6 @@ export async function registerRoutes(
     }
   });
 
-  // ===== Color Grid Endpoints =====
-
-  // Get all color grid entries
-  app.get('/api/color-grid', async (_req, res) => {
-    try {
-      const entries = await storage.getColorGrid();
-      res.json(entries);
-    } catch (e: any) {
-      res.status(500).json({ message: 'Failed to fetch color grid', error: e.message });
-    }
-  });
-
-  // Import color grid from CSV (replaces existing)
-  app.post('/api/color-grid/import', upload.single('file'), async (req, res) => {
-    try {
-      const file = req.file;
-      if (!file) {
-        return res.status(400).json({ message: 'No file uploaded' });
-      }
-
-      const fileContent = file.buffer.toString('utf-8');
-      const records = await parseCSV(fileContent);
-
-      const entries: { code: string; description: string }[] = [];
-      for (let i = 1; i < records.length; i++) {
-        const code = (records[i][0] || '').trim();
-        const description = (records[i][1] || '').trim();
-        if (code && description) {
-          entries.push({ code, description });
-        }
-      }
-
-      if (entries.length === 0) {
-        return res.status(400).json({ message: 'No valid color entries found in CSV' });
-      }
-
-      const inserted = await storage.replaceColorGrid(entries);
-      res.json({ message: `Imported ${inserted.length} color entries`, count: inserted.length });
-    } catch (e: any) {
-      res.status(500).json({ message: 'Failed to import color grid', error: e.message });
-    }
-  });
-
   // Get color breakdown for a project (computed from stored CSV data)
   // Returns per-file material breakdown: each file with its color/quantity list
   // Excludes: hardware (M-, H., R-, S. prefixes), dovetails (DBX/SDBX), glass items, empty color codes

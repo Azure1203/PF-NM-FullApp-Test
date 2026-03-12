@@ -989,50 +989,43 @@ export default function HowItWorks() {
             </ul>
           </section>
 
-          <section className="mt-6 pt-6 border-t dark:border-slate-700" data-testid="section-color-grid">
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2" data-testid="text-color-grid-title">
+          <section className="mt-6 pt-6 border-t" data-testid="section-color-grid">
+            <h2 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2" data-testid="text-color-grid-title">
               <Palette className="w-5 h-5" />
-              Material Summary &amp; Color Grid
+              Material Summary
             </h2>
-            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-4" data-testid="text-color-grid-description">
-              The system tracks which material colors are used in each order file. This helps you see at a glance what sheet materials are needed for production.
+            <p className="text-muted-foreground mb-4" data-testid="text-color-grid-description">
+              The system tracks which material colours are used in each order file, giving you a quick overview of what sheet materials are needed for production.
             </p>
 
             <div className="space-y-4">
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
-                <h3 className="font-semibold mb-2 dark:text-slate-100">How It Works</h3>
-                <ol className="list-decimal list-inside text-sm text-muted-foreground dark:text-muted-foreground/70 space-y-2">
+              <div className="p-4 bg-muted/40 rounded-lg border">
+                <h3 className="font-semibold mb-2">How It Works</h3>
+                <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-2">
                   <li>When you upload a CSV order file, the system reads each row's material code (column B in the CSV)</li>
-                  <li>It compares each code against the Color Grid database, which contains all known material codes (TFL, MT, HG, HPL, etc.)</li>
                   <li>Hardware items (codes starting with M-, H., R-, S.), dovetails (DBX/SDBX), and glass items are automatically excluded</li>
-                  <li>The remaining parts are grouped by color code and counted</li>
+                  <li>The remaining parts are grouped by colour code and counted</li>
                   <li>The result is shown as a collapsible "Material Summary Report" on the order details page</li>
                 </ol>
               </div>
 
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
-                <h3 className="font-semibold mb-2 dark:text-slate-100">Material Summary Report</h3>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground/70 mb-2">
-                  Found on the order details page (collapsed by default, click "Material Summary Report" to expand). It shows:
+              <div className="p-4 bg-muted/40 rounded-lg border">
+                <h3 className="font-semibold mb-2">Material Summary Report</h3>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Found on the order details page (collapsed by default). It shows:
                 </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground dark:text-muted-foreground/70 space-y-1">
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                   <li>Each file in the order listed separately with its name</li>
                   <li>The total number of material parts in each file</li>
-                  <li>A breakdown of each color code used, with the full material description and part count</li>
+                  <li>A breakdown of each colour code used with its part count</li>
                 </ul>
               </div>
 
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
-                <h3 className="font-semibold mb-2 dark:text-slate-100">Color Grid Management</h3>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground/70 mb-2">
-                  The Color Grid page (accessible from the "Colors" button on the Dashboard) manages the list of known material codes:
+              <div className="p-4 bg-muted/40 rounded-lg border">
+                <h3 className="font-semibold mb-2">Colour Data Management</h3>
+                <p className="text-sm text-muted-foreground">
+                  Material colour data is managed through the <strong>Attribute Grids</strong> page (System Administration → Attribute Grids). The <code className="text-xs bg-muted px-1 py-0.5 rounded">Main_Color_Attribute</code> grid defines the full set of known material codes and their descriptions.
                 </p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground dark:text-muted-foreground/70 space-y-1">
-                  <li>View all color codes and their full descriptions in a table</li>
-                  <li>Import a new color grid from a CSV file (columns: code, description)</li>
-                  <li>Importing replaces the entire grid with the new data</li>
-                  <li>Currently includes TFL, MT, HG, and HPL material series</li>
-                </ul>
               </div>
             </div>
           </section>

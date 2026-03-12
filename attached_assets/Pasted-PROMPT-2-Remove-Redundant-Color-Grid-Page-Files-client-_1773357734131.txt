@@ -1,0 +1,29 @@
+PROMPT 2 — Remove Redundant Color Grid Page
+Files: client/src/components/AppLayout.tsx, client/src/App.tsx, client/src/pages/ColorGrid.tsx (delete), server/routes.ts, server/storage.ts
+The color_grid table is a primitive two-column (code, description) leftover from before the attribute grid system was built. The pricing pipeline never reads from it. The real colour data is Main_Color_Attribute in the attribute_grids system. Remove everything related to the Color Grid page. The DB table itself can stay — no migration needed.
+2A — Remove sidebar link from AppLayout.tsx
+In the navItems array, remove this entry entirely:
+ts{ name: "Settings", href: "/admin/color-grid", icon: Settings },
+Then check if Settings is used anywhere else in AppLayout.tsx. If not, remove it from the lucide import:
+ts// Remove Settings from:
+import { ShoppingCart, Package, Grid3X3, Code, Settings, User, LogOut, ChevronRight } from "lucide-react";
+2B — Remove route from App.tsx
+Remove the route:
+tsx<Route path="/admin/color-grid" component={ColorGrid} />
+Remove the import:
+tsimport ColorGrid from "@/pages/ColorGrid";
+2C — Delete client/src/pages/ColorGrid.tsx
+Delete this file entirely.
+2D — Remove API routes from server/routes.ts
+Find and remove the entire // ===== Color Grid Endpoints ===== block, including both routes beneath it (GET /api/color-grid and POST /api/color-grid/import).
+2E — Remove storage methods from server/storage.ts
+Remove from the IStorage interface:
+tsgetColorGrid(): Promise<ColorGridEntry[]>;
+replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]>;
+Remove the implementations from DatabaseStorage:
+tsasync getColorGrid(): Promise<ColorGridEntry[]> { ... }
+async replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]> { ... }
+Remove colorGrid, ColorGridEntry, InsertColorGridEntry from the @shared/schema import in storage.ts if they're no longer used.
+2F — Clean up remaining references
+Search the codebase for color-grid, ColorGrid, colorGrid, /api/color-grid, getColorGrid, replaceColorGrid. In particular, HowItWorks.tsx has a "Color Grid Management" documentation section — find it and rewrite it to say colour data is managed via the Attribute Grids page.
+Do not remove colorGrid from shared/schema.ts — leave the table definition. No migration needed.

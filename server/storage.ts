@@ -34,7 +34,6 @@ import {
   type InsertAllowedUser,
   colorGrid,
   type ColorGridEntry,
-  type InsertColorGridEntry,
   allmoxyProducts,
   type AllmoxyProduct,
   type InsertAllmoxyProduct,
@@ -145,7 +144,6 @@ export interface IStorage {
 
   getColorGrid(): Promise<ColorGridEntry[]>;
   getColorByCode(code: string): Promise<ColorGridEntry | undefined>;
-  replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]>;
 
   getAllmoxyProducts(): Promise<AllmoxyProduct[]>;
   upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct>;
@@ -695,15 +693,6 @@ export class DatabaseStorage implements IStorage {
   async getColorByCode(code: string): Promise<ColorGridEntry | undefined> {
     const [entry] = await db.select().from(colorGrid).where(eq(colorGrid.code, code));
     return entry;
-  }
-
-  async replaceColorGrid(entries: InsertColorGridEntry[]): Promise<ColorGridEntry[]> {
-    return await db.transaction(async (tx) => {
-      await tx.delete(colorGrid);
-      if (entries.length === 0) return [];
-      const inserted = await tx.insert(colorGrid).values(entries).returning();
-      return inserted;
-    });
   }
 
   async getAllmoxyProducts(): Promise<AllmoxyProduct[]> {

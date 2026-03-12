@@ -19,7 +19,7 @@ import Products from "@/pages/Products";
 import HardwareImport from "@/pages/HardwareImport";
 import ComponentImport from "@/pages/ComponentImport";
 import AdminUsers from "@/pages/AdminUsers";
-import ColorGrid from "@/pages/ColorGrid";
+import OrdSettings from "@/pages/admin/OrdSettings";
 import HowItWorks from "@/pages/HowItWorks";
 import DynamicGridManager from "@/pages/admin/DynamicGridManager";
 import ProxyVariableManager from "@/pages/admin/ProxyVariableManager";
@@ -81,7 +81,7 @@ function AppRouter() {
         <Route path="/products/import" component={HardwareImport} />
         <Route path="/products/import-components" component={ComponentImport} />
         <Route path="/admin/users" component={AdminUsers} />
-        <Route path="/admin/color-grid" component={ColorGrid} />
+        <Route path="/admin/settings" component={OrdSettings} />
         <Route path="/admin/attribute-grids" component={DynamicGridManager} />
         <Route path="/admin/proxy-variables" component={ProxyVariableManager} />
         <Route path="/admin/allmoxy-products" component={AllmoxyProductManager} />
