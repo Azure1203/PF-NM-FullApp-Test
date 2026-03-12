@@ -666,6 +666,23 @@ export default function OrderDetails() {
     },
   });
 
+  const regenerateChecklistsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/orders/${id}/regenerate-checklists`);
+      return res.json();
+    },
+    onSuccess: (data: { success: boolean; totalHardwareItems: number; totalPackingItems: number; errors: string[] }) => {
+      queryClient.invalidateQueries({ queryKey: orderQueryKey });
+      toast({
+        title: 'Checklists regenerated',
+        description: `${data.totalHardwareItems} hardware items, ${data.totalPackingItems} packing items`,
+      });
+    },
+    onError: (e: Error) => {
+      toast({ title: 'Regenerate checklists failed', description: e.message, variant: 'destructive' });
+    },
+  });
+
   const downloadOrd = () => {
     const lines = (orderItems ?? []).filter(i => i.exportText).map(i => i.exportText!);
     if (lines.length === 0) {
@@ -1208,6 +1225,19 @@ export default function OrderDetails() {
                       : <RefreshCw className="w-4 h-4 mr-1.5" />
                     }
                     Re-run Pricing
+                  </Button>
+                  <Button
+                    data-testid="button-regenerate-checklists"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => regenerateChecklistsMutation.mutate()}
+                    disabled={regenerateChecklistsMutation.isPending}
+                  >
+                    {regenerateChecklistsMutation.isPending
+                      ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      : <ClipboardList className="w-4 h-4 mr-1.5" />
+                    }
+                    Regenerate Checklists
                   </Button>
                   <Button
                     data-testid="button-download-ord"

@@ -603,6 +603,13 @@ export async function registerRoutes(
           });
           totalProjectPrice += totalPrice;
         }
+
+        if (file.rawContent) {
+          const hwResult = await generateHardwareChecklistForFile(file.id, file.rawContent);
+          console.log(`[Reprice] File ${file.id}: Hardware checklist regenerated - ${hwResult.itemCount} items`);
+          const psResult = await generatePackingSlipChecklistForFile(file.id, file.rawContent);
+          console.log(`[Reprice] File ${file.id}: Packing slip checklist regenerated - ${psResult.itemCount} items`);
+        }
       }
 
       const savedItems = await storage.getOrderItemsByProject(projectId);
@@ -629,6 +636,58 @@ export async function registerRoutes(
           pricingError: item.pricingError,
         })),
       });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get('/api/orders/:id/files', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+      const files = await storage.getProjectFiles(projectId);
+      res.json(files);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/orders/:id/regenerate-checklists', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      const files = await storage.getProjectFiles(projectId);
+      let totalHardwareItems = 0;
+      let totalPackingItems = 0;
+      const errors: string[] = [];
+
+      for (const file of files) {
+        if (!file.rawContent) continue;
+        try {
+          const hwResult = await generateHardwareChecklistForFile(file.id, file.rawContent);
+          totalHardwareItems += hwResult.itemCount;
+          if (!hwResult.success && hwResult.error) {
+            errors.push(`File ${file.originalFilename}: hardware - ${hwResult.error}`);
+          }
+        } catch (e: any) {
+          errors.push(`File ${file.originalFilename}: hardware - ${e.message}`);
+        }
+        try {
+          const psResult = await generatePackingSlipChecklistForFile(file.id, file.rawContent);
+          totalPackingItems += psResult.itemCount;
+          if (!psResult.success && psResult.error) {
+            errors.push(`File ${file.originalFilename}: packing - ${psResult.error}`);
+          }
+        } catch (e: any) {
+          errors.push(`File ${file.originalFilename}: packing - ${e.message}`);
+        }
+      }
+
+      console.log(`[Regenerate Checklists] Project ${projectId}: ${totalHardwareItems} hardware items, ${totalPackingItems} packing items`);
+      res.json({ success: errors.length === 0, totalHardwareItems, totalPackingItems, errors });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -905,6 +964,15 @@ export async function registerRoutes(
       const allGrids = await storage.getAttributeGrids();
       const gridMap = new Map(allGrids.map(g => [g.id, g]));
 
+      // Build products map for countPartsFromCSV (MJ/Richelieu door detection)
+      const allProductsForCounting = await storage.getProducts();
+      const productsMapForCounting = new Map(
+        allProductsForCounting.map(p => [
+          p.code.toUpperCase(),
+          { category: p.category, supplier: p.supplier }
+        ])
+      );
+
       // Aggregate counts for auto-derived production statuses
       let totalDovetails = 0;
       let totalFivePiece = 0;
@@ -917,7 +985,7 @@ export async function registerRoutes(
       // Create order files linked to the project with calculated values
       for (const pf of parsedFiles) {
         // Calculate part counts from CSV data (async to cross-reference products DB)
-        const partCounts = await countPartsFromCSV(pf.records);
+        const partCounts = await countPartsFromCSV(pf.records, productsMapForCounting);
         
         // Aggregate for auto-derived statuses (reuse already-computed counts)
         totalDovetails += partCounts.dovetails;
