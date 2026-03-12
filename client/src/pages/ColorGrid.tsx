@@ -1,13 +1,14 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Palette, Upload, FileText } from "lucide-react";
+import { ArrowLeft, Loader2, Palette, Upload, FileText, Save, Settings } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -22,9 +23,40 @@ export default function ColorGrid() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [headerTemplate, setHeaderTemplate] = useState('');
+  const [headerTemplateLoaded, setHeaderTemplateLoaded] = useState(false);
 
   const { data: entries, isLoading } = useQuery<ColorGridEntry[]>({
     queryKey: ['/api/color-grid'],
+  });
+
+  const { data: headerSetting, isLoading: isLoadingHeader } = useQuery<{ value: string }>({
+    queryKey: ['/api/admin/settings', 'ord_header_template'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/settings/ord_header_template', { credentials: 'include' });
+      if (!res.ok) return { value: '' };
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (headerSetting?.value && !headerTemplateLoaded) {
+      setHeaderTemplate(headerSetting.value);
+      setHeaderTemplateLoaded(true);
+    }
+  }, [headerSetting, headerTemplateLoaded]);
+
+  const saveHeaderMutation = useMutation({
+    mutationFn: async (value: string) => {
+      return apiRequest('PUT', '/api/admin/settings/ord_header_template', { value });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/settings', 'ord_header_template'] });
+      toast({ title: 'ORD Header Template saved' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to save template', description: error.message, variant: 'destructive' });
+    },
   });
 
   const importMutation = useMutation({
@@ -170,6 +202,56 @@ export default function ColorGrid() {
             <p className="text-sm text-muted-foreground">
               The color grid is used to identify material types in imported order CSV files. Each entry maps a color code (column B in the CSV) to its full material description. Importing a new CSV will replace all existing entries.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4" data-testid="card-ord-header-template">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              ORD Header Template
+            </CardTitle>
+            <CardDescription>
+              Template for the [Header] block prepended to each file in .ORD exports.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingHeader ? (
+              <Skeleton className="h-48 w-full" />
+            ) : (
+              <div className="space-y-4">
+                <Textarea
+                  value={headerTemplate}
+                  onChange={(e) => setHeaderTemplate(e.target.value)}
+                  rows={10}
+                  className="font-mono text-sm"
+                  placeholder={`[Header]\nVersion=4\nUnit=1\nName={{design_name}}\nDescription=\nPurchaseOrder={{po_number}}\nComment=\nCustomer=\nAddress1=`}
+                  data-testid="textarea-ord-header-template"
+                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" data-testid="badge-design-name">{`{{design_name}}`}</Badge>
+                  <Badge variant="outline" data-testid="badge-po-number">{`{{po_number}}`}</Badge>
+                  <span className="text-xs text-muted-foreground ml-2">Available placeholders</span>
+                </div>
+                <Button
+                  onClick={() => saveHeaderMutation.mutate(headerTemplate)}
+                  disabled={saveHeaderMutation.isPending}
+                  data-testid="button-save-ord-header"
+                >
+                  {saveHeaderMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Template
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

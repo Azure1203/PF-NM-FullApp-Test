@@ -7,7 +7,7 @@ import multer from 'multer';
 import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
 import { evaluatePrice } from "./services/pricingEngine";
-import { generateOrdItemBlock } from "./services/ordExporter";
+import { generateOrdItemBlock, generateOrdHeader } from "./services/ordExporter";
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import path from 'path';
@@ -71,10 +71,31 @@ const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
 
 
 
+const DEFAULT_ORD_HEADER_TEMPLATE = `[Header]
+Version=4
+Unit=1
+Name={{design_name}}
+Description=
+PurchaseOrder={{po_number}}
+Comment=
+Customer=
+Address1=`;
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  // Seed default ORD header template if not already present
+  const existingHeader = await storage.getSetting('ord_header_template');
+  if (!existingHeader) {
+    await storage.setSetting(
+      'ord_header_template',
+      DEFAULT_ORD_HEADER_TEMPLATE,
+      'Template for the [Header] block prepended to each file in .ORD exports. Supports {{design_name}} and {{po_number}} placeholders.'
+    );
+    console.log('[Seed] Default ORD header template created');
+  }
 
   // Setup authentication (must be before other routes)
   await setupAuth(app);
@@ -947,6 +968,10 @@ export async function registerRoutes(
       let totalProjectPrice = 0;
       let combinedOrdText = "";
 
+      // Load ORD header template once
+      const headerSetting = await storage.getSetting('ord_header_template');
+      const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
+
       // ── Product-driven pipeline pre-load ──────────────────────────────
       const allProxyVars = await storage.getProxyVariables();
       const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
@@ -985,6 +1010,12 @@ export async function registerRoutes(
       
       // Create order files linked to the project with calculated values
       for (const pf of parsedFiles) {
+        // Generate ORD header for this file
+        const designName = pf.poNumber || pf.filename.replace(/\.[^.]+$/, '');
+        const poNumber = pf.poNumber || '';
+        const fileHeader = generateOrdHeader(headerTemplate, { designName, poNumber });
+        let fileOrdText = fileHeader + "\n";
+
         // Calculate part counts from CSV data (async to cross-reference products DB)
         const partCounts = await countPartsFromCSV(pf.records, productsMapForCounting);
         
@@ -1112,8 +1143,10 @@ export async function registerRoutes(
           });
 
           totalProjectPrice += totalPrice;
-          if (exportText) combinedOrdText += exportText + "\n";
+          if (exportText) fileOrdText += exportText + "\n";
         }
+
+        combinedOrdText += fileOrdText;
         
         // Extract and save CTS parts for this file
         const ctsParts = extractCTSParts(pf.records);
@@ -5696,6 +5729,42 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error('[Admin] Error checking if user is allowed:', e);
       res.status(500).json({ message: 'Failed to check user', error: e.message });
+    }
+  });
+
+  // ===== Settings Endpoints =====
+
+  app.get('/api/admin/settings', isAuthenticated, async (_req, res) => {
+    try {
+      const settings = await storage.getAllSettings();
+      res.json(settings);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get('/api/admin/settings/:key', isAuthenticated, async (req, res) => {
+    try {
+      const setting = await storage.getSetting(req.params.key);
+      if (!setting) {
+        return res.status(404).json({ message: 'Setting not found' });
+      }
+      res.json(setting);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.put('/api/admin/settings/:key', isAuthenticated, async (req, res) => {
+    try {
+      const { value, description } = req.body;
+      if (typeof value !== 'string') {
+        return res.status(400).json({ message: 'value is required and must be a string' });
+      }
+      const setting = await storage.setSetting(req.params.key, value, description);
+      res.json(setting);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
     }
   });
 

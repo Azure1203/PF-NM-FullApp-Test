@@ -53,6 +53,8 @@ import {
   orderItems,
   type OrderItem,
   type InsertOrderItem,
+  appSettings,
+  type AppSetting,
 } from "@shared/schema";
 import { eq, desc, and, or, inArray, sql, ilike } from "drizzle-orm";
 
@@ -173,6 +175,10 @@ export interface IStorage {
   getOrderItemsByProject(projectId: number): Promise<OrderItem[]>;
   getOrderItemsByFile(fileId: number): Promise<OrderItem[]>;
   deleteOrderItemsByFile(fileId: number): Promise<void>;
+
+  getSetting(key: string): Promise<AppSetting | undefined>;
+  setSetting(key: string, value: string, description?: string): Promise<AppSetting>;
+  getAllSettings(): Promise<AppSetting[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -847,6 +853,28 @@ export class DatabaseStorage implements IStorage {
 
   async deleteOrderItemsByFile(fileId: number): Promise<void> {
     await db.delete(orderItems).where(eq(orderItems.fileId, fileId));
+  }
+
+  async getSetting(key: string): Promise<AppSetting | undefined> {
+    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    return setting;
+  }
+
+  async setSetting(key: string, value: string, description?: string): Promise<AppSetting> {
+    const existing = await this.getSetting(key);
+    if (existing) {
+      const [updated] = await db.update(appSettings)
+        .set({ value, description: description ?? existing.description, updatedAt: new Date() })
+        .where(eq(appSettings.key, key))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(appSettings).values({ key, value, description }).returning();
+    return created;
+  }
+
+  async getAllSettings(): Promise<AppSetting[]> {
+    return await db.select().from(appSettings);
   }
 }
 

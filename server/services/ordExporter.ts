@@ -10,12 +10,25 @@ export function formatEdgebanding(item: any): string {
 }
 
 /**
+ * Generates an .ORD header block by replacing {{design_name}} and {{po_number}} placeholders.
+ */
+export function generateOrdHeader(
+  headerTemplate: string,
+  { designName, poNumber }: { designName: string; poNumber: string }
+): string {
+  return headerTemplate
+    .replace(/\{\{design_name\}\}/g, designName)
+    .replace(/\{\{po_number\}\}/g, poNumber);
+}
+
+/**
  * Generates an .ORD item block by replacing {{path.to.key}} placeholders.
  */
 export function generateOrdItemBlock(
   itemData: any,
   contextScope: any,
-  templateString: string
+  templateString: string,
+  itemNumber: number = 1
 ): string {
   const edgebanding = formatEdgebanding(itemData);
   
