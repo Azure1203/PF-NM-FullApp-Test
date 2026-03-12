@@ -168,6 +168,8 @@ export interface IStorage {
   createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding>;
   deleteProductGridBinding(id: number): Promise<boolean>;
   replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]>;
+  getProductBySkuPrefix(sku: string): Promise<AllmoxyProduct | undefined>;
+  getProxyVariableById(id: number): Promise<ProxyVariable | undefined>;
 
   createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
   getOrderItemsByProject(projectId: number): Promise<OrderItem[]>;
@@ -825,6 +827,16 @@ export class DatabaseStorage implements IStorage {
       const inserted = await tx.insert(productGridBindings).values(bindings).returning();
       return inserted;
     });
+  }
+
+  async getProductBySkuPrefix(sku: string): Promise<AllmoxyProduct | undefined> {
+    const all = await db.select().from(allmoxyProducts).where(eq(allmoxyProducts.status, 'active'));
+    return all.find(p => p.skuPrefix && sku.toUpperCase().startsWith(p.skuPrefix.toUpperCase()));
+  }
+
+  async getProxyVariableById(id: number): Promise<ProxyVariable | undefined> {
+    const [v] = await db.select().from(proxyVariables).where(eq(proxyVariables.id, id));
+    return v;
   }
 
   async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {

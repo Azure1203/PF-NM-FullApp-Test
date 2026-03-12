@@ -1,0 +1,94 @@
+PROMPT 5 — Grid Bindings: Storage Methods + API Routes
+Files: server/storage.ts, server/routes.ts
+5A — Add to IStorage interface
+tsgetProductGridBindings(productId: number): Promise<ProductGridBinding[]>;
+replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]>;
+getProductBySkuPrefix(sku: string): Promise<AllmoxyProduct | undefined>;
+getProxyVariableById(id: number): Promise<ProxyVariable | undefined>;
+createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
+getOrderItemsByProject(projectId: number): Promise<OrderItem[]>;
+deleteOrderItemsByFile(fileId: number): Promise<void>;
+Ensure ProductGridBinding, InsertProductGridBinding, OrderItem, InsertOrderItem are imported from @shared/schema.
+5B — Implement in DatabaseStorage (add after replaceProxyVariables)
+tsasync getProductGridBindings(productId: number): Promise<ProductGridBinding[]> {
+  return await db.select().from(productGridBindings)
+    .where(eq(productGridBindings.productId, productId));
+}
+
+async replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]> {
+  return await db.transaction(async (tx) => {
+    await tx.delete(productGridBindings).where(eq(productGridBindings.productId, productId));
+    if (bindings.length === 0) return [];
+    return await tx.insert(productGridBindings).values(bindings).returning();
+  });
+}
+
+async getProductBySkuPrefix(sku: string): Promise<AllmoxyProduct | undefined> {
+  const all = await db.select().from(allmoxyProducts)
+    .where(eq(allmoxyProducts.status, 'active'));
+  return all.find(p =>
+    p.skuPrefix && sku.toUpperCase().startsWith(p.skuPrefix.toUpperCase())
+  );
+}
+
+async getProxyVariableById(id: number): Promise<ProxyVariable | undefined> {
+  const [v] = await db.select().from(proxyVariables).where(eq(proxyVariables.id, id));
+  return v;
+}
+
+async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {
+  const [created] = await db.insert(orderItems).values(item).returning();
+  return created;
+}
+
+async getOrderItemsByProject(projectId: number): Promise<OrderItem[]> {
+  return await db.select().from(orderItems)
+    .where(eq(orderItems.projectId, projectId))
+    .orderBy(orderItems.id);
+}
+
+async deleteOrderItemsByFile(fileId: number): Promise<void> {
+  await db.delete(orderItems).where(eq(orderItems.fileId, fileId));
+}
+Ensure productGridBindings, orderItems are imported from @shared/schema.
+5C — Add API routes in server/routes.ts (after existing product DELETE route)
+ts// GET grid bindings for a product
+app.get('/api/admin/allmoxy-products/:id/bindings', isAuthenticated, async (req, res) => {
+  try {
+    const bindings = await storage.getProductGridBindings(Number(req.params.id));
+    res.json(bindings);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// PUT (replace all) grid bindings for a product
+app.put('/api/admin/allmoxy-products/:id/bindings', isAuthenticated, async (req, res) => {
+  try {
+    const productId = Number(req.params.id);
+    const { bindings } = req.body;
+    if (!Array.isArray(bindings)) {
+      return res.status(400).json({ message: 'bindings must be an array' });
+    }
+    const toInsert = bindings.map((b: any) => ({
+      productId,
+      gridId: Number(b.gridId),
+      alias: String(b.alias),
+      lookupColumn: String(b.lookupColumn),
+    }));
+    const saved = await storage.replaceProductGridBindings(productId, toInsert);
+    res.json(saved);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// GET order items for a project
+app.get('/api/orders/:id/items', isAuthenticated, async (req, res) => {
+  try {
+    const items = await storage.getOrderItemsByProject(Number(req.params.id));
+    res.json(items);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
