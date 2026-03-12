@@ -28,7 +28,10 @@ export function evaluatePrice(
   const scope: Record<string, any> = {
     width: Number(orderItem?.width) || 0,
     height: Number(orderItem?.height) || 0,
-    depth: Number(orderItem?.depth) || 0,
+    // Formulas use "length" for the third dimension (CSV column 5).
+    // "depth" is kept as an alias for backward compatibility.
+    length: Number(orderItem?.length ?? orderItem?.depth) || 0,
+    depth: Number(orderItem?.depth ?? orderItem?.length) || 0,
     quantity: Number(orderItem?.quantity) || 1,
     ...dynamicGrids // Merges paths like mjdoors.PRICE or color.SQFT_PRICE
   };

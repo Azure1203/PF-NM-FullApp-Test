@@ -1,0 +1,149 @@
+PROMPT 7 — Fix pricingEngine length Scope + Rewrite Upload Pipeline
+Files: server/services/pricingEngine.ts, server/routes.ts
+Both parts must be applied together.
+7A — Fix pricingEngine.ts scope
+Problem: Formulas use length (the third dimension, CSV column 5) but the engine only exposes depth. All drawer box prices silently evaluate to $0.
+Find:
+tsconst scope: Record<string, any> = {
+  width: Number(orderItem?.width) || 0,
+  height: Number(orderItem?.height) || 0,
+  depth: Number(orderItem?.depth) || 0,
+  quantity: Number(orderItem?.quantity) || 1,
+  ...dynamicGrids
+};
+Replace with:
+tsconst scope: Record<string, any> = {
+  width: Number(orderItem?.width) || 0,
+  height: Number(orderItem?.height) || 0,
+  // Formulas use "length" for the third dimension (CSV column 5).
+  // "depth" is kept as an alias for backward compatibility.
+  length: Number(orderItem?.length ?? orderItem?.depth) || 0,
+  depth: Number(orderItem?.depth ?? orderItem?.length) || 0,
+  quantity: Number(orderItem?.quantity) || 1,
+  ...dynamicGrids
+};
+7B — Rewrite upload pipeline in server/routes.ts
+In the POST /api/orders/upload handler, find the section starting with:
+ts// Pipeline: Calculate Price and Generate ORD
+or the block starting with:
+tsif (pricingProxy || exportProxy) {
+Replace that entire inner pricing/export loop with the following. Do not touch anything outside it — pallet logic, CTS extraction, hardware checklist, and Asana sync stay exactly as-is.
+ts// Pipeline: per-item product matching via skuPrefix
+const allActiveProducts = await storage.getAllmoxyProducts();
+const productsWithPrefix = allActiveProducts.filter(
+  p => p.skuPrefix && p.status === 'active'
+);
+
+const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+
+// Clear any existing order items for this file (safe for re-uploads)
+await storage.deleteOrderItemsByFile(orderFile.id);
+
+// Prepend ORD header for this file.
+// designName = the full PO string from CSV (e.g. "H Holtermann (Her Holtermann V2)")
+// poNumber   = the short numeric order ID (e.g. "1918") stored on the project
+const designName = pf.poNumber || pf.filename.replace(/\.csv$/i, '');
+combinedOrdText += generateOrdHeader(
+  `[Header]\nVersion=4\nUnit=1\nName="{{design_name}}"\nDescription="{{design_name}}"\nPurchaseOrder="{{po_number}}"\nComment=""\nCustomer="Perfect Fit Closets"\nAddress1="100-111 5 Avenue Southwest"\n`,
+  { designName, poNumber: project.orderId || '' }
+) + '\n';
+
+for (const item of itemObjects) {
+  const itemSku: string = (item.SKU || item.MANU_CODE || item['Manuf code'] || '').trim();
+
+  // 1. Match product by SKU prefix (case-insensitive)
+  const matchedProduct = productsWithPrefix.find(p =>
+    itemSku.toUpperCase().startsWith(p.skuPrefix!.toUpperCase())
+  ) ?? null;
+
+  let unitPrice = 0;
+  let exportText = '';
+  let pricingError: string | null = null;
+
+  if (matchedProduct) {
+    // 2. Load this product's declared grid bindings
+    const bindings = await storage.getProductGridBindings(matchedProduct.id);
+
+    // 3. Build context scope from bindings
+    const contextScope: Record<string, any> = {};
+    for (const binding of bindings) {
+      const lookupValue = String(item[binding.lookupColumn] || '');
+      const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
+      if (row) {
+        contextScope[binding.alias] = row.rowData;
+      }
+    }
+
+    // 4. Build the item object — pass "length" explicitly (formulas use length, not depth)
+    const pricingItem = {
+      ...item,
+      width: Number(item.Width || item.width || 0),
+      height: Number(item.Height || item.height || 0),
+      length: Number(item.Length || item.length || 0),
+      depth: Number(item.Length || item.length || 0),
+      quantity: Number(item.Qty || item.quantity || item.QUANTITY || 1),
+    };
+
+    // 5. Evaluate pricing formula
+    if (matchedProduct.pricingProxyId) {
+      const pricingProxy = await storage.getProxyVariableById(matchedProduct.pricingProxyId);
+      if (pricingProxy) {
+        try {
+          unitPrice = evaluatePrice(pricingProxy.formula, pricingItem, contextScope);
+        } catch (e: any) {
+          pricingError = `Pricing error: ${e.message}`;
+        }
+      }
+    }
+
+    // 6. Evaluate export formula
+    if (matchedProduct.exportProxyId) {
+      const exportProxy = await storage.getProxyVariableById(matchedProduct.exportProxyId);
+      if (exportProxy) {
+        try {
+          exportText = generateOrdItemBlock(pricingItem, contextScope, exportProxy.formula);
+        } catch (e: any) {
+          pricingError = (pricingError ? pricingError + '; ' : '') + `Export error: ${e.message}`;
+        }
+      }
+    }
+  } else if (itemSku) {
+    pricingError = `No product matched SKU prefix: ${itemSku}`;
+  }
+
+  const qty = Number(item.Qty || item.quantity || item.QUANTITY || 1);
+  const lineTotal = unitPrice * qty;
+  totalProjectPrice += lineTotal;
+  if (exportText) combinedOrdText += exportText + '\n';
+
+  // 7. Persist result to order_items
+  await storage.createOrderItem({
+    projectId: project.id,
+    fileId: orderFile.id,
+    productId: matchedProduct?.id ?? null,
+    sku: itemSku || null,
+    description: item.NAME || item.name || item.DESCRIPTION || null,
+    width: Number(item.Width || item.width) || null,
+    height: Number(item.Height || item.height) || null,
+    depth: Number(item.Length || item.length) || null,
+    quantity: qty,
+    unitPrice,
+    totalPrice: lineTotal,
+    exportText: exportText || null,
+    pricingError,
+    rawRowData: item,
+  });
+
+  allItems.push({ ...item, price: unitPrice, error: pricingError });
+}
+Also remove these now-unused lines from above the old loop (if no longer referenced elsewhere):
+tsconst allProxyVars = await storage.getProxyVariables();
+const pricingProxy = allProxyVars.find(v => v.type === 'pricing');
+const exportProxy = allProxyVars.find(v => v.type === 'export');
+const grids = await storage.getAttributeGrids();
+Update the import at the top of server/routes.ts:
+ts// Find:
+import { generateOrdItemBlock } from "./services/ordExporter";
+// Replace with:
+import { generateOrdHeader, generateOrdItemBlock } from "./services/ordExporter";
+

@@ -586,12 +586,21 @@ export async function registerRoutes(
             }
           }
 
+          const pricingItem = {
+            ...item,
+            width:    Number(item.Width    || item.width    || 0),
+            height:   Number(item.Height   || item.height   || 0),
+            length:   Number(item.Length   || item.length   || 0),
+            depth:    Number(item.Length   || item.length   || 0),
+            quantity: Number(item.Qty      || item.quantity || item.QUANTITY || 1),
+          };
+
           let unitPrice = 0;
           let pricingError: string | null = null;
           if (product && product.pricingProxyId != null) {
             const proxy = proxyVarMap.get(product.pricingProxyId);
             if (proxy) {
-              try { unitPrice = evaluatePrice(proxy.formula, item, contextScope); }
+              try { unitPrice = evaluatePrice(proxy.formula, pricingItem, contextScope); }
               catch (e: any) { pricingError = e.message; unitPrice = 0; }
             }
           } else if (!product) {
@@ -602,12 +611,12 @@ export async function registerRoutes(
           if (product && product.exportProxyId != null) {
             const proxy = proxyVarMap.get(product.exportProxyId);
             if (proxy) {
-              try { exportText = generateOrdItemBlock(item, contextScope, proxy.formula); }
+              try { exportText = generateOrdItemBlock(pricingItem, contextScope, proxy.formula); }
               catch { exportText = null; }
             }
           }
 
-          const qty = parseInt(item.Qty || item.qty || item.Quantity || '1') || 1;
+          const qty = pricingItem.quantity;
           const totalPrice = unitPrice * qty;
 
           await storage.createOrderItem({
@@ -616,9 +625,9 @@ export async function registerRoutes(
             productId: product?.id ?? null,
             sku,
             description: item.NAME || item['Part Name'] || item.Description || '',
-            width: parseFloat(item.Width || item.width || '0') || null,
-            height: parseFloat(item.Height || item.height || '0') || null,
-            depth: parseFloat(item.Thickness || item.thickness || item.Depth || '0') || null,
+            width:    pricingItem.width    || null,
+            height:   pricingItem.height   || null,
+            depth:    pricingItem.length   || null,
             quantity: qty,
             unitPrice,
             totalPrice,
@@ -1094,6 +1103,18 @@ export async function registerRoutes(
             }
           }
 
+          // Normalize item dimensions so formulas can use lowercase property names.
+          // CSV columns are title-case (Width, Height, Length); "depth" aliases "length"
+          // for backward-compatibility with formulas written before the rename.
+          const pricingItem = {
+            ...item,
+            width:    Number(item.Width    || item.width    || 0),
+            height:   Number(item.Height   || item.height   || 0),
+            length:   Number(item.Length   || item.length   || 0),
+            depth:    Number(item.Length   || item.length   || 0),
+            quantity: Number(item.Qty      || item.quantity || item.QUANTITY || 1),
+          };
+
           // Calculate unit price
           let unitPrice = 0;
           let pricingError: string | null = null;
@@ -1101,7 +1122,7 @@ export async function registerRoutes(
             const pricingProxy = proxyVarMap.get(product.pricingProxyId);
             if (pricingProxy) {
               try {
-                unitPrice = evaluatePrice(pricingProxy.formula, item, contextScope);
+                unitPrice = evaluatePrice(pricingProxy.formula, pricingItem, contextScope);
               } catch (e: any) {
                 pricingError = e.message;
                 unitPrice = 0;
@@ -1117,14 +1138,14 @@ export async function registerRoutes(
             const exportProxy = proxyVarMap.get(product.exportProxyId);
             if (exportProxy) {
               try {
-                exportText = generateOrdItemBlock(item, contextScope, exportProxy.formula);
+                exportText = generateOrdItemBlock(pricingItem, contextScope, exportProxy.formula);
               } catch {
                 exportText = null;
               }
             }
           }
 
-          const qty = parseInt(item.Qty || item.qty || item.Quantity || '1') || 1;
+          const qty = pricingItem.quantity;
           const totalPrice = unitPrice * qty;
 
           // Persist to order_items
@@ -1134,9 +1155,9 @@ export async function registerRoutes(
             productId: product?.id ?? null,
             sku,
             description: item.NAME || item['Part Name'] || item.Description || '',
-            width: parseFloat(item.Width || item.width || '0') || null,
-            height: parseFloat(item.Height || item.height || '0') || null,
-            depth: parseFloat(item.Thickness || item.thickness || item.Depth || '0') || null,
+            width:    pricingItem.width    || null,
+            height:   pricingItem.height   || null,
+            depth:    pricingItem.length   || null,
             quantity: qty,
             unitPrice,
             totalPrice,
