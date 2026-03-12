@@ -128,7 +128,7 @@ export default function UploadOrder() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="min-h-screen bg-muted/30 pb-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         
         <Link href="/">

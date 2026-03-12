@@ -211,14 +211,14 @@ export default function OrderDetails() {
     } else if (status === 'NO BO HARDWARE' || status === 'NO BUYOUT HARDWARE') {
       return {
         label: 'NO BUYOUT HARDWARE',
-        style: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
+        style: 'bg-muted text-foreground/80 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
       };
     }
     
     // Unknown status - show as-is with default styling
     return {
       label: status,
-      style: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
+      style: 'bg-muted text-foreground/80 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
     };
   };
 
@@ -952,7 +952,7 @@ export default function OrderDetails() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50/50">
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
@@ -960,7 +960,7 @@ export default function OrderDetails() {
 
   if (!project) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50/50 p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-muted/30 p-4">
         <h2 className="text-2xl font-bold mb-2">Project Not Found</h2>
         <p className="text-muted-foreground mb-6">The project you are looking for doesn't exist.</p>
         <Link href="/">
@@ -971,7 +971,7 @@ export default function OrderDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="min-h-screen bg-muted/30 pb-20">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-10">
         
         <div className="mb-6 flex justify-between items-center">
@@ -1444,7 +1444,7 @@ export default function OrderDetails() {
                     placeholder="Add project notes here..."
                     value={editingProjectNotes ?? project.notes ?? ""}
                     onChange={(e) => setEditingProjectNotes(e.target.value)}
-                    className="min-h-[120px] bg-slate-50/50"
+                    className="min-h-[120px] bg-muted/30"
                     data-testid="textarea-project-notes"
                   />
                   <div className="flex justify-end">
@@ -1512,7 +1512,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Project Name</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="e.g. Anderson PO25-391065" className="bg-slate-50/50" />
+                              <Input {...field} placeholder="e.g. Anderson PO25-391065" className="bg-muted/30" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1526,7 +1526,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Dealer Name</FormLabel>
                             <FormControl>
-                              <Input {...field} value={field.value ?? ""} placeholder="e.g. Closet World" className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} placeholder="e.g. Closet World" className="bg-muted/30" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1542,7 +1542,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Order Date</FormLabel>
                             <FormControl>
-                              <Input {...field} value={field.value ?? ""} type="date" className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} type="date" className="bg-muted/30" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1556,7 +1556,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Order ID</FormLabel>
                             <FormControl>
-                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} className="bg-muted/30" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1574,7 +1574,7 @@ export default function OrderDetails() {
                             <Textarea 
                               {...field}
                               value={field.value ?? ""}
-                              className="bg-slate-50/50 min-h-[80px]" 
+                              className="bg-muted/30 min-h-[80px]" 
                               placeholder="Full shipping address..."
                             />
                           </FormControl>
@@ -1591,7 +1591,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Phone Number</FormLabel>
                             <FormControl>
-                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} className="bg-muted/30" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1605,7 +1605,7 @@ export default function OrderDetails() {
                           <FormItem>
                             <FormLabel>Tax ID</FormLabel>
                             <FormControl>
-                              <Input {...field} value={field.value ?? ""} className="bg-slate-50/50" />
+                              <Input {...field} value={field.value ?? ""} className="bg-muted/30" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -1618,7 +1618,7 @@ export default function OrderDetails() {
                         control={form.control}
                         name="powerTailgate"
                         render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-slate-50/30">
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/40/30">
                             <div className="space-y-0.5">
                               <FormLabel className="text-base">Power Tailgate</FormLabel>
                             </div>
@@ -1636,7 +1636,7 @@ export default function OrderDetails() {
                         control={form.control}
                         name="phoneAppointment"
                         render={({ field }) => (
-                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-slate-50/30">
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/40/30">
                             <div className="space-y-0.5">
                               <FormLabel className="text-base">Phone Appointment</FormLabel>
                             </div>
@@ -2964,16 +2964,16 @@ export default function OrderDetails() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-slate-700">
-                    <span className="text-slate-400">Status</span>
+                    <span className="text-muted-foreground/70">Status</span>
                     <StatusBadge status={project.status as any} />
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-slate-700">
-                    <span className="text-slate-400">Asana Task</span>
+                    <span className="text-muted-foreground/70">Asana Task</span>
                     <span className="font-mono text-sm">
                       {project.asanaTaskId ? `#${project.asanaTaskId.slice(-6)}` : "Not Created"}
                     </span>
                   </div>
-                  <div className="pt-4 text-sm text-slate-400">
+                  <div className="pt-4 text-sm text-muted-foreground/70">
                     {project.status === 'synced' 
                       ? "This project has been synced to Asana. Updates here won't reflect in Asana unless you sync again."
                       : "Review the details carefully before syncing to create an accurate Asana task."

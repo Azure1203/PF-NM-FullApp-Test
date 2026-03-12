@@ -124,8 +124,8 @@ export default function DynamicGridManager() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Importer */}
-        <Card className="lg:col-span-1 shadow-sm border-slate-200">
-          <CardHeader className="pb-4 border-b bg-slate-50/50">
+        <Card className="lg:col-span-1 shadow-sm border-border">
+          <CardHeader className="pb-4 border-b bg-muted/30">
             <CardTitle className="text-lg flex items-center gap-2">
               <Upload className="h-5 w-5 text-primary" />
               Grid Importer
@@ -159,7 +159,7 @@ export default function DynamicGridManager() {
                     {...getRootProps()}
                     className={cn(
                       "border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 text-center",
-                      isDragActive ? "border-primary bg-primary/5 scale-[0.99]" : "border-slate-200 hover:border-primary/50 hover:bg-slate-50",
+                      isDragActive ? "border-primary bg-primary/5 scale-[0.99]" : "border-border hover:border-primary/50 hover:bg-muted/40",
                       file ? "border-green-500/50 bg-green-50/20" : ""
                     )}
                     data-testid="dropzone-csv"
@@ -173,15 +173,15 @@ export default function DynamicGridManager() {
                     </div>
                     {file ? (
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-900 truncate max-w-[200px]">{file.name}</p>
+                        <p className="text-sm font-medium text-foreground truncate max-w-[200px]">{file.name}</p>
                         <p className="text-xs text-green-600 font-medium">File ready</p>
                       </div>
                     ) : (
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-700">
+                        <p className="text-sm font-medium text-foreground/80">
                           {isDragActive ? "Drop here" : "Click or drag CSV"}
                         </p>
-                        <p className="text-xs text-slate-500 italic">Only .csv files supported</p>
+                        <p className="text-xs text-muted-foreground italic">Only .csv files supported</p>
                       </div>
                     )}
                   </div>
@@ -206,8 +206,8 @@ export default function DynamicGridManager() {
         </Card>
 
         {/* Right Column: Viewer */}
-        <Card className="lg:col-span-2 shadow-sm border-slate-200 flex flex-col">
-          <CardHeader className="pb-4 border-b bg-slate-50/50 flex flex-row items-center justify-between">
+        <Card className="lg:col-span-2 shadow-sm border-border flex flex-col">
+          <CardHeader className="pb-4 border-b bg-muted/30 flex flex-row items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Search className="h-5 w-5 text-primary" />
               Data Viewer
@@ -244,7 +244,7 @@ export default function DynamicGridManager() {
             {isLoadingRows ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <Loader2 className="h-10 w-10 animate-spin text-primary/40" />
-                <p className="text-sm text-slate-500 font-medium">Loading grid records...</p>
+                <p className="text-sm text-muted-foreground font-medium">Loading grid records...</p>
               </div>
             ) : rows && selectedGrid ? (
               <div className="flex-1 overflow-hidden flex flex-col">
@@ -256,7 +256,7 @@ export default function DynamicGridManager() {
                           {selectedGrid.columns.map((col) => (
                             <TableHead 
                               key={col} 
-                              className="whitespace-nowrap font-bold text-slate-900 bg-slate-50 px-4 h-11 border-r last:border-0"
+                              className="whitespace-nowrap font-bold text-foreground bg-muted/40 px-4 h-11 border-r last:border-0"
                             >
                               {col}
                             </TableHead>
@@ -268,7 +268,7 @@ export default function DynamicGridManager() {
                           <TableRow>
                             <TableCell 
                               colSpan={selectedGrid.columns.length} 
-                              className="h-32 text-center text-slate-500 italic"
+                              className="h-32 text-center text-muted-foreground italic"
                             >
                               This grid has no rows of data.
                             </TableCell>
@@ -279,13 +279,13 @@ export default function DynamicGridManager() {
                               key={row.id} 
                               className={cn(
                                 "transition-colors border-b",
-                                idx % 2 === 1 ? "bg-slate-50/50" : "bg-white"
+                                idx % 2 === 1 ? "bg-muted/30" : "bg-white"
                               )}
                             >
                               {selectedGrid.columns.map((col) => (
                                 <TableCell 
                                   key={col} 
-                                  className="whitespace-nowrap px-4 py-2.5 text-slate-600 text-sm border-r last:border-0"
+                                  className="whitespace-nowrap px-4 py-2.5 text-muted-foreground text-sm border-r last:border-0"
                                 >
                                   {String((row.rowData as any)[col] ?? "")}
                                 </TableCell>
@@ -297,7 +297,7 @@ export default function DynamicGridManager() {
                     </Table>
                   </div>
                 </ScrollArea>
-                <div className="p-3 bg-slate-50 border-t text-xs text-slate-500 flex justify-between items-center px-6">
+                <div className="p-3 bg-muted/40 border-t text-xs text-muted-foreground flex justify-between items-center px-6">
                    <span>Showing {rows.length} records</span>
                    <span className="font-mono uppercase tracking-tighter opacity-70">Grid ID: {selectedGridId}</span>
                 </div>
@@ -305,16 +305,16 @@ export default function DynamicGridManager() {
             ) : selectedGridId ? (
               <div className="text-center py-32 flex flex-col items-center gap-3">
                 <Database className="h-10 w-10 text-slate-200" />
-                <p className="text-slate-500 font-medium">No records found for this grid.</p>
+                <p className="text-muted-foreground font-medium">No records found for this grid.</p>
               </div>
             ) : (
               <div className="text-center py-32 flex flex-col items-center gap-4">
-                <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center text-muted-foreground/70">
                   <Database className="h-8 w-8" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-slate-900 font-semibold">No grid selected</p>
-                  <p className="text-slate-500 text-sm max-w-[250px] mx-auto">Select a grid from the dropdown above to view and manage its data records.</p>
+                  <p className="text-foreground font-semibold">No grid selected</p>
+                  <p className="text-muted-foreground text-sm max-w-[250px] mx-auto">Select a grid from the dropdown above to view and manage its data records.</p>
                 </div>
               </div>
             )}

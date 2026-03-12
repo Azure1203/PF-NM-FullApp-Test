@@ -330,7 +330,7 @@ export default function Dashboard() {
   }) || [];
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="min-h-screen bg-muted/30 pb-20">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-10">
         
         <div className="flex items-center justify-between mb-4 gap-2">
@@ -344,7 +344,7 @@ export default function Dashboard() {
                   </AvatarFallback>
                 </Avatar>
                 <span className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Welcome, <span className="font-medium text-slate-700">{user.firstName || user.email}</span>
+                  Welcome, <span className="font-medium text-foreground/80">{user.firstName || user.email}</span>
                 </span>
               </>
             )}
@@ -657,7 +657,7 @@ export default function Dashboard() {
         <div className="relative mb-4 sm:mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
-            className="pl-10 rounded-xl border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+            className="pl-10 rounded-xl border-border focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
             placeholder="Search by project name or dealer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -671,11 +671,11 @@ export default function Dashboard() {
               <div key={i} className="h-24 rounded-xl bg-white border border-slate-100 shadow-sm animate-pulse" />
             ))
           ) : filteredProjects.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
-              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FolderOpen className="w-8 h-8 text-slate-400" />
+            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-border">
+              <div className="w-16 h-16 bg-muted/40 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FolderOpen className="w-8 h-8 text-muted-foreground/70" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-900">No projects found</h3>
+              <h3 className="text-lg font-semibold text-foreground">No projects found</h3>
               <p className="text-muted-foreground mt-1">
                 {search ? "Try adjusting your search terms" : "Upload your first CSV files to create a project"}
               </p>
@@ -692,8 +692,8 @@ export default function Dashboard() {
                 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
                   <Link href={`/orders/${project.id}`} className="flex items-start gap-3 sm:gap-4 flex-1">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
-                      <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400 group-hover:text-primary transition-colors" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-muted/40 flex items-center justify-center border border-slate-100 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+                      <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground/70 group-hover:text-primary transition-colors" />
                     </div>
                     
                     <div className="flex-1 min-w-0">
@@ -701,7 +701,7 @@ export default function Dashboard() {
                         <span className="text-muted-foreground font-medium hidden sm:inline">Project Name:</span> {project.name}
                       </h3>
                       <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-6 gap-y-1 sm:gap-y-2 mt-1 text-xs sm:text-sm text-muted-foreground">
-                        <span>Dealer: <span className="font-medium text-slate-700">{project.dealer || "N/A"}</span></span>
+                        <span>Dealer: <span className="font-medium text-foreground/80">{project.dealer || "N/A"}</span></span>
                         <span className="hidden sm:inline">Date: {project.createdAt ? format(new Date(project.createdAt), 'PPP') : 'N/A'}</span>
                       </div>
                       
@@ -835,7 +835,7 @@ export default function Dashboard() {
                       )}
 
                       <Link href={`/orders/${project.id}`}>
-                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:translate-x-1 group-hover:text-primary transition-all">
+                        <div className="w-8 h-8 rounded-full bg-muted/40 flex items-center justify-center text-muted-foreground/70 group-hover:translate-x-1 group-hover:text-primary transition-all">
                           <ArrowRight className="w-5 h-5" />
                         </div>
                       </Link>

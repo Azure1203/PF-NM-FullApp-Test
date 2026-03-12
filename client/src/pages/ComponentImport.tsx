@@ -183,7 +183,7 @@ export default function ComponentImport() {
   const isPending = previewMutation.isPending || importMutation.isPending;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-muted/40">
       <div className="border-b bg-white shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 py-4 max-w-6xl">
           <div className="flex items-center gap-4 flex-wrap">
@@ -284,8 +284,8 @@ export default function ComponentImport() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 rounded-lg">
-                      <Check className="h-5 w-5 text-slate-600" />
+                    <div className="p-2 bg-muted rounded-lg">
+                      <Check className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{preview.unchangedItems.length}</p>

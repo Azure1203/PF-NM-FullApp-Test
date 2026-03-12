@@ -1,0 +1,89 @@
+PROMPT 1 — Apply Brand Colour Theme
+Files: client/src/components/AppLayout.tsx, client/src/index.css, all files under client/src/pages/
+The CSS variables in client/src/index.css already map to the correct brand colours. The problem is that the sidebar and header ignore them and use hardcoded white/slate classes. This prompt fixes the app shell and replaces cold slate tones with the warm brand palette throughout admin pages.
+Brand palette:
+
+Gold #CDAB4A → already --primary
+Charcoal #2E2E2E → already --foreground
+Brown #807161 → already --muted-foreground
+Off-white #F7F4F2 → already --background
+
+1A — Sidebar container
+Find:
+tsx<aside className="w-64 border-r bg-card hidden md:flex flex-col">
+Replace with:
+tsx<aside className="w-64 hidden md:flex flex-col bg-[#2E2E2E] border-r border-[#807161]/20">
+1B — App title in sidebar
+Find:
+tsx<div className="p-6">
+  <h1 className="text-xl font-bold tracking-tight text-primary">Order Manager</h1>
+</div>
+Replace with:
+tsx<div className="px-6 py-5 border-b border-[#CDAB4A]/20">
+  <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-[#807161] mb-0.5">Netley Millwork</p>
+  <h1 className="text-base font-bold tracking-tight text-[#F7F4F2]">Order Manager</h1>
+</div>
+1C — Sidebar section labels
+Find:
+tsx<h2 className="text-xs font-semibold text-muted-foreground tracking-wider px-2">
+Replace with:
+tsx<h2 className="text-[10px] font-semibold tracking-[0.15em] uppercase px-2 text-[#807161]">
+1D — Sidebar nav link items
+Find the <a className={cn(... block inside the nav items map. Replace the entire className expression and its contents:
+tsx<a className={cn(
+  "flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm font-medium",
+  isActive
+    ? "bg-[#CDAB4A]/15 text-[#CDAB4A]"
+    : "text-[#F7F4F2]/70 hover:bg-[#F7F4F2]/8 hover:text-[#F7F4F2]"
+)}>
+  <item.icon className={cn(
+    "h-4 w-4 shrink-0",
+    isActive ? "text-[#CDAB4A]" : "text-[#F7F4F2]/50"
+  )} />
+  <span>{item.name}</span>
+  {isActive && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[#CDAB4A]" />}
+</a>
+1E — Bottom user area
+Find:
+tsx<div className="p-4 border-t mt-auto">
+Replace with:
+tsx<div className="p-4 mt-auto border-t border-[#CDAB4A]/20">
+Find the AvatarFallback inside the sidebar dropdown trigger:
+tsx<AvatarFallback className="bg-primary/10 text-primary">
+Replace with:
+tsx<AvatarFallback className="bg-[#CDAB4A]/20 text-[#CDAB4A]">
+Find the username/role text in the sidebar:
+tsx<span className="text-sm font-medium truncate w-full">{user?.username}</span>
+<span className="text-xs text-muted-foreground">Admin</span>
+Replace with:
+tsx<span className="text-sm font-medium truncate w-full text-[#F7F4F2]">{user?.username}</span>
+<span className="text-xs text-[#807161]">Admin</span>
+1F — Top header bar
+Find:
+tsx<header className="h-16 border-b bg-background flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
+Replace with:
+tsx<header className="h-14 border-b border-border bg-background flex items-center justify-between px-8 sticky top-0 z-10">
+Find the page title:
+tsx<h2 className="text-lg font-semibold tracking-tight">{getPageTitle()}</h2>
+Replace with:
+tsx<h2 className="text-sm font-semibold tracking-tight text-foreground">{getPageTitle()}</h2>
+Find the header avatar fallback:
+tsx<AvatarFallback className="bg-primary/5 text-primary">
+Replace with:
+tsx<AvatarFallback className="bg-primary/15 text-primary">
+1G — Main content background
+Find:
+tsx<main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 overflow-hidden">
+Replace with:
+tsx<main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+1H — Replace hardcoded slate colours in admin pages
+Search across all files under client/src/pages/ and swap these Tailwind classes. Do not touch files under client/src/components/ui/.
+FindReplacebg-slate-50bg-muted/40bg-slate-50/50bg-muted/30bg-slate-100bg-mutedborder-slate-200border-bordertext-slate-900text-foregroundtext-slate-700text-foreground/80text-slate-600text-muted-foregroundtext-slate-500text-muted-foregroundtext-slate-400text-muted-foreground/70hover:bg-slate-50hover:bg-muted/40bg-slate-50/20bg-muted/20
+1I — Scrollbar colour in client/src/index.css
+Find the scrollbar thumb rules and ensure they read:
+css::-webkit-scrollbar-thumb {
+  @apply bg-[#807161]/25 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-[#807161]/45;
+}

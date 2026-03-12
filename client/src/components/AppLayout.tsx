@@ -6,7 +6,6 @@ import {
   Grid3X3, 
   Code, 
   LogOut,
-  ChevronRight,
   FlaskConical,
   ClipboardList,
   Users,
@@ -63,31 +62,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 border-r bg-card hidden md:flex flex-col">
-        <div className="p-6">
-          <h1 className="text-xl font-bold tracking-tight text-primary">Order Manager</h1>
+      <aside className="w-64 hidden md:flex flex-col bg-[#2E2E2E] border-r border-[#807161]/20">
+        <div className="px-6 py-5 border-b border-[#CDAB4A]/20">
+          <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-[#807161] mb-0.5">Netley Millwork</p>
+          <h1 className="text-base font-bold tracking-tight text-[#F7F4F2]">Order Manager</h1>
         </div>
         
-        <nav className="flex-1 overflow-y-auto px-4 space-y-8">
+        <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
           {navItems.map((group) => (
-            <div key={group.section} className="space-y-2">
-              <h2 className="text-xs font-semibold text-muted-foreground tracking-wider px-2">
+            <div key={group.section} className="space-y-1">
+              <h2 className="text-[10px] font-semibold tracking-[0.15em] uppercase px-2 text-[#807161] mb-2">
                 {group.section}
               </h2>
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = location === item.href;
                   return (
                     <Link key={item.href} href={item.href}>
                       <a className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors group",
-                        isActive 
-                          ? "bg-primary text-primary-foreground" 
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm font-medium",
+                        isActive
+                          ? "bg-[#CDAB4A]/15 text-[#CDAB4A]"
+                          : "text-[#F7F4F2]/70 hover:bg-[#F7F4F2]/8 hover:text-[#F7F4F2]"
                       )}>
-                        <item.icon className="h-4 w-4" />
-                        <span className="text-sm font-medium">{item.name}</span>
-                        {isActive && <ChevronRight className="ml-auto h-4 w-4" />}
+                        <item.icon className={cn(
+                          "h-4 w-4 shrink-0",
+                          isActive ? "text-[#CDAB4A]" : "text-[#F7F4F2]/50"
+                        )} />
+                        <span>{item.name}</span>
+                        {isActive && <div className="ml-auto h-1.5 w-1.5 rounded-full bg-[#CDAB4A]" />}
                       </a>
                     </Link>
                   );
@@ -97,18 +100,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
           ))}
         </nav>
 
-        <div className="p-4 border-t mt-auto">
+        <div className="p-4 mt-auto border-t border-[#CDAB4A]/20">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start gap-3 px-2 h-12 rounded-xl">
+              <Button variant="ghost" className="w-full justify-start gap-3 px-2 h-12 rounded-xl hover:bg-[#F7F4F2]/8">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/10 text-primary">
+                  <AvatarFallback className="bg-[#CDAB4A]/20 text-[#CDAB4A]">
                     {user?.username?.[0]?.toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col items-start overflow-hidden">
-                  <span className="text-sm font-medium truncate w-full">{user?.username}</span>
-                  <span className="text-xs text-muted-foreground">Admin</span>
+                  <span className="text-sm font-medium truncate w-full text-[#F7F4F2]">{user?.username}</span>
+                  <span className="text-xs text-[#807161]">Admin</span>
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -123,17 +126,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 dark:bg-slate-950 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b bg-background flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
-          <h2 className="text-lg font-semibold tracking-tight">{getPageTitle()}</h2>
+        <header className="h-14 border-b border-border bg-background flex items-center justify-between px-8 sticky top-0 z-10">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">{getPageTitle()}</h2>
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex flex-col items-end mr-2">
               <span className="text-sm font-medium">{user?.username}</span>
               <span className="text-xs text-muted-foreground capitalize">Administrator</span>
             </div>
             <Avatar className="h-9 w-9 border-2 border-primary/20">
-              <AvatarFallback className="bg-primary/5 text-primary">
+              <AvatarFallback className="bg-primary/15 text-primary">
                 {user?.username?.[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>

@@ -234,8 +234,8 @@ export default function OrderProcessingDashboard() {
       {processedOrder && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3 space-y-6">
-            <Card className="shadow-lg border-slate-200">
-              <CardHeader className="flex flex-row items-center justify-between border-b bg-slate-50/50 py-4">
+            <Card className="shadow-lg border-border">
+              <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/30 py-4">
                 <div className="space-y-1">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <FileText className="h-5 w-5 text-primary" />
@@ -274,7 +274,7 @@ export default function OrderProcessingDashboard() {
                       {processedOrder.items?.map((item, idx) => {
                         const hasError = item.price === 0 && item.error;
                         return (
-                          <TableRow key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50/30" : "bg-white")}>
+                          <TableRow key={idx} className={cn(idx % 2 === 1 ? "bg-muted/40/30" : "bg-white")}>
                             <TableCell className="font-mono text-xs">{item.SKU}</TableCell>
                             <TableCell className="max-w-[200px] truncate">{item.NAME}</TableCell>
                             <TableCell className="text-center font-medium">{item.Qty}</TableCell>
@@ -307,7 +307,7 @@ export default function OrderProcessingDashboard() {
 
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-6">
-              <Card className="shadow-xl border-slate-200 overflow-hidden">
+              <Card className="shadow-xl border-border overflow-hidden">
                 <div className="bg-primary p-6 text-primary-foreground">
                   <p className="text-sm font-medium opacity-80 uppercase tracking-wider">Total Order Price</p>
                   <h3 className="text-4xl font-black mt-1">${processedOrder.totalPrice.toFixed(2)}</h3>

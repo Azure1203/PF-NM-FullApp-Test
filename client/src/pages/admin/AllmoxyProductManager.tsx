@@ -288,7 +288,7 @@ export default function AllmoxyProductManager() {
                           {...getRootProps()}
                           className={cn(
                             "border-2 border-dashed rounded-lg p-8 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 text-center",
-                            isDragActive ? "border-primary bg-primary/5" : "border-slate-200 hover:border-primary/50",
+                            isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
                             importFile ? "border-green-500/50 bg-green-50/20" : ""
                           )}
                         >
@@ -351,7 +351,7 @@ export default function AllmoxyProductManager() {
                           "text-[10px] uppercase px-1.5 py-0.5 rounded-full font-bold",
                           p.status === "active"
                             ? (editingId === p.id ? "bg-primary-foreground/20 text-white" : "bg-green-100 text-green-700")
-                            : (editingId === p.id ? "bg-primary-foreground/10 text-white/70" : "bg-slate-100 text-slate-500")
+                            : (editingId === p.id ? "bg-primary-foreground/10 text-white/70" : "bg-muted text-muted-foreground")
                         )}>
                           {p.status}
                         </span>

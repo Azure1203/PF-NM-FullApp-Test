@@ -63,7 +63,7 @@ export default function HardwareChecklist() {
 
   if (!match || !fileId || fileId <= 0) {
     return (
-      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
         <p className="text-muted-foreground" data-testid="text-invalid-file">Invalid file ID</p>
       </div>
     );
@@ -114,7 +114,7 @@ export default function HardwareChecklist() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -128,7 +128,7 @@ export default function HardwareChecklist() {
   const buyoutCount = progress.buyoutItems;
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="min-h-screen bg-muted/30 pb-20">
       <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-10">
         
         <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">

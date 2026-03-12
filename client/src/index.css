@@ -76,5 +76,8 @@
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
+  @apply bg-[#807161]/25 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-[#807161]/45;
 }

@@ -6,7 +6,7 @@ import { ArrowLeft, Upload, FileText, Mail, CheckSquare, Send, Package, Scissors
 
 export default function HowItWorks() {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950" data-testid="page-how-it-works">
+    <div className="min-h-screen bg-muted/40 dark:bg-slate-950" data-testid="page-how-it-works">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link href="/">
           <Button variant="ghost" className="mb-4 gap-2" data-testid="button-back-dashboard">
@@ -23,7 +23,7 @@ export default function HowItWorks() {
         <div className="space-y-8 mt-8">
           <section data-testid="section-overview">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-overview-title">Order Process Overview</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-overview-description">
+            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-6" data-testid="text-overview-description">
               This system helps manage closet orders from initial CSV upload through to shipping. 
               Here's the complete workflow from start to finish.
             </p>
@@ -42,7 +42,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <ul className="list-disc list-inside space-y-2" data-testid="list-step1-items">
                   <li>Click "Upload New" on the dashboard</li>
                   <li>Drag and drop one or more CSV files from Allmoxy</li>
@@ -65,7 +65,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <p className="mb-3" data-testid="text-step2-description">When you upload a CSV, the system automatically creates:</p>
                 <ul className="list-disc list-inside space-y-2" data-testid="list-step2-items">
                   <li><strong>Hardware Packing Checklist</strong> - Lists all hardware items (screws, brackets, slides, etc.) with quantities. Items are matched against the product database.</li>
@@ -88,7 +88,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <div className="mb-4 p-3 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 rounded-lg" data-testid="section-step3-agentmail-active">
                   <p className="text-sm font-semibold text-teal-800 dark:text-teal-200 mb-1 flex items-center gap-2">
                     <Inbox className="w-4 h-4" /> Active Integration: AgentMail
@@ -98,7 +98,7 @@ export default function HowItWorks() {
                   </p>
                 </div>
 
-                <p className="mb-3 font-medium text-slate-700 dark:text-slate-300">What gets captured from each email:</p>
+                <p className="mb-3 font-medium text-foreground/80 dark:text-slate-300">What gets captured from each email:</p>
                 <ul className="list-disc list-inside space-y-2 mb-4" data-testid="list-step3-items">
                   <li><strong>Netley Packing Slip PDF</strong> — filename contains "Packing Slip" or "Packing List"</li>
                   <li><strong>Cut To Size PDF</strong> — filename contains "Cut To File", "Cut To Size", or "Cut to Size"</li>
@@ -107,7 +107,7 @@ export default function HowItWorks() {
                   <li><strong>Hardware CSV</strong> — matched by file extension; used to generate the hardware checklist</li>
                 </ul>
 
-                <p className="mb-3 font-medium text-slate-700 dark:text-slate-300">How orders are matched:</p>
+                <p className="mb-3 font-medium text-foreground/80 dark:text-slate-300">How orders are matched:</p>
                 <ol className="list-decimal list-inside space-y-2 text-sm mb-4" data-testid="list-step3-matching">
                   <li>The Allmoxy job number is extracted from the email subject line or attachment filename (any 3–6 digit number)</li>
                   <li>The system searches all order files in the database for a matching <strong>Allmoxy Job Number</strong> field</li>
@@ -116,17 +116,17 @@ export default function HowItWorks() {
                   <li>Each email attachment is marked as processed so it won't be downloaded again on the next poll</li>
                 </ol>
 
-                <p className="mb-3 font-medium text-slate-700 dark:text-slate-300">Manual controls on the dashboard:</p>
+                <p className="mb-3 font-medium text-foreground/80 dark:text-slate-300">Manual controls on the dashboard:</p>
                 <ul className="list-disc list-inside space-y-2 text-sm mb-4" data-testid="list-step3-controls">
                   <li><strong>Fetch AgentMail</strong> — immediately triggers a sync instead of waiting for the next scheduled poll. The tooltip shows the last sync time.</li>
                   <li><strong>Reset AgentMail</strong> <span className="inline-flex items-center gap-1">(<RotateCcw className="w-3 h-3 inline" /> circular arrow icon)</span> — clears all processed-email records so the system will reprocess every email on the next fetch. Use this if an attachment failed to download and you want to retry.</li>
                 </ul>
 
-                <div className="mt-4 p-3 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg" data-testid="section-step3-outlook-preserved">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-2">
+                <div className="mt-4 p-3 bg-muted dark:bg-slate-800 border border-border dark:border-slate-700 rounded-lg" data-testid="section-step3-outlook-preserved">
+                  <p className="text-sm font-semibold text-foreground/80 dark:text-slate-300 mb-1 flex items-center gap-2">
                     <Mail className="w-4 h-4" /> Outlook Integration (Preserved)
                   </p>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                  <p className="text-sm text-muted-foreground dark:text-muted-foreground/70">
                     The original Microsoft Outlook connector (which monitored the "Perfect Fit Allmoxy Emails" folder) is preserved in the codebase but not currently active. It can be reconnected in the future by renewing the Outlook OAuth token. AgentMail was introduced as a more reliable replacement.
                   </p>
                 </div>
@@ -145,7 +145,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <p className="mb-3" data-testid="text-step4-description">Click on any order card to view details and manage:</p>
                 <ul className="list-disc list-inside space-y-2" data-testid="list-step4-items">
                   <li><strong>Order Details</strong> - View and edit customer info, shipping address, notes</li>
@@ -169,7 +169,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <p className="mb-3" data-testid="text-pallet-rec-description">
                   The system automatically recommends a pallet size based on the largest qualifying parts in the order. This is shown in both the Project Totals section and in each pallet's metrics grid.
                 </p>
@@ -197,7 +197,7 @@ export default function HowItWorks() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border dark:border-slate-700 mb-4" data-testid="table-pallet-sizes">
                     <thead>
-                      <tr className="bg-slate-100 dark:bg-slate-800">
+                      <tr className="bg-muted dark:bg-slate-800">
                         <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Widest Part</th>
                         <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Longest Part</th>
                         <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Recommended Pallet</th>
@@ -248,7 +248,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <p className="mb-3" data-testid="text-step5-description">When the order is ready, sync it to Asana for production tracking:</p>
                 <ul className="list-disc list-inside space-y-2 mb-4" data-testid="list-step5-items">
                   <li>Click "Sync to Asana" button on the order details page</li>
@@ -271,7 +271,7 @@ export default function HowItWorks() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm border dark:border-slate-700" data-testid="table-asana-fields">
                     <thead>
-                      <tr className="bg-slate-100 dark:bg-slate-800">
+                      <tr className="bg-muted dark:bg-slate-800">
                         <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Asana Field Name</th>
                         <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">Type</th>
                         <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">What Gets Synced</th>
@@ -375,7 +375,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <p className="mb-3" data-testid="text-step6-description">Use the checklists during packing:</p>
                 <ul className="list-disc list-inside space-y-2" data-testid="list-step6-items">
                   <li><strong>Hardware Checklist</strong> - Check off hardware items as they're packed. Shows product images and quantities.</li>
@@ -398,7 +398,7 @@ export default function HowItWorks() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-slate-600 dark:text-slate-400">
+              <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                 <p className="mb-3" data-testid="text-step7-description">For orders with Cut-To-Size parts:</p>
                 <ul className="list-disc list-inside space-y-2" data-testid="list-step7-items">
                   <li>CTS parts are automatically extracted from the CSV (items ending in .CTS)</li>
@@ -413,7 +413,7 @@ export default function HowItWorks() {
 
           <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-agentmail-technical">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-agentmail-tech-title">AgentMail Integration — Technical Details</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-agentmail-tech-description">
+            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-6" data-testid="text-agentmail-tech-description">
               This section documents exactly how the AgentMail integration works under the hood — useful for debugging, understanding why something did or didn't match, or reconnecting after changes.
             </p>
 
@@ -428,12 +428,12 @@ export default function HowItWorks() {
                     Inbox Setup
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400 space-y-3" data-testid="content-agentmail-inbox">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70 space-y-3" data-testid="content-agentmail-inbox">
                   <p>AgentMail provides a dedicated hosted email inbox. Allmoxy is configured to BCC or forward order emails to this address:</p>
-                  <code className="block bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">allmoxyreplit@agentmail.to</code>
-                  <p>The inbox is accessed via the AgentMail REST API using the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">AGENTMAIL_API_KEY</code> secret stored in the environment. No OAuth token or browser login is required — the API key is stable and does not expire.</p>
+                  <code className="block bg-muted dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">allmoxyreplit@agentmail.to</code>
+                  <p>The inbox is accessed via the AgentMail REST API using the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">AGENTMAIL_API_KEY</code> secret stored in the environment. No OAuth token or browser login is required — the API key is stable and does not expire.</p>
                   <p>The base API endpoint is:</p>
-                  <code className="block bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">https://api.agentmail.to/v0/inboxes/allmoxyreplit%40agentmail.to/messages</code>
+                  <code className="block bg-muted dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">https://api.agentmail.to/v0/inboxes/allmoxyreplit%40agentmail.to/messages</code>
                 </CardContent>
               </Card>
 
@@ -446,12 +446,12 @@ export default function HowItWorks() {
                     Scheduler &amp; Concurrency
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400 space-y-3" data-testid="content-agentmail-scheduler">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70 space-y-3" data-testid="content-agentmail-scheduler">
                   <ul className="list-disc list-inside space-y-2">
                     <li>The scheduler runs automatically every <strong>30 minutes</strong> from the moment the server starts</li>
-                    <li>A <strong>concurrency guard</strong> (<code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">isFetching</code> flag) prevents two runs overlapping — if a manual trigger fires while the auto-poll is still running, the second call exits immediately with no side effects</li>
+                    <li>A <strong>concurrency guard</strong> (<code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">isFetching</code> flag) prevents two runs overlapping — if a manual trigger fires while the auto-poll is still running, the second call exits immediately with no side effects</li>
                     <li>The "Fetch AgentMail" button on the dashboard triggers an immediate run outside the normal 30-minute schedule</li>
-                    <li>Last sync time, emails processed, and emails matched are stored in the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">agentmail_sync_status</code> database table and shown in the button tooltip</li>
+                    <li>Last sync time, emails processed, and emails matched are stored in the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">agentmail_sync_status</code> database table and shown in the button tooltip</li>
                   </ul>
                 </CardContent>
               </Card>
@@ -465,28 +465,28 @@ export default function HowItWorks() {
                     API Call Flow &amp; Key Quirks
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400 space-y-4" data-testid="content-agentmail-api-flow">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70 space-y-4" data-testid="content-agentmail-api-flow">
                   <p>Each sync run makes the following API calls in sequence:</p>
                   <ol className="list-decimal list-inside space-y-3">
                     <li>
-                      <strong>List messages</strong> — <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">GET /messages?limit=100</code><br />
+                      <strong>List messages</strong> — <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">GET /messages?limit=100</code><br />
                       <span className="text-sm mt-1 block ml-5">Returns all messages in the inbox. Each message includes attachment metadata (filename, size, content type, attachment ID) but <em>not</em> a download URL.</span>
                     </li>
                     <li>
-                      <strong>Get attachment detail</strong> — <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">GET /messages/{"{message_id}"}/attachments/{"{attachment_id}"}</code><br />
-                      <span className="text-sm mt-1 block ml-5">Called once per matched attachment to retrieve a signed <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">download_url</code> (hosted on <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">cdn.agentmail.to</code>).</span>
+                      <strong>Get attachment detail</strong> — <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">GET /messages/{"{message_id}"}/attachments/{"{attachment_id}"}</code><br />
+                      <span className="text-sm mt-1 block ml-5">Called once per matched attachment to retrieve a signed <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">download_url</code> (hosted on <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">cdn.agentmail.to</code>).</span>
                     </li>
                     <li>
-                      <strong>Download the file</strong> — direct <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">GET</code> to the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">download_url</code><br />
+                      <strong>Download the file</strong> — direct <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">GET</code> to the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">download_url</code><br />
                       <span className="text-sm mt-1 block ml-5">The file is downloaded into memory as a Buffer.</span>
                     </li>
                     <li>
-                      <strong>Upload to Object Storage</strong> — saves the buffer to <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">.private/packing-slips/</code><br />
-                      <span className="text-sm mt-1 block ml-5">Filename format: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">{"{Order Name}"} {"{Job #}"} - {"{PDF Type}"}.pdf</code></span>
+                      <strong>Upload to Object Storage</strong> — saves the buffer to <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">.private/packing-slips/</code><br />
+                      <span className="text-sm mt-1 block ml-5">Filename format: <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">{"{Order Name}"} {"{Job #}"} - {"{PDF Type}"}.pdf</code></span>
                     </li>
                     <li>
-                      <strong>Update database</strong> — writes the storage path to the matching column on the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">order_files</code> record<br />
-                      <span className="text-sm mt-1 block ml-5">Columns: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">netleyPackingSlipPdfPath</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">cutToFilePdfPath</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">eliasDovetailPdfPath</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">netley5PiecePdfPath</code></span>
+                      <strong>Update database</strong> — writes the storage path to the matching column on the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">order_files</code> record<br />
+                      <span className="text-sm mt-1 block ml-5">Columns: <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">netleyPackingSlipPdfPath</code>, <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">cutToFilePdfPath</code>, <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">eliasDovetailPdfPath</code>, <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">netley5PiecePdfPath</code></span>
                     </li>
                   </ol>
 
@@ -516,10 +516,10 @@ export default function HowItWorks() {
                     Processed Records &amp; Deduplication
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400 space-y-3" data-testid="content-agentmail-processed">
-                  <p>To prevent downloading the same attachment twice, each processed attachment is recorded in the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">processed_outlook_emails</code> database table using a composite key:</p>
-                  <code className="block bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">agentmail:{"{message_id}"}:{"{attachment_id}"}</code>
-                  <p>Each record stores the subject, processing status (<code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">processed</code>, <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">skipped</code>, or <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">failed</code>), and the matched file ID if applicable.</p>
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70 space-y-3" data-testid="content-agentmail-processed">
+                  <p>To prevent downloading the same attachment twice, each processed attachment is recorded in the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">processed_outlook_emails</code> database table using a composite key:</p>
+                  <code className="block bg-muted dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">agentmail:{"{message_id}"}:{"{attachment_id}"}</code>
+                  <p>Each record stores the subject, processing status (<code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">processed</code>, <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">skipped</code>, or <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">failed</code>), and the matched file ID if applicable.</p>
                   <p>Attachments with no matching order file are <em>not</em> marked as processed — they will be retried on every future poll until a matching order appears in the system.</p>
 
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg" data-testid="section-agentmail-reset">
@@ -542,26 +542,26 @@ export default function HowItWorks() {
                     Troubleshooting
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400 space-y-4" data-testid="content-agentmail-troubleshoot">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70 space-y-4" data-testid="content-agentmail-troubleshoot">
                   <div>
-                    <p className="font-medium text-slate-700 dark:text-slate-300">"Processed 3 emails, matched 0 to orders"</p>
+                    <p className="font-medium text-foreground/80 dark:text-slate-300">"Processed 3 emails, matched 0 to orders"</p>
                     <p className="text-sm mt-1">The email was received and the attachment type was recognized, but no order file in the database had a matching Allmoxy Job Number. Check that the job number is filled in on the order file's detail page. Then click Reset AgentMail and Fetch AgentMail to retry.</p>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-700 dark:text-slate-300">Email attachment is stuck as "failed" and won't retry</p>
+                    <p className="font-medium text-foreground/80 dark:text-slate-300">Email attachment is stuck as "failed" and won't retry</p>
                     <p className="text-sm mt-1">Failed attachments are recorded and skipped on future polls. Click the <strong>Reset AgentMail</strong> button (circular arrow) on the dashboard to clear all processed records, then click <strong>Fetch AgentMail</strong> to reprocess.</p>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-700 dark:text-slate-300">PDF doesn't appear on the order even though Fetch AgentMail succeeded</p>
+                    <p className="font-medium text-foreground/80 dark:text-slate-300">PDF doesn't appear on the order even though Fetch AgentMail succeeded</p>
                     <p className="text-sm mt-1">Check that the Allmoxy Job Number on the order file matches the number in the email subject or filename exactly (leading zeros are stripped when comparing). Also confirm the order file doesn't already have a PDF of that type — the system skips attachments for file types that are already filled in.</p>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-700 dark:text-slate-300">No emails found in the inbox</p>
-                    <p className="text-sm mt-1">Confirm that Allmoxy is still configured to send emails to <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">allmoxyreplit@agentmail.to</code>. The AgentMail inbox only stores emails that are sent to it — it does not connect to any external email account.</p>
+                    <p className="font-medium text-foreground/80 dark:text-slate-300">No emails found in the inbox</p>
+                    <p className="text-sm mt-1">Confirm that Allmoxy is still configured to send emails to <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">allmoxyreplit@agentmail.to</code>. The AgentMail inbox only stores emails that are sent to it — it does not connect to any external email account.</p>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-700 dark:text-slate-300">AGENTMAIL_API_KEY error on startup</p>
-                    <p className="text-sm mt-1">The API key is stored as a Replit secret named <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm">AGENTMAIL_API_KEY</code>. If it is missing or incorrect, the scheduler will fail to start. Verify the secret value in the Replit environment settings.</p>
+                    <p className="font-medium text-foreground/80 dark:text-slate-300">AGENTMAIL_API_KEY error on startup</p>
+                    <p className="text-sm mt-1">The API key is stored as a Replit secret named <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">AGENTMAIL_API_KEY</code>. If it is missing or incorrect, the scheduler will fail to start. Verify the secret value in the Replit environment settings.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -571,7 +571,7 @@ export default function HowItWorks() {
 
           <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-asana-auto-import">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-auto-import-title">Asana Auto-Import</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-auto-import-description">
+            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-6" data-testid="text-auto-import-description">
               Orders can be automatically imported from Asana without manually uploading CSV files. The system polls an Asana project for new tasks and imports their CSV attachments.
             </p>
             <div className="space-y-6">
@@ -584,7 +584,7 @@ export default function HowItWorks() {
                     How Auto-Import Works
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                   <ol className="list-decimal list-inside space-y-2 mb-4" data-testid="list-auto-import-steps">
                     <li>An external system (e.g., Allmoxy) creates a task in the <strong>NEW JOBS</strong> Asana project</li>
                     <li>The task is moved to the <strong>READY TO IMPORT</strong> section (either manually or automatically)</li>
@@ -619,7 +619,7 @@ export default function HowItWorks() {
 
           <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-label-printing">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-labels-title">Label Printing</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-labels-description">
+            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-6" data-testid="text-labels-description">
               The system supports printing 4 types of labels directly from the browser using QZ Tray and Zebra thermal printers.
             </p>
 
@@ -633,7 +633,7 @@ export default function HowItWorks() {
                     Label Types
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                   <div className="space-y-4" data-testid="list-label-types">
                     <div>
                       <h4 className="font-semibold text-slate-800 dark:text-slate-200">Project Label (4x2")</h4>
@@ -664,7 +664,7 @@ export default function HowItWorks() {
                     Printer Setup
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                   <p className="mb-3" data-testid="text-printers-description">The system uses Zebra thermal printers that print using ZPL (Zebra Programming Language):</p>
                   <ul className="list-disc list-inside space-y-2" data-testid="list-printers">
                     <li><strong>4x2" Printer</strong> - Used for Project, Hardware, and CTS labels. This is a standard Zebra desktop printer loaded with 4"x2" direct thermal labels.</li>
@@ -684,7 +684,7 @@ export default function HowItWorks() {
                     QZ Tray &amp; Digital Certificate
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                   <p className="mb-3" data-testid="text-qz-description">QZ Tray is a small program that runs in the background on your computer. It acts as a bridge between the web browser and your Zebra printers, allowing the website to send print jobs directly without any print dialog or driver configuration.</p>
 
                   <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">What is QZ Tray?</h4>
@@ -707,7 +707,7 @@ export default function HowItWorks() {
                   <h4 className="font-semibold text-slate-800 dark:text-slate-200 mt-5 mb-2">Why a Digital Certificate is Needed</h4>
                   <p className="mb-2">QZ Tray uses a security system to make sure only trusted websites can send print jobs. Without a certificate, QZ Tray would show a popup asking you to approve every single print request. Our setup eliminates that:</p>
                   <ul className="list-disc list-inside space-y-2" data-testid="list-qz-cert">
-                    <li>A <strong>digital certificate</strong> (the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> file) is placed in the QZ Tray folder on each computer</li>
+                    <li>A <strong>digital certificate</strong> (the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> file) is placed in the QZ Tray folder on each computer</li>
                     <li>The matching <strong>private key</strong> is stored securely on the server — it never leaves the server</li>
                     <li>When the website connects to QZ Tray, the server signs the connection using the private key</li>
                     <li>QZ Tray checks that signature against the certificate on the computer — if they match, the website is trusted</li>
@@ -739,7 +739,7 @@ export default function HowItWorks() {
 
                   <div className="space-y-3" data-testid="list-qz-setup">
                     <div className="flex gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">1</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-foreground/80 dark:text-slate-200">1</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Install QZ Tray</p>
                         <p className="text-sm mt-1">Go to <a href="https://qz.io/download" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline" data-testid="link-qz-download">qz.io/download</a> and download QZ Tray for Windows. Run the installer with default settings. After installation, QZ Tray will appear in your system tray.</p>
@@ -747,25 +747,25 @@ export default function HowItWorks() {
                     </div>
 
                     <div className="flex gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">2</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-foreground/80 dark:text-slate-200">2</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Download the certificate file</p>
-                        <p className="text-sm mt-1">Use the download button above to get the <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> file. Save it somewhere easy to find (like the Desktop).</p>
+                        <p className="text-sm mt-1">Use the download button above to get the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> file. Save it somewhere easy to find (like the Desktop).</p>
                       </div>
                     </div>
 
                     <div className="flex gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">3</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-foreground/80 dark:text-slate-200">3</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Copy the certificate to the QZ Tray folder</p>
-                        <p className="text-sm mt-1">Copy <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> into the QZ Tray installation folder. The default location is:</p>
-                        <code className="block mt-1 text-sm bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded break-all">C:\Program Files\QZ Tray\</code>
+                        <p className="text-sm mt-1">Copy <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> into the QZ Tray installation folder. The default location is:</p>
+                        <code className="block mt-1 text-sm bg-muted dark:bg-slate-800 px-3 py-2 rounded break-all">C:\Program Files\QZ Tray\</code>
                         <p className="text-sm mt-1">Windows may ask for administrator permission — click "Continue" to allow the copy.</p>
                       </div>
                     </div>
 
                     <div className="flex gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">4</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-foreground/80 dark:text-slate-200">4</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Restart QZ Tray</p>
                         <p className="text-sm mt-1">Right-click the QZ Tray icon in the system tray and choose <strong>Exit</strong>. Then reopen QZ Tray from the Start Menu. It needs to restart so it picks up the new certificate file.</p>
@@ -773,7 +773,7 @@ export default function HowItWorks() {
                     </div>
 
                     <div className="flex gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">5</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-foreground/80 dark:text-slate-200">5</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Install the Zebra printers in Windows</p>
                         <p className="text-sm mt-1">Connect your Zebra printers via USB. Go to <strong>Settings &gt; Printers &amp; Scanners</strong> and make sure each printer appears with a name. Note the exact printer names — you will need them in the next step.</p>
@@ -781,7 +781,7 @@ export default function HowItWorks() {
                     </div>
 
                     <div className="flex gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">6</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-foreground/80 dark:text-slate-200">6</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Configure printer names on the website</p>
                         <p className="text-sm mt-1">On the dashboard, click the gear icon to open Printer Settings. Enter the exact printer names from Windows for the 4x2" and 4x6" printers. These names are saved in your browser, so each workstation can have different printer names.</p>
@@ -789,7 +789,7 @@ export default function HowItWorks() {
                     </div>
 
                     <div className="flex gap-3">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-700 dark:text-slate-200">7</span>
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-sm font-bold text-foreground/80 dark:text-slate-200">7</span>
                       <div>
                         <p className="font-medium text-slate-800 dark:text-slate-200">Test it</p>
                         <p className="text-sm mt-1">Open any order and click one of the print buttons. The label should print automatically with no approval popup. If it works, the workstation is fully set up.</p>
@@ -803,23 +803,23 @@ export default function HowItWorks() {
                   </h4>
                   <div className="space-y-3" data-testid="list-qz-troubleshoot">
                     <div>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">Print button does nothing / "QZ Tray not found" message</p>
+                      <p className="font-medium text-foreground/80 dark:text-slate-300">Print button does nothing / "QZ Tray not found" message</p>
                       <p className="text-sm mt-1">QZ Tray is not running. Look for the QZ icon in the system tray. If it's not there, open QZ Tray from the Start Menu. It must be running whenever you want to print.</p>
                     </div>
                     <div>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">QZ Tray asks for approval / shows a trust popup</p>
-                      <p className="text-sm mt-1">The certificate is missing or not in the right place. Make sure <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> is in <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-sm break-all">C:\Program Files\QZ Tray\</code> and that QZ Tray was restarted after copying it.</p>
+                      <p className="font-medium text-foreground/80 dark:text-slate-300">QZ Tray asks for approval / shows a trust popup</p>
+                      <p className="text-sm mt-1">The certificate is missing or not in the right place. Make sure <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm break-all">override.crt</code> is in <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm break-all">C:\Program Files\QZ Tray\</code> and that QZ Tray was restarted after copying it.</p>
                     </div>
                     <div>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">Label doesn't print / wrong printer</p>
+                      <p className="font-medium text-foreground/80 dark:text-slate-300">Label doesn't print / wrong printer</p>
                       <p className="text-sm mt-1">Check that the printer name in the website's Printer Settings matches exactly what's in Windows Printers &amp; Scanners (including capitalization and spaces). Also confirm the printer is powered on and has labels loaded.</p>
                     </div>
                     <div>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">Label prints but looks wrong (garbled text, blank)</p>
+                      <p className="font-medium text-foreground/80 dark:text-slate-300">Label prints but looks wrong (garbled text, blank)</p>
                       <p className="text-sm mt-1">The printer may not be set to ZPL mode. Zebra printers can run in different "languages." Refer to your printer's manual or contact support to switch it to ZPL mode.</p>
                     </div>
                     <div>
-                      <p className="font-medium text-slate-700 dark:text-slate-300">Windows shows "This certificate is not trusted" when viewing the file</p>
+                      <p className="font-medium text-foreground/80 dark:text-slate-300">Windows shows "This certificate is not trusted" when viewing the file</p>
                       <p className="text-sm mt-1">This Windows warning is normal and can be safely ignored. You do NOT need to install the certificate into the Windows certificate store. QZ Tray reads it directly from its own folder.</p>
                     </div>
                   </div>
@@ -841,7 +841,7 @@ export default function HowItWorks() {
 
           <section className="mt-10 pt-6 border-t dark:border-slate-700" data-testid="section-backup">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-backup-title">Backup &amp; Disaster Recovery</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-6" data-testid="text-backup-description">
+            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-6" data-testid="text-backup-description">
               The system uses two separate backup strategies to protect your data: GitHub for the application code, and Google Sheets for the database contents.
             </p>
 
@@ -849,13 +849,13 @@ export default function HowItWorks() {
               <Card data-testid="card-github-backup">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-3 text-lg" data-testid="text-github-backup-title">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                      <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                    <div className="w-10 h-10 rounded-full bg-muted dark:bg-slate-800 flex items-center justify-center">
+                      <Globe className="w-5 h-5 text-muted-foreground dark:text-muted-foreground/70" />
                     </div>
                     GitHub - Code Backup
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                   <p className="mb-3" data-testid="text-github-description">All application code is backed up to a private GitHub repository. This protects the code that runs the system (the website, server, database structure, etc.).</p>
                   <ul className="list-disc list-inside space-y-2" data-testid="list-github-items">
                     <li><strong>What it backs up</strong> - All source code files, configuration, database schema definitions, and build scripts</li>
@@ -884,7 +884,7 @@ export default function HowItWorks() {
                     Google Sheets - Data Backup
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                   <p className="mb-3" data-testid="text-sheets-description">The "Backup" button on the Dashboard exports all your database data to a new Google Spreadsheet. This protects your actual order data, product database, and checklist records.</p>
                   <ul className="list-disc list-inside space-y-2" data-testid="list-sheets-items">
                     <li><strong>What it backs up</strong> - Orders, order files, products, pallets, hardware checklist items, and packing checklist items</li>
@@ -918,12 +918,12 @@ export default function HowItWorks() {
                     Recovery Summary
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-slate-600 dark:text-slate-400">
+                <CardContent className="text-muted-foreground dark:text-muted-foreground/70">
                   <p className="mb-3" data-testid="text-recovery-description">If something goes wrong, here's what you need to recover:</p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm border dark:border-slate-700" data-testid="table-recovery-summary">
                       <thead>
-                        <tr className="bg-slate-100 dark:bg-slate-800">
+                        <tr className="bg-muted dark:bg-slate-800">
                           <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">What's Lost</th>
                           <th className="text-left p-2 border-b dark:border-slate-700 font-semibold text-slate-800 dark:text-slate-200">How to Recover</th>
                         </tr>
@@ -958,7 +958,7 @@ export default function HowItWorks() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700" data-testid="info-status-filters">
                 <h3 className="font-semibold mb-2 dark:text-slate-100" data-testid="text-status-filters-title">Status Filters</h3>
-                <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1" data-testid="list-status-filters">
+                <ul className="text-sm text-muted-foreground dark:text-muted-foreground/70 space-y-1" data-testid="list-status-filters">
                   <li><strong>All</strong> - Show all orders</li>
                   <li><strong>In Production</strong> - Orders being worked on</li>
                   <li><strong>Pending</strong> - Not yet synced to Asana</li>
@@ -968,7 +968,7 @@ export default function HowItWorks() {
               </div>
               <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700" data-testid="info-search">
                 <h3 className="font-semibold mb-2 dark:text-slate-100" data-testid="text-search-title">Search</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400" data-testid="text-search-description">
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground/70" data-testid="text-search-description">
                   Search by project name, PO number, dealer name, or shipping address. 
                   Results filter in real-time as you type.
                 </p>
@@ -978,10 +978,10 @@ export default function HowItWorks() {
 
           <section className="mt-6 pt-6 border-t dark:border-slate-700" data-testid="section-products">
             <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4" data-testid="text-products-title">Products Database</h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4" data-testid="text-products-description">
+            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-4" data-testid="text-products-description">
               The Products page manages the hardware and component database used for checklist generation:
             </p>
-            <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 space-y-2" data-testid="list-products-items">
+            <ul className="list-disc list-inside text-muted-foreground dark:text-muted-foreground/70 space-y-2" data-testid="list-products-items">
               <li><strong>Hardware Items</strong> - Screws, brackets, slides, etc. with stock status</li>
               <li><strong>Components</strong> - Doors, drawer boxes, etc. from suppliers</li>
               <li><strong>Bulk Import</strong> - Import products from CSV files</li>
@@ -994,14 +994,14 @@ export default function HowItWorks() {
               <Palette className="w-5 h-5" />
               Material Summary &amp; Color Grid
             </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4" data-testid="text-color-grid-description">
+            <p className="text-muted-foreground dark:text-muted-foreground/70 mb-4" data-testid="text-color-grid-description">
               The system tracks which material colors are used in each order file. This helps you see at a glance what sheet materials are needed for production.
             </p>
 
             <div className="space-y-4">
               <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
                 <h3 className="font-semibold mb-2 dark:text-slate-100">How It Works</h3>
-                <ol className="list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-2">
+                <ol className="list-decimal list-inside text-sm text-muted-foreground dark:text-muted-foreground/70 space-y-2">
                   <li>When you upload a CSV order file, the system reads each row's material code (column B in the CSV)</li>
                   <li>It compares each code against the Color Grid database, which contains all known material codes (TFL, MT, HG, HPL, etc.)</li>
                   <li>Hardware items (codes starting with M-, H., R-, S.), dovetails (DBX/SDBX), and glass items are automatically excluded</li>
@@ -1012,10 +1012,10 @@ export default function HowItWorks() {
 
               <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
                 <h3 className="font-semibold mb-2 dark:text-slate-100">Material Summary Report</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground/70 mb-2">
                   Found on the order details page (collapsed by default, click "Material Summary Report" to expand). It shows:
                 </p>
-                <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                <ul className="list-disc list-inside text-sm text-muted-foreground dark:text-muted-foreground/70 space-y-1">
                   <li>Each file in the order listed separately with its name</li>
                   <li>The total number of material parts in each file</li>
                   <li>A breakdown of each color code used, with the full material description and part count</li>
@@ -1024,10 +1024,10 @@ export default function HowItWorks() {
 
               <div className="p-4 bg-white dark:bg-slate-900 rounded-lg border dark:border-slate-700">
                 <h3 className="font-semibold mb-2 dark:text-slate-100">Color Grid Management</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground/70 mb-2">
                   The Color Grid page (accessible from the "Colors" button on the Dashboard) manages the list of known material codes:
                 </p>
-                <ul className="list-disc list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                <ul className="list-disc list-inside text-sm text-muted-foreground dark:text-muted-foreground/70 space-y-1">
                   <li>View all color codes and their full descriptions in a table</li>
                   <li>Import a new color grid from a CSV file (columns: code, description)</li>
                   <li>Importing replaces the entire grid with the new data</li>

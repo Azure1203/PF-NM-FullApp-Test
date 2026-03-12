@@ -126,7 +126,7 @@ export default function PackingChecklist() {
 
   if (!match || !fileId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-muted/40 dark:bg-slate-900">
         <p className="text-muted-foreground">Invalid file ID</p>
       </div>
     );
@@ -134,7 +134,7 @@ export default function PackingChecklist() {
 
   if (isLoading || fileLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-muted/40 dark:bg-slate-900">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -142,7 +142,7 @@ export default function PackingChecklist() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 dark:bg-slate-900 gap-4">
         <p className="text-muted-foreground">No checklist available for this file.</p>
         <p className="text-sm text-muted-foreground">This file may not have a packing checklist generated yet.</p>
         {fileInfo && (
@@ -161,7 +161,7 @@ export default function PackingChecklist() {
   const isComplete = progress.percentage === 100;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-muted/40 dark:bg-slate-900">
       <div className="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between">
           {fileInfo && (
