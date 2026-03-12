@@ -466,10 +466,13 @@ export async function registerRoutes(
       }
 
       const productsToInsert = records.map(record => ({
-        name: record.NAME || record.name || '',
-        status: 'active',
+        name: record['PRODUCT NAME'] || record.NAME || record.name || record['Product Name'] || '',
+        status: 'active' as const,
         pricingProxyId: null,
         exportProxyId: null,
+        skuPrefix: null,
+        description: null,
+        notes: null,
       })).filter(p => p.name);
 
       await storage.replaceAllmoxyProducts(productsToInsert);
