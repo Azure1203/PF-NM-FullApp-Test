@@ -1,0 +1,79 @@
+PROMPT 8 — Formula Tester Page
+Files: new client/src/pages/admin/FormulaTester.tsx, server/routes.ts, client/src/App.tsx, client/src/components/AppLayout.tsx
+8A — Add API route in server/routes.ts
+tsapp.post('/api/admin/formula-test', isAuthenticated, async (req, res) => {
+  try {
+    const { productId, width, height, length, quantity, gridLookups } = req.body;
+    // gridLookups: { [alias]: lookupValue }
+
+    const allProds = await storage.getAllmoxyProducts();
+    const product = allProds.find(p => p.id === Number(productId));
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    const bindings = await storage.getProductGridBindings(product.id);
+    const contextScope: Record<string, any> = {};
+
+    for (const binding of bindings) {
+      const lookupValue = String((gridLookups || {})[binding.alias] || '');
+      const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
+      if (row) contextScope[binding.alias] = row.rowData;
+    }
+
+    const fakeItem = {
+      width: Number(width) || 0,
+      height: Number(height) || 0,
+      length: Number(length) || 0,
+      depth: Number(length) || 0,
+      quantity: Number(quantity) || 1,
+      SKU: 'TEST',
+    };
+
+    let price = 0;
+    let priceError: string | null = null;
+    let exportBlock = '';
+    let exportError: string | null = null;
+
+    if (product.pricingProxyId) {
+      const pv = await storage.getProxyVariableById(product.pricingProxyId);
+      if (pv) {
+        try { price = evaluatePrice(pv.formula, fakeItem, contextScope); }
+        catch (e: any) { priceError = e.message; }
+      }
+    }
+
+    if (product.exportProxyId) {
+      const ev = await storage.getProxyVariableById(product.exportProxyId);
+      if (ev) {
+        try { exportBlock = generateOrdItemBlock(fakeItem, contextScope, ev.formula); }
+        catch (e: any) { exportError = e.message; }
+      }
+    }
+
+    res.json({ price, priceError, exportBlock, exportError, contextScope });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+8B — Create client/src/pages/admin/FormulaTester.tsx
+Create a new file with this component. It should:
+
+Product selector dropdown — fetches from /api/admin/allmoxy-products
+When a product is selected, fetch its bindings from /api/admin/allmoxy-products/:id/bindings
+Dimension inputs: Width, Height, Length, Quantity (number inputs — third dimension is "Length" not "Depth")
+For each binding, a text input labelled [alias] lookup (column: [lookupColumn]) — e.g. "color lookup (column: Color)"
+A "Test Formula" button that POSTs to /api/admin/formula-test
+Results section:
+
+Price: $XX.XX in green, or error in red
+Export Block: <pre> monospace block, or error in red
+Context Scope: collapsible <pre> JSON showing what grid data was loaded for each alias
+
+
+
+8C — Register route in client/src/App.tsx
+tsx<Route path="/admin/formula-tester" component={FormulaTester} />
+Import FormulaTester at the top with the other admin imports.
+8D — Add to sidebar in AppLayout.tsx
+In navItems, under SYSTEM ADMINISTRATION, add:
+ts{ name: "Formula Tester", href: "/admin/formula-tester", icon: FlaskConical },
+Add FlaskConical to the lucide-react import.

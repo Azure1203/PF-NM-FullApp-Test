@@ -59,7 +59,7 @@ export default function FormulaTester() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [width, setWidth] = useState("300");
   const [height, setHeight] = useState("600");
-  const [depth, setDepth] = useState("19");
+  const [length, setLength] = useState("19");
   const [quantity, setQuantity] = useState("1");
   const [lookupInputs, setLookupInputs] = useState<Record<string, string>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -88,7 +88,8 @@ export default function FormulaTester() {
       const inputs: Record<string, any> = {
         width: parseFloat(width) || 0,
         height: parseFloat(height) || 0,
-        depth: parseFloat(depth) || 0,
+        length: parseFloat(length) || 0,
+        depth: parseFloat(length) || 0,
         quantity: parseInt(quantity) || 1,
         ...lookupInputs,
       };
@@ -183,7 +184,7 @@ export default function FormulaTester() {
                 {([
                   { label: "Width (mm)", val: width, set: setWidth, id: "input-width" },
                   { label: "Height (mm)", val: height, set: setHeight, id: "input-height" },
-                  { label: "Depth (mm)", val: depth, set: setDepth, id: "input-depth" },
+                  { label: "Length (mm)", val: length, set: setLength, id: "input-length" },
                   { label: "Quantity", val: quantity, set: setQuantity, id: "input-quantity" },
                 ] as const).map(({ label, val, set, id }) => (
                   <div key={id} className="space-y-1">

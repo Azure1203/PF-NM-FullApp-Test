@@ -403,9 +403,10 @@ export async function registerRoutes(
       }
 
       const finalScope = {
-        width: inputs.width ?? 0,
-        height: inputs.height ?? 0,
-        depth: inputs.depth ?? 0,
+        width:    inputs.width ?? 0,
+        height:   inputs.height ?? 0,
+        length:   inputs.length ?? inputs.depth ?? 0,
+        depth:    inputs.depth ?? inputs.length ?? 0,
         quantity: inputs.quantity ?? 1,
         ...contextScope,
       };
