@@ -51,3 +51,7 @@ integrations = ["asana:1.0.0", "javascript_log_in_with_replit:2.0.0", "javascrip
 [userenv.shared]
 ASANA_PROJECT_GID = "1208263802564738"
 CUSTOM_APP_DOMAIN = "perfectfitorders.com"
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
