@@ -92,7 +92,7 @@ export default function OrderDetails() {
   const [materialSummaryOpen, setMaterialSummaryOpen] = useState(false);
   const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
   const [pricingOpen, setPricingOpen] = useState(true);
-  const [expandedPricingErrors, setExpandedPricingErrors] = useState<Set<number>>(new Set());
+
   const [editingCienappsJobNumber, setEditingCienappsJobNumber] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
   const [editingFileAllmoxyJob, setEditingFileAllmoxyJob] = useState<{ [fileId: number]: string }>({});
@@ -1304,7 +1304,7 @@ export default function OrderDetails() {
                 {/* Empty state */}
                 {!itemsLoading && (!orderItems || orderItems.length === 0) && (
                   <div className="text-center py-8 text-muted-foreground text-sm">
-                    No pricing data yet. Click <strong>Re-run Pricing</strong> to process this order.
+                    No pricing data available. Re-upload the order CSV to generate pricing breakdown.
                   </div>
                 )}
 
@@ -1318,7 +1318,7 @@ export default function OrderDetails() {
                             <TableHead className="font-bold">SKU</TableHead>
                             <TableHead className="font-bold">Product</TableHead>
                             <TableHead className="font-bold">Description</TableHead>
-                            <TableHead className="font-bold text-center">W × H</TableHead>
+                            <TableHead className="font-bold text-center">W × H × L</TableHead>
                             <TableHead className="font-bold text-center">Qty</TableHead>
                             <TableHead className="font-bold text-right">Unit Price</TableHead>
                             <TableHead className="font-bold text-right">Total</TableHead>
@@ -1328,64 +1328,64 @@ export default function OrderDetails() {
                         <TableBody>
                           {orderItems.map((item) => {
                             const hasError = !!item.pricingError;
-                            const noMatch = item.productId === null;
+                            const matched = item.productId !== null;
+                            const zeroPriced = matched && !hasError && (item.unitPrice ?? 0) === 0;
+                            const priced = matched && !hasError && (item.unitPrice ?? 0) > 0;
+                            const rowClass = hasError
+                              ? 'bg-red-50 dark:bg-red-950/20'
+                              : zeroPriced
+                              ? 'bg-yellow-50 dark:bg-yellow-950/20'
+                              : priced
+                              ? 'bg-emerald-50 dark:bg-emerald-950/20'
+                              : '';
                             return (
-                              <>
-                                <TableRow
-                                  key={item.id}
-                                  data-testid={`row-order-item-${item.id}`}
-                                  className={hasError ? 'bg-red-50 dark:bg-red-950/20' : noMatch ? 'bg-amber-50 dark:bg-amber-950/20' : ''}
-                                >
-                                  <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                                  <TableCell>
-                                    {item.productName ? (
-                                      <span className="text-sm">{item.productName}</span>
-                                    ) : (
-                                      <Badge variant="destructive" className="text-[10px]">No Match</Badge>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">{item.description || '—'}</TableCell>
-                                  <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap">
-                                    {item.width ?? '?'} × {item.height ?? '?'}
-                                  </TableCell>
-                                  <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                                  <TableCell className="text-right font-mono text-sm">
-                                    ${(item.unitPrice ?? 0).toFixed(2)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono text-sm font-semibold">
-                                    ${(item.totalPrice ?? 0).toFixed(2)}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {hasError ? (
-                                      <button
-                                        data-testid={`badge-error-${item.id}`}
-                                        onClick={() => setExpandedPricingErrors(prev => {
-                                          const next = new Set(prev);
-                                          next.has(item.id) ? next.delete(item.id) : next.add(item.id);
-                                          return next;
-                                        })}
-                                      >
-                                        <Badge variant="destructive" className="cursor-pointer gap-1 text-[10px]">
-                                          <AlertTriangle className="h-3 w-3" /> Error
-                                        </Badge>
-                                      </button>
-                                    ) : (
-                                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-1 text-[10px]">
-                                        <Check className="h-3 w-3" /> OK
-                                      </Badge>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                                {hasError && expandedPricingErrors.has(item.id) && (
-                                  <TableRow key={`err-${item.id}`} className="bg-red-50 dark:bg-red-950/20">
-                                    <TableCell colSpan={8} className="py-2 px-4">
-                                      <code className="text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950/40 rounded px-2 py-1 block">
-                                        {item.pricingError}
-                                      </code>
-                                    </TableCell>
-                                  </TableRow>
-                                )}
-                              </>
+                              <TableRow
+                                key={item.id}
+                                data-testid={`row-order-item-${item.id}`}
+                                className={rowClass}
+                              >
+                                <TableCell className="font-mono text-xs">
+                                  <div>{item.sku}</div>
+                                  {hasError && (
+                                    <div className="mt-1 text-[10px] text-red-600 dark:text-red-400 font-sans">
+                                      {item.pricingError}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {item.productName ? (
+                                    <span className="text-sm">{item.productName}</span>
+                                  ) : (
+                                    <Badge variant="destructive" className="text-[10px]">No Match</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">{item.description || '—'}</TableCell>
+                                <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap">
+                                  {item.width ?? '?'} × {item.height ?? '?'} × {item.depth ?? '?'}
+                                </TableCell>
+                                <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  ${(item.unitPrice ?? 0).toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">
+                                  ${(item.totalPrice ?? 0).toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {hasError ? (
+                                    <Badge variant="destructive" data-testid={`badge-error-${item.id}`} className="gap-1 text-[10px]">
+                                      <X className="h-3 w-3" /> Error
+                                    </Badge>
+                                  ) : zeroPriced ? (
+                                    <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 gap-1 text-[10px]" data-testid={`badge-warn-${item.id}`}>
+                                      <AlertTriangle className="h-3 w-3" /> $0
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-1 text-[10px]" data-testid={`badge-ok-${item.id}`}>
+                                      <Check className="h-3 w-3" /> OK
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
                             );
                           })}
                         </TableBody>
