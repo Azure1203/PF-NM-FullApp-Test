@@ -157,6 +157,11 @@ export interface IStorage {
   getAttributeGridRows(gridId: number): Promise<AttributeGridRow[]>;
   getAttributeGridRowByKey(gridId: number, lookupKey: string): Promise<AttributeGridRow | undefined>;
   replaceAttributeGridRows(gridId: number, rows: InsertAttributeGridRow[]): Promise<AttributeGridRow[]>;
+  updateAttributeGridRow(id: number, rowData: Record<string, any>): Promise<AttributeGridRow>;
+  deleteAttributeGridRow(id: number): Promise<void>;
+  deleteAttributeGrid(id: number): Promise<boolean>;
+  addAttributeGridRow(gridId: number, lookupKey: string, rowData: Record<string, any>): Promise<AttributeGridRow>;
+  updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string }): Promise<AttributeGrid>;
 
   getProxyVariables(): Promise<ProxyVariable[]>;
   getProxyVariableByName(name: string): Promise<ProxyVariable | undefined>;
@@ -769,6 +774,41 @@ export class DatabaseStorage implements IStorage {
       const inserted = await tx.insert(attributeGridRows).values(rows).returning();
       return inserted;
     });
+  }
+
+  async updateAttributeGridRow(id: number, rowData: Record<string, any>): Promise<AttributeGridRow> {
+    const [existingRow] = await db.select().from(attributeGridRows).where(eq(attributeGridRows.id, id));
+    const [grid] = await db.select().from(attributeGrids).where(eq(attributeGrids.id, existingRow.gridId));
+    const newLookupKey = String(rowData[grid.keyColumn] || existingRow.lookupKey);
+    const [updated] = await db.update(attributeGridRows)
+      .set({ rowData, lookupKey: newLookupKey })
+      .where(eq(attributeGridRows.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteAttributeGridRow(id: number): Promise<void> {
+    await db.delete(attributeGridRows).where(eq(attributeGridRows.id, id));
+  }
+
+  async deleteAttributeGrid(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(attributeGrids).where(eq(attributeGrids.id, id)).returning();
+    return !!deleted;
+  }
+
+  async addAttributeGridRow(gridId: number, lookupKey: string, rowData: Record<string, any>): Promise<AttributeGridRow> {
+    const [created] = await db.insert(attributeGridRows)
+      .values({ gridId, lookupKey, rowData })
+      .returning();
+    return created;
+  }
+
+  async updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string }): Promise<AttributeGrid> {
+    const [updated] = await db.update(attributeGrids)
+      .set(updates)
+      .where(eq(attributeGrids.id, id))
+      .returning();
+    return updated;
   }
 
   async getProxyVariables(): Promise<ProxyVariable[]> {

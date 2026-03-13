@@ -1,0 +1,395 @@
+PROMPT 10 — Rebuild Attribute Grid Manager
+Files: client/src/pages/admin/DynamicGridManager.tsx (full replace), server/routes.ts, server/storage.ts
+10A — Add storage methods to server/storage.ts
+Add to IStorage interface:
+tsupdateAttributeGridRow(id: number, rowData: Record<string, any>): Promise<AttributeGridRow>;
+deleteAttributeGridRow(id: number): Promise<void>;
+deleteAttributeGrid(id: number): Promise<boolean>;
+addAttributeGridRow(gridId: number, lookupKey: string, rowData: Record<string, any>): Promise<AttributeGridRow>;
+updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string }): Promise<AttributeGrid>;
+Implement in DatabaseStorage:
+tsasync updateAttributeGridRow(id: number, rowData: Record<string, any>): Promise<AttributeGridRow> {
+  const [existingRow] = await db.select().from(attributeGridRows).where(eq(attributeGridRows.id, id));
+  const [grid] = await db.select().from(attributeGrids).where(eq(attributeGrids.id, existingRow.gridId));
+  const newLookupKey = String(rowData[grid.keyColumn] || existingRow.lookupKey);
+  const [updated] = await db.update(attributeGridRows)
+    .set({ rowData, lookupKey: newLookupKey })
+    .where(eq(attributeGridRows.id, id))
+    .returning();
+  return updated;
+}
+
+async deleteAttributeGridRow(id: number): Promise<void> {
+  await db.delete(attributeGridRows).where(eq(attributeGridRows.id, id));
+}
+
+async deleteAttributeGrid(id: number): Promise<boolean> {
+  const [deleted] = await db.delete(attributeGrids).where(eq(attributeGrids.id, id)).returning();
+  return !!deleted;
+}
+
+async addAttributeGridRow(gridId: number, lookupKey: string, rowData: Record<string, any>): Promise<AttributeGridRow> {
+  const [created] = await db.insert(attributeGridRows)
+    .values({ gridId, lookupKey, rowData })
+    .returning();
+  return created;
+}
+
+async updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string }): Promise<AttributeGrid> {
+  const [updated] = await db.update(attributeGrids)
+    .set(updates)
+    .where(eq(attributeGrids.id, id))
+    .returning();
+  return updated;
+}
+10B — Add API routes to server/routes.ts (after existing grid routes)
+ts// Update a single grid row
+app.put('/api/admin/attribute-grids/rows/:rowId', isAuthenticated, async (req, res) => {
+  try {
+    const { rowData } = req.body;
+    if (!rowData || typeof rowData !== 'object') {
+      return res.status(400).json({ message: 'rowData is required' });
+    }
+    const updated = await storage.updateAttributeGridRow(Number(req.params.rowId), rowData);
+    res.json(updated);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Delete a single grid row
+app.delete('/api/admin/attribute-grids/rows/:rowId', isAuthenticated, async (req, res) => {
+  try {
+    await storage.deleteAttributeGridRow(Number(req.params.rowId));
+    res.status(204).send();
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Add a new row to a grid
+app.post('/api/admin/attribute-grids/:id/rows', isAuthenticated, async (req, res) => {
+  try {
+    const gridId = Number(req.params.id);
+    const { rowData } = req.body;
+    if (!rowData || typeof rowData !== 'object') {
+      return res.status(400).json({ message: 'rowData is required' });
+    }
+    const grids = await storage.getAttributeGrids();
+    const grid = grids.find(g => g.id === gridId);
+    if (!grid) return res.status(404).json({ message: 'Grid not found' });
+    const lookupKey = String(rowData[grid.keyColumn] || '');
+    const created = await storage.addAttributeGridRow(gridId, lookupKey, rowData);
+    res.status(201).json(created);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Delete an entire grid
+app.delete('/api/admin/attribute-grids/:id', isAuthenticated, async (req, res) => {
+  try {
+    const deleted = await storage.deleteAttributeGrid(Number(req.params.id));
+    if (!deleted) return res.status(404).json({ message: 'Grid not found' });
+    res.status(204).send();
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Update grid metadata
+app.patch('/api/admin/attribute-grids/:id', isAuthenticated, async (req, res) => {
+  try {
+    const { name, keyColumn } = req.body;
+    const updated = await storage.updateAttributeGrid(Number(req.params.id), { name, keyColumn });
+    res.json(updated);
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Export a grid as CSV
+app.get('/api/admin/attribute-grids/:id/export', isAuthenticated, async (req, res) => {
+  try {
+    const gridId = Number(req.params.id);
+    const grids = await storage.getAttributeGrids();
+    const grid = grids.find(g => g.id === gridId);
+    if (!grid) return res.status(404).json({ message: 'Grid not found' });
+    const rows = await storage.getAttributeGridRows(gridId);
+    const headers = grid.columns;
+    const csvLines = [
+      headers.join(','),
+      ...rows.map(r =>
+        headers.map(h => {
+          const val = String((r.rowData as any)[h] ?? '');
+          return val.includes(',') || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
+        }).join(',')
+      )
+    ];
+    const safeName = grid.name.replace(/[^a-z0-9_-]/gi, '_');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.csv"`);
+    res.send(csvLines.join('\n'));
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+10C — Replace DynamicGridManager.tsx completely
+Replace the entire file contents with a new component. Required imports:
+tsimport { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { useDropzone } from "react-dropzone";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Upload, Database, Search, Trash2, Plus, Download,
+  ChevronDown, ChevronUp, FileText, Loader2, AlertTriangle,
+} from "lucide-react";
+import type { AttributeGrid, AttributeGridRow } from "@shared/schema";
+import { cn } from "@/lib/utils";
+```
+
+**Layout — three panels:**
+```
+┌────────────────────────┬─────────────────────────────────────────┐
+│  LEFT PANEL            │  RIGHT PANEL                            │
+│  Scrollable grid list  │  Toolbar: name, key col, search,        │
+│  Each card: name,      │  Add Row, Export, Delete Grid           │
+│  row count, key col,   ├─────────────────────────────────────────┤
+│  column count          │  Data table: horizontally + vertically  │
+│                        │  scrollable, sticky header, inline      │
+│  [Upload New Grid]     │  editable cells, delete row buttons,    │
+│  collapsible at bottom │  add-row input row at bottom            │
+└────────────────────────┴─────────────────────────────────────────┘
+State:
+tsconst [selectedGridId, setSelectedGridId] = useState<number | null>(null);
+const [editingCell, setEditingCell] = useState<{ rowId: number; col: string } | null>(null);
+const [editingValue, setEditingValue] = useState<string>('');
+const [searchQuery, setSearchQuery] = useState('');
+const [newRowData, setNewRowData] = useState<Record<string, string>>({});
+const [uploadOpen, setUploadOpen] = useState(false);
+const [uploadFile, setUploadFile] = useState<File | null>(null);
+const [uploadName, setUploadName] = useState('');
+const [confirmDeleteGrid, setConfirmDeleteGrid] = useState(false);
+Queries:
+tsconst { data: grids = [] } = useQuery<AttributeGrid[]>({
+  queryKey: ['/api/admin/attribute-grids'],
+});
+
+const { data: rows = [], isLoading: isLoadingRows } = useQuery<AttributeGridRow[]>({
+  queryKey: ['/api/admin/attribute-grids', selectedGridId, 'rows'],
+  enabled: selectedGridId !== null,
+  queryFn: () => fetch(`/api/admin/attribute-grids/${selectedGridId}/rows`).then(r => r.json()),
+});
+
+const selectedGrid = grids.find(g => g.id === selectedGridId) ?? null;
+
+const filteredRows = useMemo(() => {
+  if (!searchQuery.trim()) return rows;
+  const q = searchQuery.toLowerCase();
+  return rows.filter(row =>
+    Object.values(row.rowData as Record<string, any>).some(v =>
+      String(v).toLowerCase().includes(q)
+    )
+  );
+}, [rows, searchQuery]);
+Mutations:
+tsconst updateRowMutation = useMutation({
+  mutationFn: async ({ rowId, rowData }: { rowId: number; rowData: Record<string, any> }) => {
+    const res = await fetch(`/api/admin/attribute-grids/rows/${rowId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rowData }),
+    });
+    if (!res.ok) throw new Error('Failed to save');
+    return res.json();
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids', selectedGridId, 'rows'] });
+    toast({ title: 'Row updated' });
+  },
+  onError: (e: Error) => toast({ title: 'Save failed', description: e.message, variant: 'destructive' }),
+});
+
+const deleteRowMutation = useMutation({
+  mutationFn: async (rowId: number) => {
+    const res = await fetch(`/api/admin/attribute-grids/rows/${rowId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete row');
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids', selectedGridId, 'rows'] });
+    toast({ title: 'Row deleted' });
+  },
+  onError: (e: Error) => toast({ title: 'Delete failed', description: e.message, variant: 'destructive' }),
+});
+
+const addRowMutation = useMutation({
+  mutationFn: async (rowData: Record<string, any>) => {
+    const res = await fetch(`/api/admin/attribute-grids/${selectedGridId}/rows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rowData }),
+    });
+    if (!res.ok) throw new Error('Failed to add row');
+    return res.json();
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids', selectedGridId, 'rows'] });
+    setNewRowData({});
+    toast({ title: 'Row added' });
+  },
+  onError: (e: Error) => toast({ title: 'Add failed', description: e.message, variant: 'destructive' }),
+});
+
+const deleteGridMutation = useMutation({
+  mutationFn: async () => {
+    const res = await fetch(`/api/admin/attribute-grids/${selectedGridId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete grid');
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids'] });
+    setSelectedGridId(null);
+    setConfirmDeleteGrid(false);
+    toast({ title: 'Grid deleted' });
+  },
+  onError: (e: Error) => toast({ title: 'Delete failed', description: e.message, variant: 'destructive' }),
+});
+
+const uploadMutation = useMutation({
+  mutationFn: async () => {
+    if (!uploadFile || !uploadName.trim()) throw new Error('Name and file required');
+    const formData = new FormData();
+    formData.append('name', uploadName.trim());
+    formData.append('file', uploadFile);
+    const res = await fetch('/api/admin/upload-dynamic-grid', { method: 'POST', body: formData });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+    return res.json();
+  },
+  onSuccess: (data) => {
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids'] });
+    setUploadFile(null);
+    setUploadName('');
+    setUploadOpen(false);
+    setSelectedGridId(data.gridId);
+    toast({ title: 'Grid uploaded', description: `${data.rowCount} rows synced` });
+  },
+  onError: (e: Error) => toast({ title: 'Upload failed', description: e.message, variant: 'destructive' }),
+});
+Inline edit helpers:
+tsfunction startEdit(rowId: number, col: string, currentValue: string) {
+  setEditingCell({ rowId, col });
+  setEditingValue(currentValue);
+}
+
+function commitEdit(row: AttributeGridRow) {
+  if (!editingCell) return;
+  const updatedRowData = { ...(row.rowData as Record<string, any>), [editingCell.col]: editingValue };
+  updateRowMutation.mutate({ rowId: row.id, rowData: updatedRowData });
+  setEditingCell(null);
+}
+
+function cancelEdit() {
+  setEditingCell(null);
+  setEditingValue('');
+}
+Left panel — grid list: Scrollable list of cards, one per grid. Each shows name (bold), row count badge, key column badge (key: MANU_CODE), column count. Click to set selectedGridId. Selected card gets a gold left border + background tint. Upload collapsible at the bottom: toggle button, grid name text input, CSV dropzone, "Upload & Sync" button, note: "Uploading to an existing grid name replaces all rows."
+Right panel toolbar: Grid name is inline editable (click → input, blur calls PATCH /api/admin/attribute-grids/:id). Key column shown as a dropdown of the grid's column names. Right side buttons: search input (filters rows client-side), [Add Row], [Export CSV] (window.open('/api/admin/attribute-grids/${selectedGridId}/export')), [Delete Grid] (shows inline confirmation: "Delete '[Name]' and all [N] rows? [Cancel] [Delete]").
+Right panel data table — critical scroll requirements:
+
+Outer wrapper: overflow-x-auto, inner div: min-w-max, max-height calc(100vh-280px) with overflow-y-auto
+Do NOT use ScrollArea from shadcn — it clips horizontal content
+<thead> is sticky (position: sticky; top: 0; z-index: 10)
+Key column header gets a small key badge
+
+Cell rendering:
+View mode (default):
+tsx<TableCell
+  className="whitespace-nowrap px-3 py-2 text-sm cursor-pointer hover:bg-primary/5 border-r last:border-0 max-w-[220px] overflow-hidden text-ellipsis"
+  title={String((row.rowData as any)[col] ?? '')}
+  onClick={() => startEdit(row.id, col, String((row.rowData as any)[col] ?? ''))}
+>
+  {String((row.rowData as any)[col] ?? '')}
+</TableCell>
+Edit mode (when editingCell?.rowId === row.id && editingCell?.col === col):
+tsx<TableCell className="p-0 border-r">
+  <input
+    autoFocus
+    className="w-full h-full px-3 py-2 text-sm bg-primary/5 border-2 border-primary outline-none min-w-[120px]"
+    value={editingValue}
+    onChange={e => setEditingValue(e.target.value)}
+    onBlur={() => commitEdit(row)}
+    onKeyDown={e => {
+      if (e.key === 'Enter') commitEdit(row);
+      if (e.key === 'Escape') cancelEdit();
+    }}
+  />
+</TableCell>
+Actions column (last column per row):
+tsx<TableCell className="px-2 py-1">
+  <Button
+    size="icon"
+    variant="ghost"
+    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+    onClick={() => {
+      if (confirm('Delete this row?')) deleteRowMutation.mutate(row.id);
+    }}
+  >
+    <Trash2 className="h-3.5 w-3.5" />
+  </Button>
+</TableCell>
+Row colours:
+
+Alternate: bg-background / bg-muted/20
+Header rows (SELECTABLE === 'Header'): bg-muted font-medium text-muted-foreground italic
+Empty key column: bg-yellow-50
+
+Add-row section (pinned at bottom of table):
+tsx<TableRow className="bg-green-50/40 border-t-2 border-green-200">
+  {selectedGrid.columns.map(col => (
+    <TableCell key={col} className="p-1 border-r">
+      <input
+        className="w-full px-2 py-1 text-sm bg-white border border-border rounded min-w-[100px]"
+        placeholder={col === selectedGrid.keyColumn ? `${col} (key)` : col}
+        value={newRowData[col] ?? ''}
+        onChange={e => setNewRowData(prev => ({ ...prev, [col]: e.target.value }))}
+      />
+    </TableCell>
+  ))}
+  <TableCell className="px-2 py-1">
+    <Button
+      size="sm"
+      className="h-7 text-xs"
+      onClick={() => {
+        const filledData: Record<string, any> = {};
+        selectedGrid.columns.forEach(col => { filledData[col] = newRowData[col] ?? ''; });
+        addRowMutation.mutate(filledData);
+      }}
+      disabled={addRowMutation.isPending || !newRowData[selectedGrid.keyColumn]}
+    >
+      {addRowMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
+    </Button>
+  </TableCell>
+</TableRow>
+Footer bar: Showing X of Y rows · key: MANU_CODE · Grid ID: 4
+Empty states:
+
+No grid selected: large Database icon centered, "Select a grid from the left to view and edit its data"
+Loading: spinner
+Zero rows: "This grid has no rows. Use the Add Row form above or re-upload a CSV."
+
+Key behavioural notes:
+
+Inline edit is the primary editing path — click cell → input → blur/Enter saves, Escape cancels. Save is immediate per-cell.
+Rows where SELECTABLE === 'Header' are Allmoxy section dividers — style them distinctly but they still support editing.
+Upload replaces all rows for that grid name but keeps the grid ID. After upload, auto-select the newly uploaded grid.
+Export is window.open(...) — no mutation needed.
+Search is purely client-side across filteredRows. Show filter count in footer. Show a clear (×) button when query is non-empty.
+Some grids have 24 columns (Drawer Boxes). Horizontal scroll must work smoothly — do not use table-fixed unless all columns have explicit widths.
+When committing an edit, get the full current rowData from the rows array for that row, merge the edited cell value in, then PUT the whole rowData object. Never send partial data.

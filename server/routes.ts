@@ -242,6 +242,92 @@ export async function registerRoutes(
     }
   });
 
+  app.put('/api/admin/attribute-grids/rows/:rowId', isAuthenticated, async (req, res) => {
+    try {
+      const { rowData } = req.body;
+      if (!rowData || typeof rowData !== 'object') {
+        return res.status(400).json({ message: 'rowData is required' });
+      }
+      const updated = await storage.updateAttributeGridRow(Number(req.params.rowId), rowData);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete('/api/admin/attribute-grids/rows/:rowId', isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteAttributeGridRow(Number(req.params.rowId));
+      res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/attribute-grids/:id/rows', isAuthenticated, async (req, res) => {
+    try {
+      const gridId = Number(req.params.id);
+      const { rowData } = req.body;
+      if (!rowData || typeof rowData !== 'object') {
+        return res.status(400).json({ message: 'rowData is required' });
+      }
+      const grids = await storage.getAttributeGrids();
+      const grid = grids.find(g => g.id === gridId);
+      if (!grid) return res.status(404).json({ message: 'Grid not found' });
+      const lookupKey = String(rowData[grid.keyColumn] || '');
+      const created = await storage.addAttributeGridRow(gridId, lookupKey, rowData);
+      res.status(201).json(created);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete('/api/admin/attribute-grids/:id', isAuthenticated, async (req, res) => {
+    try {
+      const deleted = await storage.deleteAttributeGrid(Number(req.params.id));
+      if (!deleted) return res.status(404).json({ message: 'Grid not found' });
+      res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch('/api/admin/attribute-grids/:id', isAuthenticated, async (req, res) => {
+    try {
+      const { name, keyColumn } = req.body;
+      const updated = await storage.updateAttributeGrid(Number(req.params.id), { name, keyColumn });
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get('/api/admin/attribute-grids/:id/export', isAuthenticated, async (req, res) => {
+    try {
+      const gridId = Number(req.params.id);
+      const grids = await storage.getAttributeGrids();
+      const grid = grids.find(g => g.id === gridId);
+      if (!grid) return res.status(404).json({ message: 'Grid not found' });
+      const rows = await storage.getAttributeGridRows(gridId);
+      const headers = grid.columns;
+      const csvLines = [
+        headers.join(','),
+        ...rows.map(r =>
+          headers.map(h => {
+            const val = String((r.rowData as any)[h] ?? '');
+            return val.includes(',') || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
+          }).join(',')
+        ),
+      ];
+      const safeName = grid.name.replace(/[^a-z0-9_-]/gi, '_');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeName}.csv"`);
+      res.send(csvLines.join('\n'));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/upload-dynamic-grid', isAuthenticated, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
