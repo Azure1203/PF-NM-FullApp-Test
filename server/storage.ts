@@ -783,6 +783,7 @@ export class DatabaseStorage implements IStorage {
     const allRows = await db.select().from(attributeGridRows).where(
       eq(attributeGridRows.gridId, gridId)
     );
+    console.log('[getAttributeGridRowByKey] gridId:', gridId, 'lookupKey:', trimmedKey, 'totalRows:', allRows.length, 'sampleKeys:', allRows.slice(0, 3).map(r => r.lookupKey));
     return allRows.find(r =>
       r.lookupKey.trim().toLowerCase() === trimmedKey.toLowerCase()
     );
