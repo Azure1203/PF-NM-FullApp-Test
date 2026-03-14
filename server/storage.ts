@@ -769,13 +769,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAttributeGridRowByKey(gridId: number, lookupKey: string): Promise<AttributeGridRow | undefined> {
-    const [row] = await db.select().from(attributeGridRows).where(
+    const trimmedKey = lookupKey.trim();
+    // First try exact match
+    const [exactRow] = await db.select().from(attributeGridRows).where(
       and(
         eq(attributeGridRows.gridId, gridId),
-        eq(attributeGridRows.lookupKey, lookupKey)
+        eq(attributeGridRows.lookupKey, trimmedKey)
       )
     );
-    return row;
+    if (exactRow) return exactRow;
+
+    // Fall back to case-insensitive match to handle import inconsistencies
+    const allRows = await db.select().from(attributeGridRows).where(
+      eq(attributeGridRows.gridId, gridId)
+    );
+    return allRows.find(r =>
+      r.lookupKey.trim().toLowerCase() === trimmedKey.toLowerCase()
+    );
   }
 
   async replaceAttributeGridRows(gridId: number, rows: InsertAttributeGridRow[]): Promise<AttributeGridRow[]> {
