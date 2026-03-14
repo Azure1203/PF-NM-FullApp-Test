@@ -80,6 +80,7 @@ export default function FormulaTester() {
     },
     enabled: selectedProductId !== null,
   });
+  console.log('[FormulaTester] selectedProductId:', selectedProductId, 'bindings:', bindings);
 
   const selectedProduct = products?.find(p => p.id === selectedProductId) ?? null;
 
