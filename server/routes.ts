@@ -475,7 +475,12 @@ export async function registerRoutes(
       for (const binding of bindings) {
         const grid = gridMap.get(binding.gridId);
         if (!grid) continue;
-        const lookupValue = (inputs[binding.lookupColumn] ?? '').toString().trim();
+        const lookupValue = String(
+          (req.body.inputs || {})[binding.lookupColumn] ||
+          (req.body.gridLookups || {})[binding.alias] ||
+          (req.body.gridLookups || {})[binding.lookupColumn] ||
+          ''
+        );
         const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue) : undefined;
         contextScope[binding.alias] = row ? row.rowData : null;
         gridLookupResults.push({
