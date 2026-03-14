@@ -1,0 +1,149 @@
+Add bulk delete to the Products page — paste into Replit:
+In client/src/pages/admin/AllmoxyProductManager.tsx, add multi-select and bulk delete to the left panel product list. Do not change anything in the right panel form, grid bindings, or any existing functionality.
+Add these state variables near the top of the component alongside existing state:
+tsconst [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+const [selectMode, setSelectMode] = useState(false);
+Add a bulk delete mutation alongside existing mutations:
+tsconst bulkDeleteMutation = useMutation({
+  mutationFn: async (ids: number[]) => {
+    await Promise.all(ids.map(id =>
+      apiRequest("DELETE", `/api/admin/allmoxy-products/${id}`)
+    ));
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setEditingId(null);
+    toast({ title: "Deleted", description: `${selectedIds.size} products deleted` });
+  },
+  onError: (error: Error) => {
+    toast({ title: "Error", description: error.message, variant: "destructive" });
+  },
+});
+Update the left panel header — find the area above the product list that contains the search input and "New Product" button. Add two buttons next to them:
+tsx{!selectMode ? (
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => setSelectMode(true)}
+  >
+    <CheckSquare className="h-4 w-4 mr-2" />
+    Select
+  </Button>
+) : (
+  <div className="flex items-center gap-2">
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        // Select all / deselect all toggle
+        if (selectedIds.size === (products?.length ?? 0)) {
+          setSelectedIds(new Set());
+        } else {
+          setSelectedIds(new Set(products?.map((p: any) => p.id) ?? []));
+        }
+      }}
+    >
+      {selectedIds.size === (products?.length ?? 0) ? 'Deselect All' : 'Select All'}
+    </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        setSelectMode(false);
+        setSelectedIds(new Set());
+      }}
+    >
+      Cancel
+    </Button>
+  </div>
+)}
+
+{selectMode && selectedIds.size > 0 && (
+  <AlertDialog>
+    <AlertDialogTrigger asChild>
+      <Button variant="destructive" size="sm">
+        <Trash2 className="h-4 w-4 mr-2" />
+        Delete {selectedIds.size}
+      </Button>
+    </AlertDialogTrigger>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete {selectedIds.size} products?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This will permanently delete {selectedIds.size} selected product{selectedIds.size !== 1 ? 's' : ''} and all their grid bindings. This cannot be undone.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+        >
+          {bulkDeleteMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : null}
+          Delete {selectedIds.size} products
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+)}
+Update each product row in the list — find where each product is rendered as a clickable row. When selectMode is true, show a checkbox and change the click behaviour to toggle selection instead of opening the editor:
+tsx<div
+  key={product.id}
+  className={cn(
+    "flex items-center gap-2 px-3 py-2 cursor-pointer rounded-md transition-colors",
+    selectMode
+      ? selectedIds.has(product.id)
+        ? "bg-primary/10 border border-primary/30"
+        : "hover:bg-muted/50"
+      : editingId === product.id
+        ? "bg-primary/10 border border-primary/30"
+        : "hover:bg-muted/50"
+  )}
+  onClick={() => {
+    if (selectMode) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        if (next.has(product.id)) next.delete(product.id);
+        else next.add(product.id);
+        return next;
+      });
+    } else {
+      handleEdit(product);
+    }
+  }}
+>
+  {selectMode && (
+    <input
+      type="checkbox"
+      checked={selectedIds.has(product.id)}
+      onChange={() => {}}
+      className="h-4 w-4 rounded border-gray-300 accent-primary shrink-0"
+    />
+  )}
+  {product.imageBase64 && (
+    <img
+      src={product.imageBase64}
+      alt=""
+      className="w-8 h-8 object-contain rounded border bg-muted shrink-0"
+    />
+  )}
+  <div className="flex-1 min-w-0">
+    <p className="text-sm font-medium truncate">{product.name}</p>
+    {product.skuPrefix && (
+      <p className="text-xs text-muted-foreground truncate font-mono">{product.skuPrefix}</p>
+    )}
+  </div>
+</div>
+Add CheckSquare to the lucide-react import line.
+After completing, confirm:
+
+A "Select" button appears above the product list
+Clicking it puts the list into select mode with checkboxes on each row
+"Select All" and "Cancel" buttons appear in select mode
+Selecting one or more products shows a "Delete N" button
+Confirming the delete removes all selected products and exits select mode
+The right panel form is unaffected and all existing functionality works normally

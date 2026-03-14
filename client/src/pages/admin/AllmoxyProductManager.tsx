@@ -41,7 +41,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, FileText, Link2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, FileText, Link2, CheckSquare } from "lucide-react";
 import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -78,6 +78,8 @@ export default function AllmoxyProductManager() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [bindings, setBindings] = useState<LocalBinding[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -204,6 +206,24 @@ export default function AllmoxyProductManager() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      await Promise.all(ids.map(id =>
+        apiRequest("DELETE", `/api/admin/allmoxy-products/${id}`)
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      setEditingId(null);
+      toast({ title: "Deleted", description: `${selectedIds.size} products deleted` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       setImportFile(acceptedFiles[0]);
@@ -272,7 +292,75 @@ export default function AllmoxyProductManager() {
                   <Package className="h-4 w-4" />
                   Products
                 </h2>
-                <div className="flex gap-1">
+                <div className="flex gap-1 items-center flex-wrap">
+                  {!selectMode ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectMode(true)}
+                    >
+                      <CheckSquare className="h-4 w-4 mr-2" />
+                      Select
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedIds.size === (products?.length ?? 0)) {
+                            setSelectedIds(new Set());
+                          } else {
+                            setSelectedIds(new Set(products?.map((p: any) => p.id) ?? []));
+                          }
+                        }}
+                      >
+                        {selectedIds.size === (products?.length ?? 0) ? 'Deselect All' : 'Select All'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectMode(false);
+                          setSelectedIds(new Set());
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+
+                  {selectMode && selectedIds.size > 0 && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete {selectedIds.size}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {selectedIds.size} products?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete {selectedIds.size} selected product{selectedIds.size !== 1 ? 's' : ''} and all their grid bindings. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+                          >
+                            {bulkDeleteMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : null}
+                            Delete {selectedIds.size} products
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+
                   <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
                     <DialogTrigger asChild>
                       <Button size="icon" variant="ghost" title="Bulk Import">
@@ -336,32 +424,60 @@ export default function AllmoxyProductManager() {
                 {isLoadingProducts ? (
                   <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
                 ) : filteredProducts.map((p) => (
-                  <button
+                  <div
                     key={p.id}
-                    onClick={() => handleEdit(p)}
+                    data-testid={`product-row-${p.id}`}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left group",
-                      editingId === p.id ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                      "flex items-center gap-2 px-3 py-2 cursor-pointer rounded-md transition-colors",
+                      selectMode
+                        ? selectedIds.has(p.id)
+                          ? "bg-primary/10 border border-primary/30"
+                          : "hover:bg-muted/50"
+                        : editingId === p.id
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-accent"
                     )}
+                    onClick={() => {
+                      if (selectMode) {
+                        setSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(p.id)) next.delete(p.id);
+                          else next.add(p.id);
+                          return next;
+                        });
+                      } else {
+                        handleEdit(p);
+                      }
+                    }}
                   >
+                    {selectMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(p.id)}
+                        onChange={() => {}}
+                        className="h-4 w-4 rounded border-gray-300 accent-primary shrink-0"
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium truncate">{p.name}</span>
                         <span className={cn(
                           "text-[10px] uppercase px-1.5 py-0.5 rounded-full font-bold",
                           p.status === "active"
-                            ? (editingId === p.id ? "bg-primary-foreground/20 text-white" : "bg-green-100 text-green-700")
-                            : (editingId === p.id ? "bg-primary-foreground/10 text-white/70" : "bg-muted text-muted-foreground")
+                            ? (editingId === p.id && !selectMode ? "bg-primary-foreground/20 text-white" : "bg-green-100 text-green-700")
+                            : (editingId === p.id && !selectMode ? "bg-primary-foreground/10 text-white/70" : "bg-muted text-muted-foreground")
                         )}>
                           {p.status}
                         </span>
                       </div>
                     </div>
-                    <ChevronRight className={cn(
-                      "h-4 w-4 shrink-0 transition-transform",
-                      editingId === p.id ? "translate-x-0" : "-translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0"
-                    )} />
-                  </button>
+                    {!selectMode && (
+                      <ChevronRight className={cn(
+                        "h-4 w-4 shrink-0 transition-transform",
+                        editingId === p.id ? "translate-x-0" : "-translate-x-2 opacity-0"
+                      )} />
+                    )}
+                  </div>
                 ))}
               </div>
             </ScrollArea>
