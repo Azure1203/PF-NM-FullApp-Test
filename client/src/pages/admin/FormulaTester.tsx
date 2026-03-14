@@ -96,6 +96,8 @@ export default function FormulaTester() {
         }
       }
 
+      console.log('[FormulaTester] autoLookups:', autoLookups, 'selectedProduct:', selectedProduct?.name, 'bindings:', bindings);
+
       const inputs: Record<string, any> = {
         width: parseFloat(width) || 0,
         height: parseFloat(height) || 0,
