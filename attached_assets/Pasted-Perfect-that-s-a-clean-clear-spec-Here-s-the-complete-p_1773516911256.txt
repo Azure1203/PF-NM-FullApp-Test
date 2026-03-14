@@ -1,0 +1,667 @@
+Perfect — that's a clean, clear spec. Here's the complete prompt:
+Prompt: Allmoxy File Import Page
+
+Paste this entire prompt into Replit.
+
+We need to build a dedicated Allmoxy Import page that handles bulk import of both PF Product files and Attribute Grid files exported from Allmoxy. This replaces the current manual product setup workflow. The page should be accessible from the sidebar and handle everything in one place.
+Part 1 — Sidebar and routing
+
+Add a new sidebar entry in client/src/components/AppLayout.tsx under the SYSTEM ADMINISTRATION section:
+ts
+
+{ name: "Allmoxy Import", href: "/admin/allmoxy-import", icon: FileDown },
+
+Add FileDown to the lucide-react import.
+
+Add the route in client/src/App.tsx:
+tsx
+
+<Route path="/admin/allmoxy-import" component={AllmoxyImport} />
+
+Create the new file client/src/pages/admin/AllmoxyImport.tsx.
+Part 2 — Backend API routes in server/routes.ts
+
+Add these three routes. All require isAuthenticated.
+
+Route 1 — Import a PF Products file (wipe and replace)
+ts
+
+app.post('/api/admin/import/pf-products', isAuthenticated, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const records: any[] = parseSync(req.file.buffer.toString('utf-8'), {
+      columns: true,
+      skip_empty_lines: true,
+    });
+
+    if (!records.length) return res.status(400).json({ message: 'File is empty' });
+
+    // Detect file type — PF Product files have "PRODUCT NAME" column
+    const firstRow = records[0];
+    if (!firstRow['PRODUCT NAME'] && !firstRow['ID']) {
+      return res.status(400).json({ message: 'This does not look like a PF Products file. Expected columns: ID, PRODUCT NAME' });
+    }
+
+    // Derive category name from filename
+    // e.g. "PF_Shelf_Products_02202026.csv" → "Shelves"
+    const filename = req.file.originalname;
+    const categoryName = deriveCategoryName(filename);
+
+    // Build products to insert — each row becomes one product
+    // SKU prefix = the PRODUCT NAME value (e.g. "34SHFF")
+    const productsToInsert = records
+      .filter(r => r['PRODUCT NAME'] && r['PRODUCT NAME'].trim())
+      .map(r => ({
+        name: r['PRODUCT NAME'].trim(),
+        skuPrefix: r['PRODUCT NAME'].trim(),
+        status: 'active' as const,
+        pricingProxyId: null,
+        exportProxyId: null,
+        description: categoryName,
+        notes: null,
+        imageBase64: null,
+      }));
+
+    if (!productsToInsert.length) {
+      return res.status(400).json({ message: 'No valid product rows found' });
+    }
+
+    // Wipe all existing products in this category (matched by description = categoryName)
+    // then insert the new set
+    await storage.deleteAllmoxyProductsByCategory(categoryName);
+    const inserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);
+
+    // Auto-link to matching attribute grid if one exists
+    const pairedGridName = derivePairedGridName(filename);
+    const allGrids = await storage.getAttributeGrids();
+    const matchedGrid = allGrids.find(g =>
+      g.name.toLowerCase().replace(/[^a-z0-9]/g, '') ===
+      pairedGridName.toLowerCase().replace(/[^a-z0-9]/g, '')
+    );
+
+    let gridBindingsCreated = 0;
+    if (matchedGrid) {
+      for (const product of inserted) {
+        await storage.replaceProductGridBindings(product.id, [{
+          productId: product.id,
+          gridId: matchedGrid.id,
+          alias: deriveCategoryAlias(filename),
+          lookupColumn: 'MANU_CODE',
+        }]);
+        gridBindingsCreated++;
+      }
+    }
+
+    res.json({
+      categoryName,
+      productsInserted: inserted.length,
+      pairedGridName,
+      gridMatched: !!matchedGrid,
+      gridBindingsCreated,
+      matchedGridName: matchedGrid?.name ?? null,
+    });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+Route 2 — Import an Attribute Grid file (wipe and replace)
+ts
+
+app.post('/api/admin/import/attribute-grid', isAuthenticated, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const content = req.file.buffer.toString('utf-8');
+    const records: any[] = parseSync(content, {
+      columns: true,
+      skip_empty_lines: true,
+    });
+
+    if (!records.length) return res.status(400).json({ message: 'File is empty' });
+
+    // Detect file type — attribute grids have "EXISTING OPTION ID" column
+    if (!records[0]['EXISTING OPTION ID']) {
+      return res.status(400).json({ message: 'This does not look like an Allmoxy attribute grid file. Expected column: EXISTING OPTION ID' });
+    }
+
+    const headers = Object.keys(records[0]);
+    
+    // Grid name = filename without date suffix and extension
+    // e.g. "Shelves_02202026.csv" → "Shelves"
+    const gridName = req.file.originalname
+      .replace(/\.csv$/i, '')
+      .replace(/_\d{8}$/, '')
+      .replace(/_/g, ' ')
+      .trim();
+
+    // Key column: prefer MANU_CODE, fall back to EXISTING OPTION ID
+    const keyColumn = headers.includes('MANU_CODE') ? 'MANU_CODE' : 'EXISTING OPTION ID';
+
+    // Find or create the grid, then wipe and replace its rows
+    let grid = await storage.getAttributeGridByName(gridName);
+    if (grid) {
+      await storage.replaceAttributeGridRows(grid.id, []);
+      grid = await storage.updateAttributeGrid(grid.id, { columns: headers, keyColumn });
+    } else {
+      grid = await storage.createAttributeGrid({ name: gridName, columns: headers, keyColumn });
+    }
+
+    const rowsToInsert = records.map(record => ({
+      gridId: grid!.id,
+      lookupKey: String(record[keyColumn] || record[headers[0]] || ''),
+      rowData: record,
+    }));
+
+    await storage.replaceAttributeGridRows(grid.id, rowsToInsert);
+
+    // Check if any products are already bound to this grid
+    // (in case the grid was imported after the products)
+    const allProducts = await storage.getAllmoxyProducts();
+    const unlinkedProducts = allProducts.filter(p => p.description === gridName);
+
+    res.json({
+      gridName,
+      gridId: grid.id,
+      keyColumn,
+      rowCount: rowsToInsert.length,
+      columnCount: headers.length,
+      columns: headers,
+    });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+Route 3 — Import both file types in one batch
+ts
+
+app.post('/api/admin/import/batch', isAuthenticated, upload.array('files', 100), async (req, res) => {
+  try {
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      return res.status(400).json({ message: 'No files uploaded' });
+    }
+
+    const results: any[] = [];
+
+    // Process attribute grids first so products can link to them
+    const gridFiles = (req.files as Express.Multer.File[]).filter(f =>
+      !f.originalname.startsWith('PF_')
+    );
+    const productFiles = (req.files as Express.Multer.File[]).filter(f =>
+      f.originalname.startsWith('PF_')
+    );
+
+    for (const file of [...gridFiles, ...productFiles]) {
+      try {
+        const isPFProduct = file.originalname.startsWith('PF_');
+        const endpoint = isPFProduct
+          ? '/api/admin/import/pf-products'
+          : '/api/admin/import/attribute-grid';
+
+        // Re-use the same logic by calling storage directly
+        const records: any[] = parseSync(file.buffer.toString('utf-8'), {
+          columns: true,
+          skip_empty_lines: true,
+        });
+
+        if (isPFProduct) {
+          const categoryName = deriveCategoryName(file.originalname);
+          const productsToInsert = records
+            .filter(r => r['PRODUCT NAME']?.trim())
+            .map(r => ({
+              name: r['PRODUCT NAME'].trim(),
+              skuPrefix: r['PRODUCT NAME'].trim(),
+              status: 'active' as const,
+              pricingProxyId: null,
+              exportProxyId: null,
+              description: categoryName,
+              notes: null,
+              imageBase64: null,
+            }));
+
+          await storage.deleteAllmoxyProductsByCategory(categoryName);
+          const inserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);
+
+          const pairedGridName = derivePairedGridName(file.originalname);
+          const allGrids = await storage.getAttributeGrids();
+          const matchedGrid = allGrids.find(g =>
+            g.name.toLowerCase().replace(/[^a-z0-9]/g, '') ===
+            pairedGridName.toLowerCase().replace(/[^a-z0-9]/g, '')
+          );
+
+          if (matchedGrid) {
+            for (const product of inserted) {
+              await storage.replaceProductGridBindings(product.id, [{
+                productId: product.id,
+                gridId: matchedGrid.id,
+                alias: deriveCategoryAlias(file.originalname),
+                lookupColumn: 'MANU_CODE',
+              }]);
+            }
+          }
+
+          results.push({
+            file: file.originalname,
+            type: 'pf-products',
+            categoryName,
+            productsInserted: inserted.length,
+            gridMatched: !!matchedGrid,
+            matchedGridName: matchedGrid?.name ?? null,
+          });
+        } else {
+          const gridName = file.originalname
+            .replace(/\.csv$/i, '')
+            .replace(/_\d{8}$/, '')
+            .replace(/_/g, ' ')
+            .trim();
+
+          const headers = Object.keys(records[0] || {});
+          const keyColumn = headers.includes('MANU_CODE') ? 'MANU_CODE' : 'EXISTING OPTION ID';
+
+          let grid = await storage.getAttributeGridByName(gridName);
+          if (grid) {
+            await storage.replaceAttributeGridRows(grid.id, []);
+            grid = await storage.updateAttributeGrid(grid.id, { columns: headers, keyColumn });
+          } else {
+            grid = await storage.createAttributeGrid({ name: gridName, columns: headers, keyColumn });
+          }
+
+          const rowsToInsert = records.map(record => ({
+            gridId: grid!.id,
+            lookupKey: String(record[keyColumn] || record[headers[0]] || ''),
+            rowData: record,
+          }));
+          await storage.replaceAttributeGridRows(grid.id, rowsToInsert);
+
+          results.push({
+            file: file.originalname,
+            type: 'attribute-grid',
+            gridName,
+            rowCount: rowsToInsert.length,
+            keyColumn,
+          });
+        }
+      } catch (e: any) {
+        results.push({ file: file.originalname, error: e.message });
+      }
+    }
+
+    res.json({ results, totalFiles: (req.files as Express.Multer.File[]).length });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+Add these helper functions near the top of server/routes.ts, above the route handlers:
+ts
+
+function deriveCategoryName(filename: string): string {
+  // "PF_Shelf_Products_02202026.csv" → "Shelves"
+  // "PF_Floor_Panel_Products_02202026.csv" → "Floor Panels"
+  const map: Record<string, string> = {
+    'PF_Shelf_Products': 'Shelves',
+    'PF_Floor_Panel_Products': 'Floor Panels',
+    'PF_Wall_Panel_Products': 'Wall Panels',
+    'PF_Island_Panel_Products': 'Island Panels',
+    'PF_Divider_Products': 'Divider Panels',
+    'PF_Door_Products': 'Doors',
+    'PF_Drawer_Box_Products': 'Drawer Boxes',
+    'PF_Drawer_Front_Products': 'Drawer Fronts',
+    'PF_Drawer__Drawer_Lock_Products': 'Door Drawer Locks',
+    'PF_Hinge_Products': 'Hinges',
+    'PF_Slide_Products': 'Slides',
+    'PF_Handle_Products': 'Handles',
+    'PF_Closet_Rod_Products': 'Closet Rods',
+    'PF_Closet_Accessory_Products': 'Closet Accessories',
+    'PF_Closet_LED_Lighting_Products': 'Closet LED Lighting',
+    'PF_Corner_Shelf_Products': 'Corner Shelves',
+    'PF_Outside_Shelf_Products': 'Outside Corner Shelves',
+    'PF_Floating_Shelf_Hardware_Products': 'Floating Shelf Hardware',
+    'PF_Hanging_Rails__Hardware_Products': 'Hanging Rail Hardware',
+    'PF_Hardware_Screws_Connector_Products': 'Hardware',
+    'PF_Glass_Products': 'Glass',
+    'PF_Molding_Products': 'Moldings',
+    'PF_Wall_Panel_Products': 'Wall Panels',
+    'PF_Garage_Panel_Products': 'Garage Panels',
+    'PF_Garage_Accessories_Products': 'Garage Accessories',
+    'PF_Office_Accessory_Products': 'Office Accessories',
+    'PF_Parts_Products': 'Parts',
+    'PF_Touch_Up_Sticks_Cam__Screw_Cover_Products': 'Touch Up Sticks',
+    'PF_Jigs__Tool_Products': 'Jigs Tools',
+  };
+  const base = filename.replace(/\.csv$/i, '').replace(/_\d{8}$/, '');
+  return map[base] ?? base.replace(/^PF_/, '').replace(/_Products$/, '').replace(/_/g, ' ');
+}
+
+function derivePairedGridName(filename: string): string {
+  // "PF_Shelf_Products_02202026.csv" → "Shelves"
+  // Same as category name — the attribute grid is named after the category
+  return deriveCategoryName(filename);
+}
+
+function deriveCategoryAlias(filename: string): string {
+  // "PF_Shelf_Products_02202026.csv" → "shelves"
+  return deriveCategoryName(filename).toLowerCase().replace(/[^a-z0-9]/g, '_');
+}
+
+Part 3 — Storage methods in server/storage.ts
+
+Add to IStorage interface and implement in DatabaseStorage:
+ts
+
+// Add to interface:
+deleteAllmoxyProductsByCategory(categoryName: string): Promise<void>;
+bulkInsertAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]>;
+
+// Implement:
+async deleteAllmoxyProductsByCategory(categoryName: string): Promise<void> {
+  await db.delete(allmoxyProducts)
+    .where(eq(allmoxyProducts.description, categoryName));
+}
+
+async bulkInsertAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]> {
+  if (!products.length) return [];
+  return await db.insert(allmoxyProducts).values(products).returning();
+}
+
+Also add updateAttributeGrid to the interface and implementation if it doesn't already exist from Prompt 10:
+ts
+
+async updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string; columns?: string[] }): Promise<AttributeGrid> {
+  const [updated] = await db.update(attributeGrids)
+    .set(updates)
+    .where(eq(attributeGrids.id, id))
+    .returning();
+  return updated;
+}
+
+Part 4 — Frontend page client/src/pages/admin/AllmoxyImport.tsx
+
+Create this file. It has two sections: a batch import area at the top, and a results log below.
+tsx
+
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  FileDown, Upload, CheckCircle2, AlertTriangle,
+  Loader2, X, Link, Unlink
+} from "lucide-react";
+
+type ImportResult = {
+  file: string;
+  type?: 'pf-products' | 'attribute-grid';
+  error?: string;
+  // pf-products fields
+  categoryName?: string;
+  productsInserted?: number;
+  gridMatched?: boolean;
+  matchedGridName?: string;
+  // attribute-grid fields
+  gridName?: string;
+  rowCount?: number;
+  keyColumn?: string;
+};
+
+export default function AllmoxyImport() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<ImportResult[] | null>(null);
+
+  const handleFiles = async (files: FileList) => {
+    setLoading(true);
+    setResults(null);
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+      const res = await fetch('/api/admin/import/batch', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setResults(data.results);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/allmoxy-products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids'] });
+      const errors = data.results.filter((r: ImportResult) => r.error).length;
+      toast({
+        title: 'Import complete',
+        description: `${data.totalFiles} files processed${errors ? `, ${errors} errors` : ''}`,
+        variant: errors ? 'destructive' : 'default',
+      });
+    } catch (e: any) {
+      toast({ title: 'Import failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pfResults = results?.filter(r => r.type === 'pf-products') ?? [];
+  const gridResults = results?.filter(r => r.type === 'attribute-grid') ?? [];
+  const errorResults = results?.filter(r => r.error) ?? [];
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <FileDown className="h-6 w-6 text-primary" />
+          Allmoxy Import
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Import PF Product files and Attribute Grid files exported from Allmoxy.
+          Select all files at once — the system will detect each file type automatically,
+          process attribute grids first, then link products to their matching grids.
+        </p>
+      </div>
+
+      {/* Instructions card */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            How it works
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+          <p>
+            <strong className="text-foreground">Attribute grid files</strong> — files like{' '}
+            <code className="text-xs bg-muted px-1 rounded">Shelves_02202026.csv</code>,{' '}
+            <code className="text-xs bg-muted px-1 rounded">Doors_02202026.csv</code> etc.
+            These contain the pricing data (BASE_PRICE, SQ_FT_PRICE, MARGIN). Existing grid data is wiped and replaced.
+          </p>
+          <p>
+            <strong className="text-foreground">PF Product files</strong> — files starting with{' '}
+            <code className="text-xs bg-muted px-1 rounded">PF_</code> like{' '}
+            <code className="text-xs bg-muted px-1 rounded">PF_Shelf_Products_02202026.csv</code>.
+            Each row becomes one product record. Existing products in that category are wiped and replaced.
+            Products are automatically linked to their matching attribute grid.
+          </p>
+          <p>
+            <strong className="text-foreground">After import</strong> — assign a Pricing Proxy Variable
+            and Export Proxy Variable to one product per category, then use the Formula Tester to verify
+            pricing is correct before applying to all products in that category.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Drop zone */}
+      <label className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${loading ? 'opacity-50 pointer-events-none' : 'hover:border-primary hover:bg-muted/20'}`}>
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Upload className="h-10 w-10" />
+          <div className="text-center">
+            <p className="text-sm font-medium text-foreground">Click to select Allmoxy export files</p>
+            <p className="text-xs mt-1">Select any mix of PF Product files and Attribute Grid files</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">All selected files will be processed together</p>
+          </div>
+        </div>
+        <input
+          type="file"
+          accept=".csv"
+          multiple
+          className="hidden"
+          disabled={loading}
+          onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); }}
+        />
+      </label>
+
+      {loading && (
+        <div className="flex items-center justify-center gap-2 text-muted-foreground py-4">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm">Processing files — attribute grids first, then products...</span>
+        </div>
+      )}
+
+      {/* Results */}
+      {results && !loading && (
+        <div className="space-y-4">
+
+          {/* Summary bar */}
+          <div className="flex flex-wrap gap-3 text-sm">
+            {gridResults.length > 0 && (
+              <span className="flex items-center gap-1.5 text-blue-600 font-medium">
+                <CheckCircle2 className="h-4 w-4" />
+                {gridResults.length} attribute grid{gridResults.length !== 1 ? 's' : ''} imported
+              </span>
+            )}
+            {pfResults.length > 0 && (
+              <span className="flex items-center gap-1.5 text-green-600 font-medium">
+                <CheckCircle2 className="h-4 w-4" />
+                {pfResults.reduce((sum, r) => sum + (r.productsInserted ?? 0), 0)} products imported
+                across {pfResults.length} categor{pfResults.length !== 1 ? 'ies' : 'y'}
+              </span>
+            )}
+            {pfResults.filter(r => r.gridMatched).length > 0 && (
+              <span className="flex items-center gap-1.5 text-green-600 font-medium">
+                <Link className="h-4 w-4" />
+                {pfResults.filter(r => r.gridMatched).length} auto-linked to grids
+              </span>
+            )}
+            {pfResults.filter(r => !r.gridMatched).length > 0 && (
+              <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+                <Unlink className="h-4 w-4" />
+                {pfResults.filter(r => !r.gridMatched).length} not linked (grid not found)
+              </span>
+            )}
+            {errorResults.length > 0 && (
+              <span className="flex items-center gap-1.5 text-destructive font-medium">
+                <X className="h-4 w-4" />
+                {errorResults.length} error{errorResults.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Attribute grid results */}
+          {gridResults.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Attribute Grids</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {gridResults.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                      <span className="font-medium">{r.gridName}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{r.file}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{r.rowCount} rows</span>
+                      <Badge variant="outline" className="text-[10px]">key: {r.keyColumn}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* PF Product results */}
+          {pfResults.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Products</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {pfResults.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                      <span className="font-medium">{r.categoryName}</span>
+                      <span className="text-xs text-muted-foreground font-mono">{r.file}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">{r.productsInserted} products</span>
+                      {r.gridMatched ? (
+                        <Badge className="text-[10px] bg-green-100 text-green-700 border-green-300">
+                          <Link className="h-2.5 w-2.5 mr-1" />
+                          linked → {r.matchedGridName}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+                          <Unlink className="h-2.5 w-2.5 mr-1" />
+                          no grid match
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Errors */}
+          {errorResults.length > 0 && (
+            <Card className="border-destructive/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-destructive">Errors</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {errorResults.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm py-1 border-b last:border-0">
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-mono text-xs text-muted-foreground">{r.file}</span>
+                      <p className="text-destructive text-xs mt-0.5">{r.error}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Next steps */}
+          <Card className="bg-muted/30">
+            <CardContent className="pt-4 text-sm text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Next steps</p>
+              <p>1. Go to <strong>Products</strong> and assign a Pricing Proxy Variable and Export Proxy Variable to one product from each category.</p>
+              <p>2. Use the <strong>Formula Tester</strong> to verify that product prices correctly — enter a MANU_CODE from the grid and check the result.</p>
+              <p>3. Once verified, you can bulk-assign the same proxy variables to all products in that category.</p>
+            </CardContent>
+          </Card>
+
+        </div>
+      )}
+    </div>
+  );
+}
+
+What NOT to change
+
+Do not modify any existing routes, storage methods, pages, or the sidebar entries for Products, Attribute Grids, Proxy Variables, or Formula Tester. Only add the new routes, storage methods, and the new page.
+After completing, confirm:
+
+    "Allmoxy Import" appears in the sidebar under System Administration
+    Selecting a mix of PF Product files and Attribute Grid files processes them all in one batch
+    Attribute grids are processed before products in the same batch
+    Products are automatically linked to their matching grid where the name matches
+    The results screen shows which grids were imported, how many products per category, and which categories were auto-linked
+    Re-importing the same files wipes and replaces the previous data cleanly
+    The Products page and Attribute Grids page both reflect the newly imported data

@@ -60,6 +60,49 @@ function matchProductToSku(sku: string, activeProducts: AllmoxyProduct[]): Allmo
   return bestMatch;
 }
 
+function deriveCategoryName(filename: string): string {
+  const map: Record<string, string> = {
+    'PF_Shelf_Products': 'Shelves',
+    'PF_Floor_Panel_Products': 'Floor Panels',
+    'PF_Wall_Panel_Products': 'Wall Panels',
+    'PF_Island_Panel_Products': 'Island Panels',
+    'PF_Divider_Products': 'Divider Panels',
+    'PF_Door_Products': 'Doors',
+    'PF_Drawer_Box_Products': 'Drawer Boxes',
+    'PF_Drawer_Front_Products': 'Drawer Fronts',
+    'PF_Drawer__Drawer_Lock_Products': 'Door Drawer Locks',
+    'PF_Hinge_Products': 'Hinges',
+    'PF_Slide_Products': 'Slides',
+    'PF_Handle_Products': 'Handles',
+    'PF_Closet_Rod_Products': 'Closet Rods',
+    'PF_Closet_Accessory_Products': 'Closet Accessories',
+    'PF_Closet_LED_Lighting_Products': 'Closet LED Lighting',
+    'PF_Corner_Shelf_Products': 'Corner Shelves',
+    'PF_Outside_Shelf_Products': 'Outside Corner Shelves',
+    'PF_Floating_Shelf_Hardware_Products': 'Floating Shelf Hardware',
+    'PF_Hanging_Rails__Hardware_Products': 'Hanging Rail Hardware',
+    'PF_Hardware_Screws_Connector_Products': 'Hardware',
+    'PF_Glass_Products': 'Glass',
+    'PF_Molding_Products': 'Moldings',
+    'PF_Garage_Panel_Products': 'Garage Panels',
+    'PF_Garage_Accessories_Products': 'Garage Accessories',
+    'PF_Office_Accessory_Products': 'Office Accessories',
+    'PF_Parts_Products': 'Parts',
+    'PF_Touch_Up_Sticks_Cam__Screw_Cover_Products': 'Touch Up Sticks',
+    'PF_Jigs__Tool_Products': 'Jigs Tools',
+  };
+  const base = filename.replace(/\.csv$/i, '').replace(/_\d{8}$/, '');
+  return map[base] ?? base.replace(/^PF_/, '').replace(/_Products$/, '').replace(/_/g, ' ');
+}
+
+function derivePairedGridName(filename: string): string {
+  return deriveCategoryName(filename);
+}
+
+function deriveCategoryAlias(filename: string): string {
+  return deriveCategoryName(filename).toLowerCase().replace(/[^a-z0-9]/g, '_');
+}
+
 // Asana Perfect Fit Production Project GID - use this for all Asana operations
 const ASANA_PERFECT_FIT_PROJECT_GID = '1208263802564738';
 const ASANA_NEW_JOBS_PROJECT_GID = '1209262874404235';
@@ -569,6 +612,156 @@ export async function registerRoutes(
 
       await storage.replaceAllmoxyProducts(productsToInsert);
       res.json({ message: 'Products imported successfully', count: productsToInsert.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/import/pf-products', isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+      const records: any[] = parseSync(req.file.buffer.toString('utf-8'), { columns: true, skip_empty_lines: true });
+      if (!records.length) return res.status(400).json({ message: 'File is empty' });
+      const firstRow = records[0];
+      if (!firstRow['PRODUCT NAME'] && !firstRow['ID']) {
+        return res.status(400).json({ message: 'This does not look like a PF Products file. Expected columns: ID, PRODUCT NAME' });
+      }
+      const filename = req.file.originalname;
+      const categoryName = deriveCategoryName(filename);
+      const productsToInsert = records
+        .filter(r => r['PRODUCT NAME'] && r['PRODUCT NAME'].trim())
+        .map(r => ({
+          name: r['PRODUCT NAME'].trim(),
+          skuPrefix: r['PRODUCT NAME'].trim(),
+          status: 'active' as const,
+          pricingProxyId: null,
+          exportProxyId: null,
+          description: categoryName,
+          notes: null,
+        }));
+      if (!productsToInsert.length) return res.status(400).json({ message: 'No valid product rows found' });
+      await storage.deleteAllmoxyProductsByCategory(categoryName);
+      const inserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);
+      const pairedGridName = derivePairedGridName(filename);
+      const allGrids = await storage.getAttributeGrids();
+      const matchedGrid = allGrids.find(g =>
+        g.name.toLowerCase().replace(/[^a-z0-9]/g, '') === pairedGridName.toLowerCase().replace(/[^a-z0-9]/g, '')
+      );
+      let gridBindingsCreated = 0;
+      if (matchedGrid) {
+        for (const product of inserted) {
+          await storage.replaceProductGridBindings(product.id, [{
+            productId: product.id,
+            gridId: matchedGrid.id,
+            alias: deriveCategoryAlias(filename),
+            lookupColumn: 'MANU_CODE',
+          }]);
+          gridBindingsCreated++;
+        }
+      }
+      res.json({ categoryName, productsInserted: inserted.length, pairedGridName, gridMatched: !!matchedGrid, gridBindingsCreated, matchedGridName: matchedGrid?.name ?? null });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/import/attribute-grid', isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+      const records: any[] = parseSync(req.file.buffer.toString('utf-8'), { columns: true, skip_empty_lines: true });
+      if (!records.length) return res.status(400).json({ message: 'File is empty' });
+      if (!records[0]['EXISTING OPTION ID']) {
+        return res.status(400).json({ message: 'This does not look like an Allmoxy attribute grid file. Expected column: EXISTING OPTION ID' });
+      }
+      const headers = Object.keys(records[0]);
+      const gridName = req.file.originalname.replace(/\.csv$/i, '').replace(/_\d{8}$/, '').replace(/_/g, ' ').trim();
+      const keyColumn = headers.includes('MANU_CODE') ? 'MANU_CODE' : 'EXISTING OPTION ID';
+      let grid = await storage.getAttributeGridByName(gridName);
+      if (grid) {
+        await storage.replaceAttributeGridRows(grid.id, []);
+        grid = await storage.updateAttributeGrid(grid.id, { columns: headers, keyColumn });
+      } else {
+        grid = await storage.createAttributeGrid({ name: gridName, columns: headers, keyColumn });
+      }
+      const rowsToInsert = records.map(record => ({
+        gridId: grid!.id,
+        lookupKey: String(record[keyColumn] || record[headers[0]] || ''),
+        rowData: record,
+      }));
+      await storage.replaceAttributeGridRows(grid.id, rowsToInsert);
+      res.json({ gridName, gridId: grid.id, keyColumn, rowCount: rowsToInsert.length, columnCount: headers.length, columns: headers });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/import/batch', isAuthenticated, upload.array('files', 100), async (req, res) => {
+    try {
+      if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+        return res.status(400).json({ message: 'No files uploaded' });
+      }
+      const results: any[] = [];
+      const gridFiles = (req.files as Express.Multer.File[]).filter(f => !f.originalname.startsWith('PF_'));
+      const productFiles = (req.files as Express.Multer.File[]).filter(f => f.originalname.startsWith('PF_'));
+      for (const file of [...gridFiles, ...productFiles]) {
+        try {
+          const isPFProduct = file.originalname.startsWith('PF_');
+          const records: any[] = parseSync(file.buffer.toString('utf-8'), { columns: true, skip_empty_lines: true });
+          if (isPFProduct) {
+            const categoryName = deriveCategoryName(file.originalname);
+            const productsToInsert = records
+              .filter(r => r['PRODUCT NAME']?.trim())
+              .map(r => ({
+                name: r['PRODUCT NAME'].trim(),
+                skuPrefix: r['PRODUCT NAME'].trim(),
+                status: 'active' as const,
+                pricingProxyId: null,
+                exportProxyId: null,
+                description: categoryName,
+                notes: null,
+              }));
+            await storage.deleteAllmoxyProductsByCategory(categoryName);
+            const inserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);
+            const pairedGridName = derivePairedGridName(file.originalname);
+            const allGrids = await storage.getAttributeGrids();
+            const matchedGrid = allGrids.find(g =>
+              g.name.toLowerCase().replace(/[^a-z0-9]/g, '') === pairedGridName.toLowerCase().replace(/[^a-z0-9]/g, '')
+            );
+            if (matchedGrid) {
+              for (const product of inserted) {
+                await storage.replaceProductGridBindings(product.id, [{
+                  productId: product.id,
+                  gridId: matchedGrid.id,
+                  alias: deriveCategoryAlias(file.originalname),
+                  lookupColumn: 'MANU_CODE',
+                }]);
+              }
+            }
+            results.push({ file: file.originalname, type: 'pf-products', categoryName, productsInserted: inserted.length, gridMatched: !!matchedGrid, matchedGridName: matchedGrid?.name ?? null });
+          } else {
+            const gridName = file.originalname.replace(/\.csv$/i, '').replace(/_\d{8}$/, '').replace(/_/g, ' ').trim();
+            const headers = Object.keys(records[0] || {});
+            const keyColumn = headers.includes('MANU_CODE') ? 'MANU_CODE' : 'EXISTING OPTION ID';
+            let grid = await storage.getAttributeGridByName(gridName);
+            if (grid) {
+              await storage.replaceAttributeGridRows(grid.id, []);
+              grid = await storage.updateAttributeGrid(grid.id, { columns: headers, keyColumn });
+            } else {
+              grid = await storage.createAttributeGrid({ name: gridName, columns: headers, keyColumn });
+            }
+            const rowsToInsert = records.map(record => ({
+              gridId: grid!.id,
+              lookupKey: String(record[keyColumn] || record[headers[0]] || ''),
+              rowData: record,
+            }));
+            await storage.replaceAttributeGridRows(grid.id, rowsToInsert);
+            results.push({ file: file.originalname, type: 'attribute-grid', gridName, rowCount: rowsToInsert.length, keyColumn });
+          }
+        } catch (e: any) {
+          results.push({ file: file.originalname, error: e.message });
+        }
+      }
+      res.json({ results, totalFiles: (req.files as Express.Multer.File[]).length });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

@@ -161,7 +161,9 @@ export interface IStorage {
   deleteAttributeGridRow(id: number): Promise<void>;
   deleteAttributeGrid(id: number): Promise<boolean>;
   addAttributeGridRow(gridId: number, lookupKey: string, rowData: Record<string, any>): Promise<AttributeGridRow>;
-  updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string }): Promise<AttributeGrid>;
+  updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string; columns?: string[] }): Promise<AttributeGrid>;
+  deleteAllmoxyProductsByCategory(categoryName: string): Promise<void>;
+  bulkInsertAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]>;
 
   getProxyVariables(): Promise<ProxyVariable[]>;
   getProxyVariableByName(name: string): Promise<ProxyVariable | undefined>;
@@ -739,6 +741,15 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async deleteAllmoxyProductsByCategory(categoryName: string): Promise<void> {
+    await db.delete(allmoxyProducts).where(eq(allmoxyProducts.description, categoryName));
+  }
+
+  async bulkInsertAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]> {
+    if (!products.length) return [];
+    return await db.insert(allmoxyProducts).values(products).returning();
+  }
+
   async getAttributeGrids(): Promise<AttributeGrid[]> {
     return await db.select().from(attributeGrids).orderBy(attributeGrids.name);
   }
@@ -803,7 +814,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string }): Promise<AttributeGrid> {
+  async updateAttributeGrid(id: number, updates: { name?: string; keyColumn?: string; columns?: string[] }): Promise<AttributeGrid> {
     const [updated] = await db.update(attributeGrids)
       .set(updates)
       .where(eq(attributeGrids.id, id))
