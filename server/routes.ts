@@ -25,7 +25,7 @@ import { getAsanaImportStatus, triggerManualAsanaImport } from "./asanaImportSch
 import { buildAsanaTaskNotes, syncAsanaTaskNotes, syncAsanaOrderType } from "./asanaNotes";
 import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
-import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks } from "@shared/schema";
+import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks, productGridBindings, orderItems, allmoxyProducts, attributeGridRows, attributeGrids } from "@shared/schema";
 import type { AllmoxyProduct, ProductGridBinding } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
