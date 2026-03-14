@@ -493,6 +493,7 @@ export async function registerRoutes(
         productId: number;
         inputs: Record<string, any>;
       };
+      console.log('[formula-test] productId:', productId, 'inputs:', JSON.stringify(inputs));
 
       const allProducts = await storage.getAllmoxyProducts();
       const product = allProducts.find(p => p.id === productId);
