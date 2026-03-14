@@ -25,7 +25,6 @@ import DynamicGridManager from "@/pages/admin/DynamicGridManager";
 import ProxyVariableManager from "@/pages/admin/ProxyVariableManager";
 import AllmoxyProductManager from "@/pages/admin/AllmoxyProductManager";
 import FormulaTester from "@/pages/admin/FormulaTester";
-import AllmoxyImport from "@/pages/admin/AllmoxyImport";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import AppLayout from "@/components/AppLayout";
@@ -87,7 +86,6 @@ function AppRouter() {
         <Route path="/admin/proxy-variables" component={ProxyVariableManager} />
         <Route path="/admin/allmoxy-products" component={AllmoxyProductManager} />
         <Route path="/admin/formula-tester" component={FormulaTester} />
-        <Route path="/admin/allmoxy-import" component={AllmoxyImport} />
         <Route path="/how-it-works" component={HowItWorks} />
         <Route path="/orders/:id" component={OrderDetails} />
         <Route path="/files/:fileId/cts" component={CutToSize} />

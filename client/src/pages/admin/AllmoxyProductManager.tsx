@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,12 +36,13 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, FileText, Link2, CheckSquare } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2 } from "lucide-react";
 import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -50,7 +51,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { useDropzone } from "react-dropzone";
 
 const productSchema = z.object({
   id: z.number().optional(),
@@ -75,8 +75,15 @@ export default function AllmoxyProductManager() {
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ categoryName: string; productsInserted: number; bindingsCreated: number } | null>(null);
+  const [importPricingProxyId, setImportPricingProxyId] = useState<string>("none");
+  const [importExportProxyId, setImportExportProxyId] = useState<string>("none");
+  const [importGridId, setImportGridId] = useState<string>("none");
+  const [importAlias, setImportAlias] = useState("");
+  const [importLookupColumn, setImportLookupColumn] = useState("MANU_CODE");
   const [bindings, setBindings] = useState<LocalBinding[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
@@ -184,28 +191,6 @@ export default function AllmoxyProductManager() {
     },
   });
 
-  const importMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/admin/upload-allmoxy-products", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Failed to import products");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
-      toast({ title: "Imported", description: `Successfully imported ${data.count} products` });
-      setIsImportModalOpen(false);
-      setImportFile(null);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: number[]) => {
       await Promise.all(ids.map(id =>
@@ -224,17 +209,35 @@ export default function AllmoxyProductManager() {
     },
   });
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setImportFile(acceptedFiles[0]);
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      if (importPricingProxyId !== "none") formData.append("pricingProxyId", importPricingProxyId);
+      if (importExportProxyId !== "none") formData.append("exportProxyId", importExportProxyId);
+      if (importGridId !== "none") formData.append("gridId", importGridId);
+      if (importAlias.trim()) formData.append("alias", importAlias.trim());
+      if (importLookupColumn.trim()) formData.append("lookupColumn", importLookupColumn.trim());
+      const res = await fetch("/api/admin/allmoxy-products/import-csv", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Import failed" }));
+        throw new Error(err.message ?? "Import failed");
+      }
+      const data = await res.json();
+      setImportResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+    } catch (e: any) {
+      toast({ title: "Import error", description: e.message, variant: "destructive" });
+    } finally {
+      setImportLoading(false);
     }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { "text/csv": [".csv"] },
-    multiple: false,
-  });
+  };
 
   const handleEdit = (product: AllmoxyProduct) => {
     setEditingId(product.id);
@@ -361,49 +364,15 @@ export default function AllmoxyProductManager() {
                     </AlertDialog>
                   )}
 
-                  <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="icon" variant="ghost" title="Bulk Import">
-                        <Upload className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Bulk Import Products</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <div
-                          {...getRootProps()}
-                          className={cn(
-                            "border-2 border-dashed rounded-lg p-8 transition-all cursor-pointer flex flex-col items-center justify-center gap-3 text-center",
-                            isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
-                            importFile ? "border-green-500/50 bg-green-50/20" : ""
-                          )}
-                        >
-                          <input {...getInputProps()} />
-                          <div className={cn(
-                            "h-12 w-12 rounded-full flex items-center justify-center",
-                            importFile ? "bg-green-100 text-green-600" : "bg-primary/10 text-primary"
-                          )}>
-                            {importFile ? <FileText className="h-6 w-6" /> : <Upload className="h-6 w-6" />}
-                          </div>
-                          {importFile ? (
-                            <p className="text-sm font-medium">{importFile.name}</p>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">Click or drag Allmoxy CSV here</p>
-                          )}
-                        </div>
-                        <Button
-                          className="w-full"
-                          disabled={!importFile || importMutation.isPending}
-                          onClick={() => importFile && importMutation.mutate(importFile)}
-                        >
-                          {importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          Start Import
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Import Products CSV"
+                    data-testid="button-import-csv"
+                    onClick={() => { setImportModalOpen(true); setImportFile(null); setImportResult(null); }}
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Button>
                   <Button size="icon" variant="ghost" onClick={handleNew} title="New Product">
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -785,6 +754,160 @@ export default function AllmoxyProductManager() {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      {/* Import Products CSV Modal */}
+      <Dialog
+        open={importModalOpen}
+        onOpenChange={(open) => {
+          if (!open) { setImportFile(null); setImportResult(null); }
+          setImportModalOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Import Products CSV</DialogTitle>
+            <DialogDescription>
+              Upload a PF_*_Products CSV file. Existing products in the same category will be replaced.
+            </DialogDescription>
+          </DialogHeader>
+
+          {importResult ? (
+            <div className="space-y-4 py-2">
+              <div className="flex flex-col items-center gap-3 py-4 text-center">
+                <CheckCircle2 className="h-12 w-12 text-green-500" />
+                <p className="font-semibold text-lg">Import complete</p>
+                <p className="text-sm text-muted-foreground">
+                  Category: <span className="font-medium text-foreground">{importResult.categoryName}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {importResult.productsInserted} products imported
+                  {importResult.bindingsCreated > 0 && `, ${importResult.bindingsCreated} grid bindings created`}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setImportResult(null); setImportFile(null); }}>Import another</Button>
+                <Button onClick={() => { setImportModalOpen(false); setImportResult(null); setImportFile(null); }}>Done</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              {/* File picker */}
+              <div>
+                <label className="text-sm font-medium block mb-1.5">CSV File</label>
+                <label
+                  data-testid="input-import-file"
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg p-6 cursor-pointer text-center transition-colors",
+                    importFile ? "border-green-500/60 bg-green-50/10" : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                  />
+                  <Upload className={cn("h-6 w-6", importFile ? "text-green-600" : "text-muted-foreground")} />
+                  <span className="text-sm text-muted-foreground">
+                    {importFile ? importFile.name : "Click to select a PF_*_Products.csv file"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Pricing Proxy */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium block mb-1.5">Pricing Proxy</label>
+                  <Select value={importPricingProxyId} onValueChange={setImportPricingProxyId}>
+                    <SelectTrigger data-testid="select-import-pricing-proxy">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {pricingProxies.map(v => (
+                        <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1.5">Export Proxy</label>
+                  <Select value={importExportProxyId} onValueChange={setImportExportProxyId}>
+                    <SelectTrigger data-testid="select-import-export-proxy">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {exportProxies.map(v => (
+                        <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Grid Binding */}
+              <div>
+                <label className="text-sm font-medium block mb-1.5">Attribute Grid</label>
+                <Select value={importGridId} onValueChange={(val) => {
+                  setImportGridId(val);
+                  if (val !== "none" && !importAlias) {
+                    const grid = (attributeGrids ?? []).find(g => String(g.id) === val);
+                    if (grid) setImportAlias(grid.name.toLowerCase().replace(/\s+/g, "_"));
+                  }
+                }}>
+                  <SelectTrigger data-testid="select-import-grid">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {(attributeGrids ?? []).map(g => (
+                      <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {importGridId !== "none" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium block mb-1.5">Grid Alias</label>
+                    <Input
+                      data-testid="input-import-alias"
+                      placeholder="e.g. color"
+                      value={importAlias}
+                      onChange={(e) => setImportAlias(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">Variable name in formula</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium block mb-1.5">CSV Lookup Column</label>
+                    <Input
+                      data-testid="input-import-lookup-column"
+                      placeholder="MANU_CODE"
+                      value={importLookupColumn}
+                      onChange={(e) => setImportLookupColumn(e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">Column in order CSV for lookup</p>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setImportModalOpen(false)}>Cancel</Button>
+                <Button
+                  data-testid="button-run-import"
+                  disabled={!importFile || importLoading}
+                  onClick={handleImport}
+                >
+                  {importLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Import
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
