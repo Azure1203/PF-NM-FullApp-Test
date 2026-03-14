@@ -526,7 +526,7 @@ export async function registerRoutes(
           product.name ||
           ''
         );
-        const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue) : undefined;
+        const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn) : undefined;
         if (row) {
           const rawData = row.rowData as Record<string, any>;
           contextScope[binding.alias] = Object.fromEntries(
@@ -875,7 +875,7 @@ export async function registerRoutes(
               if (!grid) continue;
               const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
               if (!lookupValue) continue;
-              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
+              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn);
               if (row) {
                 const rawData = row.rowData as Record<string, any>;
                 contextScope[binding.alias] = Object.fromEntries(
@@ -1395,7 +1395,7 @@ export async function registerRoutes(
               if (!grid) continue;
               const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
               if (!lookupValue) continue;
-              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
+              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn);
               if (row) {
                 const rawData = row.rowData as Record<string, any>;
                 contextScope[binding.alias] = Object.fromEntries(

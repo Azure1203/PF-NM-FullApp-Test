@@ -155,7 +155,7 @@ export interface IStorage {
   createAttributeGrid(grid: InsertAttributeGrid): Promise<AttributeGrid>;
 
   getAttributeGridRows(gridId: number): Promise<AttributeGridRow[]>;
-  getAttributeGridRowByKey(gridId: number, lookupKey: string): Promise<AttributeGridRow | undefined>;
+  getAttributeGridRowByKey(gridId: number, lookupKey: string, rowDataColumn?: string): Promise<AttributeGridRow | undefined>;
   replaceAttributeGridRows(gridId: number, rows: InsertAttributeGridRow[]): Promise<AttributeGridRow[]>;
   updateAttributeGridRow(id: number, rowData: Record<string, any>): Promise<AttributeGridRow>;
   deleteAttributeGridRow(id: number): Promise<void>;
@@ -768,9 +768,9 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(attributeGridRows).where(eq(attributeGridRows.gridId, gridId));
   }
 
-  async getAttributeGridRowByKey(gridId: number, lookupKey: string): Promise<AttributeGridRow | undefined> {
+  async getAttributeGridRowByKey(gridId: number, lookupKey: string, rowDataColumn?: string): Promise<AttributeGridRow | undefined> {
     const trimmedKey = lookupKey.trim();
-    // First try exact match
+    // First try exact match on lookupKey
     const [exactRow] = await db.select().from(attributeGridRows).where(
       and(
         eq(attributeGridRows.gridId, gridId),
@@ -779,14 +779,26 @@ export class DatabaseStorage implements IStorage {
     );
     if (exactRow) return exactRow;
 
-    // Fall back to case-insensitive match to handle import inconsistencies
+    // Second: case-insensitive match on lookupKey
     const allRows = await db.select().from(attributeGridRows).where(
       eq(attributeGridRows.gridId, gridId)
     );
-    console.log('[getAttributeGridRowByKey] gridId:', gridId, 'lookupKey:', trimmedKey, 'totalRows:', allRows.length, 'sampleKeys:', allRows.slice(0, 3).map(r => r.lookupKey));
-    return allRows.find(r =>
+    const ciMatch = allRows.find(r =>
       r.lookupKey.trim().toLowerCase() === trimmedKey.toLowerCase()
     );
+    if (ciMatch) return ciMatch;
+
+    // Third: search within rowData by the binding's lookup column
+    // (handles grids imported with wrong keyColumn, e.g. EXISTING OPTION ID instead of MANU_CODE)
+    if (rowDataColumn) {
+      return allRows.find(r => {
+        const rd = r.rowData as Record<string, any>;
+        const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
+        return String(val ?? '').trim().toLowerCase() === trimmedKey.toLowerCase();
+      });
+    }
+
+    return undefined;
   }
 
   async replaceAttributeGridRows(gridId: number, rows: InsertAttributeGridRow[]): Promise<AttributeGridRow[]> {
