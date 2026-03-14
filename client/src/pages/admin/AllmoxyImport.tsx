@@ -4,9 +4,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   FileDown, Upload, CheckCircle2, AlertTriangle,
-  Loader2, X, Link, Unlink
+  Loader2, X, Link, Unlink,
 } from "lucide-react";
 
 type ImportResult = {
@@ -22,20 +26,97 @@ type ImportResult = {
   keyColumn?: string;
 };
 
+type CategoryPreview = {
+  filename: string;
+  categoryName: string;
+  isPFProduct: boolean;
+  productCount: number;
+  pairedGridName: string | null;
+  matchedGridId: number | null;
+  matchedGridName: string | null;
+  suggestedAlias: string;
+};
+
+type CategoryConfig = {
+  pricingProxyId: number | null;
+  exportProxyId: number | null;
+  gridId: number | null;
+  alias: string;
+  lookupColumn: string;
+};
+
+type PreviewResult = {
+  categories: CategoryPreview[];
+  availableProxyVars: { id: number; name: string; type: string }[];
+  availableGrids: { id: number; name: string }[];
+};
+
 export default function AllmoxyImport() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
+  const [step, setStep] = useState<'select' | 'configure' | 'results'>('select');
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [categoryConfigs, setCategoryConfigs] = useState<Record<string, CategoryConfig>>({});
+  const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
 
+  // Phase 1 — analyse files, show configuration step
   const handleFiles = async (files: FileList) => {
-    setLoading(true);
-    setResults(null);
+    setPreviewLoading(true);
+    setPendingFiles(files);
     try {
       const formData = new FormData();
       for (let i = 0; i < files.length; i++) {
         formData.append('files', files[i]);
       }
+      const res = await fetch('/api/admin/import/batch/preview', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setPreview(data);
+
+      // Pre-populate configs with smart defaults
+      const defaults: Record<string, CategoryConfig> = {};
+      for (const cat of data.categories.filter((c: CategoryPreview) => c.isPFProduct)) {
+        const pricingVar = data.availableProxyVars.find((v: any) =>
+          v.name.toLowerCase() === cat.suggestedAlias + '_pricing' ||
+          v.name.toLowerCase().includes(cat.suggestedAlias)
+        );
+        const exportVar = data.availableProxyVars.find((v: any) =>
+          v.name.toLowerCase() === cat.suggestedAlias + '_export'
+        );
+        defaults[cat.categoryName] = {
+          pricingProxyId: pricingVar?.id ?? null,
+          exportProxyId: exportVar?.id ?? null,
+          gridId: cat.matchedGridId,
+          alias: cat.suggestedAlias,
+          lookupColumn: 'MANU_CODE',
+        };
+      }
+      setCategoryConfigs(defaults);
+      setStep('configure');
+    } catch (e: any) {
+      toast({ title: 'Analysis failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  // Phase 2 — commit with configuration
+  const handleCommit = async () => {
+    if (!pendingFiles) return;
+    setLoading(true);
+    setResults(null);
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < pendingFiles.length; i++) {
+        formData.append('files', pendingFiles[i]);
+      }
+      formData.append('config', JSON.stringify(categoryConfigs));
       const res = await fetch('/api/admin/import/batch', {
         method: 'POST',
         body: formData,
@@ -43,19 +124,23 @@ export default function AllmoxyImport() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setResults(data.results);
+      setStep('results');
       queryClient.invalidateQueries({ queryKey: ['/api/admin/allmoxy-products'] });
       queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids'] });
-      const errors = data.results.filter((r: ImportResult) => r.error).length;
-      toast({
-        title: 'Import complete',
-        description: `${data.totalFiles} files processed${errors ? `, ${errors} errors` : ''}`,
-        variant: errors ? 'destructive' : 'default',
-      });
+      toast({ title: 'Import complete', description: `${data.totalFiles} files processed` });
     } catch (e: any) {
       toast({ title: 'Import failed', description: e.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetToSelect = () => {
+    setStep('select');
+    setPreview(null);
+    setResults(null);
+    setPendingFiles(null);
+    setCategoryConfigs({});
   };
 
   const pfResults = results?.filter(r => r.type === 'pf-products') ?? [];
@@ -77,65 +162,226 @@ export default function AllmoxyImport() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            How it works
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>
-            <strong className="text-foreground">Attribute grid files</strong> — files like{' '}
-            <code className="text-xs bg-muted px-1 rounded">Shelves_02202026.csv</code>,{' '}
-            <code className="text-xs bg-muted px-1 rounded">Doors_02202026.csv</code> etc.
-            These contain the pricing data (BASE_PRICE, SQ_FT_PRICE, MARGIN). Existing grid data is wiped and replaced.
-          </p>
-          <p>
-            <strong className="text-foreground">PF Product files</strong> — files starting with{' '}
-            <code className="text-xs bg-muted px-1 rounded">PF_</code> like{' '}
-            <code className="text-xs bg-muted px-1 rounded">PF_Shelf_Products_02202026.csv</code>.
-            Each row becomes one product record. Existing products in that category are wiped and replaced.
-            Products are automatically linked to their matching attribute grid.
-          </p>
-          <p>
-            <strong className="text-foreground">After import</strong> — assign a Pricing Proxy Variable
-            and Export Proxy Variable to one product per category, then use the Formula Tester to verify
-            pricing is correct before applying to all products in that category.
-          </p>
-        </CardContent>
-      </Card>
+      {step === 'select' && (
+        <>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                How it works
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground space-y-2">
+              <p>
+                <strong className="text-foreground">Attribute grid files</strong> — files like{' '}
+                <code className="text-xs bg-muted px-1 rounded">Shelves_02202026.csv</code>,{' '}
+                <code className="text-xs bg-muted px-1 rounded">Doors_02202026.csv</code> etc.
+                These contain the pricing data (BASE_PRICE, SQ_FT_PRICE, MARGIN). Existing grid data is wiped and replaced.
+              </p>
+              <p>
+                <strong className="text-foreground">PF Product files</strong> — files starting with{' '}
+                <code className="text-xs bg-muted px-1 rounded">PF_</code> like{' '}
+                <code className="text-xs bg-muted px-1 rounded">PF_Shelf_Products_02202026.csv</code>.
+                Each row becomes one product record. Existing products in that category are wiped and replaced.
+                After upload you can assign a Pricing Formula, Export Formula, and Attribute Grid per category.
+              </p>
+            </CardContent>
+          </Card>
 
-      <label
-        data-testid="dropzone-allmoxy-import"
-        className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${loading ? 'opacity-50 pointer-events-none' : 'hover:border-primary hover:bg-muted/20'}`}
-      >
-        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-          <Upload className="h-10 w-10" />
-          <div className="text-center">
-            <p className="text-sm font-medium text-foreground">Click to select Allmoxy export files</p>
-            <p className="text-xs mt-1">Select any mix of PF Product files and Attribute Grid files</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">All selected files will be processed together</p>
+          <label
+            data-testid="dropzone-allmoxy-import"
+            className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${previewLoading ? 'opacity-50 pointer-events-none' : 'hover:border-primary hover:bg-muted/20'}`}
+          >
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              {previewLoading ? (
+                <Loader2 className="h-10 w-10 animate-spin" />
+              ) : (
+                <Upload className="h-10 w-10" />
+              )}
+              <div className="text-center">
+                <p className="text-sm font-medium text-foreground">
+                  {previewLoading ? 'Analysing files…' : 'Click to select Allmoxy export files'}
+                </p>
+                <p className="text-xs mt-1">Select any mix of PF Product files and Attribute Grid files</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">All selected files will be processed together</p>
+              </div>
+            </div>
+            <input
+              type="file"
+              accept=".csv"
+              multiple
+              className="hidden"
+              disabled={previewLoading}
+              data-testid="input-allmoxy-files"
+              onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); }}
+            />
+          </label>
+        </>
+      )}
+
+      {step === 'configure' && preview && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Configure Import</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Set pricing formula and grid binding for each product category.
+                These will be applied to all products in that category.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={resetToSelect}>
+              ← Back
+            </Button>
           </div>
-        </div>
-        <input
-          type="file"
-          accept=".csv"
-          multiple
-          className="hidden"
-          disabled={loading}
-          data-testid="input-allmoxy-files"
-          onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); }}
-        />
-      </label>
 
-      {loading && (
-        <div className="flex items-center justify-center gap-2 text-muted-foreground py-4">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm">Processing files — attribute grids first, then products...</span>
+          {preview.categories.filter(c => !c.isPFProduct).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Attribute Grids — will be imported as-is</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                {preview.categories.filter(c => !c.isPFProduct).map((cat, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                    <span className="font-medium">{cat.categoryName}</span>
+                    <span className="text-xs text-muted-foreground">{cat.productCount} rows · {cat.filename}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {preview.categories.filter(c => c.isPFProduct).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Product Categories — configure below</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {preview.categories.filter(c => c.isPFProduct).map((cat, i) => {
+                  const config = categoryConfigs[cat.categoryName] ?? {
+                    pricingProxyId: null,
+                    exportProxyId: null,
+                    gridId: cat.matchedGridId,
+                    alias: cat.suggestedAlias,
+                    lookupColumn: 'MANU_CODE',
+                  };
+                  const updateConfig = (updates: Partial<CategoryConfig>) => {
+                    setCategoryConfigs(prev => ({
+                      ...prev,
+                      [cat.categoryName]: { ...config, ...updates },
+                    }));
+                  };
+
+                  return (
+                    <div key={i} className="space-y-3 pb-4 border-b last:border-0">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-sm">{cat.categoryName}</p>
+                          <p className="text-xs text-muted-foreground">{cat.productCount} products · {cat.filename}</p>
+                        </div>
+                        {config.gridId ? (
+                          <Badge className="text-[10px] bg-green-100 text-green-700 border-green-300">
+                            <Link className="h-2.5 w-2.5 mr-1" />
+                            grid linked
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+                            <Unlink className="h-2.5 w-2.5 mr-1" />
+                            no grid match
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Pricing Formula</label>
+                          <Select
+                            value={config.pricingProxyId ? String(config.pricingProxyId) : 'none'}
+                            onValueChange={val => updateConfig({ pricingProxyId: val === 'none' ? null : Number(val) })}
+                          >
+                            <SelectTrigger className="h-8 text-xs" data-testid={`select-pricing-proxy-${i}`}>
+                              <SelectValue placeholder="Select pricing formula…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {preview.availableProxyVars
+                                .filter(v => v.type === 'pricing')
+                                .map(v => (
+                                  <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Export Formula</label>
+                          <Select
+                            value={config.exportProxyId ? String(config.exportProxyId) : 'none'}
+                            onValueChange={val => updateConfig({ exportProxyId: val === 'none' ? null : Number(val) })}
+                          >
+                            <SelectTrigger className="h-8 text-xs" data-testid={`select-export-proxy-${i}`}>
+                              <SelectValue placeholder="Select export formula…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None (Skip Export)</SelectItem>
+                              {preview.availableProxyVars
+                                .filter(v => v.type === 'export')
+                                .map(v => (
+                                  <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Attribute Grid</label>
+                          <Select
+                            value={config.gridId ? String(config.gridId) : 'none'}
+                            onValueChange={val => updateConfig({ gridId: val === 'none' ? null : Number(val) })}
+                          >
+                            <SelectTrigger className="h-8 text-xs" data-testid={`select-grid-${i}`}>
+                              <SelectValue placeholder="Select grid…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {preview.availableGrids.map(g => (
+                                <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Formula Alias</label>
+                          <Input
+                            className="h-8 text-xs font-mono"
+                            value={config.alias}
+                            onChange={e => updateConfig({ alias: e.target.value })}
+                            placeholder="e.g. closet_rod"
+                            data-testid={`input-alias-${i}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          <Button
+            className="w-full"
+            onClick={handleCommit}
+            disabled={loading}
+            data-testid="button-confirm-import"
+          >
+            {loading
+              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Importing...</>
+              : <><FileDown className="h-4 w-4 mr-2" />Confirm & Import All</>
+            }
+          </Button>
         </div>
       )}
 
-      {results && !loading && (
+      {step === 'results' && results && (
         <div className="space-y-4">
 
           <div className="flex flex-wrap gap-3 text-sm">
@@ -250,11 +496,20 @@ export default function AllmoxyImport() {
           <Card className="bg-muted/30">
             <CardContent className="pt-4 text-sm text-muted-foreground space-y-1">
               <p className="font-medium text-foreground">Next steps</p>
-              <p>1. Go to <strong>Products</strong> and assign a Pricing Proxy Variable and Export Proxy Variable to one product from each category.</p>
-              <p>2. Use the <strong>Formula Tester</strong> to verify that product prices correctly — enter a MANU_CODE from the grid and check the result.</p>
-              <p>3. Once verified, you can bulk-assign the same proxy variables to all products in that category.</p>
+              <p>1. Use the <strong>Formula Tester</strong> to verify that pricing is correct for a product from each category.</p>
+              <p>2. If proxy variables were not assigned during import, go to <strong>Products</strong> and assign them per category.</p>
             </CardContent>
           </Card>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={resetToSelect}
+            data-testid="button-import-more"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import More Files
+          </Button>
 
         </div>
       )}

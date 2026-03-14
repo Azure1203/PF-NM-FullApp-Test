@@ -1,0 +1,427 @@
+Add proxy variable and grid binding configuration to Allmoxy Import — paste into Replit:
+In client/src/pages/admin/AllmoxyImport.tsx and server/routes.ts, add a two-phase import flow: first a preview step that shows what will be imported and lets you configure proxy variables per category, then a commit step that applies everything.
+
+Part 1 — New preview API route in server/routes.ts
+Add this route before the existing batch import route:
+tsapp.post('/api/admin/import/batch/preview', isAuthenticated, upload.array('files', 100), async (req, res) => {
+  try {
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      return res.status(400).json({ message: 'No files uploaded' });
+    }
+
+    const allGrids = await storage.getAttributeGrids();
+    const allProxyVars = await storage.getProxyVariables();
+    const categories: Array<{
+      filename: string;
+      categoryName: string;
+      isPFProduct: boolean;
+      productCount: number;
+      pairedGridName: string | null;
+      matchedGridId: number | null;
+      matchedGridName: string | null;
+      suggestedAlias: string;
+    }> = [];
+
+    for (const file of req.files as Express.Multer.File[]) {
+      try {
+        const records: any[] = parseSync(file.buffer.toString('utf-8'), {
+          columns: true,
+          skip_empty_lines: true,
+        });
+
+        const isPFProduct = file.originalname.startsWith('PF_');
+
+        if (isPFProduct) {
+          const categoryName = deriveCategoryName(file.originalname);
+          const pairedGridName = derivePairedGridName(file.originalname);
+          const matchedGrid = allGrids.find(g =>
+            g.name.toLowerCase().replace(/[^a-z0-9]/g, '') ===
+            pairedGridName.toLowerCase().replace(/[^a-z0-9]/g, '')
+          );
+          const productCount = records.filter(r => r['PRODUCT NAME']?.trim()).length;
+
+          categories.push({
+            filename: file.originalname,
+            categoryName,
+            isPFProduct: true,
+            productCount,
+            pairedGridName,
+            matchedGridId: matchedGrid?.id ?? null,
+            matchedGridName: matchedGrid?.name ?? null,
+            suggestedAlias: deriveCategoryAlias(file.originalname),
+          });
+        } else {
+          const gridName = file.originalname
+            .replace(/\.csv$/i, '')
+            .replace(/_\d{8}$/, '')
+            .replace(/_/g, ' ')
+            .trim();
+
+          categories.push({
+            filename: file.originalname,
+            categoryName: gridName,
+            isPFProduct: false,
+            productCount: records.length,
+            pairedGridName: null,
+            matchedGridId: null,
+            matchedGridName: null,
+            suggestedAlias: '',
+          });
+        }
+      } catch (e: any) {
+        categories.push({
+          filename: file.originalname,
+          categoryName: file.originalname,
+          isPFProduct: false,
+          productCount: 0,
+          pairedGridName: null,
+          matchedGridId: null,
+          matchedGridName: null,
+          suggestedAlias: '',
+        });
+      }
+    }
+
+    res.json({
+      categories,
+      availableProxyVars: allProxyVars.map(v => ({ id: v.id, name: v.name, type: v.type })),
+      availableGrids: allGrids.map(g => ({ id: g.id, name: g.name })),
+    });
+  } catch (e: any) {
+    res.status(500).json({ message: e.message });
+  }
+});
+Also update the existing POST /api/admin/import/batch route to accept proxy variable and grid binding configuration in the request body alongside the files. Add this to the top of the batch route handler, after parsing req.files:
+ts// Parse per-category configuration passed as JSON in the 'config' form field
+let categoryConfig: Record<string, {
+  pricingProxyId: number | null;
+  exportProxyId: number | null;
+  gridId: number | null;
+  alias: string;
+  lookupColumn: string;
+}> = {};
+if (req.body.config) {
+  try { categoryConfig = JSON.parse(req.body.config); } catch {}
+}
+Then in the PF Products processing block, after const inserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);, replace the existing grid binding code with:
+tsconst config = categoryConfig[categoryName];
+const pricingProxyId = config?.pricingProxyId ?? null;
+const exportProxyId = config?.exportProxyId ?? null;
+
+// Apply proxy variables to all inserted products if configured
+if (pricingProxyId || exportProxyId) {
+  for (const product of inserted) {
+    await db.update(allmoxyProducts)
+      .set({
+        pricingProxyId: pricingProxyId,
+        exportProxyId: exportProxyId,
+      })
+      .where(eq(allmoxyProducts.id, product.id));
+  }
+}
+
+// Apply grid binding
+const gridId = config?.gridId ?? (matchedGrid?.id ?? null);
+const alias = config?.alias ?? deriveCategoryAlias(file.originalname);
+const lookupColumn = config?.lookupColumn ?? 'MANU_CODE';
+
+if (gridId) {
+  for (const product of inserted) {
+    await storage.replaceProductGridBindings(product.id, [{
+      productId: product.id,
+      gridId,
+      alias,
+      lookupColumn,
+    }]);
+  }
+  gridBindingsCreated = inserted.length;
+}
+Make sure allmoxyProducts and eq are imported from drizzle at the top of routes.ts — they should already be available.
+
+Part 2 — Update AllmoxyImport.tsx frontend
+Replace the current single-step import with a three-step flow:
+Step 1 — File selection (existing drop zone, unchanged)
+Step 2 — Configuration (new — appears after files are analysed)
+Step 3 — Results (existing results display, unchanged)
+Add these types at the top of the file:
+tstype CategoryPreview = {
+  filename: string;
+  categoryName: string;
+  isPFProduct: boolean;
+  productCount: number;
+  pairedGridName: string | null;
+  matchedGridId: number | null;
+  matchedGridName: string | null;
+  suggestedAlias: string;
+};
+
+type CategoryConfig = {
+  pricingProxyId: number | null;
+  exportProxyId: number | null;
+  gridId: number | null;
+  alias: string;
+  lookupColumn: string;
+};
+
+type PreviewResult = {
+  categories: CategoryPreview[];
+  availableProxyVars: { id: number; name: string; type: string }[];
+  availableGrids: { id: number; name: string }[];
+};
+Add these state variables:
+tsconst [step, setStep] = useState<'select' | 'configure' | 'results'>('select');
+const [preview, setPreview] = useState<PreviewResult | null>(null);
+const [previewLoading, setPreviewLoading] = useState(false);
+const [categoryConfigs, setCategoryConfigs] = useState<Record<string, CategoryConfig>>({});
+const [pendingFiles, setPendingFiles] = useState<FileList | null>(null);
+Replace the handleFiles function with two functions:
+ts// Phase 1 — analyse files, show configuration step
+const handleFiles = async (files: FileList) => {
+  setPreviewLoading(true);
+  setPendingFiles(files);
+  try {
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+    const res = await fetch('/api/admin/import/batch/preview', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
+    setPreview(data);
+
+    // Pre-populate configs with smart defaults
+    const defaults: Record<string, CategoryConfig> = {};
+    for (const cat of data.categories.filter((c: CategoryPreview) => c.isPFProduct)) {
+      // Auto-match proxy variables by category name
+      const pricingVar = data.availableProxyVars.find((v: any) =>
+        v.name.toLowerCase() === cat.suggestedAlias + '_pricing' ||
+        v.name.toLowerCase().includes(cat.suggestedAlias)
+      );
+      const exportVar = data.availableProxyVars.find((v: any) =>
+        v.name.toLowerCase() === cat.suggestedAlias + '_export'
+      );
+      defaults[cat.categoryName] = {
+        pricingProxyId: pricingVar?.id ?? null,
+        exportProxyId: exportVar?.id ?? null,
+        gridId: cat.matchedGridId,
+        alias: cat.suggestedAlias,
+        lookupColumn: 'MANU_CODE',
+      };
+    }
+    setCategoryConfigs(defaults);
+    setStep('configure');
+  } catch (e: any) {
+    toast({ title: 'Analysis failed', description: e.message, variant: 'destructive' });
+  } finally {
+    setPreviewLoading(false);
+  }
+};
+
+// Phase 2 — commit with configuration
+const handleCommit = async () => {
+  if (!pendingFiles) return;
+  setLoading(true);
+  setResults(null);
+  try {
+    const formData = new FormData();
+    for (let i = 0; i < pendingFiles.length; i++) {
+      formData.append('files', pendingFiles[i]);
+    }
+    formData.append('config', JSON.stringify(categoryConfigs));
+    const res = await fetch('/api/admin/import/batch', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
+    setResults(data.results);
+    setStep('results');
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/allmoxy-products'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids'] });
+    toast({ title: 'Import complete', description: `${data.totalFiles} files processed` });
+  } catch (e: any) {
+    toast({ title: 'Import failed', description: e.message, variant: 'destructive' });
+  } finally {
+    setLoading(false);
+  }
+};
+Add the configuration step UI between the file picker and the results section. Show it when step === 'configure' and preview is set:
+tsx{step === 'configure' && preview && (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="font-semibold">Configure Import</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Set pricing formula and grid binding for each product category.
+          These will be applied to all products in that category.
+        </p>
+      </div>
+      <Button variant="outline" size="sm" onClick={() => { setStep('select'); setPreview(null); }}>
+        ← Back
+      </Button>
+    </div>
+
+    {/* Attribute grid files — just show these, no config needed */}
+    {preview.categories.filter(c => !c.isPFProduct).length > 0 && (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Attribute Grids — will be imported as-is</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {preview.categories.filter(c => !c.isPFProduct).map((cat, i) => (
+            <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+              <span className="font-medium">{cat.categoryName}</span>
+              <span className="text-xs text-muted-foreground">{cat.productCount} rows · {cat.filename}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    )}
+
+    {/* PF Product files — configurable */}
+    {preview.categories.filter(c => c.isPFProduct).length > 0 && (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Product Categories — configure below</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {preview.categories.filter(c => c.isPFProduct).map((cat, i) => {
+            const config = categoryConfigs[cat.categoryName] ?? {
+              pricingProxyId: null, exportProxyId: null,
+              gridId: cat.matchedGridId, alias: cat.suggestedAlias, lookupColumn: 'MANU_CODE',
+            };
+            const updateConfig = (updates: Partial<CategoryConfig>) => {
+              setCategoryConfigs(prev => ({
+                ...prev,
+                [cat.categoryName]: { ...config, ...updates },
+              }));
+            };
+
+            return (
+              <div key={i} className="space-y-3 pb-4 border-b last:border-0">
+                {/* Category header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-sm">{cat.categoryName}</p>
+                    <p className="text-xs text-muted-foreground">{cat.productCount} products · {cat.filename}</p>
+                  </div>
+                  {config.gridId ? (
+                    <Badge className="text-[10px] bg-green-100 text-green-700 border-green-300">
+                      <Link className="h-2.5 w-2.5 mr-1" />
+                      grid linked
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
+                      <Unlink className="h-2.5 w-2.5 mr-1" />
+                      no grid match
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Pricing Proxy */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Pricing Formula</label>
+                    <Select
+                      value={config.pricingProxyId ? String(config.pricingProxyId) : 'none'}
+                      onValueChange={val => updateConfig({ pricingProxyId: val === 'none' ? null : Number(val) })}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select pricing formula…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {preview.availableProxyVars
+                          .filter(v => v.type === 'pricing')
+                          .map(v => (
+                            <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Export Proxy */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Export Formula</label>
+                    <Select
+                      value={config.exportProxyId ? String(config.exportProxyId) : 'none'}
+                      onValueChange={val => updateConfig({ exportProxyId: val === 'none' ? null : Number(val) })}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select export formula…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None (Skip Export)</SelectItem>
+                        {preview.availableProxyVars
+                          .filter(v => v.type === 'export')
+                          .map(v => (
+                            <SelectItem key={v.id} value={String(v.id)}>{v.name}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Grid binding */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Attribute Grid</label>
+                    <Select
+                      value={config.gridId ? String(config.gridId) : 'none'}
+                      onValueChange={val => updateConfig({ gridId: val === 'none' ? null : Number(val) })}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select grid…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {preview.availableGrids.map(g => (
+                          <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Alias */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Formula Alias</label>
+                    <Input
+                      className="h-8 text-xs font-mono"
+                      value={config.alias}
+                      onChange={e => updateConfig({ alias: e.target.value })}
+                      placeholder="e.g. closet_rod"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Commit button */}
+    <Button
+      className="w-full"
+      onClick={handleCommit}
+      disabled={loading}
+    >
+      {loading
+        ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Importing...</>
+        : <><FileDown className="h-4 w-4 mr-2" />Confirm & Import All</>
+      }
+    </Button>
+  </div>
+)}
+Also update the file picker drop zone to only show when step === 'select', and the results section to only show when step === 'results'. Add a "Import more files" button in the results section that resets back to step === 'select'.
+Add Select, SelectTrigger, SelectValue, SelectContent, SelectItem to imports from @/components/ui/select, and Input from @/components/ui/input if not already present. Add Link, Unlink to the lucide-react import.
+
+After completing, confirm:
+
+Selecting files shows the configuration step before importing
+Each PF Product category has dropdowns for Pricing Formula, Export Formula, Attribute Grid, and an Alias field
+Proxy variables are auto-matched by name where possible (e.g. closet_rods_pricing auto-selects for Closet Rods)
+Clicking "Confirm & Import All" applies everything in one shot
+All products in a category get the same pricing proxy, export proxy, and grid binding
+The results screen shows the same summary as before

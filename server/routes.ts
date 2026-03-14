@@ -704,11 +704,113 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/admin/import/batch/preview', isAuthenticated, upload.array('files', 100), async (req, res) => {
+    try {
+      if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+        return res.status(400).json({ message: 'No files uploaded' });
+      }
+
+      const allGrids = await storage.getAttributeGrids();
+      const allProxyVars = await storage.getProxyVariables();
+      const categories: Array<{
+        filename: string;
+        categoryName: string;
+        isPFProduct: boolean;
+        productCount: number;
+        pairedGridName: string | null;
+        matchedGridId: number | null;
+        matchedGridName: string | null;
+        suggestedAlias: string;
+      }> = [];
+
+      for (const file of req.files as Express.Multer.File[]) {
+        try {
+          const records: any[] = parseSync(file.buffer.toString('utf-8'), {
+            columns: true,
+            skip_empty_lines: true,
+          });
+
+          const isPFProduct = file.originalname.startsWith('PF_');
+
+          if (isPFProduct) {
+            const categoryName = deriveCategoryName(file.originalname);
+            const pairedGridName = derivePairedGridName(file.originalname);
+            const matchedGrid = allGrids.find(g =>
+              g.name.toLowerCase().replace(/[^a-z0-9]/g, '') ===
+              pairedGridName.toLowerCase().replace(/[^a-z0-9]/g, '')
+            );
+            const productCount = records.filter(r => r['PRODUCT NAME']?.trim()).length;
+
+            categories.push({
+              filename: file.originalname,
+              categoryName,
+              isPFProduct: true,
+              productCount,
+              pairedGridName,
+              matchedGridId: matchedGrid?.id ?? null,
+              matchedGridName: matchedGrid?.name ?? null,
+              suggestedAlias: deriveCategoryAlias(file.originalname),
+            });
+          } else {
+            const gridName = file.originalname
+              .replace(/\.csv$/i, '')
+              .replace(/_\d{8}$/, '')
+              .replace(/_/g, ' ')
+              .trim();
+
+            categories.push({
+              filename: file.originalname,
+              categoryName: gridName,
+              isPFProduct: false,
+              productCount: records.length,
+              pairedGridName: null,
+              matchedGridId: null,
+              matchedGridName: null,
+              suggestedAlias: '',
+            });
+          }
+        } catch (e: any) {
+          categories.push({
+            filename: file.originalname,
+            categoryName: file.originalname,
+            isPFProduct: false,
+            productCount: 0,
+            pairedGridName: null,
+            matchedGridId: null,
+            matchedGridName: null,
+            suggestedAlias: '',
+          });
+        }
+      }
+
+      res.json({
+        categories,
+        availableProxyVars: allProxyVars.map(v => ({ id: v.id, name: v.name, type: v.type })),
+        availableGrids: allGrids.map(g => ({ id: g.id, name: g.name })),
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/import/batch', isAuthenticated, upload.array('files', 100), async (req, res) => {
     try {
       if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
         return res.status(400).json({ message: 'No files uploaded' });
       }
+
+      // Parse per-category configuration passed as JSON in the 'config' form field
+      let categoryConfig: Record<string, {
+        pricingProxyId: number | null;
+        exportProxyId: number | null;
+        gridId: number | null;
+        alias: string;
+        lookupColumn: string;
+      }> = {};
+      if (req.body.config) {
+        try { categoryConfig = JSON.parse(req.body.config); } catch {}
+      }
+
       const results: any[] = [];
       const gridFiles = (req.files as Express.Multer.File[]).filter(f => !f.originalname.startsWith('PF_'));
       const productFiles = (req.files as Express.Multer.File[]).filter(f => f.originalname.startsWith('PF_'));
@@ -731,22 +833,62 @@ export async function registerRoutes(
               }));
             await storage.deleteAllmoxyProductsByCategory(categoryName);
             const inserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);
+
+            const config = categoryConfig[categoryName];
+            const pricingProxyId = config?.pricingProxyId ?? null;
+            const exportProxyId = config?.exportProxyId ?? null;
+
+            // Apply proxy variables to all inserted products if configured
+            if (pricingProxyId || exportProxyId) {
+              for (const product of inserted) {
+                await db.update(allmoxyProducts)
+                  .set({ pricingProxyId, exportProxyId })
+                  .where(eq(allmoxyProducts.id, product.id));
+              }
+            }
+
+            // Apply grid binding
             const pairedGridName = derivePairedGridName(file.originalname);
             const allGrids = await storage.getAttributeGrids();
             const matchedGrid = allGrids.find(g =>
               g.name.toLowerCase().replace(/[^a-z0-9]/g, '') === pairedGridName.toLowerCase().replace(/[^a-z0-9]/g, '')
             );
-            if (matchedGrid) {
+            const gridId = config?.gridId ?? (matchedGrid?.id ?? null);
+            const alias = config?.alias ?? deriveCategoryAlias(file.originalname);
+            const lookupColumn = config?.lookupColumn ?? 'MANU_CODE';
+            let gridBindingsCreated = 0;
+
+            if (gridId) {
+              const resolvedGrid = allGrids.find(g => g.id === gridId) ?? matchedGrid ?? null;
               for (const product of inserted) {
                 await storage.replaceProductGridBindings(product.id, [{
                   productId: product.id,
-                  gridId: matchedGrid.id,
-                  alias: deriveCategoryAlias(file.originalname),
-                  lookupColumn: 'MANU_CODE',
+                  gridId,
+                  alias,
+                  lookupColumn,
                 }]);
               }
+              gridBindingsCreated = inserted.length;
+              results.push({
+                file: file.originalname,
+                type: 'pf-products',
+                categoryName,
+                productsInserted: inserted.length,
+                gridMatched: true,
+                matchedGridName: resolvedGrid?.name ?? null,
+                gridBindingsCreated,
+              });
+            } else {
+              results.push({
+                file: file.originalname,
+                type: 'pf-products',
+                categoryName,
+                productsInserted: inserted.length,
+                gridMatched: false,
+                matchedGridName: null,
+                gridBindingsCreated: 0,
+              });
             }
-            results.push({ file: file.originalname, type: 'pf-products', categoryName, productsInserted: inserted.length, gridMatched: !!matchedGrid, matchedGridName: matchedGrid?.name ?? null });
           } else {
             const gridName = file.originalname.replace(/\.csv$/i, '').replace(/_\d{8}$/, '').replace(/_/g, ' ').trim();
             const headers = Object.keys(records[0] || {});
