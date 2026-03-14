@@ -80,19 +80,30 @@ export default function FormulaTester() {
     },
     enabled: selectedProductId !== null,
   });
-  console.log('[FormulaTester] selectedProductId:', selectedProductId, 'bindings:', bindings);
 
   const selectedProduct = products?.find(p => p.id === selectedProductId) ?? null;
 
   const testMutation = useMutation({
     mutationFn: async () => {
+      // Auto-populate lookup inputs from the product's own name (which is the MANU_CODE)
+      // for any binding where the user hasn't manually provided a value
+      const autoLookups: Record<string, string> = {};
+      if (selectedProduct && bindings) {
+        for (const binding of bindings) {
+          if (!lookupInputs[binding.lookupColumn] && selectedProduct.name) {
+            autoLookups[binding.lookupColumn] = selectedProduct.name;
+          }
+        }
+      }
+
       const inputs: Record<string, any> = {
         width: parseFloat(width) || 0,
         height: parseFloat(height) || 0,
         length: parseFloat(length) || 0,
         depth: parseFloat(length) || 0,
         quantity: parseInt(quantity) || 1,
-        ...lookupInputs,
+        ...autoLookups,
+        ...lookupInputs, // manual entries still override auto ones
       };
       const res = await apiRequest("POST", "/api/admin/formula-test", {
         productId: selectedProductId,
@@ -202,32 +213,12 @@ export default function FormulaTester() {
               </div>
             </div>
 
-            {/* Grid binding inputs */}
-            {bindings && bindings.length > 0 && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Grid Lookup Values</label>
-                {bindings.map(b => {
-                  const val = lookupInputs[b.lookupColumn] ?? "";
-                  const isEmpty = val.trim() === "";
-                  return (
-                    <div key={b.alias} className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">
-                        <span className="font-mono text-primary">{b.alias}</span> lookup ({b.lookupColumn} column)
-                      </label>
-                      <Input
-                        data-testid={`input-lookup-${b.alias}`}
-                        placeholder={b.lookupColumn}
-                        value={val}
-                        onChange={e => setLookupInputs(prev => ({ ...prev, [b.lookupColumn]: e.target.value }))}
-                        onKeyDown={handleKeyDown}
-                        className={cn(isEmpty && "border-amber-400 focus-visible:ring-amber-400/30")}
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        Enter the value from the <span className="font-mono">{b.lookupColumn}</span> column of your CSV for this item
-                      </p>
-                    </div>
-                  );
-                })}
+            {/* Grid binding auto-lookup note */}
+            {bindings && bindings.length > 0 && bindings.some(b => !lookupInputs[b.lookupColumn]) && (
+              <div className="space-y-1 rounded-md bg-muted/40 border px-3 py-2 text-xs text-muted-foreground">
+                <p>
+                  Lookup: using product SKU <span className="font-mono text-foreground">{selectedProduct?.name}</span> automatically
+                </p>
               </div>
             )}
 

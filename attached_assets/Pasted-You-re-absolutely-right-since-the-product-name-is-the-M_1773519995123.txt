@@ -1,0 +1,64 @@
+You're absolutely right — since the product name is the MANU_CODE (e.g. H.801.13.201), the Formula Tester should automatically use that as the lookup value. No dropdown, no typing — you pick the product and it just works.
+
+Here's the prompt:
+
+Auto-populate lookup value from product name in Formula Tester — paste into Replit:
+
+In client/src/pages/admin/FormulaTester.tsx, find the testMutation function where it builds the inputs object before sending the POST request.
+
+Currently it spreads lookupInputs into the inputs:
+ts
+
+const inputs: Record<string, any> = {
+  width: parseFloat(width) || 0,
+  height: parseFloat(height) || 0,
+  length: parseFloat(length) || 0,
+  depth: parseFloat(length) || 0,
+  quantity: parseInt(quantity) || 1,
+  ...lookupInputs,
+};
+
+Replace it with:
+ts
+
+// Auto-populate lookup inputs from the product's own name (which is the MANU_CODE)
+// for any binding where the user hasn't manually provided a value
+const autoLookups: Record<string, string> = {};
+if (selectedProduct && bindings) {
+  for (const binding of bindings) {
+    if (!lookupInputs[binding.lookupColumn] && selectedProduct.name) {
+      autoLookups[binding.lookupColumn] = selectedProduct.name;
+    }
+  }
+}
+
+const inputs: Record<string, any> = {
+  width: parseFloat(width) || 0,
+  height: parseFloat(height) || 0,
+  length: parseFloat(length) || 0,
+  depth: parseFloat(length) || 0,
+  quantity: parseInt(quantity) || 1,
+  ...autoLookups,
+  ...lookupInputs, // manual entries still override auto ones
+};
+
+Also hide the Grid Lookup Values section entirely when all bindings can be auto-populated from the product name. Find the section that renders the lookup inputs and wrap it with:
+tsx
+
+{bindings && bindings.length > 0 && bindings.some(b => !lookupInputs[b.lookupColumn]) && (
+  <div className="space-y-1 rounded-md bg-muted/40 border px-3 py-2 text-xs text-muted-foreground">
+    <p>
+      Lookup: using product SKU <span className="font-mono text-foreground">{selectedProduct?.name}</span> automatically
+    </p>
+  </div>
+)}
+
+Replace the existing Grid Lookup Values section entirely with this — removing the input fields completely since they're no longer needed for SKU-based products.
+
+Do not change anything else.
+
+After completing, confirm:
+
+    Selecting product H.801.13.201 and clicking Run Pricing Test automatically looks up H.801.13.201 in the Closet Rod grid
+    No manual input required — the result shows $8.45
+    The page shows a small note saying which SKU it used for the lookup
