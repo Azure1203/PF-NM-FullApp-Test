@@ -523,6 +523,7 @@ export async function registerRoutes(
           (req.body.inputs || {})[binding.lookupColumn] ||
           (req.body.gridLookups || {})[binding.alias] ||
           (req.body.gridLookups || {})[binding.lookupColumn] ||
+          product.name ||
           ''
         );
         const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue) : undefined;
