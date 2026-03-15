@@ -36,6 +36,13 @@
       "when": 1773277060331,
       "tag": "0004_tense_silhouette",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773538288989,
+      "tag": "0005_legal_maverick",
+      "breakpoints": true
     }
   ]
 }

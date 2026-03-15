@@ -432,6 +432,9 @@ export const asanaImportSyncStatus = pgTable("asana_import_sync_status", {
 
 export type AsanaImportSyncStatus = typeof asanaImportSyncStatus.$inferSelect;
 
+export const EXPORT_TYPE_OPTIONS = ['ORD', 'HARDWARE', 'ELIAS', 'MJ', 'CTS', 'GLASS', 'NONE'] as const;
+export type ExportType = typeof EXPORT_TYPE_OPTIONS[number];
+
 export const allmoxyProducts = pgTable("allmoxy_products", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull().unique(),
@@ -441,6 +444,7 @@ export const allmoxyProducts = pgTable("allmoxy_products", {
   skuPrefix: varchar("sku_prefix", { length: 100 }),
   description: text("description"),
   notes: text("notes"),
+  exportType: varchar("export_type", { length: 20 }).default('ORD'),
 });
 
 export const insertAllmoxyProductSchema = createInsertSchema(allmoxyProducts);
@@ -508,6 +512,7 @@ export const orderItems = pgTable("order_items", {
   exportText: text("export_text"),
   pricingError: text("pricing_error"),
   rawRowData: jsonb("raw_row_data"),
+  exportType: varchar("export_type", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

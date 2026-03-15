@@ -721,6 +721,7 @@ export class DatabaseStorage implements IStorage {
           skuPrefix: product.skuPrefix,
           description: product.description,
           notes: product.notes,
+          exportType: product.exportType,
         },
       })
       .returning();

@@ -27,6 +27,7 @@ import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks, productGridBindings, orderItems, allmoxyProducts, attributeGridRows, attributeGrids } from "@shared/schema";
 import type { AllmoxyProduct, ProductGridBinding } from "@shared/schema";
+import { EXPORT_TYPE_OPTIONS } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
   parseCSV,
@@ -442,10 +443,11 @@ export async function registerRoutes(
 
   app.post('/api/admin/allmoxy-products', isAuthenticated, async (req, res) => {
     try {
-      const { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes } = req.body;
+      const { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes, exportType } = req.body;
       if (!name) {
         return res.status(400).json({ message: 'name is required' });
       }
+      const validExportType = exportType && (EXPORT_TYPE_OPTIONS as readonly string[]).includes(exportType) ? exportType : 'ORD';
       const product = await storage.upsertAllmoxyProduct({
         name,
         status: status ?? 'active',
@@ -454,6 +456,7 @@ export async function registerRoutes(
         skuPrefix: skuPrefix ?? null,
         description: description ?? null,
         notes: notes ?? null,
+        exportType: validExportType,
       });
       res.json(product);
     } catch (e: any) {
@@ -468,6 +471,38 @@ export async function registerRoutes(
         return res.status(404).json({ message: 'Product not found' });
       }
       res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/products/auto-classify-export-types', isAuthenticated, async (_req, res) => {
+    try {
+      const allProducts = await storage.getAllmoxyProducts();
+      const active = allProducts.filter(p => p.status === 'active');
+      const classified: Record<string, number> = { CTS: 0, ELIAS: 0, MJ: 0, GLASS: 0, HARDWARE: 0, ORD: 0 };
+
+      for (const product of active) {
+        const prefix = (product.skuPrefix || '').toUpperCase().trim();
+        let exportType = 'ORD';
+
+        if (prefix.startsWith('H.')) {
+          exportType = 'CTS';
+        } else if (['DOVETAIL', 'DTL', 'DVT'].some(k => prefix.includes(k))) {
+          exportType = 'ELIAS';
+        } else if (['5PIECE', '5-PIECE', 'SHAKER', 'MJ'].some(k => prefix.includes(k))) {
+          exportType = 'MJ';
+        } else if (prefix.includes('GLASS')) {
+          exportType = 'GLASS';
+        } else if (['HARDWARE', 'HINGE', 'SLIDE', 'HANDLE', 'KNOB', 'PULL', 'SCREW', 'BRACKET'].some(k => prefix.includes(k))) {
+          exportType = 'HARDWARE';
+        }
+
+        classified[exportType]++;
+        await storage.upsertAllmoxyProduct({ ...product, exportType });
+      }
+
+      res.json({ total: active.length, classified });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -870,6 +905,7 @@ export async function registerRoutes(
             exportText,
             pricingError,
             rawRowData: item,
+            exportType: product?.exportType || null,
           });
           totalProjectPrice += totalPrice;
         }
@@ -1387,7 +1423,6 @@ export async function registerRoutes(
           const qty = pricingItem.quantity;
           const totalPrice = unitPrice * qty;
 
-          // Persist to order_items
           await storage.createOrderItem({
             projectId: project.id,
             fileId: orderFile.id,
@@ -1403,6 +1438,7 @@ export async function registerRoutes(
             exportText,
             pricingError,
             rawRowData: item,
+            exportType: product?.exportType || null,
           });
 
           totalProjectPrice += totalPrice;

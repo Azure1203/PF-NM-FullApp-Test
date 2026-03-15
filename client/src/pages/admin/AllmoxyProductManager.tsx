@@ -42,8 +42,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2, Wand2 } from "lucide-react";
 import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding } from "@shared/schema";
+import { EXPORT_TYPE_OPTIONS, type ExportType } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
@@ -61,7 +62,17 @@ const productSchema = z.object({
   skuPrefix: z.string().nullable(),
   description: z.string().nullable(),
   notes: z.string().nullable(),
+  exportType: z.string().default('ORD'),
 });
+
+const EXPORT_TYPE_COLORS: Record<string, string> = {
+  ORD: 'bg-blue-100 text-blue-700',
+  HARDWARE: 'bg-gray-100 text-gray-700',
+  ELIAS: 'bg-green-100 text-green-700',
+  MJ: 'bg-purple-100 text-purple-700',
+  CTS: 'bg-orange-100 text-orange-700',
+  GLASS: 'bg-cyan-100 text-cyan-700',
+};
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -98,6 +109,7 @@ export default function AllmoxyProductManager() {
       skuPrefix: null,
       description: null,
       notes: null,
+      exportType: "ORD",
     },
   });
 
@@ -251,6 +263,7 @@ export default function AllmoxyProductManager() {
       skuPrefix: product.skuPrefix ?? null,
       description: product.description ?? null,
       notes: product.notes ?? null,
+      exportType: product.exportType ?? "ORD",
     });
   };
 
@@ -265,6 +278,7 @@ export default function AllmoxyProductManager() {
       skuPrefix: null,
       description: null,
       notes: null,
+      exportType: "ORD",
     });
   };
 
@@ -367,6 +381,28 @@ export default function AllmoxyProductManager() {
                   <Button
                     size="icon"
                     variant="ghost"
+                    title="Auto-Classify Export Types"
+                    data-testid="button-auto-classify"
+                    onClick={async () => {
+                      try {
+                        const res = await apiRequest("POST", "/api/admin/products/auto-classify-export-types");
+                        const data = await res.json();
+                        const counts = Object.entries(data.classified as Record<string, number>)
+                          .filter(([, v]) => v > 0)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join(', ');
+                        toast({ title: "Classification complete", description: `${data.total} products classified — ${counts}` });
+                        queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+                      } catch (e: any) {
+                        toast({ title: "Error", description: e.message, variant: "destructive" });
+                      }
+                    }}
+                  >
+                    <Wand2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     title="Import Products CSV"
                     data-testid="button-import-csv"
                     onClick={() => { setImportModalOpen(true); setImportFile(null); setImportResult(null); }}
@@ -439,6 +475,29 @@ export default function AllmoxyProductManager() {
                           {p.status}
                         </span>
                       </div>
+                      {p.skuPrefix && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className={cn(
+                            "text-[10px] font-mono",
+                            editingId === p.id && !selectMode ? "text-primary-foreground/70" : "text-muted-foreground"
+                          )}>
+                            {p.skuPrefix}
+                          </span>
+                          {p.exportType && p.exportType !== 'NONE' && (
+                            <span
+                              data-testid={`badge-export-type-${p.id}`}
+                              className={cn(
+                                "text-[9px] uppercase px-1 py-0.5 rounded font-bold shrink-0",
+                                editingId === p.id && !selectMode
+                                  ? "bg-primary-foreground/20 text-white"
+                                  : EXPORT_TYPE_COLORS[p.exportType] || 'bg-muted text-muted-foreground'
+                              )}
+                            >
+                              {p.exportType}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {!selectMode && (
                       <ChevronRight className={cn(
@@ -614,6 +673,31 @@ export default function AllmoxyProductManager() {
                           )}
                         />
                       </div>
+                      <FormField
+                        control={form.control}
+                        name="exportType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Export Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || 'ORD'}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-export-type">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {EXPORT_TYPE_OPTIONS.map((t) => (
+                                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              Determines which output file this product belongs to during exports.
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
                     {/* Grid Bindings */}
