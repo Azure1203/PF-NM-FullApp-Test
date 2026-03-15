@@ -93,6 +93,7 @@ export default function AllmoxyProductManager() {
   const [importResult, setImportResult] = useState<{ categoryName: string; productsInserted: number; bindingsCreated: number } | null>(null);
   const [importPricingProxyId, setImportPricingProxyId] = useState<string>("none");
   const [importExportProxyId, setImportExportProxyId] = useState<string>("none");
+  const [importExportType, setImportExportType] = useState<string>("ORD");
   const [importGridId, setImportGridId] = useState<string>("none");
   const [importAlias, setImportAlias] = useState("");
   const [importLookupColumn, setImportLookupColumn] = useState("MANU_CODE");
@@ -232,6 +233,7 @@ export default function AllmoxyProductManager() {
       formData.append("file", importFile);
       if (importPricingProxyId !== "none") formData.append("pricingProxyId", importPricingProxyId);
       if (importExportProxyId !== "none") formData.append("exportProxyId", importExportProxyId);
+      formData.append("exportType", importExportType);
       if (importGridId !== "none") formData.append("gridId", importGridId);
       if (importAlias.trim()) formData.append("alias", importAlias.trim());
       if (importLookupColumn.trim()) formData.append("lookupColumn", importLookupColumn.trim());
@@ -898,7 +900,7 @@ export default function AllmoxyProductManager() {
       <Dialog
         open={importModalOpen}
         onOpenChange={(open) => {
-          if (!open) { setImportFile(null); setImportResult(null); }
+          if (!open) { setImportFile(null); setImportResult(null); setImportExportType("ORD"); }
           setImportModalOpen(open);
         }}
       >
@@ -983,6 +985,21 @@ export default function AllmoxyProductManager() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Export Type */}
+              <div>
+                <label className="text-sm font-medium block mb-1.5">Export Type</label>
+                <Select value={importExportType} onValueChange={setImportExportType}>
+                  <SelectTrigger data-testid="select-import-export-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPORT_TYPE_OPTIONS.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Grid Binding */}

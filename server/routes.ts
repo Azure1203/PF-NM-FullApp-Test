@@ -648,7 +648,7 @@ export async function registerRoutes(
     try {
       if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-      const { pricingProxyId, exportProxyId, gridId, alias, lookupColumn } = req.body;
+      const { pricingProxyId, exportProxyId, exportType, gridId, alias, lookupColumn } = req.body;
 
       const records: any[] = parseSync(req.file.buffer.toString('utf-8'), {
         columns: true,
@@ -672,6 +672,8 @@ export async function registerRoutes(
         .replace(/_/g, ' ')
         .trim();
 
+      const resolvedExportType = exportType && exportType !== 'ORD' ? exportType : 'ORD';
+
       const productsToInsert = records
         .filter(r => r['PRODUCT NAME']?.trim())
         .map(r => ({
@@ -680,6 +682,7 @@ export async function registerRoutes(
           status: 'active' as const,
           pricingProxyId: pricingProxyId ? Number(pricingProxyId) : null,
           exportProxyId: exportProxyId ? Number(exportProxyId) : null,
+          exportType: resolvedExportType,
           description: categoryName,
           notes: null,
           supplyType: 'STOCK' as const,
