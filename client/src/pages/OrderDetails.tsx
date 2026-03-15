@@ -1358,6 +1358,17 @@ export default function OrderDetails() {
                       Cut-to-Size ({exportTypeCounts['CTS']})
                     </Button>
                   )}
+                  {hasCTS && (
+                    <Button
+                      data-testid="button-cts-pdf"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/orders/${id}/pdf/cut-to-size`, '_blank')}
+                    >
+                      <FileText className="w-4 h-4 mr-1.5" />
+                      Cut-to-Size PDF ({exportTypeCounts['CTS']})
+                    </Button>
+                  )}
                   <Button
                     data-testid="button-download-erp"
                     variant="outline"

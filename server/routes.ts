@@ -8,7 +8,7 @@ import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
 import { evaluatePrice } from "./services/pricingEngine";
 import { generateOrdItemBlock, generateOrdHeader } from "./services/ordExporter";
-import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf, generateInternalPackingSlipPdf, generateMJPdf } from "./services/pdfGenerator";
+import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf, generateInternalPackingSlipPdf, generateMJPdf, generateCutToSizePdf } from "./services/pdfGenerator";
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import path from 'path';
@@ -905,6 +905,87 @@ export async function registerRoutes(
       const totalRodsNeeded = Math.round((totalLengthMm / ROD_LENGTH_MM) * 100) / 100;
       res.json({ items: result, totalLengthMm, totalLengthInches, totalRodsNeeded });
     } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET Cut-to-Size PDF
+  app.get('/api/orders/:id/pdf/cut-to-size', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      const items = await storage.getOrderItemsByProject(projectId);
+      const ctsItems = items.filter(i => i.exportType === 'CTS');
+      if (ctsItems.length === 0) {
+        return res.status(404).json({ message: 'No CTS items in this order' });
+      }
+
+      const ROD_LENGTH_MM = 2438.4;
+
+      const allConfigs = await storage.getAllCtsPartConfigs();
+      const configMap = new Map(allConfigs.map(c => [c.partNumber, c]));
+
+      const lengthMap = new Map<number, number>();
+      let totalLengthMm = 0;
+      let skuCode = '';
+
+      const pdfItems = ctsItems.map((item, idx) => {
+        const lengthMm = item.depth ?? 0;
+        const qty = item.quantity ?? 1;
+        totalLengthMm += lengthMm * qty;
+
+        const existing = lengthMap.get(lengthMm) || 0;
+        lengthMap.set(lengthMm, existing + qty);
+
+        if (!skuCode && item.sku) skuCode = item.sku;
+
+        const partNumber = item.sku ?? '';
+        const config = configMap.get(partNumber) ||
+          configMap.get(partNumber.replace(/\.CTS$/, '')) ||
+          configMap.get(partNumber + '.CTS');
+
+        return {
+          id: String(idx + 1),
+          qty,
+          lengthMm,
+          lengthIn: lengthMm / 25.4,
+          supplyType: item.supplyType ?? 'STOCK',
+          rackLocation: config?.rackLocation ?? null,
+        };
+      });
+
+      const lengthSummary = Array.from(lengthMap.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([cutMm, totalQty]) => ({
+          cutLengthMm: cutMm,
+          cutLengthIn: cutMm / 25.4,
+          totalQty,
+          totalLengthMm: cutMm * totalQty,
+        }));
+
+      const totalLengthInches = totalLengthMm / 25.4;
+      const totalRodsNeeded = Math.round((totalLengthMm / ROD_LENGTH_MM) * 100) / 100;
+
+      const ctsData = {
+        orderId: projectId,
+        orderName: project.name ?? `Order ${projectId}`,
+        skuCode,
+        lengthSummary,
+        items: pdfItems,
+        totalLengthMm,
+        totalLengthInches,
+        totalRodsNeeded,
+        outputPath: `/tmp/cts_${projectId}_${Date.now()}.pdf`,
+      };
+
+      const pdfBuf = await generateCutToSizePdf(ctsData);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="CutToSize_${projectId}.pdf"`);
+      res.send(pdfBuf);
+    } catch (e: any) {
+      console.error('[Cut-to-Size PDF]', e.message);
       res.status(500).json({ message: e.message });
     }
   });

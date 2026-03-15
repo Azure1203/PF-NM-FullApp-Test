@@ -85,6 +85,7 @@ const PACKING_SLIP_SCRIPT          = path.join(process.cwd(), 'server', 'scripts
 const ELIAS_SCRIPT                 = path.join(process.cwd(), 'server', 'scripts', 'generate_elias_pdf.py');
 const INTERNAL_PACKING_SLIP_SCRIPT = path.join(process.cwd(), 'server', 'scripts', 'generate_internal_packing_slip.py');
 const MJ_SCRIPT                    = path.join(process.cwd(), 'server', 'scripts', 'generate_mj_pdf.py');
+const CTS_SCRIPT                   = path.join(process.cwd(), 'server', 'scripts', 'generate_cut_to_size.py');
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
   const tmpPath = path.join(os.tmpdir(), `invoice_${data.orderId}_${Date.now()}.pdf`);
@@ -341,6 +342,76 @@ export async function generateMJPdf(data: MJData): Promise<Buffer> {
 
     py.on('error', (err) => {
       reject(new Error(`Failed to spawn Python for M&J PDF: ${err.message}`));
+    });
+  });
+}
+
+export interface CtsLengthSummary {
+  cutLengthMm: number;
+  cutLengthIn: number;
+  totalQty: number;
+  totalLengthMm: number;
+}
+
+export interface CtsItem {
+  id: string;
+  qty: number;
+  lengthMm: number;
+  lengthIn: number;
+  supplyType: string;
+  rackLocation: string | null;
+}
+
+export interface CtsData {
+  orderId: number;
+  orderName: string;
+  skuCode: string;
+  lengthSummary: CtsLengthSummary[];
+  items: CtsItem[];
+  totalLengthMm: number;
+  totalLengthInches: number;
+  totalRodsNeeded: number;
+  outputPath: string;
+}
+
+export async function generateCutToSizePdf(data: CtsData): Promise<Buffer> {
+  const tmpPath = path.join(os.tmpdir(), `cts_${data.orderId}_${Date.now()}.pdf`);
+  const payload: CtsData = { ...data, outputPath: tmpPath };
+
+  return new Promise((resolve, reject) => {
+    const py = spawn('python3', [CTS_SCRIPT], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    py.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    py.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    py.stdin.write(JSON.stringify(payload));
+    py.stdin.end();
+
+    py.on('close', (code) => {
+      if (code !== 0) {
+        return reject(new Error(`CTS PDF generator failed (exit ${code}): ${stderr.slice(0, 500)}`));
+      }
+      const successLine = stdout.trim().split('\n').find(l => l.startsWith('SUCCESS:'));
+      if (!successLine) {
+        return reject(new Error(`CTS PDF generator gave no SUCCESS line. stderr: ${stderr.slice(0, 500)}`));
+      }
+      const pdfPath = successLine.replace('SUCCESS:', '').trim();
+      try {
+        const buf = fs.readFileSync(pdfPath);
+        try { fs.unlinkSync(pdfPath); } catch { }
+        resolve(buf);
+      } catch (e: any) {
+        reject(new Error(`Could not read generated CTS PDF: ${e.message}`));
+      }
+    });
+
+    py.on('error', (err) => {
+      reject(new Error(`Failed to spawn Python for CTS PDF: ${err.message}`));
     });
   });
 }
