@@ -4160,361 +4160,6 @@ export async function registerRoutes(
     }
   });
 
-  // Fetch Marathon product images from their website
-  app.post('/api/products/fetch-marathon-images', isAuthenticated, async (req, res) => {
-    try {
-      const { limit = 20 } = req.body; // Process max 20 products per run by default
-      
-      // Get all Marathon products without images
-      const allProducts = await storage.getProducts();
-      const marathonProducts = allProducts
-        .filter(p => p.supplier?.toLowerCase() === 'marathon' && !p.imagePath)
-        .slice(0, limit); // Limit per run to avoid blocking
-      
-      if (marathonProducts.length === 0) {
-        return res.json({ message: 'No Marathon products without images found', updated: 0, errors: [], remaining: 0 });
-      }
-      
-      const totalRemaining = allProducts.filter(p => 
-        p.supplier?.toLowerCase() === 'marathon' && !p.imagePath
-      ).length;
-      
-      console.log(`[Marathon Images] Processing ${marathonProducts.length} of ${totalRemaining} products...`);
-      
-      const updated: string[] = [];
-      const errors: Array<{ code: string; error: string }> = [];
-      let consecutiveErrors = 0;
-      
-      for (const product of marathonProducts) {
-        // Stop if too many consecutive errors (possible rate limiting)
-        if (consecutiveErrors >= 3) {
-          errors.push({ code: product.code, error: 'Stopped: too many consecutive errors (possible rate limit)' });
-          break;
-        }
-        
-        try {
-          // Strip "M-" or "M" prefix from code
-          let marathonCode = product.code;
-          if (marathonCode.startsWith('M-')) {
-            marathonCode = marathonCode.substring(2);
-          } else if (marathonCode.startsWith('M')) {
-            marathonCode = marathonCode.substring(1);
-          }
-          
-          // Fetch the Marathon product page
-          const searchUrl = `https://marathonhardware.com/search?q=${encodeURIComponent(marathonCode)}`;
-          console.log(`[Marathon Images] Fetching: ${searchUrl}`);
-          
-          const response = await fetch(searchUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-          });
-          
-          if (!response.ok) {
-            consecutiveErrors++;
-            errors.push({ code: product.code, error: `HTTP ${response.status}` });
-            // Longer delay on errors
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            continue;
-          }
-          
-          const html = await response.text();
-          
-          // Verify this is a product page by checking for the part number
-          const partNumberMatch = html.match(/PART\s*#:\s*([A-Za-z0-9\-]+)/i);
-          if (partNumberMatch) {
-            const pagePartNumber = partNumberMatch[1].toLowerCase().replace(/\s/g, '');
-            const expectedCode = marathonCode.toLowerCase().replace(/\s/g, '');
-            
-            // Verify the page is for the correct product
-            if (!pagePartNumber.includes(expectedCode) && !expectedCode.includes(pagePartNumber)) {
-              errors.push({ code: product.code, error: `Page part# ${partNumberMatch[1]} doesn't match ${marathonCode}` });
-              consecutiveErrors = 0; // This is a valid response, just wrong product
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue;
-            }
-          }
-          
-          // Look for product image URL pattern in the HTML
-          const imageMatch = html.match(/https:\/\/marathonhardware[^"']+image-thumb__\d+__productPageSlider[^"'\s]+\.webp/);
-          
-          if (!imageMatch) {
-            // Try alternative pattern for grid images
-            const altMatch = html.match(/https:\/\/marathonhardware[^"']+image-thumb__\d+__itemsGrid[^"'\s]+\.webp/);
-            if (!altMatch) {
-              errors.push({ code: product.code, error: 'No image found on page' });
-              consecutiveErrors = 0;
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue;
-            }
-            const imageUrl = altMatch[0];
-            await storage.updateProduct(product.id, { imagePath: imageUrl });
-            updated.push(product.code);
-            console.log(`[Marathon Images] Updated ${product.code} with image (grid)`);
-          } else {
-            const imageUrl = imageMatch[0];
-            await storage.updateProduct(product.id, { imagePath: imageUrl });
-            updated.push(product.code);
-            console.log(`[Marathon Images] Updated ${product.code} with image`);
-          }
-          
-          consecutiveErrors = 0;
-          // Delay between successful requests (1 second)
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-        } catch (e: any) {
-          consecutiveErrors++;
-          errors.push({ code: product.code, error: e.message });
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-      
-      const remaining = totalRemaining - updated.length;
-      console.log(`[Marathon Images] Completed: ${updated.length} updated, ${errors.length} errors, ${remaining} remaining`);
-      res.json({ 
-        message: `Updated ${updated.length} products with images`,
-        updated: updated.length,
-        updatedCodes: updated,
-        errors,
-        remaining
-      });
-    } catch (e: any) {
-      console.error('[Marathon Images] Error:', e);
-      res.status(500).json({ message: 'Failed to fetch Marathon images', error: e.message });
-    }
-  });
-
-  // Fetch Hafele product images from their website
-  app.post('/api/products/fetch-hafele-images', isAuthenticated, async (req, res) => {
-    try {
-      const { limit = 20 } = req.body;
-      
-      const allProducts = await storage.getProducts();
-      const hafeleProducts = allProducts
-        .filter(p => p.supplier?.toLowerCase() === 'hafele' && !p.imagePath)
-        .slice(0, limit);
-      
-      if (hafeleProducts.length === 0) {
-        return res.json({ message: 'No Hafele products without images found', updated: 0, errors: [], remaining: 0 });
-      }
-      
-      const totalRemaining = allProducts.filter(p => 
-        p.supplier?.toLowerCase() === 'hafele' && !p.imagePath
-      ).length;
-      
-      console.log(`[Hafele Images] Processing ${hafeleProducts.length} of ${totalRemaining} products...`);
-      
-      const updated: string[] = [];
-      const errors: Array<{ code: string; error: string }> = [];
-      let consecutiveErrors = 0;
-      
-      for (const product of hafeleProducts) {
-        if (consecutiveErrors >= 3) {
-          errors.push({ code: product.code, error: 'Stopped: too many consecutive errors (possible rate limit)' });
-          break;
-        }
-        
-        try {
-          // Strip "H." or "H-" prefix from code (Hafele codes are like H.833.89.128)
-          let hafeleCode = product.code;
-          if (hafeleCode.startsWith('H.')) {
-            hafeleCode = hafeleCode.substring(2);
-          } else if (hafeleCode.startsWith('H-')) {
-            hafeleCode = hafeleCode.substring(2);
-          } else if (hafeleCode.startsWith('H')) {
-            hafeleCode = hafeleCode.substring(1);
-          }
-          
-          // Remove dots to create the URL article number (801.13.201 -> 80113201)
-          const articleNumber = hafeleCode.replace(/\./g, '');
-          
-          // Fetch the Hafele product page directly
-          const productUrl = `https://www.hafele.ca/en/product/-/${articleNumber}/`;
-          console.log(`[Hafele Images] Fetching: ${productUrl}`);
-          
-          const response = await fetch(productUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5'
-            }
-          });
-          
-          if (!response.ok) {
-            consecutiveErrors++;
-            errors.push({ code: product.code, error: `HTTP ${response.status}` });
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            continue;
-          }
-          
-          const html = await response.text();
-          
-          // Look for product image URL pattern - Hafele uses INTERSHOP/static path
-          // Pattern: /INTERSHOP/static/WFS/Haefele-HCN-Site/-/Haefele/en_CA/pim/images/default/ppic-XXXXXXXX.jpg
-          const imageMatch = html.match(/https:\/\/www\.hafele\.ca\/INTERSHOP\/static\/[^"'\s]+\/pim\/images\/[^"'\s]+\.(jpg|jpeg|png|webp)/i) ||
-                            html.match(/src="(\/INTERSHOP\/static\/[^"]+\/pim\/images\/[^"]+\.(jpg|jpeg|png|webp))"/i);
-          
-          if (!imageMatch) {
-            // Try alternate pattern - look for any hafele.ca image URL
-            const altMatch = html.match(/"(https:\/\/www\.hafele\.ca\/INTERSHOP\/[^"]+\.(jpg|jpeg|png|webp))"/i);
-            if (!altMatch) {
-              errors.push({ code: product.code, error: 'No image found on page' });
-              consecutiveErrors = 0;
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue;
-            }
-            const imageUrl = altMatch[1];
-            await storage.updateProduct(product.id, { imagePath: imageUrl });
-            updated.push(product.code);
-            console.log(`[Hafele Images] Updated ${product.code} with image (alt)`);
-          } else {
-            let imageUrl = imageMatch[1] || imageMatch[0];
-            if (imageUrl.startsWith('/')) {
-              imageUrl = `https://www.hafele.ca${imageUrl}`;
-            }
-            await storage.updateProduct(product.id, { imagePath: imageUrl });
-            updated.push(product.code);
-            console.log(`[Hafele Images] Updated ${product.code} with image`);
-          }
-          
-          consecutiveErrors = 0;
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-        } catch (e: any) {
-          consecutiveErrors++;
-          errors.push({ code: product.code, error: e.message });
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-      
-      const remaining = totalRemaining - updated.length;
-      console.log(`[Hafele Images] Completed: ${updated.length} updated, ${errors.length} errors, ${remaining} remaining`);
-      res.json({ 
-        message: `Updated ${updated.length} products with images`,
-        updated: updated.length,
-        updatedCodes: updated,
-        errors,
-        remaining
-      });
-    } catch (e: any) {
-      console.error('[Hafele Images] Error:', e);
-      res.status(500).json({ message: 'Failed to fetch Hafele images', error: e.message });
-    }
-  });
-
-  // Fetch Richelieu product images from their website
-  app.post('/api/products/fetch-richelieu-images', isAuthenticated, async (req, res) => {
-    try {
-      const { limit = 20 } = req.body;
-      
-      const allProducts = await storage.getProducts();
-      const richelieuProducts = allProducts
-        .filter(p => p.supplier?.toLowerCase() === 'richelieu' && !p.imagePath)
-        .slice(0, limit);
-      
-      if (richelieuProducts.length === 0) {
-        return res.json({ message: 'No Richelieu products without images found', updated: 0, errors: [], remaining: 0 });
-      }
-      
-      const totalRemaining = allProducts.filter(p => 
-        p.supplier?.toLowerCase() === 'richelieu' && !p.imagePath
-      ).length;
-      
-      console.log(`[Richelieu Images] Processing ${richelieuProducts.length} of ${totalRemaining} products...`);
-      
-      const updated: string[] = [];
-      const errors: Array<{ code: string; error: string }> = [];
-      let consecutiveErrors = 0;
-      
-      for (const product of richelieuProducts) {
-        if (consecutiveErrors >= 3) {
-          errors.push({ code: product.code, error: 'Stopped: too many consecutive errors (possible rate limit)' });
-          break;
-        }
-        
-        try {
-          // Strip "R-" prefix from code
-          let richelieuCode = product.code;
-          if (richelieuCode.startsWith('R-')) {
-            richelieuCode = richelieuCode.substring(2);
-          } else if (richelieuCode.startsWith('R')) {
-            richelieuCode = richelieuCode.substring(1);
-          }
-          
-          // Fetch the Richelieu search page
-          const searchUrl = `https://www.richelieu.com/ca/en/search?q=${encodeURIComponent(richelieuCode)}`;
-          console.log(`[Richelieu Images] Fetching: ${searchUrl}`);
-          
-          const response = await fetch(searchUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.5'
-            }
-          });
-          
-          if (!response.ok) {
-            consecutiveErrors++;
-            errors.push({ code: product.code, error: `HTTP ${response.status}` });
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            continue;
-          }
-          
-          const html = await response.text();
-          
-          // Look for product image URL pattern - Richelieu uses /images/ paths
-          const imageMatch = html.match(/https:\/\/[^"'\s]*richelieu[^"'\s]*\/images\/[^"'\s]+\.(jpg|jpeg|png|webp)/i) ||
-                            html.match(/src="(\/images\/[^"]+\.(jpg|jpeg|png|webp))"/i);
-          
-          if (!imageMatch) {
-            // Try alternate pattern for product images
-            const altMatch = html.match(/"(https:\/\/[^"]+\.(jpg|jpeg|png|webp))"/i);
-            if (!altMatch) {
-              errors.push({ code: product.code, error: 'No image found on page' });
-              consecutiveErrors = 0;
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue;
-            }
-            const imageUrl = altMatch[1];
-            await storage.updateProduct(product.id, { imagePath: imageUrl });
-            updated.push(product.code);
-            console.log(`[Richelieu Images] Updated ${product.code} with image (alt)`);
-          } else {
-            let imageUrl = imageMatch[1] || imageMatch[0];
-            if (imageUrl.startsWith('/')) {
-              imageUrl = `https://www.richelieu.com${imageUrl}`;
-            }
-            await storage.updateProduct(product.id, { imagePath: imageUrl });
-            updated.push(product.code);
-            console.log(`[Richelieu Images] Updated ${product.code} with image`);
-          }
-          
-          consecutiveErrors = 0;
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-        } catch (e: any) {
-          consecutiveErrors++;
-          errors.push({ code: product.code, error: e.message });
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      }
-      
-      const remaining = totalRemaining - updated.length;
-      console.log(`[Richelieu Images] Completed: ${updated.length} updated, ${errors.length} errors, ${remaining} remaining`);
-      res.json({ 
-        message: `Updated ${updated.length} products with images`,
-        updated: updated.length,
-        updatedCodes: updated,
-        errors,
-        remaining
-      });
-    } catch (e: any) {
-      console.error('[Richelieu Images] Error:', e);
-      res.status(500).json({ message: 'Failed to fetch Richelieu images', error: e.message });
-    }
-  });
-
   // Bulk lookup products by codes (for packaging checklist)
   app.post('/api/products/bulk-lookup', isAuthenticated, async (req, res) => {
     try {
@@ -6959,6 +6604,268 @@ Comment=Half - {{item.description}}`,
       res.json({ formulasAssigned, bindingsCreated, skipped, errors });
     } catch (e: any) {
       console.error('[AutoAssign] Error:', e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
+  const imageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { files: 200, fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      cb(null, allowedImageMimes.includes(file.mimetype));
+    }
+  });
+
+  app.post('/api/admin/products/bulk-upload-images', isAuthenticated, imageUpload.array('images', 200), async (req, res) => {
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: 'No files uploaded' });
+      }
+
+      const targetFilter = (req.body.targetTable as string) || (req.body.target as string) || 'both';
+
+      const allHardwareProducts = targetFilter !== 'allmoxy' ? await storage.getProducts() : [];
+      const allAllmoxyProducts = targetFilter !== 'hardware' ? await storage.getAllmoxyProducts() : [];
+
+      const results: Array<{
+        filename: string;
+        storagePath: string;
+        matchedProduct: string | null;
+        targetTable: 'allmoxy' | 'hardware' | null;
+        productId: number | null;
+        confidence: 'exact' | 'prefix' | 'partial' | 'none';
+      }> = [];
+
+      for (const file of files) {
+        const ext = path.extname(file.originalname).toLowerCase();
+        const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+        if (!allowedExts.includes(ext)) continue;
+
+        const baseName = path.basename(file.originalname, ext);
+        const storagePath = `product-images/${file.originalname}`;
+
+        const contentTypeMap: Record<string, string> = {
+          '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+          '.png': 'image/png', '.webp': 'image/webp'
+        };
+        await objectStorageService.uploadBuffer(file.buffer, storagePath, contentTypeMap[ext] || 'application/octet-stream');
+
+        const searchVariants = new Set<string>([baseName]);
+        const dottedPrefixes = ['H.', 'M.', 'S.', 'R.'];
+        const dashedPrefixes = ['M-', 'R-', 'S-'];
+        const allPrefixes = [...dottedPrefixes, ...dashedPrefixes];
+        for (const pfx of allPrefixes) {
+          searchVariants.add(`${pfx}${baseName}`);
+        }
+        for (const pfx of allPrefixes) {
+          if (baseName.startsWith(pfx)) {
+            searchVariants.add(baseName.substring(pfx.length));
+          }
+        }
+        const variantArray = Array.from(searchVariants);
+
+        type MatchResult = { productId: number; displayName: string; table: 'allmoxy' | 'hardware'; confidence: 'exact' | 'prefix' | 'partial' };
+        let match: MatchResult | null = null;
+
+        // Stage 1: Allmoxy exact (name or skuPrefix) across ALL variants
+        if (!match && targetFilter !== 'hardware') {
+          for (const variant of variantArray) {
+            const lv = variant.toLowerCase();
+            const found = allAllmoxyProducts.find(p =>
+              p.name.toLowerCase() === lv ||
+              (p.skuPrefix && p.skuPrefix.toLowerCase() === lv)
+            );
+            if (found) { match = { productId: found.id, displayName: found.name, table: 'allmoxy', confidence: 'exact' }; break; }
+          }
+        }
+
+        // Stage 2: Hardware exact (code) across ALL variants
+        if (!match && targetFilter !== 'allmoxy') {
+          for (const variant of variantArray) {
+            const lv = variant.toLowerCase();
+            const found = allHardwareProducts.find(p => p.code.toLowerCase() === lv);
+            if (found) { match = { productId: found.id, displayName: `${found.code} - ${found.name || ''}`, table: 'hardware', confidence: 'exact' }; break; }
+          }
+        }
+
+        // Stage 3: Allmoxy prefix (variant starts with product name/sku)
+        if (!match && targetFilter !== 'hardware') {
+          for (const variant of variantArray) {
+            const lv = variant.toLowerCase();
+            const found = allAllmoxyProducts.find(p => {
+              const pName = p.name.toLowerCase();
+              const pSku = p.skuPrefix?.toLowerCase();
+              return (pName.length >= 3 && lv.startsWith(pName)) ||
+                     (pSku && pSku.length >= 3 && lv.startsWith(pSku));
+            });
+            if (found) { match = { productId: found.id, displayName: found.name, table: 'allmoxy', confidence: 'prefix' }; break; }
+          }
+        }
+
+        // Stage 4: Hardware prefix (variant starts with product code)
+        if (!match && targetFilter !== 'allmoxy') {
+          for (const variant of variantArray) {
+            const lv = variant.toLowerCase();
+            const found = allHardwareProducts.find(p => {
+              const pCode = p.code.toLowerCase();
+              return pCode.length >= 3 && lv.startsWith(pCode);
+            });
+            if (found) { match = { productId: found.id, displayName: `${found.code} - ${found.name || ''}`, table: 'hardware', confidence: 'prefix' }; break; }
+          }
+        }
+
+        // Stage 5: Allmoxy partial (substring containment, min 4 chars)
+        if (!match && targetFilter !== 'hardware') {
+          for (const variant of variantArray) {
+            const lv = variant.toLowerCase();
+            if (lv.length < 4) continue;
+            const found = allAllmoxyProducts.find(p => {
+              const pName = p.name.toLowerCase();
+              const pSku = p.skuPrefix?.toLowerCase();
+              return (pName.length >= 4 && (pName.includes(lv) || lv.includes(pName))) ||
+                     (pSku && pSku.length >= 4 && (pSku.includes(lv) || lv.includes(pSku)));
+            });
+            if (found) { match = { productId: found.id, displayName: found.name, table: 'allmoxy', confidence: 'partial' }; break; }
+          }
+        }
+
+        // Stage 6: Hardware partial (substring containment, min 4 chars)
+        if (!match && targetFilter !== 'allmoxy') {
+          for (const variant of variantArray) {
+            const lv = variant.toLowerCase();
+            if (lv.length < 4) continue;
+            const found = allHardwareProducts.find(p => {
+              const pCode = p.code.toLowerCase();
+              return pCode.length >= 4 && (pCode.includes(lv) || lv.includes(pCode));
+            });
+            if (found) { match = { productId: found.id, displayName: `${found.code} - ${found.name || ''}`, table: 'hardware', confidence: 'partial' }; break; }
+          }
+        }
+
+        if (match) {
+          results.push({ filename: file.originalname, storagePath, matchedProduct: match.displayName, targetTable: match.table, productId: match.productId, confidence: match.confidence });
+        } else {
+          results.push({ filename: file.originalname, storagePath, matchedProduct: null, targetTable: null, productId: null, confidence: 'none' });
+        }
+      }
+
+      const summary = {
+        total: results.length,
+        exact: results.filter(r => r.confidence === 'exact').length,
+        prefix: results.filter(r => r.confidence === 'prefix').length,
+        partial: results.filter(r => r.confidence === 'partial').length,
+        unmatched: results.filter(r => r.confidence === 'none').length,
+      };
+
+      res.json({ results, summary });
+    } catch (e: any) {
+      console.error('[BulkImageUpload] Error:', e);
+      res.status(500).json({ message: 'Failed to process bulk image upload', error: e.message });
+    }
+  });
+
+  app.post('/api/admin/products/confirm-image-assignments', isAuthenticated, async (req, res) => {
+    try {
+      const { assignments } = req.body;
+      if (!Array.isArray(assignments)) {
+        return res.status(400).json({ message: 'assignments must be an array' });
+      }
+
+      let updated = 0;
+      const errors: Array<{ storagePath: string; error: string }> = [];
+
+      for (const assignment of assignments) {
+        const { storagePath, targetTable, productId } = assignment;
+        if (!storagePath || !targetTable || !productId) {
+          errors.push({ storagePath: storagePath || 'unknown', error: 'Missing required fields' });
+          continue;
+        }
+
+        try {
+          if (targetTable === 'allmoxy') {
+            await db.update(allmoxyProducts)
+              .set({ imagePath: storagePath })
+              .where(eq(allmoxyProducts.id, productId));
+            updated++;
+          } else if (targetTable === 'hardware') {
+            await storage.updateProduct(productId, { imagePath: storagePath });
+            updated++;
+          } else {
+            errors.push({ storagePath, error: `Unknown table: ${targetTable}` });
+          }
+        } catch (e: any) {
+          errors.push({ storagePath, error: e.message });
+        }
+      }
+
+      res.json({ updated, errors });
+    } catch (e: any) {
+      console.error('[ConfirmImageAssignments] Error:', e);
+      res.status(500).json({ message: 'Failed to confirm assignments', error: e.message });
+    }
+  });
+
+  app.get('/api/product-images/*', isAuthenticated, async (req, res) => {
+    try {
+      const imagePath = req.params[0];
+      if (!imagePath || imagePath.includes('..') || imagePath.startsWith('/')) {
+        return res.status(400).json({ message: 'Invalid image path' });
+      }
+
+      const storagePath = `product-images/${imagePath}`;
+      const buffer = await objectStorageService.downloadBuffer(storagePath);
+
+      if (!buffer) {
+        return res.status(404).json({ message: 'Image not found' });
+      }
+
+      const ext = path.extname(imagePath).toLowerCase();
+      const contentTypeMap: Record<string, string> = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png', '.webp': 'image/webp',
+        '.gif': 'image/gif', '.svg': 'image/svg+xml'
+      };
+
+      res.set({
+        'Content-Type': contentTypeMap[ext] || 'application/octet-stream',
+        'Cache-Control': 'public, max-age=86400',
+        'Content-Length': String(buffer.length),
+      });
+
+      res.send(buffer);
+    } catch (e: any) {
+      console.error('[ProductImages] Error serving image:', e);
+      res.status(500).json({ message: 'Failed to serve image' });
+    }
+  });
+
+  app.get('/api/admin/products/search-all', isAuthenticated, async (req, res) => {
+    try {
+      const q = (req.query.q as string || '').toLowerCase().trim();
+      if (!q) return res.json([]);
+
+      const hwProducts = await storage.getProducts(q);
+      const allHw = await storage.getProducts();
+      const hwByName = allHw.filter(p =>
+        p.name && p.name.toLowerCase().includes(q) &&
+        !hwProducts.some(hp => hp.id === p.id)
+      );
+      const combinedHw = [...hwProducts, ...hwByName];
+      const amProducts = await storage.getAllmoxyProducts();
+      const filteredAm = amProducts.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.skuPrefix && p.skuPrefix.toLowerCase().includes(q))
+      );
+
+      const results = [
+        ...combinedHw.slice(0, 20).map(p => ({ id: p.id, name: `${p.code} - ${p.name || ''}`, table: 'hardware' as const })),
+        ...filteredAm.slice(0, 20).map(p => ({ id: p.id, name: p.name, table: 'allmoxy' as const })),
+      ];
+
+      res.json(results.slice(0, 30));
+    } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
   });

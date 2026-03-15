@@ -1,0 +1,1 @@
+ALTER TABLE "allmoxy_products" ADD COLUMN "image_path" text;

@@ -44,7 +44,8 @@ Preferred communication style: Simple, everyday language.
 - **Color Breakdown**: Analyzes and displays part counts by material color, cross-referencing a stored color grid.
 - **Admin Roles**: Role-based access control for sensitive operations like order deletion.
 - **Order Status Tracking**: Displays production and shipping statuses derived from Asana.
-- **Product Management**: Comprehensive system for managing hardware and component products, including bulk import and image linking.
+- **Product Management**: Comprehensive system for managing hardware and component products, including bulk import and image linking. Includes a bulk image uploader (`/admin/product-images`) that matches images to products by filename across both Allmoxy and Hardware tables.
+- **Product Image Serving**: Images uploaded via the bulk uploader are stored in object storage under `product-images/` and served via `/api/product-images/:path` with proper content-type and cache headers.
 - **Hardware Packing Checklist**: Generates and manages packing checklists based on uploaded hardware CSVs, cross-referencing a product database.
 - **Component Import**: Dedicated system for importing component products with specific CSV formats and validation.
 - **Supplier-Based Counting**: Accurately counts doors from specific suppliers (M&J Woodcraft, Richelieu) by cross-referencing the products database.

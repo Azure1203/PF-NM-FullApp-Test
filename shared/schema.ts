@@ -445,6 +445,7 @@ export const allmoxyProducts = pgTable("allmoxy_products", {
   description: text("description"),
   notes: text("notes"),
   exportType: varchar("export_type", { length: 20 }).default('ORD'),
+  imagePath: text("image_path"),
 });
 
 export const insertAllmoxyProductSchema = createInsertSchema(allmoxyProducts);

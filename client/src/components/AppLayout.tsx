@@ -11,6 +11,7 @@ import {
   Users,
   Settings,
   Rocket,
+  ImagePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ const navItems = [
     section: "SYSTEM ADMINISTRATION",
     items: [
       { name: "Products", href: "/admin/allmoxy-products", icon: Package },
+      { name: "Product Images", href: "/admin/product-images", icon: ImagePlus },
       { name: "Attribute Grids", href: "/admin/attribute-grids", icon: Grid3X3 },
       { name: "Proxy Variables", href: "/admin/proxy-variables", icon: Code },
       { name: "Formula Tester", href: "/admin/formula-tester", icon: FlaskConical },

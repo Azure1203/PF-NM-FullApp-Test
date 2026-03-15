@@ -463,6 +463,16 @@ export default function AllmoxyProductManager() {
                         className="h-4 w-4 rounded border-gray-300 accent-primary shrink-0"
                       />
                     )}
+                    {p.imagePath ? (
+                      <img
+                        src={p.imagePath.startsWith('product-images/') ? `/api/product-images/${encodeURIComponent(p.imagePath.replace('product-images/', ''))}` : p.imagePath}
+                        alt={p.name}
+                        className="w-8 h-8 object-cover rounded border shrink-0"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <Package className="w-8 h-8 text-muted-foreground/30 shrink-0" />
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium truncate">{p.name}</span>
@@ -520,6 +530,31 @@ export default function AllmoxyProductManager() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="h-full flex flex-col">
                 <ScrollArea className="flex-1">
                   <div className="p-6 space-y-8">
+                    {editingId && (() => {
+                      const currentProduct = products?.find(p => p.id === editingId);
+                      if (!currentProduct) return null;
+                      if (!currentProduct.imagePath) {
+                        return (
+                          <div className="flex justify-center">
+                            <Package className="w-16 h-16 text-muted-foreground/20" />
+                          </div>
+                        );
+                      }
+                      const imgSrc = currentProduct.imagePath.startsWith('product-images/')
+                        ? `/api/product-images/${encodeURIComponent(currentProduct.imagePath.replace('product-images/', ''))}`
+                        : currentProduct.imagePath;
+                      return (
+                        <div className="flex justify-center">
+                          <img
+                            src={imgSrc}
+                            alt={currentProduct.name}
+                            className="w-16 h-16 object-cover rounded-lg border shadow-sm"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            data-testid="img-product-edit-thumbnail"
+                          />
+                        </div>
+                      );
+                    })()}
                     {/* Basic Information */}
                     <div className="space-y-4">
                       <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-2">Basic Information</h3>
