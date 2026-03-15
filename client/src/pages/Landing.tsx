@@ -1,82 +1,134 @@
 export default function Landing() {
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-6"
-      style={{ backgroundColor: "#2E2E2E" }}
+      className="min-h-screen flex flex-col items-center justify-center p-6 relative"
+      style={{
+        background: "radial-gradient(ellipse at center, #4a4540 0%, #2E2E2E 55%, #1a1a1a 100%)",
+      }}
     >
-      {/* Login card */}
-      <div
-        className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden"
-        style={{ backgroundColor: "#F7F4F2" }}
-      >
-        {/* Gold header bar */}
-        <div
-          className="h-2 w-full"
-          style={{ backgroundColor: "#CDAB4A" }}
-        />
+      <div className="w-full max-w-[340px] flex flex-col items-center gap-5">
 
-        <div className="px-10 py-10 flex flex-col items-center gap-7">
-          {/* Monogram */}
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center shadow-md flex-shrink-0"
-            style={{ backgroundColor: "#CDAB4A" }}
-          >
+        {/* Netley Millwork Logo Box */}
+        <div
+          className="rounded-xl shadow-xl px-5 py-4 flex items-center gap-3 bg-white"
+          style={{ minWidth: 220 }}
+        >
+          {/* Stylized N */}
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="52" height="52" rx="4" fill="white"/>
+            {/* Bold geometric N */}
+            <path
+              d="M8 42V10h7.5L33 31.5V10h7.5v32H33L15.5 20.5V42H8z"
+              fill="#1a1a1a"
+            />
+          </svg>
+
+          {/* Wordmark */}
+          <div className="flex flex-col leading-none">
             <span
-              className="text-2xl font-bold tracking-tight select-none"
-              style={{ color: "#2E2E2E", fontFamily: "var(--font-display)" }}
+              className="font-black tracking-widest text-base"
+              style={{ color: "#1a1a1a", letterSpacing: "0.18em", fontFamily: "var(--font-display)" }}
             >
-              NM
+              NETLEY
+            </span>
+            {/* Gold divider */}
+            <div className="my-1" style={{ height: 2, backgroundColor: "#CDAB4A", width: "100%" }} />
+            <span
+              className="font-semibold tracking-widest text-xs"
+              style={{ color: "#1a1a1a", letterSpacing: "0.22em", fontFamily: "var(--font-display)" }}
+            >
+              MILLWORK
             </span>
           </div>
+        </div>
 
-          {/* Title block */}
-          <div className="text-center space-y-1.5">
-            <p
-              className="text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "#807161" }}
+        {/* Title & subtitle */}
+        <div className="text-center space-y-1.5">
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: "#F7F4F2", fontFamily: "var(--font-display)" }}
+          >
+            Closet Order Processing
+          </h1>
+          <p className="text-sm" style={{ color: "#9e978f" }}>
+            Sign in to your account
+          </p>
+        </div>
+
+        {/* Login card */}
+        <div
+          className="w-full rounded-2xl p-6 shadow-2xl space-y-4"
+          style={{ backgroundColor: "#F7F4F2" }}
+        >
+          {/* Username */}
+          <div className="space-y-1.5">
+            <label
+              className="text-sm font-medium block"
+              style={{ color: "#2E2E2E" }}
             >
-              Netley Millwork
-            </p>
-            <h1
-              className="text-xl font-bold leading-snug"
-              style={{ color: "#2E2E2E", fontFamily: "var(--font-display)" }}
-            >
-              Closet Order Processing
-            </h1>
-          </div>
-
-          {/* Divider */}
-          <div className="w-full h-px" style={{ backgroundColor: "#807161", opacity: 0.2 }} />
-
-          {/* Sign-in button */}
-          <a href="/api/login" className="w-full">
-            <button
-              data-testid="button-login"
-              className="w-full py-3 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 hover:opacity-90 active:scale-95 shadow-md"
+              Username
+            </label>
+            <input
+              type="text"
+              placeholder="Enter username"
+              readOnly
+              className="w-full rounded-lg px-4 py-2.5 text-sm outline-none border"
               style={{
-                backgroundColor: "#CDAB4A",
+                backgroundColor: "#ede9e4",
+                borderColor: "#d8d0c8",
                 color: "#2E2E2E",
               }}
+              onFocus={(e) => e.target.blur()}
+            />
+          </div>
+
+          {/* Password */}
+          <div className="space-y-1.5">
+            <label
+              className="text-sm font-medium block"
+              style={{ color: "#2E2E2E" }}
             >
+              Password
+            </label>
+            <input
+              type="password"
+              placeholder="Enter password"
+              readOnly
+              className="w-full rounded-lg px-4 py-2.5 text-sm outline-none border"
+              style={{
+                backgroundColor: "#ede9e4",
+                borderColor: "#d8d0c8",
+                color: "#2E2E2E",
+              }}
+              onFocus={(e) => e.target.blur()}
+            />
+          </div>
+
+          {/* Sign In button */}
+          <a href="/api/login" className="block w-full">
+            <button
+              data-testid="button-login"
+              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-lg font-semibold text-sm tracking-wide transition-all duration-150 hover:opacity-90 active:scale-[.98] shadow-md"
+              style={{ backgroundColor: "#CDAB4A", color: "#2E2E2E" }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                <polyline points="10 17 15 12 10 7"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
               Sign In
             </button>
           </a>
-
-          <p
-            className="text-xs text-center"
-            style={{ color: "#807161" }}
-          >
-            Authorized personnel only
-          </p>
         </div>
+
       </div>
 
       {/* Footer */}
       <p
-        className="mt-8 text-xs text-center"
-        style={{ color: "#807161", opacity: 0.7 }}
+        className="absolute bottom-6 text-xs text-center"
+        style={{ color: "#807161" }}
       >
-        &copy; {new Date().getFullYear()} Netley Millwork
+        Netley Millwork &copy; {new Date().getFullYear()}
       </p>
     </div>
   );
