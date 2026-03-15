@@ -42,7 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2, Wand2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2 } from "lucide-react";
 import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding } from "@shared/schema";
 import { EXPORT_TYPE_OPTIONS, SUPPLY_TYPE_OPTIONS, type ExportType } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -382,28 +382,6 @@ export default function AllmoxyProductManager() {
                     </AlertDialog>
                   )}
 
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    title="Auto-Classify Export Types"
-                    data-testid="button-auto-classify"
-                    onClick={async () => {
-                      try {
-                        const res = await apiRequest("POST", "/api/admin/products/auto-classify-export-types");
-                        const data = await res.json();
-                        const counts = Object.entries(data.classified as Record<string, number>)
-                          .filter(([, v]) => v > 0)
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(', ');
-                        toast({ title: "Classification complete", description: `${data.total} products classified — ${counts}` });
-                        queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
-                      } catch (e: any) {
-                        toast({ title: "Error", description: e.message, variant: "destructive" });
-                      }
-                    }}
-                  >
-                    <Wand2 className="h-4 w-4" />
-                  </Button>
                   <Button
                     size="icon"
                     variant="ghost"

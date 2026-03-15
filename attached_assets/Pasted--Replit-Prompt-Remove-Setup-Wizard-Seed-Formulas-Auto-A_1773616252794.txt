@@ -1,0 +1,71 @@
+# Replit Prompt: Remove Setup Wizard (Seed Formulas, Auto-Assign Formulas & Grid Bindings)
+
+## Context
+
+The Setup Wizard features (Seed Formulas, Auto-Assign Formulas, Auto-Assign Grid Bindings) are bootstrap shortcuts that bulk-create proxy variables and auto-wire them to products. Since all proxy variables, attribute grids, products, and their formula/grid-binding assignments are managed manually through the existing UI, these features are redundant and potentially dangerous (they could overwrite manually configured formulas). Remove them entirely.
+
+## What to Remove
+
+### 1. Backend — `server/routes.ts`
+
+Remove the following blocks in order. Each is clearly marked with comments in the source:
+
+**a) The entire `SEED_FORMULAS` array**
+- Find the comment `// Setup Wizard Routes` 
+- Delete the entire `const SEED_FORMULAS: Array<{ name: string; type: 'pricing' | 'export'; formula: string }> = [...]` array (this is a very large array containing all the hardcoded pricing and export formulas like `pricing.shelves`, `export.shelves`, `pricing.drawer_boxes`, etc.)
+
+**b) The `POST /api/admin/seed-formulas` route**
+- Delete the entire `app.post('/api/admin/seed-formulas', ...)` handler that loops through `SEED_FORMULAS` and upserts them into proxy variables
+
+**c) The entire `SKU_FORMULA_MAP` array**
+- Find the `const SKU_FORMULA_MAP` array that maps SKU patterns to formula names and grid bindings (contains entries for shelves, corner shelves, drawer boxes, doors, panels, fillers, closet rods, handles, hardware, etc.)
+- Delete the entire array
+
+**d) The `POST /api/admin/products/auto-assign-formulas` route**
+- Delete the entire `app.post('/api/admin/products/auto-assign-formulas', ...)` handler that loops through active products, matches SKU prefixes against `SKU_FORMULA_MAP`, and auto-assigns `pricingProxyId`, `exportProxyId`, and grid bindings
+
+**e) The `POST /api/admin/products/auto-classify-export-types` route**  
+- Delete the entire `app.post('/api/admin/products/auto-classify-export-types', ...)` handler that auto-classifies products into export types (CTS, ELIAS, MJ, GLASS, HARDWARE, ORD) based on SKU prefix pattern matching
+
+### 2. Frontend — `client/src/pages/admin/AllmoxyProductManager.tsx`
+
+**a) Remove the Auto-Classify toolbar button**
+- Find the `<Button>` with `title="Auto-Classify Export Types"` and `data-testid="button-auto-classify"` (it has the `<Wand2>` icon)
+- Delete the entire button element including its `onClick` handler that calls `/api/admin/products/auto-classify-export-types`
+
+**b) Remove the `Wand2` icon import** (if it's no longer used anywhere else in the file after removing the button)
+- Check the lucide-react import line and remove `Wand2` if it has no other references
+
+### 3. Frontend — Check for any Setup Wizard page/component
+
+- Search the `client/src/pages/admin/` directory for any file named `SetupWizard.tsx` or similar
+- Search the router configuration (likely in `client/src/App.tsx` or `client/src/main.tsx`) for any route like `/admin/setup-wizard` or `/admin/setup`
+- If a dedicated Setup Wizard page exists, delete the page component file and remove its route from the router
+- If there's a sidebar/navigation link to the Setup Wizard page, remove that link as well
+
+### 4. Frontend — Check `HowItWorks.tsx` for Setup Wizard references
+
+- Search `client/src/pages/HowItWorks.tsx` for any mention of "Setup Wizard", "Seed Formulas", or "Auto-Assign"
+- Remove any documentation sections that describe these features
+
+## What to KEEP
+
+- **All proxy variable CRUD routes** (`GET/POST/PUT/DELETE /api/admin/proxy-variables`) — these are the manual management endpoints
+- **All product CRUD routes** (`GET/POST/PUT/DELETE /api/admin/allmoxy-products`) — including the product edit form with formula assignment dropdowns
+- **All grid binding routes** (`GET/POST /api/admin/allmoxy-products/:id/grid-bindings`) — the per-product manual binding management
+- **The formula tester** (`POST /api/admin/formula-test`) — the pricing sandbox
+- **The `matchProductToSku()` helper function** — this is used at runtime during order processing, not part of the setup wizard
+- **The `evaluatePrice()` and `generateOrdItemBlock()` functions** — these are runtime pricing/export engines
+- **The order processing pipeline** that uses products, formulas, and grid bindings at order upload time
+
+## Verification Steps
+
+After making all changes:
+
+1. **Build check**: Run the app and confirm it compiles without errors
+2. **Products page**: Navigate to the Allmoxy Product Manager — confirm the Wand2 (auto-classify) button is gone, but all other toolbar buttons still work (Import CSV, New Product, Select mode, bulk delete)
+3. **Product edit form**: Open any product's edit form — confirm you can still manually assign a Pricing Formula, Export Formula, Export Type, and Grid Bindings
+4. **Proxy Variables page**: Confirm proxy variables are still listed, editable, and creatable manually
+5. **Attribute Grids page**: Confirm grids are still listed, editable, and CSV-importable
+6. **Order upload**: Upload a test CSV and confirm the pricing pipeline still runs (SKU matching → grid lookups → formula evaluation → pricing)
+7. **No dead routes**: Confirm that hitting `/api/admin/seed-formulas`, `/api/admin/products/auto-assign-formulas`, and `/api/admin/products/auto-classify-export-types` returns 404 (route not found)
