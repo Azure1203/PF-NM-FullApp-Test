@@ -1,0 +1,108 @@
+# Prompt I — Elias Dovetail Drawer PDF
+
+Paste this entire prompt into Replit.
+
+Generate an Elias Dovetail Drawer PDF matching the reference `Elias_PF_Dovetail_Drawers.pdf`. This document is **only generated when the order contains dovetail drawer boxes** (exportType = ELIAS). It is sent to Elias Woodworking as a purchase order reference.
+
+---
+
+## Part 1 — Python PDF script
+
+Create `server/scripts/generate_elias_pdf.py`.
+
+Input JSON:
+
+```json
+{
+  "orderId": 1970,
+  "orderName": "Powell Builders Primary Closet (2026012625)",
+  "projectLabel": "",
+  "sections": [
+    {
+      "sku": "DBX36_18_167",
+      "color": "TFL1W",
+      "supplierCheckmarks": 1,
+      "items": [
+        { "id": "1 01", "qty": 3, "height": 167, "width": 901.1875, "length": 440, "type": "Dovetail Drawer Box" }
+      ],
+      "totalItems": 3
+    },
+    {
+      "sku": "DBX30_22_167",
+      "color": "TFL1W",
+      "supplierCheckmarks": 2,
+      "items": [
+        { "id": "2 01", "qty": 4, "height": 167, "width": 679, "length": 540, "type": "Dovetail Drawer Box" },
+        { "id": "2 02", "qty": 4, "height": 167, "width": 628.1875, "length": 540, "type": "Dovetail Drawer Box" }
+      ],
+      "totalItems": 8
+    }
+  ],
+  "outputPath": "/tmp/elias_1970.pdf"
+}
+```
+
+**Page layout**: Letter size, 0.5" margins.
+
+**Header**:
+- Title: "Elias PF Dovetail Drawers" (bold)
+- "Job #{orderId}"
+- "Order Info" section: Order Name, "PROJECT & CV LABEL #:" (blank)
+- "Notes" (blank section)
+
+**Body**: One section per unique drawer box SKU + color. Each section:
+
+- "Supplier" label with "Elias" text
+- Row of "X" checkmarks — the count matches `supplierCheckmarks` (represents the number of distinct line items in the group, used as a visual indicator on the reference form)
+- Table columns: ID, Qty, Height, Width, Length, product type ("Drawer Boxes" header, "Dovetail Drawer Box" per row)
+- Section footer: "{totalItems} Total Items"
+- SKU code: e.g. "DBX36_18_167"
+- "Color: {color}"
+
+**No pricing shown.**
+
+**Page footer**: "Order #{orderId} Page {n} of {total}"
+
+---
+
+## Part 2 — Backend route
+
+Add to `server/routes.ts`:
+
+```
+GET /api/orders/:id/pdf/elias
+```
+
+1. Load order_items where `exportType = 'ELIAS'` for this project
+2. If none exist, return 404: `{ message: 'No Elias dovetail items in this order' }`
+3. Group items by SKU + color (from rawRowData.Color or similar)
+4. For each group, count the number of distinct line items for supplierCheckmarks
+5. Build sections JSON, pass to Python script, return PDF
+
+Require `isAuthenticated`.
+
+---
+
+## Part 3 — Frontend: Conditional button
+
+```tsx
+{hasElias && (
+  <Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/pdf/elias`, '_blank')}>
+    <FileText className="w-4 h-4 mr-1.5" />
+    Elias PDF ({exportTypeCounts['ELIAS']})
+  </Button>
+)}
+```
+
+---
+
+## After completing, confirm:
+
+1. Upload a test order containing DBX* items
+2. "Elias PDF" button appears on Order Details
+3. PDF shows "Elias PF Dovetail Drawers" header
+4. Each drawer box SKU group shows "Supplier: Elias" with X checkmarks
+5. Table shows ID, Qty, Height, Width, Length, product type
+6. SKU and Color shown below each section
+7. No pricing anywhere
+8. Orders without dovetail drawers do not show the button

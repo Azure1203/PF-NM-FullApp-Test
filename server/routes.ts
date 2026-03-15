@@ -8,7 +8,7 @@ import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
 import { evaluatePrice } from "./services/pricingEngine";
 import { generateOrdItemBlock, generateOrdHeader } from "./services/ordExporter";
-import { generateInvoicePdf, generateCustomerPackingSlipPdf } from "./services/pdfGenerator";
+import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf } from "./services/pdfGenerator";
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import path from 'path';
@@ -1126,6 +1126,83 @@ export async function registerRoutes(
       res.send(pdfBuf);
     } catch (e: any) {
       console.error('[Customer Packing Slip PDF]', e.message);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET Elias Dovetail Drawer PDF
+  app.get('/api/orders/:id/pdf/elias', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      const allItems = await storage.getOrderItemsByProject(projectId);
+      const eliasItems = allItems.filter(i => i.exportType === 'ELIAS');
+
+      if (eliasItems.length === 0) {
+        return res.status(404).json({ message: 'No Elias dovetail items in this order' });
+      }
+
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+
+      const groupedMap = new Map<string, typeof eliasItems>();
+      const groupOrder: string[] = [];
+      for (const item of eliasItems) {
+        const raw = (item.rawRowData ?? {}) as Record<string, any>;
+        const colorVal = raw['Material'] ?? raw['Color'] ?? raw['Colour'] ?? raw['color'] ?? '';
+        const key = `${item.sku ?? item.productId ?? 'unknown'}::${colorVal}`;
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, []);
+          groupOrder.push(key);
+        }
+        groupedMap.get(key)!.push(item);
+      }
+
+      let sectionIdx = 0;
+      const sections = groupOrder.map(key => {
+        const groupItems = groupedMap.get(key)!;
+        const firstItem = groupItems[0];
+        const product = firstItem.productId != null ? productMap.get(firstItem.productId) : null;
+        const raw0 = (firstItem.rawRowData ?? {}) as Record<string, any>;
+        const color: string | null = raw0['Material'] ?? raw0['Color'] ?? raw0['Colour'] ?? raw0['color'] ?? null;
+
+        const items = groupItems.map((item, idx) => ({
+          id: `${sectionIdx + 1} ${String(idx + 1).padStart(2, '0')}`,
+          qty: item.quantity ?? 1,
+          height: item.height ?? null,
+          width: item.width ?? null,
+          length: item.depth ?? null,
+          type: product?.name ?? item.description ?? 'Dovetail Drawer Box',
+        }));
+
+        const totalItems = groupItems.reduce((s, i) => s + (i.quantity ?? 1), 0);
+        sectionIdx++;
+
+        return {
+          sku: firstItem.sku ?? product?.skuPrefix ?? `Item ${sectionIdx}`,
+          color,
+          supplierCheckmarks: groupItems.length,
+          items,
+          totalItems,
+        };
+      });
+
+      const eliasData = {
+        orderId: projectId,
+        orderName: project.name ?? `Order ${projectId}`,
+        projectLabel: '',
+        sections,
+        outputPath: `/tmp/elias_${projectId}_${Date.now()}.pdf`,
+      };
+
+      const pdfBuf = await generateEliasPdf(eliasData);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="Elias_DrawerBoxes_${projectId}.pdf"`);
+      res.send(pdfBuf);
+    } catch (e: any) {
+      console.error('[Elias PDF]', e.message);
       res.status(500).json({ message: e.message });
     }
   });

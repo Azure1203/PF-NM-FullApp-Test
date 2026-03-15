@@ -1,0 +1,122 @@
+# Prompt H — Cut-to-Size PDF
+
+Paste this entire prompt into Replit.
+
+Generate a Cut-to-Size Part List PDF matching the reference `Cut_To_Size.pdf`. This document is **only generated when the order contains custom-cut items** (SKUs ending in `.CTS`). It is an internal production document — not sent with the job.
+
+---
+
+## Part 1 — Python PDF script
+
+Create `server/scripts/generate_cut_to_size.py`.
+
+The script receives JSON on stdin:
+
+```json
+{
+  "orderId": 1970,
+  "orderName": "Powell Builders Primary Closet (2026012625)",
+  "projectLabel": "",
+  "lengthSummary": [
+    { "totalLength": 3416.5, "cutLength": 854.125 },
+    { "totalLength": 2114.625, "cutLength": 1057.3125 },
+    { "totalLength": 3378, "cutLength": 844.5 },
+    { "totalLength": 936.625, "cutLength": 936.625 }
+  ],
+  "items": [
+    { "id": "15 01", "qty": 4, "length": 854.125, "supplyType": "Stock", "rackLocation": "Rack B Slot 13 / 14" },
+    { "id": "15 02", "qty": 2, "length": 1057.3125, "supplyType": "Stock", "rackLocation": "Rack B Slot 13 / 14" },
+    { "id": "15 03", "qty": 4, "length": 844.5, "supplyType": "Stock", "rackLocation": "Rack B Slot 13 / 14" },
+    { "id": "15 04", "qty": 1, "length": 936.625, "supplyType": "Stock", "rackLocation": "Rack B Slot 13 / 14" }
+  ],
+  "totalItems": 11,
+  "skuCode": "H.801.13.201.CTS",
+  "totals": {
+    "totalMm": 8883924.8984,
+    "totalInches": 349760.8228,
+    "totalRodsNeeded": 4.0187
+  },
+  "outputPath": "/tmp/cts_1970.pdf"
+}
+```
+
+**Page layout**: Letter size, 0.5" margins.
+
+**Header**:
+- Title: "CUT TO SIZE PART LIST (DO NOT SEND WITH JOB)" (bold, centered)
+- "Job #: {orderId}"
+- "Order Name: {orderName}"
+- "Order Info" sub-section repeating Order Name
+- "PROJECT & CNC LABEL #:" (blank field)
+- "Notes" (blank section for manual notes)
+
+**Length Summary Table**:
+- Header: "Cut To Size"
+- Two columns: "Length" (total = cutLength × qty) and "Length_Summation" (individual cut length)
+- One row per unique cut length
+
+**Item Detail Table**:
+- Columns: ID, Qty, Length, Buyout Or Stock?, Rack Location
+- One row per CTS line item
+- Footer: "{totalItems} Total Items"
+
+**Item Totals Section**:
+- "Cut To Size Totals (mm) - Total: {totalMm}"
+- "Cut To Size Total (inches) - Total: {totalInches}"
+- "Total Rods Needed - Total: {totalRodsNeeded}"
+
+The "Total Rods Needed" is calculated as: total length in mm ÷ 2438.4 (8ft stock rod length in mm).
+
+**SKU code** shown at bottom: e.g. "H.801.13.201.CTS"
+
+**Page footer**: "Order #{orderId} Page {n} of {total}"
+
+---
+
+## Part 2 — Backend route
+
+Add to `server/routes.ts`:
+
+```
+GET /api/orders/:id/pdf/cut-to-size
+```
+
+1. Load order_items where `exportType = 'CTS'` for this project
+2. If none exist, return 404: `{ message: 'No cut-to-size items in this order' }`
+3. Group CTS items by SKU (there may be multiple CTS SKUs — e.g. rods and hanging rails)
+4. For each item, resolve rackLocation from the product's grid data (same as Internal Packing Slip)
+5. Build the length summary: for each unique cut length, calculate totalLength = cutLength × qty
+6. Calculate totals: sum of all (length × qty), convert to inches (÷ 25.4), calculate rods needed (÷ 2438.4)
+7. Pass to Python script, return PDF
+
+Require `isAuthenticated`.
+
+---
+
+## Part 3 — Frontend: Conditional button
+
+In `client/src/pages/OrderDetails.tsx`, the CTS button should already exist from Prompt D as a data download. Update or add a PDF version:
+
+```tsx
+{hasCTS && (
+  <Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/pdf/cut-to-size`, '_blank')}>
+    <FileText className="w-4 h-4 mr-1.5" />
+    Cut-to-Size PDF ({exportTypeCounts['CTS']})
+  </Button>
+)}
+```
+
+This button only appears when the order contains CTS items.
+
+---
+
+## After completing, confirm:
+
+1. Upload a test order with `.CTS` items (e.g. H.801.13.201.CTS)
+2. "Cut-to-Size PDF" button appears on Order Details
+3. PDF opens with correct header and "DO NOT SEND WITH JOB" warning
+4. Length summary table shows correct calculations
+5. Item table shows ID, Qty, Length, Buyout Or Stock?, Rack Location
+6. Item Totals show total mm, total inches, total rods needed
+7. SKU code shown at bottom
+8. Orders WITHOUT CTS items do not show the button

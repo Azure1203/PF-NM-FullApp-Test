@@ -1,0 +1,145 @@
+# Prompt J — M&J 5-Piece Shaker Door PDF
+
+Paste this entire prompt into Replit.
+
+Generate the M&J (Premoule) 5-Piece Shaker Door PDF matching the reference `Netley_5_Piece_Shaker_Door.pdf`. This document is **only generated when the order contains 5-piece shaker doors, shaker drawer fronts, or glass items associated with shaker doors** (exportType = MJ or GLASS). It is sent to M&J Woodcraft (Premoule) as a purchase order reference.
+
+---
+
+## Part 1 — Python PDF script
+
+Create `server/scripts/generate_mj_pdf.py`.
+
+Input JSON:
+
+```json
+{
+  "orderId": 1945,
+  "orderName": "Shoutwest design studio (Showroom V7)",
+  "projectLabel": "",
+  "sections": [
+    {
+      "type": "drawer_front",
+      "sku": "DRWTFL90SHA",
+      "color": "TFL2F",
+      "supplierCheckmarks": 6,
+      "items": [
+        { "id": "10 01", "qty": 2, "height": 285, "width": 778, "thickness": 19, "type": "TFL 5-Piece Shaker" },
+        { "id": "10 02", "qty": 2, "height": 221, "width": 778, "thickness": 19, "type": "TFL 5-Piece Shaker" }
+      ],
+      "totalItems": 20
+    },
+    {
+      "type": "door",
+      "sku": "LDRTFL90SHAGD",
+      "color": "TFL2F",
+      "supplierCheckmarks": 3,
+      "items": [
+        { "id": "41 01", "qty": 2, "height": 2333, "width": 309, "thickness": 19, "type": "TFL 5-Piece Shaker GD" }
+      ],
+      "totalItems": 6
+    },
+    {
+      "type": "glass",
+      "sku": "CLEARSAFETY",
+      "color": "TFL1W",
+      "supplierCheckmarks": 5,
+      "items": [
+        { "id": "46 01", "qty": 4, "height": 2238, "width": 214, "thickness": 6.3, "type": "Glass Safety Clear", "supplyType": "Buyout" }
+      ],
+      "totalItems": 16
+    }
+  ],
+  "outputPath": "/tmp/mj_1945.pdf"
+}
+```
+
+**Page layout**: Letter size, 0.5" margins.
+
+**Header**:
+- Title: "NETLEY 5 PIECE SHAKER JOB LIST" (bold, centered)
+- "Perfect Fit Job #: {orderId}"
+- "Order Info" section: Order Name, "PROJECT & CNC LABEL #:" (blank)
+
+**Body**: One section per unique SKU + color. Three types of sections:
+
+**1. Shaker drawer fronts** (type: "drawer_front"):
+- "Supplier" label with "Premoule" text
+- Row of "X" checkmarks (count = supplierCheckmarks)
+- Table columns: ID, Qty, Height, Width, Thickness, product type ("Drawer Fronts" header)
+- Product type per row: "TFL 5-Piece Shaker"
+- Section footer: "{totalItems} Total Items" (or "1 Total Item")
+- SKU code and "Color: {color}"
+
+**2. Shaker doors** (type: "door"):
+- Same layout as drawer fronts
+- Table columns: ID, Qty, Height, Width, Thickness, product type ("Doors" header)
+- Product type per row: "TFL 5-Piece Shaker GD"
+- SKU code and "Color: {color}"
+
+**3. Glass items** (type: "glass"):
+- "Notes" section at top (blank for manual notes) — this appears on the glass page
+- "Supplier" label with "Premoule" text
+- Row of "X" checkmarks
+- Table columns: ID, Qty, Height, Width, Thickness, product type ("Glass" header), **Buyout Or Stock?**
+- Product type per row: e.g. "Glass Safety Clear"
+- Buyout Or Stock column shows "Buyout" for all glass items
+- SKU code and "Color: {color}"
+
+**No pricing shown on any section.**
+
+**Page footer**: "Order #{orderId} Page {n} of {total}"
+
+---
+
+## Part 2 — Backend route
+
+Add to `server/routes.ts`:
+
+```
+GET /api/orders/:id/pdf/mj
+```
+
+1. Load order_items where `exportType IN ('MJ', 'GLASS')` for this project
+2. If none exist, return 404: `{ message: 'No M&J/shaker items in this order' }`
+3. Classify each item:
+   - SKUs containing `DRWTFL90SHA` or `IDRWTFL90SHA` or `BDRWTFL90SHA` or `JDRWTFL90SHA` → type "drawer_front"
+   - SKUs containing `LDRTFL90SHAGD` or `RDRTFL90SHAGD` or `HDRTFL90SHA` → type "door"
+   - exportType = GLASS → type "glass"
+4. Group by SKU + color within each type
+5. Order sections: drawer fronts first, then doors, then glass (matching reference PDF order)
+6. Build sections JSON, pass to Python script, return PDF
+
+Require `isAuthenticated`.
+
+---
+
+## Part 3 — Frontend: Conditional button
+
+```tsx
+{(hasMJ || hasGlass) && (
+  <Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/pdf/mj`, '_blank')}>
+    <FileText className="w-4 h-4 mr-1.5" />
+    M&J Shaker PDF ({(exportTypeCounts['MJ'] || 0) + (exportTypeCounts['GLASS'] || 0)})
+  </Button>
+)}
+```
+
+Add `hasGlass` to the computed flags:
+```tsx
+const hasGlass = (exportTypeCounts['GLASS'] || 0) > 0;
+```
+
+---
+
+## After completing, confirm:
+
+1. Upload a test order containing shaker doors/fronts (DRWTFL90SHA, LDRTFL90SHAGD etc.) and/or glass items (CLEARSAFETY)
+2. "M&J Shaker PDF" button appears on Order Details
+3. PDF shows "NETLEY 5 PIECE SHAKER JOB LIST" header
+4. Drawer front sections show correct columns with "Supplier: Premoule" and X checkmarks
+5. Door sections show correct columns
+6. Glass section (if present) shows "Buyout Or Stock?" column with "Buyout" for all items
+7. Glass section has "Notes" area at top
+8. No pricing anywhere
+9. Orders without MJ or GLASS items do not show the button

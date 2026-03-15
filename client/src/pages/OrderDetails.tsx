@@ -1313,6 +1313,17 @@ export default function OrderDetails() {
                       Elias CSV ({exportTypeCounts['ELIAS']})
                     </Button>
                   )}
+                  {hasElias && (
+                    <Button
+                      data-testid="button-elias-pdf"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/orders/${id}/pdf/elias`, '_blank')}
+                    >
+                      <FileText className="w-4 h-4 mr-1.5" />
+                      Elias PDF ({exportTypeCounts['ELIAS']})
+                    </Button>
+                  )}
                   {hasMJ && (
                     <Button
                       data-testid="button-download-mj"
