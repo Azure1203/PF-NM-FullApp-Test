@@ -1373,6 +1373,15 @@ export default function OrderDetails() {
                     <FileText className="w-4 h-4 mr-1.5" />
                     Customer Packing Slip
                   </Button>
+                  <Button
+                    data-testid="button-internal-packing-slip"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/api/orders/${id}/pdf/internal-packing-slip`, '_blank')}
+                  >
+                    <FileText className="w-4 h-4 mr-1.5" />
+                    Internal Packing Slip
+                  </Button>
                 </div>
 
                 {/* Loading skeleton */}

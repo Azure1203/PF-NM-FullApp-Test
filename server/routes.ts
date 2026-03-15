@@ -8,7 +8,7 @@ import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
 import { evaluatePrice } from "./services/pricingEngine";
 import { generateOrdItemBlock, generateOrdHeader } from "./services/ordExporter";
-import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf } from "./services/pdfGenerator";
+import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf, generateInternalPackingSlipPdf } from "./services/pdfGenerator";
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import path from 'path';
@@ -1203,6 +1203,148 @@ export async function registerRoutes(
       res.send(pdfBuf);
     } catch (e: any) {
       console.error('[Elias PDF]', e.message);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+
+  // GET Internal Packing Slip PDF
+  app.get('/api/orders/:id/pdf/internal-packing-slip', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      const items = await storage.getOrderItemsByProject(projectId);
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+
+      const allCtsConfigs = await storage.getAllCtsPartConfigs();
+      const ctsConfigMap = new Map(allCtsConfigs.map(c => [c.partNumber, c]));
+
+      const DRAWER_BOX_SKU_PREFIXES = ['34MDRWB', '34IMDRWB', 'BDRW', 'DRW', 'DBX', 'SDBX'];
+      const DRAWER_FRONT_SKU_PREFIXES = ['34DRF', '34MDRF', '34IMDRWF', 'DRWF'];
+
+      const isDrawerBox = (sku: string, productName: string): boolean => {
+        const upper = sku.toUpperCase();
+        if (DRAWER_BOX_SKU_PREFIXES.some(p => upper.startsWith(p))) return true;
+        const nameLower = productName.toLowerCase();
+        return nameLower.includes('drawer box') || nameLower.includes('drawer boxes');
+      };
+
+      const isDrawerFront = (sku: string, productName: string): boolean => {
+        const upper = sku.toUpperCase();
+        if (DRAWER_FRONT_SKU_PREFIXES.some(p => upper.startsWith(p))) return true;
+        const nameLower = productName.toLowerCase();
+        return nameLower.includes('drawer front');
+      };
+
+      const internalColumnsForType = (exportType: string | null, sku: string, productName: string): string[] => {
+        switch (exportType) {
+          case 'CTS':      return ['ID', 'Qty', 'Height', 'Width', 'Length', 'Buyout Or Stock?', 'Rack Location'];
+          case 'HARDWARE': return ['ID', 'Qty', 'Buyout Or Stock?', 'Rack Location'];
+          case 'ELIAS':
+            if (isDrawerBox(sku, productName)) return ['ID', 'Qty', 'Height', 'Width', 'Length', 'Thickness', 'type'];
+            if (isDrawerFront(sku, productName)) return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'type'];
+            return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'Edge Left', 'Edge Right', 'Edge Top', 'Edge Bottom', 'type'];
+          case 'MJ':
+            if (isDrawerFront(sku, productName)) return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'type'];
+            return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'type'];
+          case 'GLASS':    return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'type'];
+          case 'ORD':
+            if (isDrawerBox(sku, productName)) return ['ID', 'Qty', 'Height', 'Width', 'Length', 'Thickness', 'type'];
+            if (isDrawerFront(sku, productName)) return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'type'];
+            return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'Edge Left', 'Edge Right', 'Edge Top', 'Edge Bottom', 'type'];
+          default:
+            return ['ID', 'Qty', 'Height', 'Width', '0', 'Thickness', 'type'];
+        }
+      };
+
+      const groupedMap = new Map<string, typeof items>();
+      const groupOrder: string[] = [];
+      for (const item of items) {
+        const key = item.productId != null ? `p:${item.productId}` : `s:${item.sku ?? item.description ?? 'unknown'}`;
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, []);
+          groupOrder.push(key);
+        }
+        groupedMap.get(key)!.push(item);
+      }
+
+      let sectionIndex = 0;
+      const sections = groupOrder.map(key => {
+        const groupItems = groupedMap.get(key)!;
+        const firstItem = groupItems[0];
+        const product = firstItem.productId != null ? productMap.get(firstItem.productId) : null;
+        const exportType = firstItem.exportType ?? null;
+        const productName = product?.name ?? firstItem.description ?? '';
+        const itemSku = firstItem.sku ?? product?.skuPrefix ?? '';
+        const columns = internalColumnsForType(exportType, itemSku, productName);
+
+        const raw0 = (firstItem.rawRowData ?? {}) as Record<string, any>;
+        const color: string | null = raw0['Material'] ?? raw0['Color'] ?? raw0['Colour'] ?? raw0['color'] ?? null;
+
+        const sectionItems = groupItems.map((item, idx) => {
+          const raw = (item.rawRowData ?? {}) as Record<string, any>;
+          const edgeLeft   = (raw['Left']   === '1' || raw['Left']   === 1) ? 'E' : 'N';
+          const edgeRight  = (raw['Right']  === '1' || raw['Right']  === 1) ? 'E' : 'N';
+          const edgeTop    = (raw['Top']    === '1' || raw['Top']    === 1) ? 'E' : 'N';
+          const edgeBottom = (raw['Bottom'] === '1' || raw['Bottom'] === 1) ? 'E' : 'N';
+
+          let rackLocation: string | null = null;
+          if (exportType === 'CTS' || exportType === 'HARDWARE') {
+            const partSku = item.sku ?? '';
+            const ctsConfig = ctsConfigMap.get(partSku);
+            if (ctsConfig?.rackLocation) {
+              rackLocation = ctsConfig.rackLocation;
+            }
+            if (!rackLocation) {
+              const rawData = (item.rawRowData ?? {}) as Record<string, any>;
+              rackLocation = rawData['rack_location'] ?? rawData['RACK_LOCATION'] ?? rawData['Rack Location'] ?? rawData['rackLocation'] ?? null;
+            }
+          }
+
+          return {
+            id: `${sectionIndex + 1} ${String(idx + 1).padStart(2, '0')}`,
+            qty: item.quantity ?? 1,
+            height: item.height ?? null,
+            width: item.width ?? null,
+            length: item.depth ?? null,
+            thickness: item.depth ?? null,
+            edgeLeft, edgeRight, edgeTop, edgeBottom,
+            type: productName,
+            supplyType: item.supplyType ?? 'STOCK',
+            rackLocation,
+          };
+        });
+
+        const totalItems = groupItems.reduce((s, i) => s + (i.quantity ?? 1), 0);
+
+        sectionIndex++;
+        return {
+          sku: firstItem.sku ?? product?.skuPrefix ?? `Item ${sectionIndex}`,
+          color,
+          categoryLabel: product?.description ?? exportType ?? '',
+          productDescription: productName,
+          columns,
+          items: sectionItems,
+          totalItems,
+        };
+      });
+
+      const packingData = {
+        orderId: projectId,
+        orderName: project.name ?? `Order ${projectId}`,
+        sections,
+        outputPath: `/tmp/internal_packing_slip_${projectId}_${Date.now()}.pdf`,
+      };
+
+      const pdfBuf = await generateInternalPackingSlipPdf(packingData);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="InternalPackingSlip_${projectId}.pdf"`);
+      res.send(pdfBuf);
+    } catch (e: any) {
+      console.error('[Internal Packing Slip PDF]', e.message);
       res.status(500).json({ message: e.message });
     }
   });
