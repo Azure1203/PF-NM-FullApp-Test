@@ -801,33 +801,31 @@ export default function Dashboard() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      {isAdmin && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive/60 gap-1.5" data-testid={`button-delete-project-${project.id}`}>
-                              <Trash2 className="w-3.5 h-3.5" />
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive/60 gap-1.5" data-testid={`button-delete-project-${project.id}`}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Order?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove the order "{project.name}" and all its files. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => deleteProject(project.id)}
+                              className="bg-destructive text-destructive-foreground"
+                            >
                               Delete
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Order?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently remove the order "{project.name}" and all its files. This cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => deleteProject(project.id)}
-                                className="bg-destructive text-destructive-foreground"
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
 
                       <Link href={`/orders/${project.id}`}>
                         <div className="w-8 h-8 rounded-full bg-muted/40 flex items-center justify-center text-muted-foreground/70 group-hover:translate-x-1 group-hover:text-primary transition-all">

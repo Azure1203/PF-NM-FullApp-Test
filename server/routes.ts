@@ -207,18 +207,7 @@ export async function registerRoutes(
     res.json({ ...project, files });
   });
 
-  // Delete a project (admin only)
   app.delete(api.orders.delete.path, isAuthenticated, async (req, res) => {
-    const replitUser = (req as any).user;
-    const username = replitUser?.claims?.username || replitUser?.name;
-    const email = replitUser?.claims?.email;
-    if (!username && !email) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
-    const isAdmin = await storage.isUserAdmin(username, email);
-    if (!isAdmin) {
-      return res.status(403).json({ message: 'Only admins can delete orders' });
-    }
     const success = await storage.deleteProject(Number(req.params.id));
     if (!success) {
       return res.status(404).json({ message: 'Project not found' });
@@ -6123,9 +6112,12 @@ export async function registerRoutes(
   app.get('/api/admin/is-admin', isAuthenticated, async (req, res) => {
     try {
       const replitUser = (req as any).user;
-      const username = replitUser?.claims?.username || replitUser?.name;
-      const email = replitUser?.claims?.email;
+      const claims = replitUser?.claims ?? {};
+      const username = claims?.username || claims?.name || replitUser?.name;
+      const email = claims?.email;
+      console.log('[Admin] is-admin check — claims keys:', Object.keys(claims), '| username:', username, '| email:', email);
       const isAdmin = await storage.isUserAdmin(username, email);
+      console.log('[Admin] isAdmin result:', isAdmin);
       res.json({ isAdmin });
     } catch (e: any) {
       console.error('[Admin] Error checking admin status:', e);
