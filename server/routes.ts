@@ -8,7 +8,7 @@ import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
 import { evaluatePrice } from "./services/pricingEngine";
 import { generateOrdItemBlock, generateOrdHeader } from "./services/ordExporter";
-import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf, generateInternalPackingSlipPdf } from "./services/pdfGenerator";
+import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf, generateInternalPackingSlipPdf, generateMJPdf } from "./services/pdfGenerator";
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import path from 'path';
@@ -1345,6 +1345,112 @@ export async function registerRoutes(
       res.send(pdfBuf);
     } catch (e: any) {
       console.error('[Internal Packing Slip PDF]', e.message);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.get('/api/orders/:id/pdf/mj', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      const allItems = await storage.getOrderItemsByProject(projectId);
+      const mjGlassItems = allItems.filter(i => i.exportType === 'MJ' || i.exportType === 'GLASS');
+
+      if (mjGlassItems.length === 0) {
+        return res.status(404).json({ message: 'No MJ or GLASS items in this order' });
+      }
+
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+
+      const DRAWER_FRONT_SKUS = new Set(['DRWTFL90SHA', 'IDRWTFL90SHA', 'BDRWTFL90SHA', 'JDRWTFL90SHA']);
+      const DOOR_SKUS = new Set(['LDRTFL90SHAGD', 'RDRTFL90SHAGD', 'HDRTFL90SHA']);
+
+      function classifyItem(item: typeof mjGlassItems[0]): 'drawer_front' | 'door' | 'glass' {
+        if (item.exportType === 'GLASS') return 'glass';
+        const sku = item.sku ?? '';
+        if (DRAWER_FRONT_SKUS.has(sku)) return 'drawer_front';
+        if (DOOR_SKUS.has(sku)) return 'door';
+        return 'drawer_front';
+      }
+
+      const drawerFrontItems: typeof mjGlassItems = [];
+      const doorItems: typeof mjGlassItems = [];
+      const glassItems: typeof mjGlassItems = [];
+
+      for (const item of mjGlassItems) {
+        const cls = classifyItem(item);
+        if (cls === 'drawer_front') drawerFrontItems.push(item);
+        else if (cls === 'door') doorItems.push(item);
+        else glassItems.push(item);
+      }
+
+      function buildSections(items: typeof mjGlassItems, sectionType: 'drawer_front' | 'door' | 'glass') {
+        const groupedMap = new Map<string, typeof items>();
+        const groupOrder: string[] = [];
+        for (const item of items) {
+          const raw = (item.rawRowData ?? {}) as Record<string, any>;
+          const colorVal = raw['Material'] ?? raw['Color'] ?? raw['Colour'] ?? raw['color'] ?? '';
+          const key = `${item.sku ?? item.productId ?? 'unknown'}::${colorVal}`;
+          if (!groupedMap.has(key)) {
+            groupedMap.set(key, []);
+            groupOrder.push(key);
+          }
+          groupedMap.get(key)!.push(item);
+        }
+
+        return groupOrder.map(key => {
+          const groupItems = groupedMap.get(key)!;
+          const firstItem = groupItems[0];
+          const product = firstItem.productId != null ? productMap.get(firstItem.productId) : null;
+          const raw0 = (firstItem.rawRowData ?? {}) as Record<string, any>;
+          const color: string | null = raw0['Material'] ?? raw0['Color'] ?? raw0['Colour'] ?? raw0['color'] ?? null;
+
+          const sectionItems = groupItems.map((item, idx) => ({
+            id: `${sectionIdx + 1} ${String(idx + 1).padStart(2, '0')}`,
+            qty: item.quantity ?? 1,
+            height: item.height ?? null,
+            width: item.width ?? null,
+            thickness: item.depth ?? null,
+            type: product?.name ?? item.description ?? '',
+          }));
+
+          const totalItems = groupItems.reduce((s, i) => s + (i.quantity ?? 1), 0);
+          sectionIdx++;
+
+          return {
+            sectionType,
+            sku: firstItem.sku ?? product?.skuPrefix ?? `Item ${sectionIdx}`,
+            color,
+            supplierCheckmarks: groupItems.length,
+            items: sectionItems,
+            totalItems,
+          };
+        });
+      }
+
+      let sectionIdx = 0;
+      const sections = [
+        ...buildSections(drawerFrontItems, 'drawer_front'),
+        ...buildSections(doorItems, 'door'),
+        ...buildSections(glassItems, 'glass'),
+      ];
+
+      const mjData = {
+        orderId: projectId,
+        orderName: project.name ?? `Order ${projectId}`,
+        sections,
+        outputPath: `/tmp/mj_${projectId}_${Date.now()}.pdf`,
+      };
+
+      const pdfBuf = await generateMJPdf(mjData);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="MJ_Shaker_${projectId}.pdf"`);
+      res.send(pdfBuf);
+    } catch (e: any) {
+      console.error('[M&J PDF]', e.message);
       res.status(500).json({ message: e.message });
     }
   });

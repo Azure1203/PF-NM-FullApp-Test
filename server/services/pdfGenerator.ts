@@ -84,6 +84,7 @@ const SCRIPT_PATH                  = path.join(process.cwd(), 'server', 'scripts
 const PACKING_SLIP_SCRIPT          = path.join(process.cwd(), 'server', 'scripts', 'generate_customer_packing_slip.py');
 const ELIAS_SCRIPT                 = path.join(process.cwd(), 'server', 'scripts', 'generate_elias_pdf.py');
 const INTERNAL_PACKING_SLIP_SCRIPT = path.join(process.cwd(), 'server', 'scripts', 'generate_internal_packing_slip.py');
+const MJ_SCRIPT                    = path.join(process.cwd(), 'server', 'scripts', 'generate_mj_pdf.py');
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
   const tmpPath = path.join(os.tmpdir(), `invoice_${data.orderId}_${Date.now()}.pdf`);
@@ -273,6 +274,73 @@ export async function generateInternalPackingSlipPdf(data: InternalPackingSlipDa
 
     py.on('error', (err) => {
       reject(new Error(`Failed to spawn Python for internal packing slip: ${err.message}`));
+    });
+  });
+}
+
+export interface MJSectionItem {
+  id: string;
+  qty: number;
+  height?: number | null;
+  width?: number | null;
+  thickness?: number | null;
+  type?: string;
+}
+
+export interface MJSection {
+  sectionType: 'drawer_front' | 'door' | 'glass';
+  sku: string;
+  color: string | null;
+  supplierCheckmarks: number;
+  items: MJSectionItem[];
+  totalItems: number;
+}
+
+export interface MJData {
+  orderId: number;
+  orderName: string;
+  sections: MJSection[];
+  outputPath: string;
+}
+
+export async function generateMJPdf(data: MJData): Promise<Buffer> {
+  const tmpPath = path.join(os.tmpdir(), `mj_${data.orderId}_${Date.now()}.pdf`);
+  const payload: MJData = { ...data, outputPath: tmpPath };
+
+  return new Promise((resolve, reject) => {
+    const py = spawn('python3', [MJ_SCRIPT], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    py.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    py.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    py.stdin.write(JSON.stringify(payload));
+    py.stdin.end();
+
+    py.on('close', (code) => {
+      if (code !== 0) {
+        return reject(new Error(`M&J PDF generator failed (exit ${code}): ${stderr.slice(0, 500)}`));
+      }
+      const successLine = stdout.trim().split('\n').find(l => l.startsWith('SUCCESS:'));
+      if (!successLine) {
+        return reject(new Error(`M&J PDF generator gave no SUCCESS line. stderr: ${stderr.slice(0, 500)}`));
+      }
+      const pdfPath = successLine.replace('SUCCESS:', '').trim();
+      try {
+        const buf = fs.readFileSync(pdfPath);
+        try { fs.unlinkSync(pdfPath); } catch { }
+        resolve(buf);
+      } catch (e: any) {
+        reject(new Error(`Could not read generated M&J PDF: ${e.message}`));
+      }
+    });
+
+    py.on('error', (err) => {
+      reject(new Error(`Failed to spawn Python for M&J PDF: ${err.message}`));
     });
   });
 }

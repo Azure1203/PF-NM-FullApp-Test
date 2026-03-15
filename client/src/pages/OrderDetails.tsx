@@ -750,6 +750,7 @@ export default function OrderDetails() {
 
   const hasElias = (exportTypeCounts['ELIAS'] || 0) > 0;
   const hasMJ = (exportTypeCounts['MJ'] || 0) > 0;
+  const hasGlass = (exportTypeCounts['GLASS'] || 0) > 0;
   const hasCTS = (exportTypeCounts['CTS'] || 0) > 0;
 
   // Auto-select first file when preview loads
@@ -1333,6 +1334,17 @@ export default function OrderDetails() {
                     >
                       <Download className="w-4 h-4 mr-1.5" />
                       M&amp;J CSV ({exportTypeCounts['MJ']})
+                    </Button>
+                  )}
+                  {(hasMJ || hasGlass) && (
+                    <Button
+                      data-testid="button-mj-shaker-pdf"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/orders/${id}/pdf/mj`, '_blank')}
+                    >
+                      <FileText className="w-4 h-4 mr-1.5" />
+                      M&amp;J Shaker PDF ({(exportTypeCounts['MJ'] || 0) + (exportTypeCounts['GLASS'] || 0)})
                     </Button>
                   )}
                   {hasCTS && (
