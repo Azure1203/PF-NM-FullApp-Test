@@ -1,0 +1,715 @@
+# Prompt 18 — Bulk Formula & Template Import + Product-Grid Binding Setup
+
+Paste this entire prompt into Replit.
+
+This prompt creates a one-time setup system that loads all pricing formulas, all export templates, and all product-grid bindings from reference data — eliminating the need to manually configure each of the ~180 products one by one. It adds one new admin page and several backend routes.
+
+---
+
+## Part 1 — Backend: Seed Proxy Variables from Reference Data
+
+Add a new route to `server/routes.ts`:
+
+```
+POST /api/admin/seed-formulas
+```
+
+This route creates proxy variables from hardcoded formula text. Each entry has a `name`, `type` ("pricing" or "export"), and `formula` (the actual formula string). The route should:
+
+1. For each entry in the list below, check if a proxy variable with that exact name already exists. If it does, **update** its formula. If not, **create** it.
+2. Return `{ created: number, updated: number, total: number }`.
+
+Here is the complete list of formulas to seed. **Copy these formula strings EXACTLY** — they are the actual Allmoxy formulas, including comments and line breaks. The route should store them verbatim.
+
+### Pricing Formulas (type: "pricing")
+
+```
+Name: shelves_pricing
+Formula:
+(shelves.pricing_id == 1 ?
+((shelves.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * shelves.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + shelves.margin))
+:
+((shelves.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 2 ? 2 : ((height * width) / 92900)) * shelves.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + shelves.margin)))
+```
+
+```
+Name: wall_panel_pricing
+Formula:
+(wall_panels.pricing_id == 1 ?
+((wall_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * wall_panels.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + wall_panels.margin))
+:
+((wall_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + wall_panels.margin)))
+```
+
+```
+Name: floor_panel_pricing
+Formula:
+(floor_panels.pricing_id == 1 ?
+((floor_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * floor_panels.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + floor_panels.margin))
+:
+((floor_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + floor_panels.margin)))
+```
+
+```
+Name: island_panel_pricing
+Formula:
+(island_panels.pricing_id == 1 ?
+((island_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * island_panels.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + island_panels.margin))
+:
+((island_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + island_panels.margin)))
+```
+
+```
+Name: divider_panel_pricing
+Formula:
+(divider_panels.pricing_id == 1 ?
+((divider_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * divider_panels.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + divider_panels.margin))
+:
+((divider_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + divider_panels.margin)))
+```
+
+```
+Name: garage_panels_pricing
+Formula:
+(garage_panels.pricing_id == 1 ?
+((garage_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * garage_panels.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + garage_panels.margin))
+:
+((garage_panels.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + garage_panels.margin)))
+```
+
+```
+Name: parts_pricing
+Formula:
+(product_parts.pricing_id == 1 ?
+((product_parts.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * product_parts.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + product_parts.margin))
+:
+((product_parts.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + product_parts.margin)))
+```
+
+```
+Name: corner_shelves_pricing
+Formula:
+(corner_shelves.pricing_id == 1 ?
+((corner_shelves.base_price
++
+/*sq footage cost*/
+((((height * length)/92900) < 1 ? 1 : ((height * length) / 92900)) * corner_shelves.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + corner_shelves.margin))
+:
+((corner_shelves.base_price
++
+/*sq footage cost*/
+((((height * length)/92900) < 1.5 ? 1.5 : ((height * length) / 92900)) * color.sqft_price)) * (1 + corner_shelves.margin)))
+```
+
+```
+Name: outside_corner_shelves_pricing
+Formula:
+(outside_corner_shelves.pricing_id == 1 ?
+((outside_corner_shelves.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * outside_corner_shelves.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + outside_corner_shelves.margin))
+:
+((outside_corner_shelves.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + outside_corner_shelves.margin)))
+```
+
+```
+Name: moldings_pricing
+Formula:
+(moldings.pricing_id == 1 ?
+((moldings.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * moldings.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + moldings.margin))
+:
+((moldings.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1.5 ? 1.5 : ((height * width) / 92900)) * color.sqft_price)) * (1 + moldings.margin)))
+```
+
+```
+Name: doors_pricing
+Formula:
+(doors.pricing_id == 1 ?
+((doors.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * doors.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + doors.margin))
+:
+((doors.base_price
++
+/*sq footage cost*/
+(((((ceil(height/25.4)) * (ceil(width/25.4))) / 144) < 1.1 ? 1.1 : (((ceil(height/25.4)) * (ceil(width/25.4))) / 144))
+*
+(doors.45_and_90_pricing_id == 45 ? color.poly45_door_sqft_cost
+:
+    (doors.45_and_90_pricing_id == 90 ? color.tfl90_door_sqft_cost
+    :
+        color.sqft_price))
+    )) * (1 + doors.margin)))
+```
+
+```
+Name: drawer_fronts_pricing
+Formula:
+((drawer_fronts.pricing_id == 1 ?
+((drawer_fronts.base_price
++
+/*sq footage cost*/
+((((height * width)/92900) < 1 ? 1 : ((height * width) / 92900)) * drawer_fronts.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + drawer_fronts.margin))
+:
+((drawer_fronts.base_price
++
+/*sq footage cost*/
+((((((ceil(height/25.4)) * (ceil(width/25.4))) / 144)) < 1 ? 1 : (((ceil(height/25.4)) * (ceil(width/25.4))) / 144)) *
+(drawer_fronts.45_and_90_pricing_id == 45 ? color.poly45_door_sqft_cost
+:
+    (drawer_fronts.45_and_90_pricing_id == 90 ? color.tfl90_door_sqft_cost
+    :
+        color.sqft_price)))) * (1 + drawer_fronts.margin))))
++
+/*hinge hole cost*/
+(2 * drawer_fronts.hinge_hole_cost)
+```
+
+```
+Name: drawer_boxes_pricing
+Formula:
+(drawer_boxes.pricing_id == 1 ?
+((drawer_boxes.base_price
++
+/*sq footage cost*/
+(((((height * width * 2) + (width * length)) + (length * height * 2)) / 92900) * drawer_boxes.sq_ft_price)) *
+(1 + (drawer_boxes.color_upcharge_id == 1 ? color.level_percent_upcharge : 0))
+* (1 + drawer_boxes.margin))
+:
+((drawer_boxes.base_price
++
+/*sq footage cost*/
+(((((height * width * 2) + (width * length)) + (length * height * 2)) / 92900) * color.sqft_price)) * (1 + drawer_boxes.margin)))
+```
+
+```
+Name: glass_pricing
+Formula:
+(((ceil(height/25.4)) * (ceil(width/25.4))) / 144) > 2 ?
+(glass.pricing_id == 1 ?
+((glass.base_price
++
+/*sq footage cost*/
+((((ceil(height/25.4)) * (ceil(width/25.4))) / 144) * glass.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + glass.margin))
+:
+((glass.base_price
++
+/*sq footage cost*/
+((((ceil(height/25.4)) * (ceil(width/25.4))) / 144) * color.sqft_price)) * (1 + glass.margin)))
+:
+/*MIN 2 SQUARE FOOT COST*/
+(glass.pricing_id == 1 ?
+((glass.base_price
++
+/*sq footage cost*/
+(((185806) / 92900) * glass.sq_ft_price)) * (1 + color.level_percent_upcharge) * (1 + glass.margin))
+:
+((glass.base_price
++
+/*sq footage cost*/
+(((185806) / 92900) * color.sqft_price)) * (1 + glass.margin)))
+```
+
+```
+Name: mj_doors_pricing
+Formula:
+(
+    /*SQFT Calculation with minimum of 1 SQFT*/
+    (
+        (((width * height)/92903.04) < 1 ? 1 : ((width * height)/92903.04))
+    )
+    *
+    /*SWITCH - Multiplier*/
+    (mjdoors.pricing_id == 1 ? mjcolors.mj_slimline_pricing :
+        (mjdoors.pricing_id == 2 ? mjcolors.mj_venice_pricing :
+            (mjdoors.pricing_id == 3 ? mjcolors.mj_sussex_pricing :
+                (mjdoors.pricing_id == 4 ? mjcolors.mj_lancaster_pricing :
+                    (mjdoors.pricing_id == 5 ? mjcolors.mj_lancastervgroove_pricing :
+                        (mjdoors.pricing_id == 6 ? mjcolors.mj_lancasterglassdoor_pricing :
+                            (mjdoors.pricing_id == 12 ? mjcolors.pacificwave_panel_pricing :
+                                (mjdoors.pricing_id == 13 ? mjcolors.morroccan_panel_pricing :
+                                    (mjdoors.pricing_id == 14 ? mjcolors.honeycomb_panel_pricing :
+                                        (mjdoors.pricing_id == 15 ? mjcolors.brickweck_panel_pricing :
+                                            (mjdoors.pricing_id == 16 ? mjcolors.mj_mezza_panel_pricing :
+                                                (mjdoors.pricing_id == 17 ? mjcolors.mj_profonda_panel_pricing :
+                                                    (mjdoors.pricing_id == 18 ? mjcolors.mj_sottile_panel_pricing :
+                                                        (mjdoors.pricing_id == 19 ? mjcolors.mj_duo_panel_pricing :
+                                                            (mjdoors.pricing_id == 20 ? mjcolors.pacificwave_panel_pricing :
+                                                                (mjdoors.pricing_id == 21 ? mjcolors.morroccan_panel_pricing :
+                                                                    (mjdoors.pricing_id == 22 ? mjcolors.honeycomb_panel_pricing :
+                                                                        (mjdoors.pricing_id == 23 ? mjcolors.brickweck_panel_pricing :
+                                                                            (mjdoors.pricing_id == 24 ? mjcolors.mj_mezza_panel_pricing :
+                                                                                (mjdoors.pricing_id == 25 ? mjcolors.mj_profonda_panel_pricing :
+                                                                                    (mjdoors.pricing_id == 26 ? mjcolors.mj_sottile_panel_pricing :
+                                                                                        (mjdoors.pricing_id == 27 ? mjcolors.mj_duo_panel_pricing : 0.00))))))))))))))))))))))
+)
++
+/*Hinge Hole Pricing Calculator*/
+(
+    ((height * 25.4) <= 899.16 ? (2 * mjdoors.hinge_hole_cost)
+    :
+        ((height * 25.4) > 899.17 && (height * 25.4) <= 1008.8 ? (3 * mjdoors.hinge_hole_cost)
+        :
+            ((height * 25.4) > 1000.9 && (height * 25.4) <= 1991.4 ? (4 * mjdoors.hinge_hole_cost)
+            :
+                ((height * 25.4) > 1991.5 && (height * 25.4) <= 2438.4 ? (5 * mjdoors.hinge_hole_cost)
+                :
+                    0))))
+)
+```
+
+```
+Name: handles_pricing
+Formula: handles.price * (1 + handles.margin)
+```
+
+```
+Name: hinges_pricing
+Formula: hinges.price * (1 + hinges.margin)
+```
+
+```
+Name: slides_pricing
+Formula: slides.price * (1 + slides.margin)
+```
+
+```
+Name: closet_accessories_pricing
+Formula: closet_accessories.price * (1 + closet_accessories.margin)
+```
+
+```
+Name: closet_led_lighting_pricing
+Formula: closet_led_lighting.price * (1 + closet_led_lighting.margin)
+```
+
+```
+Name: closet_rods_pricing
+Formula: closet_rod.price * (1 + closet_rod.margin)
+```
+
+```
+Name: closet_rods_custom_cut_pricing
+Formula: (((closet_rod.price * (length/25.4)) * (1 + closet_rod.margin)) + closet_rod.price_per_cut)
+```
+
+```
+Name: floating_shelf_hardware_pricing
+Formula: floating_shelf_hardware.price * (1 + floating_shelf_hardware.margin)
+```
+
+```
+Name: floating_shelf_hardware_custom_cut_pricing
+Formula: (((floating_shelf_hardware.price * (length/25.4)) * (1 + floating_shelf_hardware.margin)) + floating_shelf_hardware.price_per_cut)
+```
+
+```
+Name: hanging_rails_hardware_pricing
+Formula: hanging_rails_hardware.price * (1 + hanging_rails_hardware.margin)
+```
+
+```
+Name: hanging_rails_hardware_custom_cut_pricing
+Formula: (((hanging_rails_hardware.price * (length/25.4)) * hanging_rails_hardware.margin) + (hanging_rails_hardware.price_per_cut))
+```
+
+```
+Name: garage_accessories_pricing
+Formula: garage_accessories.price * (1 + garage_accessories.margin)
+```
+
+```
+Name: garage_accessories_custom_cut_pricing
+Formula: (((garage_accessories.price * (length/25.4)) * (1 + garage_accessories.margin)) + garage_accessories.custom_cut_cost)
+```
+
+```
+Name: door_drawer_locks_pricing
+Formula: door_drawer_locks.price * (1 + door_drawer_locks.margin)
+```
+
+```
+Name: jigs_tools_pricing
+Formula: jigs_tools.price * (1 + jigs_tools.margin)
+```
+
+```
+Name: office_accessories_pricing
+Formula: office_accessories.price * (1 + office_accessories.margin)
+```
+
+```
+Name: touch_up_sticks_pricing
+Formula: touch_up_sticks.price * (1 + touch_up_sticks.margin)
+```
+
+### Export Formulas (type: "export")
+
+```
+Name: shelves_export
+Formula:
+[Catalog]
+Name="Perfect Fit"
+CabinetConstruction="X-Perfect Fit"
+DrawerBoxConstruction="X-Perfect Fit Drawer 19"
+RollOutConstruction="X-Perfect Fit Roll Out 19"
+Materials="{{color.panel_export}}"
+
+[Parameters]
+Attribute="Banding","xPFC_BAND","text","{{edge_left.export}}{{edge_right.export}}{{edge_top.export}}{{edge_bottom.export}}"
+
+[Cabinets]
+1,"{{product_name}}",{{width}},{{height}},{{thickness}},"*","N",{{quantity}}
+;
+```
+
+```
+Name: doors_export
+Formula:
+[Catalog]
+Name="Perfect Fit"
+CabinetConstruction="X-Perfect Fit"
+DrawerBoxConstruction="X-Perfect Fit Drawer 19"
+RollOutConstruction="X-Perfect Fit Roll Out 19"
+Materials="{{color.panel_export}}"
+GuideMaterials="X-Marathon Undermount"
+BaseDoors="5 Piece Mel Shaker Door","{{color.door_export}}","","","","","Door"
+
+[Parameters]
+Attribute="Banding","xPFC_BAND","text","EEEE"
+
+[Cabinets]
+1,"{{product_name}}",{{width}},{{height}},{{length}},"*","N",{{quantity}}
+;
+```
+
+```
+Name: drawer_boxes_export
+Formula:
+[Catalog]
+Name="Perfect Fit"
+CabinetConstruction="X-Perfect Fit"
+DrawerBoxConstruction="X-Perfect Fit Drawer 19"
+RollOutConstruction="X-Perfect Fit Roll Out 19"
+Materials="{{color.drawer_box_export}}"
+DrawerBoxMaterials="{{color.drawer_box_export}}"
+GuideMaterials="X-Marathon Undermount"
+
+[Parameters]
+Attribute="Banding","xPFC_BAND","text","NNNN"
+
+[Cabinets]
+1,"{{product_name}}",{{width}},{{height}},{{length}},"*","N",{{quantity}}
+;
+```
+
+```
+Name: drawer_fronts_export
+Formula:
+[Catalog]
+Name="Perfect Fit"
+CabinetConstruction="X-Perfect Fit"
+DrawerBoxConstruction="X-Perfect Fit Drawer 19"
+RollOutConstruction="X-Perfect Fit Roll Out 19"
+Materials="{{color.panel_export}}"
+BaseDoors="5 Piece Mel Shaker Door","{{color.door_export}}","","","","","Door"
+
+[Parameters]
+Attribute="Banding","xPFC_BAND","text","EEEE"
+
+[Cabinets]
+1,"{{product_name}}",{{width}},{{height}},{{thickness}},"*","N",{{quantity}}
+;
+```
+
+```
+Name: hardware_export
+Formula: {{quantity}},{{product_name}},,,,HARDWARE,,,,,,,,,,,,,,
+```
+
+```
+Name: elias_export
+Formula: {{product_name}},{{quantity}},{{height}},{{width}},{{length}},{{drawer_boxes.elias_style}},{{drawer_boxes.elias_species}},{{drawer_boxes.elias_side}},{{drawer_boxes.elias_bottom_o}},{{drawer_boxes.elias_bottom_r}},{{drawer_boxes.elias_assembly}},{{drawer_boxes.elias_top_edge}},{{drawer_boxes.elias_hand_pull}},{{drawer_boxes.elias_notching}},{{drawer_boxes.elias_coating}},{{drawer_boxes.elias_lacq_type}}
+```
+
+```
+Name: mj_doors_export
+Formula: {{mjdoors.name}},{{mjdoors.manu_code}},{{quantity}},{{width}},{{height}},{{mjcolors.name}},{{mjcolors.mj_color}},{{mjdoors.mj_hinges}},{{mjdoors.mj_tab}},{{mjdoors.mj_screw}},{{mjdoors.mj_grain}},{{this_part.Hinges_To_Drill}}
+```
+
+```
+Name: erp_component_export
+Formula: {{quantity}},{{product_name}},{{width}},{{height}},{{thickness}},COMPONENT,,,,,,,,,,,,,,
+```
+
+```
+Name: erp_drawer_box_export
+Formula: {{quantity}},{{product_name}},{{width}},{{height}},{{length}},COMPONENT,,,,,,,,,,,,,,
+```
+
+```
+Name: cut_to_size_export
+Formula: {{product_name}},{{quantity}},{{length}}
+```
+
+```
+Name: divider_panel_export
+Formula:
+[Catalog]
+Name="Perfect Fit"
+CabinetConstruction="X-Perfect Fit"
+DrawerBoxConstruction="X-Perfect Fit Drawer 19"
+RollOutConstruction="X-Perfect Fit Roll Out 19"
+Materials="{{color.panel_export}}"
+
+[Parameters]
+Attribute="Banding","xPFC_BAND","text","{{edge_left.export}}{{edge_right.export}}{{edge_top.export}}{{edge_bottom.export}}"
+
+[Cabinets]
+1,"{{product_name}}",{{width}},{{height}},{{thickness}},"*","N",{{quantity}}
+;
+```
+
+```
+Name: garage_panels_export
+Formula:
+[Catalog]
+Name="Perfect Fit"
+CabinetConstruction="X-Perfect Fit"
+DrawerBoxConstruction="X-Perfect Fit Drawer 19"
+RollOutConstruction="X-Perfect Fit Roll Out 19"
+Materials="{{color.panel_export}}"
+
+[Parameters]
+Attribute="Banding","xPFC_BAND","text","EEEE"
+
+[Cabinets]
+1,"{{product_name}}",{{width}},{{height}},{{thickness}},"*","N",{{quantity}}
+;
+```
+
+Use the `shelves_export` template for these additional export formulas (they use the same edgebanding-based template): `wall_panel_export`, `floor_panel_export`, `island_panel_export`, `corner_shelves_export`, `outside_corner_shelves_export`, `moldings_export`, `parts_export`.
+
+Use the `hardware_export` template for these additional export formulas (all identical — qty, name, HARDWARE): `handles_export`, `hinges_export`, `slides_export`, `closet_accessories_export`, `closet_led_lighting_export`, `closet_rods_export`, `floating_shelf_hardware_export`, `hanging_rails_hardware_export`, `jigs_tools_export`, `door_drawer_locks_export`, `office_accessories_export`, `garage_accessories_export`, `touch_up_sticks_export`.
+
+Require `isAuthenticated` on this route.
+
+---
+
+## Part 2 — Backend: Auto-Assign Formulas and Grid Bindings to Products
+
+Add a new route:
+
+```
+POST /api/admin/products/auto-assign-formulas
+```
+
+This route does two things for each active product that has a `skuPrefix`:
+
+### A) Assigns the correct pricing and export proxy variable IDs
+
+Use these rules based on product category (match by skuPrefix pattern). For each product, look up the proxy variable by name and set `pricingProxyId` and `exportProxyId`.
+
+| SKU Pattern | Pricing Formula | Export Formula |
+|---|---|---|
+| `34SHFF`, `34SHFA`, `34SHFFC`, `34MTSHFF`, `34MTSHFA`, `34MTSHFFC`, `15HGSHFF`, `15HGSHFA`, `15HGSHFAI` | shelves_pricing | shelves_export |
+| `34WPNL`, `34MTWPNL` | wall_panel_pricing | wall_panel_export |
+| `34FPNL`, `34MTFPNL` | floor_panel_pricing | floor_panel_export |
+| `34IPNL`, `34MTIPNL` | island_panel_pricing | island_panel_export |
+| `34DIVF`, `34MTDIVF` | divider_panel_pricing | divider_panel_export |
+| `34GPNL` | garage_panels_pricing | garage_panels_export |
+| `TK`, `MTTK`, `FILL`, `MTFILL`, `CLEAT`, `MTCLEAT`, `34PNLF`, `34PNLL`, `34PNLR`, `34MTPNLF`, `34MTPNLL`, `34MTPNLR` | parts_pricing | parts_export |
+| `34CRNR`, `34MTCRNR`, `15HGCRNR` | corner_shelves_pricing | corner_shelves_export |
+| `34OCRNR`, `34MTOCRNR`, `15HGOCRNR` | outside_corner_shelves_pricing | outside_corner_shelves_export |
+| `MOL` | moldings_pricing | moldings_export |
+| SKU starts with `DR` and contains `EURO` or `SHA` or `LIFT` (but NOT `DRWF` prefix) | doors_pricing | doors_export |
+| SKU starts with `DRWF` | drawer_fronts_pricing | drawer_fronts_export |
+| `34MDRWB`, `34IMDRWB`, `34INFMDRWB`, `8MDRWB` (melamine drawer boxes) | drawer_boxes_pricing | drawer_boxes_export |
+| `DBX`, `SDBX` (dovetail drawer boxes) | drawer_boxes_pricing | elias_export |
+| `BADR`, `HBADR`, `34HBACK` (MJ doors) | mj_doors_pricing | mj_doors_export |
+| `CLEAR`, `FROSTED`, `BAMBOO`, `CATHEDRAL`, `FLUTEX`, `REEDGLASS` (and SAFETY variants) | glass_pricing | (none) |
+| `H.110`, `H.111` (handles) | handles_pricing | hardware_export |
+| `H.245`, `H.329`, `H.372`, `M-105-89`, `M-105-C80`, `M-105-SQ` (hinges) | hinges_pricing | hardware_export |
+| `M-105-D`, `M-372` (slides) | slides_pricing | hardware_export |
+| `H.547` (closet accessories) | closet_accessories_pricing | hardware_export |
+| `H.801`, `H.803`, `H.830`, `H.833` (closet rods, non-CTS) | closet_rods_pricing | hardware_export |
+| SKU ends `.CTS` and starts `H.801` or `H.830` or `H.833` | closet_rods_custom_cut_pricing | cut_to_size_export |
+| `S.16` (floating shelf HW, non-CTS) | floating_shelf_hardware_pricing | hardware_export |
+| SKU ends `.CTS` and starts `S.` | floating_shelf_hardware_custom_cut_pricing | cut_to_size_export |
+| `H.022`, `H.263`, `H.267`, `M-02`, `M-03`, `M-06`, `M-R20` (hardware) | (none — fixed price from product DB) | hardware_export |
+| `H.001`, `H.006`, `R.AT` (jigs/tools) | jigs_tools_pricing | hardware_export |
+| `CAM-`, `TUS-` (touch-up sticks) | touch_up_sticks_pricing | hardware_export |
+
+For products that don't match any rule, leave their existing assignments unchanged.
+
+### B) Creates grid bindings for each product
+
+For each product, based on which pricing formula it was assigned, create the required grid bindings. Delete existing bindings first, then create the correct ones.
+
+| Pricing Formula | Required Grid Bindings (alias → grid name → lookupColumn) |
+|---|---|---|
+| shelves_pricing | `shelves` → Shelves grid → `MANU_CODE`, `color` → Main Color Attribute grid → `Color` |
+| wall_panel_pricing | `wall_panels` → Wall Panels grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| floor_panel_pricing | `floor_panels` → Floor Panels grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| island_panel_pricing | `island_panels` → Island Panels grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| divider_panel_pricing | `divider_panels` → Divider Panels grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| garage_panels_pricing | `garage_panels` → Garage Panels grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| parts_pricing | `product_parts` → Parts grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| corner_shelves_pricing | `corner_shelves` → Corner Shelves grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| outside_corner_shelves_pricing | `outside_corner_shelves` → Outside Corner Shelves grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| moldings_pricing | `moldings` → Moldings grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| doors_pricing | `doors` → Doors grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| drawer_fronts_pricing | `drawer_fronts` → Drawer Fronts grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| drawer_boxes_pricing | `drawer_boxes` → Drawer Boxes grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| glass_pricing | `glass` → Glass grid → `MANU_CODE`, `color` → Main Color Attribute → `Color` |
+| mj_doors_pricing | `mjdoors` → MJ Doors grid → `MANU_CODE`, `mjcolors` → MJ Colors grid → `Color` |
+| handles_pricing | `handles` → Handles grid → `MANU_CODE` |
+| hinges_pricing | `hinges` → Hinges grid → `MANU_CODE` |
+| slides_pricing | `slides` → Slides grid → `MANU_CODE` |
+| closet_accessories_pricing | `closet_accessories` → Closet Accessories grid → `MANU_CODE` |
+| closet_led_lighting_pricing | `closet_led_lighting` → Closet LED Lighting grid → `MANU_CODE` |
+| closet_rods_pricing | `closet_rod` → Closet Rod grid → `MANU_CODE` |
+| closet_rods_custom_cut_pricing | `closet_rod` → Closet Rod grid → `MANU_CODE` |
+| floating_shelf_hardware_pricing | `floating_shelf_hardware` → Floating Shelf Hardware grid → `MANU_CODE` |
+| floating_shelf_hardware_custom_cut_pricing | `floating_shelf_hardware` → Floating Shelf Hardware grid → `MANU_CODE` |
+| hanging_rails_hardware_pricing | `hanging_rails_hardware` → Hanging Rail Hardware grid → `MANU_CODE` |
+| garage_accessories_pricing | `garage_accessories` → Garage Accessories grid → `MANU_CODE` |
+| door_drawer_locks_pricing | `door_drawer_locks` → Door Drawer Locks grid → `MANU_CODE` |
+| jigs_tools_pricing | `jigs_tools` → Jigs Tools grid → `MANU_CODE` |
+| office_accessories_pricing | `office_accessories` → Office Accessories grid → `MANU_CODE` |
+| touch_up_sticks_pricing | `touch_up_sticks` → Touch Up Sticks grid → `MANU_CODE` |
+
+**IMPORTANT**: The grid name used above must match the actual name in the `attribute_grids` table. The grids were imported from CSVs, so the name stored may include the date suffix (e.g. `Shelves_02202026`) or may have been cleaned up. The route should do a **fuzzy match** — search for grids whose name contains the keyword (e.g. search for a grid name containing "Shelves" for the shelves binding, "Main_Color" or "Main Color" for the color binding, "MJ_Doors" or "MJ Doors" for the MJ doors binding). Use case-insensitive partial matching.
+
+The route should return:
+```json
+{
+  "formulasAssigned": 42,
+  "bindingsCreated": 78,
+  "skipped": 12,
+  "errors": ["product X: no matching grid found for 'shelves'"]
+}
+```
+
+Require `isAuthenticated`.
+
+---
+
+## Part 3 — Frontend: Setup Wizard Page
+
+Create a new admin page at `/admin/setup-wizard` with the file `client/src/pages/admin/SetupWizard.tsx`.
+
+This is a simple page with three action cards arranged vertically:
+
+### Card 1: Seed Formulas
+- Title: "Step 1 — Seed Pricing Formulas & Export Templates"
+- Description: "Loads all 30 pricing formulas and 25+ export templates as proxy variables. Safe to run multiple times — existing formulas are updated, not duplicated."
+- Button: "Seed Formulas" → calls `POST /api/admin/seed-formulas`
+- On success: shows toast with created/updated counts
+
+### Card 2: Auto-Classify Export Types
+- Title: "Step 2 — Classify Product Export Types"
+- Description: "Sets the export type (ORD, HARDWARE, ELIAS, MJ, CTS, GLASS) on each product based on its SKU prefix pattern."
+- Button: "Auto-Classify" → calls `POST /api/admin/products/auto-classify-export-types`
+- On success: shows toast with classification counts
+
+### Card 3: Auto-Assign Formulas & Grid Bindings
+- Title: "Step 3 — Assign Formulas & Grid Bindings"
+- Description: "Assigns the correct pricing formula, export template, and attribute grid bindings to each product. Requires that formulas are seeded (Step 1) and attribute grids are imported first."
+- Button: "Auto-Assign" → calls `POST /api/admin/products/auto-assign-formulas`
+- On success: shows toast with assignment counts
+
+Add a note at the top of the page: "Run these steps in order after importing all attribute grid CSVs and product CSVs. Each step is idempotent — safe to run again if you need to update."
+
+### Sidebar entry
+
+Add to the SYSTEM ADMINISTRATION section in `AppLayout.tsx`:
+
+```ts
+{ name: "Setup Wizard", href: "/admin/setup-wizard", icon: Rocket },
+```
+
+Import `Rocket` from `lucide-react`. Also add `getPageTitle()` handling:
+
+```ts
+if (location === "/admin/setup-wizard") return "Setup Wizard";
+```
+
+Add the route to `App.tsx`:
+
+```tsx
+<Route path="/admin/setup-wizard" component={SetupWizard} />
+```
+
+---
+
+## What NOT to change
+
+- Do not modify the pricing engine
+- Do not modify the formula tester
+- Do not modify the upload pipeline
+- Do not modify any existing proxy variables that were manually created
+- Do not modify any existing grid bindings that were manually created (the auto-assign only touches products that don't already have formula assignments, OR products where you explicitly want to overwrite — use a checkbox "Overwrite existing assignments" on Card 3, defaulting to OFF)
+
+## After completing, confirm:
+
+1. The Setup Wizard page loads at `/admin/setup-wizard`
+2. "Seed Formulas" creates all proxy variables (check the Proxy Variables page — should see ~55 entries)
+3. "Auto-Classify" sets export types on all products (check products page — badges should appear)
+4. "Auto-Assign" sets pricing/export formulas and creates grid bindings on all matched products
+5. Open the Formula Tester, pick a shelf product (e.g. 34SHFF), enter width=355.625, height=685.8125, Color=300 — it should resolve the shelves grid, the color grid, and compute a price
+6. Pick an MJ door product (e.g. BADREURO), enter dimensions and Color value — the mjdoors and mjcolors grids should resolve
+7. The app still starts without errors
