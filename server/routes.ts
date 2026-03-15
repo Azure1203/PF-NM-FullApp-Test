@@ -210,10 +210,11 @@ export async function registerRoutes(
   app.delete(api.orders.delete.path, isAuthenticated, async (req, res) => {
     const replitUser = (req as any).user;
     const username = replitUser?.claims?.username || replitUser?.name;
-    if (!username) {
+    const email = replitUser?.claims?.email;
+    if (!username && !email) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
-    const isAdmin = await storage.isUserAdmin(username);
+    const isAdmin = await storage.isUserAdmin(username, email);
     if (!isAdmin) {
       return res.status(403).json({ message: 'Only admins can delete orders' });
     }
@@ -3673,7 +3674,8 @@ export async function registerRoutes(
     try {
       const replitUser = (req as any).user;
       const username = replitUser?.claims?.username || replitUser?.name;
-      const isAdmin = username ? await storage.isUserAdmin(username) : false;
+      const email = replitUser?.claims?.email;
+      const isAdmin = await storage.isUserAdmin(username, email);
       if (!isAdmin) {
         return res.status(403).json({ message: 'Admin access required' });
       }
@@ -3728,10 +3730,11 @@ export async function registerRoutes(
     try {
       const replitUser = (req as any).user;
       const username = replitUser?.claims?.username || replitUser?.name;
-      if (!username) {
+      const email = replitUser?.claims?.email;
+      if (!username && !email) {
         return res.status(401).json({ message: 'Not authenticated' });
       }
-      const isAdmin = await storage.isUserAdmin(username);
+      const isAdmin = await storage.isUserAdmin(username, email);
       if (!isAdmin) {
         return res.status(403).json({ message: 'Only admins can reset imports' });
       }
@@ -3764,10 +3767,11 @@ export async function registerRoutes(
     try {
       const replitUser = (req as any).user;
       const username = replitUser?.claims?.username || replitUser?.name;
-      if (!username) {
+      const email = replitUser?.claims?.email;
+      if (!username && !email) {
         return res.status(401).json({ message: 'Not authenticated' });
       }
-      const isAdmin = await storage.isUserAdmin(username);
+      const isAdmin = await storage.isUserAdmin(username, email);
       if (!isAdmin) {
         return res.status(403).json({ message: 'Only admins can reset imports' });
       }
@@ -5355,10 +5359,11 @@ export async function registerRoutes(
       // Check if requester is admin
       const replitUser = (req as any).user;
       const username = replitUser?.claims?.username || replitUser?.name;
-      if (!username) {
+      const email = replitUser?.claims?.email;
+      if (!username && !email) {
         return res.status(401).json({ message: 'Not authenticated' });
       }
-      const requesterIsAdmin = await storage.isUserAdmin(username);
+      const requesterIsAdmin = await storage.isUserAdmin(username, email);
       if (!requesterIsAdmin) {
         return res.status(403).json({ message: 'Only admins can modify admin status' });
       }
@@ -5418,10 +5423,8 @@ export async function registerRoutes(
     try {
       const replitUser = (req as any).user;
       const username = replitUser?.claims?.username || replitUser?.name;
-      if (!username) {
-        return res.json({ isAdmin: false });
-      }
-      const isAdmin = await storage.isUserAdmin(username);
+      const email = replitUser?.claims?.email;
+      const isAdmin = await storage.isUserAdmin(username, email);
       res.json({ isAdmin });
     } catch (e: any) {
       console.error('[Admin] Error checking admin status:', e);

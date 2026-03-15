@@ -140,7 +140,7 @@ export interface IStorage {
   isUserAllowed(username: string, email?: string): Promise<boolean>;
   isWhitelistEmpty(): Promise<boolean>;
   updateAllowedUserAdmin(id: number, isAdmin: boolean): Promise<boolean>;
-  isUserAdmin(username: string): Promise<boolean>;
+  isUserAdmin(username: string, email?: string): Promise<boolean>;
 
   getColorGrid(): Promise<ColorGridEntry[]>;
   getColorByCode(code: string): Promise<ColorGridEntry | undefined>;
@@ -689,10 +689,16 @@ export class DatabaseStorage implements IStorage {
     return !!updated;
   }
 
-  async isUserAdmin(username: string): Promise<boolean> {
-    if (!username) return false;
-    const user = await this.getAllowedUserByUsername(username);
-    return user?.isAdmin === true;
+  async isUserAdmin(username: string, email?: string): Promise<boolean> {
+    if (username) {
+      const user = await this.getAllowedUserByUsername(username);
+      if (user) return user.isAdmin === true;
+    }
+    if (email) {
+      const user = await this.getAllowedUserByEmail(email);
+      if (user) return user.isAdmin === true;
+    }
+    return false;
   }
 
   async getColorGrid(): Promise<ColorGridEntry[]> {
