@@ -804,15 +804,16 @@ export default function Dashboard() {
                       {isAdmin && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10" data-testid={`button-delete-project-${project.id}`}>
-                              <Trash2 className="w-4 h-4" />
+                            <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive/60 gap-1.5" data-testid={`button-delete-project-${project.id}`}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                              <AlertDialogTitle>Delete Order?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will permanently remove the project "{project.name}" and all its files.
+                                This will permanently remove the order "{project.name}" and all its files. This cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

@@ -1004,16 +1004,16 @@ export default function OrderDetails() {
             {isAdmin && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" className="text-destructive hover:bg-destructive/10" data-testid="button-delete-project">
-                    <Trash2 className="w-4 h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Delete Project</span>
+                  <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:border-destructive/60 gap-2" data-testid="button-delete-project">
+                    <Trash2 className="w-4 h-4" />
+                    Delete Order
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogTitle>Delete Order?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the project
+                      This action cannot be undone. This will permanently delete this order
                       and all its files from the database.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
