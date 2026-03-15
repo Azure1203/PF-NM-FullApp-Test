@@ -44,7 +44,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2, Wand2 } from "lucide-react";
 import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding } from "@shared/schema";
-import { EXPORT_TYPE_OPTIONS, type ExportType } from "@shared/schema";
+import { EXPORT_TYPE_OPTIONS, SUPPLY_TYPE_OPTIONS, type ExportType } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +63,7 @@ const productSchema = z.object({
   description: z.string().nullable(),
   notes: z.string().nullable(),
   exportType: z.string().default('ORD'),
+  supplyType: z.string().nullable().default('STOCK'),
 });
 
 const EXPORT_TYPE_COLORS: Record<string, string> = {
@@ -110,6 +111,7 @@ export default function AllmoxyProductManager() {
       description: null,
       notes: null,
       exportType: "ORD",
+      supplyType: "STOCK",
     },
   });
 
@@ -264,6 +266,7 @@ export default function AllmoxyProductManager() {
       description: product.description ?? null,
       notes: product.notes ?? null,
       exportType: product.exportType ?? "ORD",
+      supplyType: product.supplyType ?? "STOCK",
     });
   };
 
@@ -279,6 +282,7 @@ export default function AllmoxyProductManager() {
       description: null,
       notes: null,
       exportType: "ORD",
+      supplyType: "STOCK",
     });
   };
 
@@ -506,6 +510,20 @@ export default function AllmoxyProductManager() {
                               {p.exportType}
                             </span>
                           )}
+                          {p.supplyType === 'BUYOUT' && (
+                            <Badge
+                              variant="outline"
+                              data-testid={`badge-supply-type-${p.id}`}
+                              className={cn(
+                                "text-[10px] px-1 py-0 h-4 shrink-0",
+                                editingId === p.id && !selectMode
+                                  ? "border-amber-300 text-amber-200"
+                                  : "border-amber-400 text-amber-600"
+                              )}
+                            >
+                              Buyout
+                            </Badge>
+                          )}
                         </div>
                       )}
                     </div>
@@ -728,6 +746,30 @@ export default function AllmoxyProductManager() {
                             </Select>
                             <p className="text-xs text-muted-foreground">
                               Determines which output file this product belongs to during exports.
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="supplyType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Supply Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || 'STOCK'}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-supply-type">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="STOCK">Stock — We hold inventory</SelectItem>
+                                <SelectItem value="BUYOUT">Buyout — Ordered per job from supplier</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              Stock items are held in inventory; Buyout items are ordered from a supplier per job.
                             </p>
                             <FormMessage />
                           </FormItem>

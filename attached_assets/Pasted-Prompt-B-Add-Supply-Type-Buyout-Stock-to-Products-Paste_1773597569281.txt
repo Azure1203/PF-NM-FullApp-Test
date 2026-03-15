@@ -1,0 +1,93 @@
+Prompt B — Add Supply Type (Buyout / Stock) to Products
+Paste this entire prompt into Replit.
+We need to add a supplyType field to the product catalog so each product can be designated as either Stock (we hold inventory) or Buyout (purchased from a supplier per order). This value flows through the pipeline into order_items and is displayed on Invoice, Internal Packing Slip, and Cut-to-Size PDFs.
+
+Part 1 — Schema Change
+In shared/schema.ts, add a new column to the allmoxyProducts table, after the existing exportType column:
+tssupplyType: varchar("supply_type", { length: 20 }).default('STOCK'),
+Also add supplyType to the orderItems table (so processed line items carry the resolved value), after the existing exportType column:
+tssupplyType: varchar("supply_type", { length: 20 }),
+Add an exported constant for the valid options:
+tsexport const SUPPLY_TYPE_OPTIONS = ['STOCK', 'BUYOUT'] as const;
+export type SupplyType = typeof SUPPLY_TYPE_OPTIONS[number];
+Run the Drizzle migration:
+bashnpx drizzle-kit generate
+npx drizzle-kit migrate
+
+Part 2 — Update Storage
+In server/storage.ts, make sure the upsertAllmoxyProduct method (or whatever method handles product create/update) includes supplyType in the insert and in the conflict update set, so it gets saved when creating or updating products.
+Also ensure the createOrderItem method can accept supplyType — it should already work if the insert schema is derived from the table, but verify.
+
+Part 3 — Update the Upload Pipeline
+In server/routes.ts, in the upload pipeline where order_items are created, add supplyType from the matched product. Find the createOrderItem call — it currently looks something like:
+tsawait storage.createOrderItem({
+  projectId: ...,
+  fileId: ...,
+  productId: product?.id ?? null,
+  sku: ...,
+  ...
+  exportType: product?.exportType ?? null,
+  ...
+});
+Add supplyType to this object:
+tssupplyType: product?.supplyType ?? null,
+Do the same in any other place where createOrderItem is called (e.g. the reprice route if one exists).
+
+Part 4 — Update the Product Manager UI
+In client/src/pages/admin/AllmoxyProductManager.tsx:
+4A — Add to Zod schema
+Find the productSchema (or equivalent form validation schema). Add:
+tssupplyType: z.string().nullable(),
+4B — Add to form defaults
+In handleEdit (when loading a product into the form), add:
+tssupplyType: product.supplyType ?? 'STOCK',
+In handleNew (when creating a new product), add:
+tssupplyType: 'STOCK',
+4C — Add dropdown to the form
+In the product edit form, add a "Supply Type" dropdown. Place it near the "Export Type" dropdown in the form layout — in the same section (e.g. "Logic Binding" or wherever Export Type currently sits):
+tsx<div className="space-y-1">
+  <label className="text-xs text-muted-foreground">Supply Type</label>
+  <Select
+    value={form.watch("supplyType") || "STOCK"}
+    onValueChange={(val) => form.setValue("supplyType", val)}
+  >
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="STOCK">Stock — We hold inventory</SelectItem>
+      <SelectItem value="BUYOUT">Buyout — Ordered per job from supplier</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+4D — Show badge in product list
+In the left panel product list, alongside existing badges (export type, status), add a small badge for buyout products only (don't show a badge for Stock since that's the default). Find where product badges are rendered in the list row and add:
+tsx{product.supplyType === 'BUYOUT' && (
+  <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-amber-400 text-amber-600">
+    Buyout
+  </Badge>
+)}
+
+Part 5 — Update CSV Product Import
+If the product CSV import route (POST /api/admin/allmoxy-products/import-csv or similar) builds product objects to insert, add supplyType defaulting to 'STOCK':
+tssupplyType: 'STOCK',
+Products imported via CSV will default to Stock. The administrator can then change individual products to Buyout through the UI.
+
+What NOT to change
+
+Do not modify the pricing engine
+Do not modify the formula tester
+Do not modify the ordExporter
+Do not modify attribute grids or proxy variables
+Do not modify any PDF generation (that comes in later prompts)
+
+
+After completing, confirm:
+
+The migration runs without errors
+The Products page shows a "Supply Type" dropdown in the edit form with "Stock" and "Buyout" options
+Setting a product to "Buyout" and saving — then reloading — shows "Buyout" persisted
+Buyout products show a small amber "Buyout" badge in the left panel list
+Stock products show no supply type badge (clean default)
+Uploading a test order CSV — the resulting order_items rows have supply_type populated from the matched product
+The app starts without errors

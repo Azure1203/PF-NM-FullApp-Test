@@ -27,7 +27,7 @@ import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks, productGridBindings, orderItems, allmoxyProducts, attributeGridRows, attributeGrids } from "@shared/schema";
 import type { AllmoxyProduct, ProductGridBinding } from "@shared/schema";
-import { EXPORT_TYPE_OPTIONS } from "@shared/schema";
+import { EXPORT_TYPE_OPTIONS, SUPPLY_TYPE_OPTIONS } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
   parseCSV,
@@ -443,11 +443,12 @@ export async function registerRoutes(
 
   app.post('/api/admin/allmoxy-products', isAuthenticated, async (req, res) => {
     try {
-      const { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes, exportType } = req.body;
+      const { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes, exportType, supplyType } = req.body;
       if (!name) {
         return res.status(400).json({ message: 'name is required' });
       }
       const validExportType = exportType && (EXPORT_TYPE_OPTIONS as readonly string[]).includes(exportType) ? exportType : 'ORD';
+      const validSupplyType = supplyType && (SUPPLY_TYPE_OPTIONS as readonly string[]).includes(supplyType) ? supplyType : 'STOCK';
       const product = await storage.upsertAllmoxyProduct({
         name,
         status: status ?? 'active',
@@ -457,6 +458,7 @@ export async function registerRoutes(
         description: description ?? null,
         notes: notes ?? null,
         exportType: validExportType,
+        supplyType: validSupplyType,
       });
       res.json(product);
     } catch (e: any) {
@@ -710,6 +712,7 @@ export async function registerRoutes(
           exportProxyId: exportProxyId ? Number(exportProxyId) : null,
           description: categoryName,
           notes: null,
+          supplyType: 'STOCK' as const,
         }));
 
       if (!productsToInsert.length) {
@@ -906,6 +909,7 @@ export async function registerRoutes(
             pricingError,
             rawRowData: item,
             exportType: product?.exportType || null,
+            supplyType: product?.supplyType || null,
           });
           totalProjectPrice += totalPrice;
         }
@@ -1439,6 +1443,7 @@ export async function registerRoutes(
             pricingError,
             rawRowData: item,
             exportType: product?.exportType || null,
+            supplyType: product?.supplyType || null,
           });
 
           totalProjectPrice += totalPrice;

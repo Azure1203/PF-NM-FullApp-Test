@@ -722,6 +722,7 @@ export class DatabaseStorage implements IStorage {
           description: product.description,
           notes: product.notes,
           exportType: product.exportType,
+          supplyType: product.supplyType,
           imagePath: product.imagePath,
         },
       })

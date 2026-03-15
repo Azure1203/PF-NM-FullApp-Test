@@ -1,0 +1,258 @@
+Prompt — Add Multi-Select Bulk Delete to Proxy Variables Page
+Paste this entire prompt into Replit.
+In client/src/pages/admin/ProxyVariableManager.tsx, add multi-select and bulk delete to the left panel variable list. This matches the same pattern already used on the Products page and Attribute Grids page. Do not change anything in the right panel editor form or any existing save/delete functionality.
+
+Part 1 — Add state variables
+Near the top of the component, alongside the existing search, editingId, and form state, add:
+tsconst [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+const [selectMode, setSelectMode] = useState(false);
+
+Part 2 — Add bulk delete mutation
+Alongside the existing saveMutation and deleteMutation, add:
+tsconst bulkDeleteMutation = useMutation({
+  mutationFn: async (ids: number[]) => {
+    await Promise.all(ids.map(id =>
+      apiRequest("DELETE", `/api/admin/proxy-variables/${id}`)
+    ));
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/proxy-variables"] });
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setEditingId(null);
+    form.reset({
+      name: "",
+      type: "pricing",
+      formula: "// Enter your formula here\n",
+    });
+    toast({ title: "Deleted", description: `${selectedIds.size} variable${selectedIds.size !== 1 ? 's' : ''} deleted` });
+  },
+  onError: (error: Error) => {
+    toast({ title: "Error", description: error.message, variant: "destructive" });
+  },
+});
+
+Part 3 — Update the left panel header
+Find the existing header area inside the left ResizablePanel — it currently contains:
+tsx<div className="p-4 space-y-4 border-b">
+  <div className="flex items-center justify-between">
+    <h2 className="font-semibold flex items-center gap-2">
+      <Code className="h-4 w-4" />
+      Variables
+    </h2>
+    <Button size="icon" variant="ghost" onClick={handleNew} title="New Variable">
+      <Plus className="h-4 w-4" />
+    </Button>
+  </div>
+  <div className="relative">
+    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+    <Input
+      placeholder="Search variables..."
+      className="pl-8"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+    />
+  </div>
+</div>
+Replace the entire <div className="p-4 space-y-4 border-b"> block with:
+tsx<div className="p-4 space-y-3 border-b">
+  <div className="flex items-center justify-between">
+    <h2 className="font-semibold flex items-center gap-2">
+      <Code className="h-4 w-4" />
+      Variables
+      {variables && (
+        <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
+          {variables.length}
+        </Badge>
+      )}
+    </h2>
+    <div className="flex items-center gap-1">
+      {!selectMode ? (
+        <>
+          <Button size="icon" variant="ghost" onClick={() => setSelectMode(true)} title="Select multiple">
+            <CheckSquare className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={handleNew} title="New Variable">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => {
+              if (selectedIds.size === filteredVariables.length) {
+                setSelectedIds(new Set());
+              } else {
+                setSelectedIds(new Set(filteredVariables.map(v => v.id)));
+              }
+            }}
+          >
+            {selectedIds.size === filteredVariables.length ? 'Clear All' : 'All'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => {
+              setSelectMode(false);
+              setSelectedIds(new Set());
+            }}
+          >
+            Cancel
+          </Button>
+        </>
+      )}
+    </div>
+  </div>
+
+  {/* Bulk delete bar — shows when items are selected */}
+  {selectMode && selectedIds.size > 0 && (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive" size="sm" className="w-full h-8 text-xs">
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+          Delete {selectedIds.size} variable{selectedIds.size !== 1 ? 's' : ''}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {selectedIds.size} proxy variable{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete {selectedIds.size} selected variable{selectedIds.size !== 1 ? 's' : ''}. Any products referencing these as pricing or export formulas will lose their assignment. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+          >
+            {bulkDeleteMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : null}
+            Delete {selectedIds.size} variable{selectedIds.size !== 1 ? 's' : ''}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )}
+
+  <div className="relative">
+    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+    <Input
+      placeholder="Search variables..."
+      className="pl-8"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+    />
+  </div>
+</div>
+
+Part 4 — Update variable list rows
+Find the existing variable row rendering — it currently looks like:
+tsxfilteredVariables.map((v) => (
+  <button
+    key={v.id}
+    onClick={() => handleEdit(v)}
+    className={cn(
+      "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left group",
+      editingId === v.id
+        ? "bg-primary text-primary-foreground"
+        : "hover:bg-accent text-foreground"
+    )}
+  >
+Replace the entire <button> element (opening tag through closing </button>) for each variable with:
+tsxfilteredVariables.map((v) => (
+  <button
+    key={v.id}
+    onClick={() => {
+      if (selectMode) {
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          if (next.has(v.id)) next.delete(v.id);
+          else next.add(v.id);
+          return next;
+        });
+      } else {
+        handleEdit(v);
+      }
+    }}
+    className={cn(
+      "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left group",
+      selectMode
+        ? selectedIds.has(v.id)
+          ? "bg-primary/10 border border-primary/30"
+          : "hover:bg-accent text-foreground"
+        : editingId === v.id
+          ? "bg-primary text-primary-foreground"
+          : "hover:bg-accent text-foreground"
+    )}
+  >
+    {selectMode && (
+      <input
+        type="checkbox"
+        checked={selectedIds.has(v.id)}
+        onChange={() => {}}
+        className="h-4 w-4 rounded border-gray-300 accent-primary shrink-0"
+      />
+    )}
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium truncate">{v.name}</span>
+        <Badge 
+          variant={editingId === v.id && !selectMode ? "outline" : "secondary"}
+          className={cn(
+            "text-[10px] uppercase px-1 py-0 h-4",
+            editingId === v.id && !selectMode && "border-primary-foreground/20 text-primary-foreground"
+          )}
+        >
+          {v.type}
+        </Badge>
+      </div>
+    </div>
+    {!selectMode && (
+      <ChevronRight className={cn(
+        "h-4 w-4 shrink-0 transition-transform",
+        editingId === v.id ? "translate-x-0" : "-translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0"
+      )} />
+    )}
+  </button>
+))
+
+Part 5 — Update imports
+Add CheckSquare to the existing lucide-react import line. Also ensure these are imported (they should already exist, but confirm):
+tsimport {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+If the AlertDialog components are not already imported, add the import. They are already available in the project's shadcn/ui components.
+
+What NOT to change
+
+Do not modify the right panel editor form (name, type, formula fields, save/delete buttons)
+Do not modify the existing saveMutation or deleteMutation
+Do not modify any backend routes — the existing DELETE /api/admin/proxy-variables/:id route is used for each item in the bulk delete
+Do not modify the ResizablePanelGroup structure
+
+
+After completing, confirm:
+
+A checkbox/select icon button appears in the left panel header next to the "+" new variable button
+Clicking it puts the list into select mode — each row shows a checkbox
+"All" / "Clear All" toggle button works to select/deselect all filtered variables
+"Cancel" exits select mode and clears selections
+Selecting one or more variables shows a red "Delete N variables" button
+Clicking the delete button shows a confirmation dialog warning about product assignment impact
+Confirming the delete removes all selected variables, exits select mode, and resets the editor
+Search still works in select mode — only visible/filtered variables are affected by "All"
+The right panel editor form continues to work normally when not in select mode
