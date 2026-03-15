@@ -283,6 +283,23 @@ export async function registerRoutes(
     }
   });
 
+  app.delete('/api/admin/attribute-grids/bulk', isAuthenticated, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: 'ids array is required' });
+      }
+      let deleted = 0;
+      for (const id of ids) {
+        const result = await storage.deleteAttributeGrid(Number(id));
+        if (result) deleted++;
+      }
+      res.json({ deleted, requested: ids.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.delete('/api/admin/attribute-grids/:id', isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteAttributeGrid(Number(req.params.id));
@@ -401,23 +418,6 @@ export async function registerRoutes(
       }
     }
     res.status(201).json({ results, totalFiles: files.length });
-  });
-
-  app.delete('/api/admin/attribute-grids/bulk', isAuthenticated, async (req, res) => {
-    try {
-      const { ids } = req.body;
-      if (!Array.isArray(ids) || ids.length === 0) {
-        return res.status(400).json({ message: 'ids array is required' });
-      }
-      let deleted = 0;
-      for (const id of ids) {
-        const result = await storage.deleteAttributeGrid(Number(id));
-        if (result) deleted++;
-      }
-      res.json({ deleted, requested: ids.length });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
-    }
   });
 
   // Proxy Variable Routes

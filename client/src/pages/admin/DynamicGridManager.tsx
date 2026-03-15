@@ -235,15 +235,35 @@ export default function DynamicGridManager() {
         {/* ── LEFT PANEL ── */}
         <div className="w-72 shrink-0 flex flex-col border-r overflow-hidden">
           <div className="shrink-0 px-3 pt-3 pb-1 flex items-center justify-between">
-            <Button
-              size="sm"
-              variant={selectMode ? "default" : "outline"}
-              className="h-7 text-xs"
-              onClick={() => { setSelectMode(m => !m); setSelectedGridIds(new Set()); setConfirmBulkDelete(false); }}
-              data-testid="button-toggle-select-mode"
-            >
-              {selectMode ? <><CheckSquare className="w-3.5 h-3.5 mr-1" />Done</> : <><Square className="w-3.5 h-3.5 mr-1" />Select</>}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant={selectMode ? "default" : "outline"}
+                className="h-7 text-xs"
+                onClick={() => { setSelectMode(m => !m); setSelectedGridIds(new Set()); setConfirmBulkDelete(false); }}
+                data-testid="button-toggle-select-mode"
+              >
+                {selectMode ? <><CheckSquare className="w-3.5 h-3.5 mr-1" />Done</> : <><Square className="w-3.5 h-3.5 mr-1" />Select</>}
+              </Button>
+              {selectMode && grids.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    if (selectedGridIds.size === grids.length) {
+                      setSelectedGridIds(new Set());
+                    } else {
+                      setSelectedGridIds(new Set(grids.map(g => g.id)));
+                    }
+                    setConfirmBulkDelete(false);
+                  }}
+                  data-testid="button-select-all"
+                >
+                  {selectedGridIds.size === grids.length ? 'Clear All' : 'All'}
+                </Button>
+              )}
+            </div>
             {selectMode && selectedGridIds.size > 0 && !confirmBulkDelete && (
               <Button
                 size="sm"
