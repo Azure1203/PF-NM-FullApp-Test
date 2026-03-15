@@ -16,7 +16,6 @@ export default function Landing() {
           {/* Stylized N */}
           <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="52" height="52" rx="4" fill="white"/>
-            {/* Bold geometric N */}
             <path
               d="M8 42V10h7.5L33 31.5V10h7.5v32H33L15.5 20.5V42H8z"
               fill="#1a1a1a"
@@ -31,7 +30,6 @@ export default function Landing() {
             >
               NETLEY
             </span>
-            {/* Gold divider */}
             <div className="my-1" style={{ height: 2, backgroundColor: "#CDAB4A", width: "100%" }} />
             <span
               className="font-semibold tracking-widest text-xs"
@@ -51,7 +49,7 @@ export default function Landing() {
             Closet Order Processing
           </h1>
           <p className="text-sm" style={{ color: "#9e978f" }}>
-            Sign in to your account
+            Sign in with your Replit account to continue
           </p>
         </div>
 
@@ -60,49 +58,9 @@ export default function Landing() {
           className="w-full rounded-2xl p-6 shadow-2xl space-y-4"
           style={{ backgroundColor: "#F7F4F2" }}
         >
-          {/* Username */}
-          <div className="space-y-1.5">
-            <label
-              className="text-sm font-medium block"
-              style={{ color: "#2E2E2E" }}
-            >
-              Username
-            </label>
-            <input
-              type="text"
-              placeholder="Enter username"
-              readOnly
-              className="w-full rounded-lg px-4 py-2.5 text-sm outline-none border"
-              style={{
-                backgroundColor: "#ede9e4",
-                borderColor: "#d8d0c8",
-                color: "#2E2E2E",
-              }}
-              onFocus={(e) => e.target.blur()}
-            />
-          </div>
-
-          {/* Password */}
-          <div className="space-y-1.5">
-            <label
-              className="text-sm font-medium block"
-              style={{ color: "#2E2E2E" }}
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="Enter password"
-              readOnly
-              className="w-full rounded-lg px-4 py-2.5 text-sm outline-none border"
-              style={{
-                backgroundColor: "#ede9e4",
-                borderColor: "#d8d0c8",
-                color: "#2E2E2E",
-              }}
-              onFocus={(e) => e.target.blur()}
-            />
-          </div>
+          <p className="text-sm text-center" style={{ color: "#807161" }}>
+            Access is restricted to authorized team members. Click below to authenticate.
+          </p>
 
           {/* Sign In button */}
           <a href="/api/login" className="block w-full">
