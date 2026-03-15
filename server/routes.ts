@@ -367,6 +367,59 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/admin/upload-dynamic-grids-bulk', isAuthenticated, upload.array('files', 50), async (req, res) => {
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: 'No files uploaded' });
+    }
+    const results: { filename: string; gridName: string; gridId?: number; rowCount?: number; error?: string }[] = [];
+    for (const file of files) {
+      const gridName = file.originalname.replace(/\.csv$/i, '').replace(/_\d{8}$/, '').trim();
+      try {
+        const records: any[] = parseSync(file.buffer.toString('utf-8'), { columns: true, skip_empty_lines: true });
+        if (records.length === 0) {
+          results.push({ filename: file.originalname, gridName, error: 'File is empty or has no data rows' });
+          continue;
+        }
+        const headers = Object.keys(records[0]);
+        let keyColumn = 'NAME';
+        if (headers.includes('EXISTING OPTION ID')) keyColumn = 'EXISTING OPTION ID';
+        else if (headers.includes('MANU_CODE')) keyColumn = 'MANU_CODE';
+        let grid = await storage.getAttributeGridByName(gridName);
+        if (!grid) {
+          grid = await storage.createAttributeGrid({ name: gridName, columns: headers, keyColumn });
+        }
+        const rowsToInsert = records.map(record => ({
+          gridId: grid!.id,
+          lookupKey: String(record[keyColumn] || record[headers[0]] || ''),
+          rowData: record,
+        }));
+        await storage.replaceAttributeGridRows(grid.id, rowsToInsert);
+        results.push({ filename: file.originalname, gridName, gridId: grid.id, rowCount: rowsToInsert.length });
+      } catch (e: any) {
+        results.push({ filename: file.originalname, gridName, error: e.message });
+      }
+    }
+    res.status(201).json({ results, totalFiles: files.length });
+  });
+
+  app.delete('/api/admin/attribute-grids/bulk', isAuthenticated, async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: 'ids array is required' });
+      }
+      let deleted = 0;
+      for (const id of ids) {
+        const result = await storage.deleteAttributeGrid(Number(id));
+        if (result) deleted++;
+      }
+      res.json({ deleted, requested: ids.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // Proxy Variable Routes
   app.get('/api/admin/proxy-variables', isAuthenticated, async (_req, res) => {
     try {

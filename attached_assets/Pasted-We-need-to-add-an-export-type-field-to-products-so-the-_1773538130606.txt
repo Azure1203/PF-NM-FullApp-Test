@@ -1,0 +1,149 @@
+We need to add an export_type field to products so the system knows which output file each item belongs to when generating exports. This is the foundation that all export routes (Hardware Excel, Elias CSV, MJ CSV, ORD assembly) depend on.
+Part 1 — Schema Change
+In shared/schema.ts, add a new column to the allmoxyProducts table:
+tsexportType: varchar("export_type", { length: 20 }).default("ORD"),
+Valid values are: 'ORD', 'HARDWARE', 'ELIAS', 'MJ', 'CTS', 'ERP', 'GLASS', 'NONE'.
+
+ORD = generates a Cabinet Vision .ORD block (shelves, panels, dividers, doors, drawer fronts, parts, moldings, corner shelves, outside corner shelves, floor panels, wall panels, island panels, garage panels)
+HARDWARE = appears in the Hardware Excel export only — no ORD block (handles, hinges, slides, closet rods without .CTS, closet accessories, hardware screws/connectors, hanging rail hardware, jigs/tools, door/drawer locks, floating shelf hardware without .CTS, office accessories, garage accessories, touch-up sticks)
+ELIAS = generates an Elias dovetail CSV row (dovetail drawer boxes: DBX and SDBX prefixes)
+MJ = generates an M&J Woodcraft door CSV row (BADR and HBADR prefixes, and 34HBACK prefix)
+CTS = cut-to-size items (SKUs ending in .CTS)
+GLASS = glass products (CLEAR, FROSTED, BAMBOO, etc.)
+NONE = do not include in any export
+
+Also add exportType to the order_items table so each processed item records what export type was resolved:
+tsexportType: varchar("export_type", { length: 20 }),
+Run the Drizzle migration:
+bashnpx drizzle-kit generate
+npx drizzle-kit migrate
+Part 2 — Update Storage
+In server/storage.ts, make sure the upsertAllmoxyProduct method includes exportType in the conflict update set so it gets saved when creating or updating products.
+Part 3 — Update the Product Manager UI
+In client/src/pages/admin/AllmoxyProductManager.tsx, add an "Export Type" dropdown to the product edit form. Place it in the "Logic Binding" section, after the Export Proxy Variable dropdown.
+tsx<div className="space-y-1">
+  <label className="text-xs text-muted-foreground">Export Type</label>
+  <Select
+    value={form.watch("exportType") || "ORD"}
+    onValueChange={(val) => form.setValue("exportType", val)}
+  >
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="ORD">ORD — Cabinet Vision</SelectItem>
+      <SelectItem value="HARDWARE">HARDWARE — Hardware Excel</SelectItem>
+      <SelectItem value="ELIAS">ELIAS — Dovetail Drawer CSV</SelectItem>
+      <SelectItem value="MJ">MJ — M&J Door CSV</SelectItem>
+      <SelectItem value="CTS">CTS — Cut to Size</SelectItem>
+      <SelectItem value="GLASS">GLASS — Glass Parts</SelectItem>
+      <SelectItem value="NONE">NONE — No Export</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+Add exportType to the form's default values and the save mutation payload.
+Also display the export type as a small badge in the product list (left panel), next to the SKU prefix. Use these colors:
+
+ORD: blue badge
+HARDWARE: gray badge
+ELIAS: green badge
+MJ: purple badge
+CTS: orange badge
+GLASS: cyan badge
+NONE: no badge shown
+
+Part 4 — Auto-Classification API Endpoint
+Add a new route that auto-classifies all products that still have the default 'ORD' export type. This is a one-time bulk operation to set up the data correctly.
+POST /api/admin/products/auto-classify-export-types
+This route should load all active products and apply these classification rules based on the product's skuPrefix (the name/code stored in the product, which is the SKU used in order CSVs):
+Classification Rules (apply in this order — first match wins):
+CTS — SKU ends with .CTS (case-insensitive):
+H.801.13.201.CTS, H.801.42.040.CTS, H.830.28.700.CTS, S.1622410.CTS, etc.
+ELIAS — SKU starts with DBX or SDBX (dovetail drawer boxes sent to Elias):
+DBX10_12_103, DBX15_14_135, SDBX10_12_2, SDBX36_22_8, etc.
+MJ — SKU starts with BADR, HBADR, or 34HBACK (M&J Woodcraft doors):
+BADREURO, BADRLANCASTER, BADRSLIMLINE, HBADREURO, 34HBACK-MORROCCAN, etc.
+GLASS — SKU matches known glass names (no prefix pattern, use exact list):
+CLEAR, CLEARSAFETY, FROSTED, FROSTEDSAFETY, FLUTEX, FLUTEXSAFETY, 
+CATHEDRAL, CATHEDRALSAFETY, BAMBOO, BAMBOOSAFETY, REEDGLASS, REEDGLASSSAFETY
+HARDWARE — SKU starts with H. or M. or M- or S. or R. AND does NOT end in .CTS AND is in a hardware-type product category. Specifically these product categories (based on which product CSV they came from):
+
+Hardware/Screws/Connectors (H.022.xx, H.263.xx, H.267.xx, M-02-xx, M-03-xx, M-06-xx)
+Handles (H.110.xx, H.111.xx, and similar)
+Hinges (H.245.xx, H.329.xx, H.372.xx, M-105-89xx, M-105-C80xx, M-105-SQxx)
+Slides (M-105-DF10-xx, M-105-DS10xx, M-105-HT0xx, M-372-xx)
+Closet Accessories (H.547.xx)
+Closet Rods without .CTS suffix (H.801.xx, H.803.xx, H.830.xx, H.833.xx — only those NOT ending in .CTS)
+Jigs/Tools (H.001.xx, H.006.xx, R.AT55102)
+Door/Drawer Locks
+Floating Shelf Hardware without .CTS (S.16xxxxx — only those NOT ending in .CTS)
+Hanging Rail Hardware
+Office Accessories
+Garage Accessories
+Touch Up Sticks (CAM-xxx, TUS-xxx)
+
+The simplest reliable rule for HARDWARE: If the SKU starts with H., M-, M., S., or R. AND does NOT end with .CTS AND does NOT start with HBADR (which are MJ doors), classify as HARDWARE.
+ORD — Everything else. This includes:
+
+Melamine drawer boxes: 34MDRWB, 34IMDRWB, 34INFMDRWB, 8MDRWB (these go to ORD, NOT Elias)
+Assembled drawer boxes: any SKU containing ASS suffix (34MDRWB1ASS, etc.) — ORD
+Shelves: 34SHFF, 34SHFA, 34MTSHFF, 34MTSHFA, 15HGSHFF, 15HGSHFA, etc.
+Wall panels: 34WPNLF, 34MTWPNLF, etc.
+Floor panels: 34FPNL, 34MTFPNL, etc.
+Island panels: 34IPNL, 34MTIPNL, etc.
+Divider panels: 34DIVF, 34MTDIVF, etc.
+Garage panels: 34GPNL, etc.
+Doors: DRWEURO, DRMTEURO, DRHGEURO, LIFTDR, various SHA/SHAGD door codes
+Drawer fronts: DRWFREURO, DRWFMTEURO, etc.
+Parts: TK, MTTK, FILL, MTFILL, CLEAT, MTCLEAT, various panel codes
+Moldings: MOL codes
+Corner shelves, outside corner shelves
+
+The route should:
+
+Load all active products
+For each product with a skuPrefix, apply the rules above
+Update the product's exportType
+Return a summary: { total: number, classified: { ORD: number, HARDWARE: number, ELIAS: number, MJ: number, CTS: number, GLASS: number } }
+
+Require isAuthenticated on this route.
+Part 5 — Update the Upload Pipeline
+In server/routes.ts, in the POST /api/orders/upload handler, when creating order_items, also store the matched product's exportType on the order_item:
+Find the line where await storage.createOrderItem({...}) is called and add:
+tsexportType: product?.exportType || null,
+This way each order_item knows which export file it belongs to, making the export routes simple filters.
+Part 6 — Add Auto-Classify Button to Product Manager
+In AllmoxyProductManager.tsx, add a button in the toolbar area (near the existing import button):
+tsx<Button
+  variant="outline"
+  onClick={async () => {
+    const res = await fetch('/api/admin/products/auto-classify-export-types', { method: 'POST' });
+    const data = await res.json();
+    toast({ 
+      title: "Export types classified", 
+      description: `ORD: ${data.classified.ORD}, HARDWARE: ${data.classified.HARDWARE}, ELIAS: ${data.classified.ELIAS}, MJ: ${data.classified.MJ}, CTS: ${data.classified.CTS}, GLASS: ${data.classified.GLASS}` 
+    });
+    // Refetch products to show updated badges
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+  }}
+>
+  <Wand2 className="h-4 w-4 mr-2" />
+  Auto-Classify Export Types
+</Button>
+Import Wand2 from lucide-react.
+What NOT to change
+
+Do not change the pricing pipeline logic — it already works correctly
+Do not change the formula tester
+Do not change the attribute grid manager
+Do not change any existing production workflow features (checklists, Asana, pallets)
+Do not change the proxy variable manager
+
+After completing, confirm:
+
+The migration ran successfully and export_type column exists on both allmoxy_products and order_items
+The product manager shows the Export Type dropdown in the edit form
+The auto-classify button works and shows a count summary in a toast
+Products in the list show colored export type badges
+Re-upload a test CSV and confirm that order_items now have exportType populated
+The app still starts without errors and all existing pages work

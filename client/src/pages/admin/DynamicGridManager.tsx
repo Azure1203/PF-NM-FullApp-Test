@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Upload, Database, Search, Trash2, Download,
-  ChevronDown, ChevronUp, FileText, Loader2, AlertTriangle, X,
+  ChevronDown, ChevronUp, FileText, Loader2, AlertTriangle, X, CheckSquare, Square,
 } from "lucide-react";
 import type { AttributeGrid, AttributeGridRow } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -25,9 +25,13 @@ export default function DynamicGridManager() {
   const [searchQuery, setSearchQuery] = useState('');
   const [newRowData, setNewRowData] = useState<Record<string, string>>({});
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadName, setUploadName] = useState('');
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadResults, setUploadResults] = useState<{ filename: string; gridName: string; rowCount?: number; error?: string }[] | null>(null);
   const [confirmDeleteGrid, setConfirmDeleteGrid] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedGridIds, setSelectedGridIds] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [editingGridName, setEditingGridName] = useState(false);
   const [editingGridNameValue, setEditingGridNameValue] = useState('');
   const [editingKeyColumn, setEditingKeyColumn] = useState(false);
@@ -133,40 +137,69 @@ export default function DynamicGridManager() {
     onError: (e: Error) => toast({ title: 'Update failed', description: e.message, variant: 'destructive' }),
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: async () => {
-      if (!uploadFile || !uploadName.trim()) throw new Error('Name and file required');
-      const formData = new FormData();
-      formData.append('name', uploadName.trim());
-      formData.append('file', uploadFile);
-      const res = await fetch('/api/admin/upload-dynamic-grid', { method: 'POST', body: formData });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      const res = await fetch('/api/admin/attribute-grids/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error('Failed to delete grids');
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids'] });
-      setUploadFile(null);
-      setUploadName('');
-      setUploadOpen(false);
-      setSelectedGridId(data.gridId);
-      toast({ title: 'Grid uploaded', description: `${data.rowCount} rows synced` });
+      if (selectedGridId && selectedGridIds.has(selectedGridId)) setSelectedGridId(null);
+      setSelectedGridIds(new Set());
+      setSelectMode(false);
+      setConfirmBulkDelete(false);
+      toast({ title: 'Grids deleted', description: `${data.deleted} grid(s) removed` });
     },
-    onError: (e: Error) => toast({ title: 'Upload failed', description: e.message, variant: 'destructive' }),
+    onError: (e: Error) => toast({ title: 'Bulk delete failed', description: e.message, variant: 'destructive' }),
   });
 
-  const onDrop = useCallback((accepted: File[]) => {
-    if (accepted[0]) {
-      setUploadFile(accepted[0]);
-      if (!uploadName.trim()) {
-        setUploadName(accepted[0].name.replace(/\.csv$/i, ''));
+  async function handleBulkUpload() {
+    if (uploadFiles.length === 0) return;
+    setUploadLoading(true);
+    setUploadResults(null);
+    try {
+      const formData = new FormData();
+      uploadFiles.forEach(f => formData.append('files', f));
+      const res = await fetch('/api/admin/upload-dynamic-grids-bulk', { method: 'POST', body: formData });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      const data = await res.json();
+      setUploadResults(data.results);
+      setUploadFiles([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids'] });
+      const successes = data.results.filter((r: any) => !r.error);
+      if (successes.length > 0) {
+        toast({ title: 'Upload complete', description: `${successes.length} of ${data.totalFiles} grid(s) synced` });
       }
+    } catch (e: any) {
+      toast({ title: 'Upload failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setUploadLoading(false);
     }
-  }, [uploadName]);
+  }
+
+  function toggleGridSelection(id: number) {
+    setSelectedGridIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const onDrop = useCallback((accepted: File[]) => {
+    setUploadFiles(prev => [...prev, ...accepted]);
+    setUploadResults(null);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'text/csv': ['.csv'] },
-    maxFiles: 1,
+    multiple: true,
   });
 
   function startEdit(rowId: number, col: string, currentValue: string) {
@@ -201,6 +234,46 @@ export default function DynamicGridManager() {
       <div className="flex flex-1 overflow-hidden">
         {/* ── LEFT PANEL ── */}
         <div className="w-72 shrink-0 flex flex-col border-r overflow-hidden">
+          <div className="shrink-0 px-3 pt-3 pb-1 flex items-center justify-between">
+            <Button
+              size="sm"
+              variant={selectMode ? "default" : "outline"}
+              className="h-7 text-xs"
+              onClick={() => { setSelectMode(m => !m); setSelectedGridIds(new Set()); setConfirmBulkDelete(false); }}
+              data-testid="button-toggle-select-mode"
+            >
+              {selectMode ? <><CheckSquare className="w-3.5 h-3.5 mr-1" />Done</> : <><Square className="w-3.5 h-3.5 mr-1" />Select</>}
+            </Button>
+            {selectMode && selectedGridIds.size > 0 && !confirmBulkDelete && (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 text-xs"
+                onClick={() => setConfirmBulkDelete(true)}
+                data-testid="button-bulk-delete"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                Delete {selectedGridIds.size}
+              </Button>
+            )}
+            {confirmBulkDelete && (
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setConfirmBulkDelete(false)} data-testid="button-cancel-bulk-delete">
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-7 text-xs"
+                  onClick={() => bulkDeleteMutation.mutate([...selectedGridIds])}
+                  disabled={bulkDeleteMutation.isPending}
+                  data-testid="button-confirm-bulk-delete"
+                >
+                  {bulkDeleteMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : `Delete ${selectedGridIds.size}`}
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {grids.length === 0 && (
               <div className="text-center py-8 text-muted-foreground text-sm">
@@ -213,27 +286,40 @@ export default function DynamicGridManager() {
                 key={grid.id}
                 data-testid={`card-grid-${grid.id}`}
                 onClick={() => {
-                  setSelectedGridId(grid.id);
-                  setConfirmDeleteGrid(false);
-                  setSearchQuery('');
-                  setEditingCell(null);
-                  setNewRowData({});
+                  if (selectMode) {
+                    toggleGridSelection(grid.id);
+                  } else {
+                    setSelectedGridId(grid.id);
+                    setConfirmDeleteGrid(false);
+                    setSearchQuery('');
+                    setEditingCell(null);
+                    setNewRowData({});
+                  }
                 }}
                 className={cn(
-                  "rounded-md border p-3 cursor-pointer transition-colors",
-                  selectedGridId === grid.id
+                  "rounded-md border p-3 cursor-pointer transition-colors flex items-start gap-2",
+                  selectMode && selectedGridIds.has(grid.id)
+                    ? "border-primary bg-primary/10"
+                    : selectedGridId === grid.id && !selectMode
                     ? "border-l-4 border-l-primary bg-primary/5"
                     : "hover:bg-muted/40"
                 )}
               >
-                <div className="font-semibold text-sm truncate">{grid.name}</div>
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  <Badge variant="secondary" className="text-[10px]">
-                    key: {grid.keyColumn}
-                  </Badge>
-                  <Badge variant="outline" className="text-[10px]">
-                    {grid.columns?.length ?? 0} cols
-                  </Badge>
+                {selectMode && (
+                  <div className="shrink-0 mt-0.5" data-testid={`checkbox-grid-${grid.id}`}>
+                    {selectedGridIds.has(grid.id) ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4 text-muted-foreground" />}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-sm truncate">{grid.name}</div>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <Badge variant="secondary" className="text-[10px]">
+                      key: {grid.keyColumn}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      {grid.columns?.length ?? 0} cols
+                    </Badge>
+                  </div>
                 </div>
               </div>
             ))}
@@ -243,24 +329,17 @@ export default function DynamicGridManager() {
           <div className="border-t shrink-0">
             <button
               className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/40 transition-colors"
-              onClick={() => setUploadOpen(o => !o)}
+              onClick={() => { setUploadOpen(o => !o); setUploadResults(null); }}
               data-testid="button-toggle-upload"
             >
               <span className="flex items-center gap-2">
                 <Upload className="w-4 h-4" />
-                Upload New Grid
+                Upload Grids
               </span>
               {uploadOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             {uploadOpen && (
               <div className="px-3 pb-3 space-y-2">
-                <Input
-                  placeholder="Grid name"
-                  value={uploadName}
-                  onChange={e => setUploadName(e.target.value)}
-                  className="text-sm"
-                  data-testid="input-upload-name"
-                />
                 <div
                   {...getRootProps()}
                   className={cn(
@@ -270,27 +349,49 @@ export default function DynamicGridManager() {
                   data-testid="dropzone-grid-csv"
                 >
                   <input {...getInputProps()} />
-                  {uploadFile ? (
-                    <span className="text-foreground font-medium flex items-center justify-center gap-1">
-                      <FileText className="w-3.5 h-3.5" />{uploadFile.name}
-                    </span>
-                  ) : (
-                    <span>Drop CSV here or click to browse</span>
-                  )}
+                  <span>Drop CSV files here or click to browse</span>
                 </div>
+                {uploadFiles.length > 0 && (
+                  <div className="space-y-1 max-h-32 overflow-y-auto" data-testid="upload-file-queue">
+                    {uploadFiles.map((f, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-xs border rounded px-2 py-1.5">
+                        <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
+                        <span className="truncate flex-1 font-medium">{f.name.replace(/\.csv$/i, '')}</span>
+                        <button
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={(e) => { e.stopPropagation(); setUploadFiles(prev => prev.filter((_, j) => j !== i)); }}
+                          data-testid={`button-remove-file-${i}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {uploadResults && (
+                  <div className="space-y-1 max-h-32 overflow-y-auto border rounded p-2 bg-muted/20" data-testid="upload-results">
+                    {uploadResults.map((r, i) => (
+                      <div key={i} className={cn("text-[11px] flex items-center gap-1.5", r.error ? "text-destructive" : "text-green-600 dark:text-green-400")}>
+                        {r.error ? <AlertTriangle className="w-3 h-3 shrink-0" /> : <FileText className="w-3 h-3 shrink-0" />}
+                        <span className="truncate font-medium">{r.gridName}</span>
+                        <span className="ml-auto shrink-0">{r.error || `${r.rowCount} rows`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <p className="text-[10px] text-muted-foreground">
-                  Uploading to an existing grid name replaces all rows.
+                  Grid name derived from filename. Existing grids will have rows replaced.
                 </p>
                 <Button
                   size="sm"
                   className="w-full"
-                  onClick={() => uploadMutation.mutate()}
-                  disabled={uploadMutation.isPending || !uploadFile || !uploadName.trim()}
+                  onClick={handleBulkUpload}
+                  disabled={uploadLoading || uploadFiles.length === 0}
                   data-testid="button-upload-grid"
                 >
-                  {uploadMutation.isPending
-                    ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Uploading…</>
-                    : <><Upload className="w-3.5 h-3.5 mr-1.5" />Upload &amp; Sync</>
+                  {uploadLoading
+                    ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Uploading {uploadFiles.length} file(s)…</>
+                    : <><Upload className="w-3.5 h-3.5 mr-1.5" />Upload {uploadFiles.length > 0 ? `${uploadFiles.length} File(s)` : 'All'}</>
                   }
                 </Button>
               </div>
