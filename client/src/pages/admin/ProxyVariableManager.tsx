@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Code, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Search, Code, ChevronRight, CheckSquare } from "lucide-react";
 import type { ProxyVariable } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -33,6 +33,17 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const proxyVariableSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -46,6 +57,8 @@ export default function ProxyVariableManager() {
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
 
   const form = useForm<ProxyVariableValues>({
     resolver: zodResolver(proxyVariableSchema),
@@ -62,7 +75,7 @@ export default function ProxyVariableManager() {
 
   const filteredVariables = useMemo(() => {
     if (!variables) return [];
-    return variables.filter(v => 
+    return variables.filter(v =>
       v.name.toLowerCase().includes(search.toLowerCase())
     );
   }, [variables, search]);
@@ -103,6 +116,30 @@ export default function ProxyVariableManager() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) => {
+      await Promise.all(ids.map(id =>
+        apiRequest("DELETE", `/api/admin/proxy-variables/${id}`)
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/proxy-variables"] });
+      const count = selectedIds.size;
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      setEditingId(null);
+      form.reset({
+        name: "",
+        type: "pricing",
+        formula: "// Enter your formula here\n",
+      });
+      toast({ title: "Deleted", description: `${count} variable${count !== 1 ? 's' : ''} deleted` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const onSubmit = (values: ProxyVariableValues) => {
     saveMutation.mutate(values);
   };
@@ -131,16 +168,93 @@ export default function ProxyVariableManager() {
         {/* Left Pane: List View */}
         <ResizablePanel defaultSize={30} minSize={20}>
           <div className="h-full flex flex-col border-r">
-            <div className="p-4 space-y-4 border-b">
+            <div className="p-4 space-y-3 border-b">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold flex items-center gap-2">
                   <Code className="h-4 w-4" />
                   Variables
+                  {variables && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 h-4">
+                      {variables.length}
+                    </Badge>
+                  )}
                 </h2>
-                <Button size="icon" variant="ghost" onClick={handleNew} title="New Variable">
-                  <Plus className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {!selectMode ? (
+                    <>
+                      <Button size="icon" variant="ghost" onClick={() => setSelectMode(true)} title="Select multiple" data-testid="button-toggle-select-mode">
+                        <CheckSquare className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={handleNew} title="New Variable" data-testid="button-new-variable">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        data-testid="button-select-all"
+                        onClick={() => {
+                          if (selectedIds.size === filteredVariables.length) {
+                            setSelectedIds(new Set());
+                          } else {
+                            setSelectedIds(new Set(filteredVariables.map(v => v.id)));
+                          }
+                        }}
+                      >
+                        {selectedIds.size === filteredVariables.length ? 'Clear All' : 'All'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        data-testid="button-cancel-select"
+                        onClick={() => {
+                          setSelectMode(false);
+                          setSelectedIds(new Set());
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
+
+              {selectMode && selectedIds.size > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="w-full h-8 text-xs" data-testid="button-bulk-delete">
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Delete {selectedIds.size} variable{selectedIds.size !== 1 ? 's' : ''}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete {selectedIds.size} proxy variable{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete {selectedIds.size} selected variable{selectedIds.size !== 1 ? 's' : ''}. Any products referencing these as pricing or export formulas will lose their assignment. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => bulkDeleteMutation.mutate(Array.from(selectedIds))}
+                        data-testid="button-confirm-bulk-delete"
+                      >
+                        {bulkDeleteMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : null}
+                        Delete {selectedIds.size} variable{selectedIds.size !== 1 ? 's' : ''}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -148,6 +262,7 @@ export default function ProxyVariableManager() {
                   className="pl-8"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  data-testid="input-search-variables"
                 />
               </div>
             </div>
@@ -165,32 +280,59 @@ export default function ProxyVariableManager() {
                   filteredVariables.map((v) => (
                     <button
                       key={v.id}
-                      onClick={() => handleEdit(v)}
+                      data-testid={`button-variable-${v.id}`}
+                      onClick={() => {
+                        if (selectMode) {
+                          setSelectedIds(prev => {
+                            const next = new Set(prev);
+                            if (next.has(v.id)) next.delete(v.id);
+                            else next.add(v.id);
+                            return next;
+                          });
+                        } else {
+                          handleEdit(v);
+                        }
+                      }}
                       className={cn(
                         "w-full flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-left group",
-                        editingId === v.id
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent text-foreground"
+                        selectMode
+                          ? selectedIds.has(v.id)
+                            ? "bg-primary/10 border border-primary/30"
+                            : "hover:bg-accent text-foreground"
+                          : editingId === v.id
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-accent text-foreground"
                       )}
                     >
+                      {selectMode && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(v.id)}
+                          onChange={() => {}}
+                          className="h-4 w-4 rounded border-gray-300 accent-primary shrink-0"
+                          data-testid={`checkbox-variable-${v.id}`}
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium truncate">{v.name}</span>
-                          <Badge 
-                            variant={editingId === v.id ? "outline" : "secondary"}
+                          <Badge
+                            variant={editingId === v.id && !selectMode ? "outline" : "secondary"}
                             className={cn(
                               "text-[10px] uppercase px-1 py-0 h-4",
-                              editingId === v.id && "border-primary-foreground/20 text-primary-foreground"
+                              editingId === v.id && !selectMode && "border-primary-foreground/20 text-primary-foreground"
                             )}
                           >
                             {v.type}
                           </Badge>
                         </div>
                       </div>
-                      <ChevronRight className={cn(
-                        "h-4 w-4 shrink-0 transition-transform",
-                        editingId === v.id ? "translate-x-0" : "-translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0"
-                      )} />
+                      {!selectMode && (
+                        <ChevronRight className={cn(
+                          "h-4 w-4 shrink-0 transition-transform",
+                          editingId === v.id ? "translate-x-0" : "-translate-x-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-0"
+                        )} />
+                      )}
                     </button>
                   ))
                 )}
@@ -215,7 +357,7 @@ export default function ProxyVariableManager() {
                         <FormItem className="space-y-1">
                           <FormLabel className="text-xs uppercase text-muted-foreground font-bold">Name</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="variable.name" className="h-8 bg-background" />
+                            <Input {...field} placeholder="variable.name" className="h-8 bg-background" data-testid="input-variable-name" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -229,7 +371,7 @@ export default function ProxyVariableManager() {
                           <FormLabel className="text-xs uppercase text-muted-foreground font-bold">Type</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger className="h-8 bg-background">
+                              <SelectTrigger className="h-8 bg-background" data-testid="select-variable-type">
                                 <SelectValue />
                               </SelectTrigger>
                             </FormControl>
@@ -275,16 +417,17 @@ export default function ProxyVariableManager() {
 
                 <div className="p-4 border-t flex justify-between bg-muted/30">
                   <div className="flex gap-2">
-                    <Button type="submit" size="sm" disabled={saveMutation.isPending}>
+                    <Button type="submit" size="sm" disabled={saveMutation.isPending} data-testid="button-save-variable">
                       {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                       {editingId ? "Save Changes" : "Create Variable"}
                     </Button>
                   </div>
                   {editingId && (
-                    <Button 
-                      type="button" 
-                      variant="destructive" 
-                      size="sm" 
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      data-testid="button-delete-variable"
                       onClick={() => {
                         if (confirm("Are you sure you want to delete this variable?")) {
                           deleteMutation.mutate(editingId);
