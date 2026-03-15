@@ -800,7 +800,109 @@ export async function registerRoutes(
         totalPrice: item.totalPrice,
         exportText: item.exportText,
         pricingError: item.pricingError,
+        exportType: item.exportType,
+        supplyType: item.supplyType,
       })));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET Elias CSV export
+  app.get('/api/orders/:id/export/elias', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const eliasItems = items.filter(i => i.exportType === 'ELIAS' && i.exportText);
+      if (eliasItems.length === 0) {
+        return res.status(404).json({ message: 'No Elias items in this order' });
+      }
+      const csv = eliasItems.map(i => i.exportText!).join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="Elias_Job_${projectId}.csv"`);
+      res.send(csv);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET M&J CSV export
+  app.get('/api/orders/:id/export/mj', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const mjItems = items.filter(i => i.exportType === 'MJ' && i.exportText);
+      if (mjItems.length === 0) {
+        return res.status(404).json({ message: 'No M&J items in this order' });
+      }
+      const csv = mjItems.map(i => i.exportText!).join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="MJ_Job_${projectId}.csv"`);
+      res.send(csv);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET ERP import CSV export
+  app.get('/api/orders/:id/export/erp', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const lines: string[] = [];
+      for (const item of items) {
+        const qty = item.quantity ?? 1;
+        const sku = item.sku ?? '';
+        const w = item.width ?? '';
+        const h = item.height ?? '';
+        const d = item.depth ?? '';
+        const t = item.exportType;
+        if (t === 'GLASS') continue;
+        if (t === 'ORD') {
+          lines.push(`${qty},${sku},${w},${h},${d},COMPONENT,,,,,,,,,,,,,,`);
+        } else if (t === 'ELIAS') {
+          lines.push(`${qty},${sku},${w},${h},${d},COMPONENT,,,,,,,,,,,,,,`);
+        } else if (t === 'HARDWARE' || t === 'CTS' || t === 'MJ') {
+          lines.push(`${qty},${sku},,,,HARDWARE,,,,,,,,,,,,,,`);
+        } else {
+          lines.push(`${qty},${sku},${w},${h},${d},COMPONENT,,,,,,,,,,,,,,`);
+        }
+      }
+      const csv = lines.join('\n');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="ERP_Import_${projectId}.csv"`);
+      res.send(csv);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET CTS part list export (JSON)
+  app.get('/api/orders/:id/export/cts', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const ctsItems = items.filter(i => i.exportType === 'CTS');
+      if (ctsItems.length === 0) {
+        return res.status(404).json({ message: 'No CTS items in this order' });
+      }
+      const ROD_LENGTH_MM = 2438.4; // 96 inches standard rod
+      let totalLengthMm = 0;
+      const result = ctsItems.map(item => {
+        const lengthMm = (item.depth ?? 0);
+        const lengthIn = lengthMm / 25.4;
+        totalLengthMm += lengthMm * (item.quantity ?? 1);
+        return {
+          sku: item.sku ?? '',
+          quantity: item.quantity ?? 1,
+          length: Math.round(lengthIn * 1000) / 1000,
+          supplyType: item.supplyType ?? 'STOCK',
+          rackLocation: null,
+        };
+      });
+      const totalLengthInches = totalLengthMm / 25.4;
+      const totalRodsNeeded = Math.round((totalLengthMm / ROD_LENGTH_MM) * 100) / 100;
+      res.json({ items: result, totalLengthMm, totalLengthInches, totalRodsNeeded });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

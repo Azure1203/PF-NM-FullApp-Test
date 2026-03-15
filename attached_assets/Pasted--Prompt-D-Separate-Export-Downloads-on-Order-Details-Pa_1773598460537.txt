@@ -1,0 +1,152 @@
+# Prompt D — Separate Export Downloads on Order Details
+
+Paste this entire prompt into Replit.
+
+The Order Details page currently has a single "Download .ORD" button. We need to add conditional download buttons for each export type so each supplier file can be downloaded independently. The buttons should only appear when the order contains items of that type.
+
+---
+
+## Part 1 — Backend: Export assembly endpoints
+
+Add these routes to `server/routes.ts`. All require `isAuthenticated`.
+
+### Route 1 — Elias CSV export
+```
+GET /api/orders/:id/export/elias
+```
+
+1. Load all order_items for this project where `exportType = 'ELIAS'`
+2. If none exist, return 404 with `{ message: 'No Elias items in this order' }`
+3. For each item, the `exportText` field already contains the rendered Elias CSV row (from the elias_export proxy variable)
+4. Join all exportText values with `\n`
+5. Return as `text/csv` with header `Content-Disposition: attachment; filename="Elias_Job_{orderId}.csv"`
+
+### Route 2 — M&J CSV export
+```
+GET /api/orders/:id/export/mj
+```
+
+Same pattern — filter order_items where `exportType = 'MJ'`, join exportText, return as CSV. Filename: `MJ_Job_{orderId}.csv`
+
+### Route 3 — ERP import file
+```
+GET /api/orders/:id/export/erp
+```
+
+Filter order_items where exportType is NOT 'NONE' and NOT 'GLASS'. For each item, the exportText from the ERP export proxy contains the ERP row. However, ERP items may use a different export proxy than the ORD/Elias/MJ proxy. 
+
+Approach: Load all order_items for the project. For each item, look up the matched product's ERP export template and render it. Since this requires re-evaluating templates, use a simpler approach:
+
+1. Load all items for the project
+2. Build ERP lines based on exportType:
+   - ORD items: `{qty},{sku},{width},{height},{thickness},COMPONENT,,,,,,,,,,,,,,`
+   - ELIAS items: `{qty},{sku},{width},{height},{depth},COMPONENT,,,,,,,,,,,,,,`
+   - HARDWARE/CTS/MJ items: `{qty},{sku},,,,HARDWARE,,,,,,,,,,,,,,`
+   - GLASS items: skip (or include as HARDWARE if needed)
+3. Return as `text/csv`. Filename: `ERP_Import_{orderId}.csv`
+
+### Route 4 — CTS part list (data only, not PDF yet)
+```
+GET /api/orders/:id/export/cts
+```
+
+Filter order_items where `exportType = 'CTS'`. Return JSON:
+```json
+{
+  "items": [
+    { "sku": "H.801.13.201.CTS", "quantity": 4, "length": 854.125, "supplyType": "STOCK", "rackLocation": "Rack B Slot 13 / 14" }
+  ],
+  "totalLengthMm": 9845.75,
+  "totalLengthInches": 387.63,
+  "totalRodsNeeded": 4.04
+}
+```
+
+For rackLocation: look up the matched product's grid binding for the closet_rod grid and check if the grid row data has a rack_location field. If not available, return null.
+
+---
+
+## Part 2 — Frontend: Conditional download buttons
+
+In `client/src/pages/OrderDetails.tsx`, find the existing download buttons area (where "Download .ORD" and "Re-run Pricing" buttons are).
+
+First, compute which export types exist in the current order:
+
+```tsx
+const exportTypeCounts = useMemo(() => {
+  if (!orderItems) return {};
+  const counts: Record<string, number> = {};
+  for (const item of orderItems) {
+    if (item.exportType) {
+      counts[item.exportType] = (counts[item.exportType] || 0) + 1;
+    }
+  }
+  return counts;
+}, [orderItems]);
+
+const hasElias = (exportTypeCounts['ELIAS'] || 0) > 0;
+const hasMJ = (exportTypeCounts['MJ'] || 0) > 0;
+const hasCTS = (exportTypeCounts['CTS'] || 0) > 0;
+const hasHardware = (exportTypeCounts['HARDWARE'] || 0) > 0;
+```
+
+Then add conditional buttons after the existing .ORD button. Use a flex-wrap layout so they flow nicely:
+
+```tsx
+<div className="flex flex-wrap gap-2">
+  {/* Existing buttons */}
+  <Button variant="outline" size="sm" onClick={reprice} disabled={repricing}>
+    {repricing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
+    Re-run Pricing
+  </Button>
+  <Button variant="outline" size="sm" onClick={downloadOrd}>
+    <Download className="w-4 h-4 mr-1.5" />
+    Download .ORD
+  </Button>
+
+  {/* Conditional export buttons */}
+  {hasElias && (
+    <Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/export/elias`, '_blank')}>
+      <Download className="w-4 h-4 mr-1.5" />
+      Elias CSV ({exportTypeCounts['ELIAS']})
+    </Button>
+  )}
+  {hasMJ && (
+    <Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/export/mj`, '_blank')}>
+      <Download className="w-4 h-4 mr-1.5" />
+      M&J CSV ({exportTypeCounts['MJ']})
+    </Button>
+  )}
+  {hasCTS && (
+    <Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/export/cts`, '_blank')}>
+      <Download className="w-4 h-4 mr-1.5" />
+      Cut-to-Size ({exportTypeCounts['CTS']})
+    </Button>
+  )}
+  <Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/export/erp`, '_blank')}>
+    <Download className="w-4 h-4 mr-1.5" />
+    ERP Import
+  </Button>
+</div>
+```
+
+---
+
+## What NOT to change
+
+- Do not modify the upload pipeline
+- Do not modify the pricing engine or ordExporter
+- Do not modify the existing .ORD download logic
+- Do not modify any admin pages
+
+---
+
+## After completing, confirm:
+
+1. Upload a test order CSV that contains a mix of item types (shelves, dovetail drawers, hardware, CTS rods)
+2. Order Details page shows: "Download .ORD" (always), "Elias CSV (N)" (only if dovetails present), "M&J CSV (N)" (only if MJ items present), "Cut-to-Size (N)" (only if CTS items present), "ERP Import" (always)
+3. Clicking each download button produces the correct file
+4. Elias CSV contains only dovetail drawer box rows
+5. ERP Import contains all items categorized as COMPONENT or HARDWARE
+6. Orders without dovetail drawers do not show the Elias button
+7. Orders without CTS items do not show the Cut-to-Size button

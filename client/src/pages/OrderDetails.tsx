@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useRoute, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -645,6 +645,8 @@ export default function OrderDetails() {
     totalPrice: number;
     exportText: string | null;
     pricingError: string | null;
+    exportType: string | null;
+    supplyType: string | null;
   };
 
   const { data: orderItems, isLoading: itemsLoading, refetch: refetchItems } = useQuery<OrderItemRow[]>({
@@ -734,6 +736,21 @@ export default function OrderDetails() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const exportTypeCounts = useMemo(() => {
+    if (!orderItems) return {} as Record<string, number>;
+    const counts: Record<string, number> = {};
+    for (const item of orderItems) {
+      if (item.exportType) {
+        counts[item.exportType] = (counts[item.exportType] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [orderItems]);
+
+  const hasElias = (exportTypeCounts['ELIAS'] || 0) > 0;
+  const hasMJ = (exportTypeCounts['MJ'] || 0) > 0;
+  const hasCTS = (exportTypeCounts['CTS'] || 0) > 0;
 
   // Auto-select first file when preview loads
   useEffect(() => {
@@ -1249,7 +1266,7 @@ export default function OrderDetails() {
             <CollapsibleContent>
               <CardContent className="pt-0">
                 {/* Action buttons */}
-                <div className="flex gap-2 mb-4">
+                <div className="flex flex-wrap gap-2 mb-4">
                   <Button
                     data-testid="button-reprice"
                     variant="outline"
@@ -1284,6 +1301,48 @@ export default function OrderDetails() {
                   >
                     <Download className="w-4 h-4 mr-1.5" />
                     Download .ORD
+                  </Button>
+                  {hasElias && (
+                    <Button
+                      data-testid="button-download-elias"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/orders/${id}/export/elias`, '_blank')}
+                    >
+                      <Download className="w-4 h-4 mr-1.5" />
+                      Elias CSV ({exportTypeCounts['ELIAS']})
+                    </Button>
+                  )}
+                  {hasMJ && (
+                    <Button
+                      data-testid="button-download-mj"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/orders/${id}/export/mj`, '_blank')}
+                    >
+                      <Download className="w-4 h-4 mr-1.5" />
+                      M&amp;J CSV ({exportTypeCounts['MJ']})
+                    </Button>
+                  )}
+                  {hasCTS && (
+                    <Button
+                      data-testid="button-download-cts"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/api/orders/${id}/export/cts`, '_blank')}
+                    >
+                      <Download className="w-4 h-4 mr-1.5" />
+                      Cut-to-Size ({exportTypeCounts['CTS']})
+                    </Button>
+                  )}
+                  <Button
+                    data-testid="button-download-erp"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/api/orders/${id}/export/erp`, '_blank')}
+                  >
+                    <Download className="w-4 h-4 mr-1.5" />
+                    ERP Import
                   </Button>
                 </div>
 
