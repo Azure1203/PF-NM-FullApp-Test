@@ -391,7 +391,7 @@ export async function registerRoutes(
     }
     const results: { filename: string; gridName: string; gridId?: number; rowCount?: number; error?: string }[] = [];
     for (const file of files) {
-      const gridName = file.originalname.replace(/\.csv$/i, '').replace(/_\d{8}$/, '').trim();
+      const gridName = file.originalname.replace(/\.csv$/i, '').trim();
       try {
         const records: any[] = parseSync(file.buffer.toString('utf-8'), { columns: true, skip_empty_lines: true });
         if (records.length === 0) {
