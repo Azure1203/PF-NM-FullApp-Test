@@ -1,0 +1,157 @@
+# Prompt E — Invoice PDF Generation
+
+Paste this entire prompt into Replit.
+
+Generate an Invoice PDF matching the reference `Invoice.pdf` format. The PDF is generated server-side using reportlab and downloadable from the Order Details page.
+
+---
+
+## Part 1 — Install reportlab
+
+```bash
+pip install reportlab --break-system-packages
+```
+
+---
+
+## Part 2 — Backend: PDF generation service
+
+Create a new file `server/services/pdfGenerator.ts` that calls a Python script to generate PDFs. The TypeScript service will pass JSON data to a Python script via stdin and receive the PDF file path back.
+
+Create the Python script at `server/scripts/generate_invoice.py`:
+
+The script receives a JSON object on stdin with this shape:
+
+```json
+{
+  "orderId": 1970,
+  "orderName": "Powell Builders Primary Closet (2026012625)",
+  "orderStatus": "Bid",
+  "paymentDueBy": "03/16/2026",
+  "projectedShipDate": "03/16/2026",
+  "shippingMethod": "Will Call",
+  "shipTo": "Will Call",
+  "projectLabel": "",
+  "sections": [
+    {
+      "sku": "DBX36_18_167",
+      "color": "TFL1W",
+      "categoryLabel": "Drawer Boxes",
+      "productDescription": "Dovetail Drawer Box",
+      "columns": ["ID", "Qty", "Height", "Width", "Length", "Drawer Boxes", "Price", "Total"],
+      "items": [
+        { "id": "1 01", "qty": 3, "height": 167, "width": 901.1875, "length": 440, "type": "Dovetail Drawer Box", "unitPrice": 67.92, "totalPrice": 203.76 }
+      ],
+      "totalItems": 3,
+      "subtotal": 203.76
+    },
+    {
+      "sku": "H.801.13.201.CTS",
+      "color": null,
+      "categoryLabel": "Closet Rods",
+      "productDescription": "Closet Oval Rod Chrome (Custom Lengths)",
+      "columns": ["ID", "Qty", "Length", "Buyout Or Stock?", "Price", "Total"],
+      "items": [
+        { "id": "15 01", "qty": 4, "length": 854.125, "supplyType": "Stock", "unitPrice": 5.96, "totalPrice": 23.84 }
+      ],
+      "totalItems": 11,
+      "subtotal": 67.13
+    }
+  ],
+  "originalTotal": 4450.39,
+  "discountAmount": 0.00,
+  "finalTotal": 4450.39,
+  "outputPath": "/tmp/invoice_1970.pdf"
+}
+```
+
+The Python script uses reportlab to create a PDF with:
+
+**Page setup**: Letter size (8.5" × 11"), 0.5" margins.
+
+**Header** (page 1 only):
+- "Order #: {orderId}" and "Bid # {orderId}" top right
+- "Netley Millwork" company name and address top left
+- "Bill To:" Perfect Fit Mailing Address block
+- "Ship To:" shipping address block
+- Order Name, Order Status, Date Ordered, Payment Due By, Projected Ship Date, Shipping Method
+- "PROJECT & CNC LABEL #:" (blank field)
+
+**Body**: For each section in the sections array:
+- SKU header line (bold): e.g. "DBX36_18_167:"
+- Table with the columns specified in section.columns
+- Each item as a table row
+- Section footer: "{totalItems} Total Items  ${subtotal}"
+- "Color: {color}" below (if color is not null)
+
+**Column rendering rules** (determines which columns to show based on product type):
+- Drawer boxes: ID, Qty, Height, Width, Length, type, Price, Total
+- Drawer fronts: ID, Qty, Height, Width, Thickness, type, Price, Total
+- Shelves/Panels/Parts/Moldings: ID, Qty, Height, Width, Thickness, Edge Left, Edge Right, Edge Top, Edge Bottom, type, Price, Total
+- CTS rods: ID, Qty, Length, Buyout Or Stock?, Price, Total
+- Hardware (non-CTS): ID, Qty, Buyout Or Stock?, Price, Total
+
+**Footer** (last page): Order Totals section:
+- "ORIGINAL TOTAL: ${originalTotal}"
+- "DISCOUNT AMOUNT: ${discountAmount}"
+- "FINAL ORDER TOTAL: ${finalTotal}"
+
+**Page footer** (every page): "Order #{orderId} Page {n} of {total}"
+
+---
+
+## Part 3 — Backend: Invoice API route
+
+Add to `server/routes.ts`:
+
+```
+GET /api/orders/:id/pdf/invoice
+```
+
+1. Load the project and all its order_items (joined with product info)
+2. Group items by SKU (maintaining CSV input order)
+3. For each group, determine column set based on the product's exportType
+4. Build the sections JSON structure above
+5. Calculate order totals
+6. Write the JSON to a temp file, spawn the Python script, wait for completion
+7. Stream the resulting PDF back with `Content-Type: application/pdf` and `Content-Disposition: inline; filename="Invoice_{orderId}.pdf"`
+
+Require `isAuthenticated`.
+
+---
+
+## Part 4 — Frontend: Invoice download button
+
+In `client/src/pages/OrderDetails.tsx`, add an Invoice button to the download buttons area:
+
+```tsx
+<Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/pdf/invoice`, '_blank')}>
+  <FileText className="w-4 h-4 mr-1.5" />
+  Invoice PDF
+</Button>
+```
+
+Add `FileText` to lucide-react imports if not already present.
+
+---
+
+## What NOT to change
+
+- Do not modify the upload pipeline
+- Do not modify the pricing engine
+- Do not modify any existing download buttons
+- Do not modify any admin pages
+
+---
+
+## After completing, confirm:
+
+1. Upload a test order CSV with mixed product types
+2. "Invoice PDF" button appears on Order Details
+3. Clicking it opens a PDF in a new tab
+4. PDF header shows order info, bill-to, ship-to correctly
+5. Each SKU group has the correct columns for its product type
+6. Hardware items show "Buyout Or Stock?" column, shelves/panels show edge banding columns
+7. Price and Total columns show formatted dollar amounts
+8. Last page shows Order Totals section
+9. Every page shows "Order #XXXX Page X of Y" footer

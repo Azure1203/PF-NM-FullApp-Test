@@ -1344,6 +1344,15 @@ export default function OrderDetails() {
                     <Download className="w-4 h-4 mr-1.5" />
                     ERP Import
                   </Button>
+                  <Button
+                    data-testid="button-invoice-pdf"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/api/orders/${id}/pdf/invoice`, '_blank')}
+                  >
+                    <FileText className="w-4 h-4 mr-1.5" />
+                    Invoice PDF
+                  </Button>
                 </div>
 
                 {/* Loading skeleton */}
