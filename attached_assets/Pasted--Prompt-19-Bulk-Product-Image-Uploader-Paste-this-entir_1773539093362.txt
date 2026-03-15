@@ -1,0 +1,322 @@
+# Prompt 19 — Bulk Product Image Uploader
+
+Paste this entire prompt into Replit.
+
+We need the ability to upload a large batch of product images at once and have them automatically match to products by filename. This works for BOTH the `allmoxy_products` table (pricing/configurator products like shelves, panels, doors) and the `products` table (hardware products like handles, hinges, slides). The user drops a folder of images, the system shows which files matched which products, and on confirm it saves them all.
+
+---
+
+## Part 1 — Schema: Add imagePath to Allmoxy Products
+
+In `shared/schema.ts`, add a new column to the `allmoxyProducts` table:
+
+```ts
+imagePath: text("image_path"),
+```
+
+In `server/storage.ts`, add `imagePath` to the `upsertAllmoxyProduct` conflict update set so it gets saved on create/update.
+
+Run the Drizzle migration:
+```bash
+npx drizzle-kit generate
+npx drizzle-kit migrate
+```
+
+---
+
+## Part 2 — Backend: Bulk Image Upload Endpoint
+
+Add a new route to `server/routes.ts`:
+
+```
+POST /api/admin/products/bulk-upload-images
+```
+
+This route accepts a `multipart/form-data` request with multiple image files. Use the existing `multer` setup (already in the project). Configure multer to accept up to 200 files at once with a field name of `images`.
+
+```ts
+const bulkImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 200 }, // 5MB per file, 200 max
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    cb(null, allowed.includes(file.mimetype));
+  }
+});
+```
+
+The route logic:
+
+1. Receive the uploaded files from `req.files`
+2. Also receive a `target` field from `req.body` — either `"allmoxy"`, `"hardware"`, or `"both"` (default: `"both"`)
+3. For each uploaded file:
+   a. Extract the filename without extension: e.g. `34SHFF.jpg` → `34SHFF`, `H.801.13.201.png` → `H.801.13.201`, `801.13.201.png` → `801.13.201`
+   b. Generate **search variants** from the extracted filename to handle supplier prefix conventions. Many product codes in the hardware table have an `H.`, `M-`, `M.`, `S.`, or `R.` prefix, but image filenames may or may not include that prefix. For each filename, build an array of variants to try:
+      - The original filename as-is (e.g. `801.13.201`)
+      - With `H.` prepended (e.g. `H.801.13.201`)
+      - With `M-` prepended (e.g. `M-801.13.201`)
+      - With `S.` prepended (e.g. `S.801.13.201`)
+      - With `R.` prepended (e.g. `R.801.13.201`)
+      - If the filename already starts with `H.`, `M-`, `M.`, `S.`, or `R.` — also try with that prefix stripped (e.g. `H.801.13.201` → also try `801.13.201`)
+      
+      This means a file named `801.13.201.png` will match hardware product `H.801.13.201`, and a file named `H.801.13.201.png` will also match. Both directions work.
+      
+   c. Try to match against products using this priority (try ALL variants at each step before moving to the next):
+      - **Exact match on Allmoxy product name/skuPrefix** — if any variant (case-insensitive) exactly matches an `allmoxy_products.name` or `allmoxy_products.skuPrefix`, match it
+      - **Exact match on Hardware product code** — if any variant exactly matches a `products.code`, match it
+      - **Prefix match on Allmoxy** — if any variant starts with an Allmoxy product's `skuPrefix` (e.g. filename `34SHFF_front.jpg` matches product with skuPrefix `34SHFF`)
+      - **Partial match** — if any variant contains a product name/code as a substring, or if a product name/code contains any variant as a substring
+   d. Store the image using the Replit Object Storage service (already used in the codebase for packing slip images):
+      ```ts
+      const { ObjectStorageService } = await import('./replit_integrations/object_storage');
+      const objectStorage = new ObjectStorageService();
+      const storagePath = `product-images/${file.originalname}`;
+      await objectStorage.uploadBuffer(storagePath, file.buffer);
+      ```
+   e. Record the match result: `{ filename, storagePath, matchedTable ('allmoxy' | 'hardware' | null), matchedProductId, matchedProductName, confidence ('exact' | 'prefix' | 'partial' | 'none') }`
+
+4. **Do NOT save the imagePath to any product yet.** Return all match results as a preview:
+
+```json
+{
+  "results": [
+    {
+      "filename": "34SHFF.jpg",
+      "storagePath": "product-images/34SHFF.jpg",
+      "matchedTable": "allmoxy",
+      "matchedProductId": 42,
+      "matchedProductName": "34SHFF",
+      "confidence": "exact"
+    },
+    {
+      "filename": "H.801.13.201.png",
+      "storagePath": "product-images/H.801.13.201.png",
+      "matchedTable": "hardware",
+      "matchedProductId": 367,
+      "matchedProductName": "H.801.13.201",
+      "confidence": "exact"
+    },
+    {
+      "filename": "801.13.201.png",
+      "storagePath": "product-images/801.13.201.png",
+      "matchedTable": "hardware",
+      "matchedProductId": 367,
+      "matchedProductName": "H.801.13.201",
+      "confidence": "exact"
+    },
+    {
+      "filename": "random_photo.jpg",
+      "storagePath": "product-images/random_photo.jpg",
+      "matchedTable": null,
+      "matchedProductId": null,
+      "matchedProductName": null,
+      "confidence": "none"
+    }
+  ],
+  "summary": {
+    "total": 50,
+    "exactMatches": 42,
+    "prefixMatches": 5,
+    "partialMatches": 2,
+    "unmatched": 1
+  }
+}
+```
+
+Require `isAuthenticated`.
+
+---
+
+## Part 3 — Backend: Confirm Bulk Image Assignment
+
+Add a second route:
+
+```
+POST /api/admin/products/confirm-image-assignments
+```
+
+Request body:
+```json
+{
+  "assignments": [
+    {
+      "storagePath": "product-images/34SHFF.jpg",
+      "targetTable": "allmoxy",
+      "productId": 42
+    },
+    {
+      "storagePath": "product-images/H.801.13.201.png",
+      "targetTable": "hardware",
+      "productId": 367
+    }
+  ]
+}
+```
+
+For each assignment:
+- If `targetTable` is `"allmoxy"`: update the `allmoxy_products` row with `imagePath = storagePath`
+- If `targetTable` is `"hardware"`: update the `products` row with `imagePath = storagePath`
+
+Return `{ updated: number, errors: string[] }`.
+
+Require `isAuthenticated`.
+
+---
+
+## Part 4 — Backend: Serve Product Images
+
+Add a route to serve images from object storage:
+
+```
+GET /api/product-images/:imagePath(*)
+```
+
+This route reads the image from Replit Object Storage and streams it back with the correct Content-Type header. Add cache headers (`Cache-Control: public, max-age=86400`).
+
+```ts
+app.get('/api/product-images/*', isAuthenticated, async (req, res) => {
+  try {
+    const imagePath = req.params[0];
+    // Validate path to prevent traversal
+    if (imagePath.includes('..') || imagePath.startsWith('/')) {
+      return res.status(400).json({ message: 'Invalid path' });
+    }
+    const fullPath = `product-images/${imagePath}`;
+    const { ObjectStorageService } = await import('./replit_integrations/object_storage');
+    const objectStorage = new ObjectStorageService();
+    const buffer = await objectStorage.downloadBuffer(fullPath);
+    if (!buffer) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+    // Detect content type from extension
+    const ext = imagePath.split('.').pop()?.toLowerCase();
+    const contentTypes: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+      webp: 'image/webp', gif: 'image/gif'
+    };
+    res.setHeader('Content-Type', contentTypes[ext || ''] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(buffer);
+  } catch (err: any) {
+    res.status(500).json({ message: 'Failed to serve image' });
+  }
+});
+```
+
+---
+
+## Part 5 — Frontend: Bulk Image Upload Page
+
+Create a new page at `/admin/product-images` in `client/src/pages/admin/ProductImageUploader.tsx`.
+
+### Layout
+
+**Top section — Drop Zone:**
+A large drag-and-drop area (dashed border, accepts multiple files). Also has a "Browse Files" button. Accepts `.jpg`, `.jpeg`, `.png`, `.webp` files. Shows a count of selected files before upload.
+
+Below the drop zone, a target selector:
+```tsx
+<Select value={target} onValueChange={setTarget}>
+  <SelectTrigger className="w-64">
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="both">Match Both Tables</SelectItem>
+    <SelectItem value="allmoxy">Allmoxy Products Only</SelectItem>
+    <SelectItem value="hardware">Hardware Products Only</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+An "Upload & Match" button that sends the files to the bulk upload endpoint.
+
+**Middle section — Match Preview (shown after upload):**
+A table showing all results with columns:
+- Thumbnail (small preview of the uploaded image)
+- Filename
+- Matched Product (product name or "No match" in red)
+- Table (badge: "Allmoxy" blue, "Hardware" gray, or "—")
+- Confidence (badge: "Exact" green, "Prefix" amber, "Partial" orange, "None" red)
+- Action (checkbox — checked by default for exact/prefix matches, unchecked for partial/none)
+
+Above the table, show the summary: "42 exact, 5 prefix, 2 partial, 1 unmatched"
+
+For unmatched files, add a manual product selector dropdown in the row so the user can manually pick which product the image belongs to. The dropdown should search both product tables.
+
+**Bottom section — Confirm:**
+A "Save X Image Assignments" button that sends only the checked rows to the confirm endpoint. On success, show a toast with the count.
+
+### Sidebar entry
+
+Add to the SYSTEM ADMINISTRATION section in `AppLayout.tsx`:
+
+```ts
+{ name: "Product Images", href: "/admin/product-images", icon: ImagePlus },
+```
+
+Import `ImagePlus` from `lucide-react`.
+
+Add `getPageTitle()`:
+```ts
+if (location === "/admin/product-images") return "Product Images";
+```
+
+Add the route to `App.tsx`:
+```tsx
+<Route path="/admin/product-images" component={ProductImageUploader} />
+```
+
+---
+
+## Part 6 — Show Images in Product Manager
+
+In `AllmoxyProductManager.tsx`, add a small image preview in the product edit form. If the product has an `imagePath`, show the image as a thumbnail (64x64) next to the product name at the top of the edit panel. If no image, show a placeholder icon.
+
+Also show a small thumbnail (32x32) in the product list for each product that has an image.
+
+In the product list on the left panel, products with images get a small image thumbnail instead of the generic icon.
+
+---
+
+## Part 7 — Show Images in Hardware Product List
+
+In `client/src/pages/Products.tsx`, if a product's `imagePath` starts with `product-images/`, render it using the `/api/product-images/` route. If it starts with `http`, render it directly as an `<img>` src (this handles any legacy external URLs that may already exist on some products).
+
+---
+
+## Part 8 — Remove Auto-Scraper Routes and UI
+
+The existing Marathon, Hafele, and Richelieu image auto-scrapers are no longer needed — the bulk uploader replaces them.
+
+**In `server/routes.ts`, remove these three routes entirely:**
+- `POST /api/products/fetch-marathon-images`
+- `POST /api/products/fetch-hafele-images`
+- `POST /api/products/fetch-richelieu-images`
+
+**In `client/src/pages/Products.tsx`, remove:**
+- The `fetchMarathonImagesMutation`, `fetchHafeleImagesMutation`, and `fetchRichelieuImagesMutation` mutation definitions
+- The "Fetch Images:" label and the three Marathon/Hafele/Richelieu buttons in the toolbar
+- The `ImageDown` import from lucide-react (if no longer used elsewhere)
+
+Do NOT remove any product data or existing `imagePath` values that were previously set by the scrapers — those URLs still work and should continue to display.
+
+---
+
+## What NOT to change
+
+- Do not modify the pricing engine or formula tester
+- Do not modify the upload pipeline
+- Do not modify any checklist or packing slip functionality
+- Do not delete any existing imagePath values on products (the old scraper URLs are still valid)
+
+## After completing, confirm:
+
+1. The migration ran and `image_path` column exists on `allmoxy_products`
+2. The Product Images page loads at `/admin/product-images`
+3. You can drag multiple image files onto the drop zone
+4. Clicking "Upload & Match" shows a preview table with match results
+5. Exact matches show green confidence badges
+6. Unmatched files show a manual product selector dropdown
+7. Clicking "Save Assignments" updates the products and shows a toast
+8. Product images appear as thumbnails in both the Allmoxy Product Manager and the Hardware Products page
+9. The app still starts without errors
