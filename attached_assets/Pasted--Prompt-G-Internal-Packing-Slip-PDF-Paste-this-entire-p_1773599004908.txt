@@ -1,0 +1,104 @@
+# Prompt G — Internal Packing Slip PDF
+
+Paste this entire prompt into Replit.
+
+Generate an Internal Packing Slip PDF matching the reference `Netley_Packing_Slip.pdf`. This is the production team's working copy — internal use only, never sent with the job. It has extra columns compared to the Customer Packing Slip.
+
+---
+
+## Part 1 — Python PDF script
+
+Create `server/scripts/generate_internal_packing_slip.py`.
+
+**Header**:
+- Title: "INTERNAL PACKING LIST" (large, bold, centered)
+- Warning: "(DO NOT SEND WITH JOB)" (centered, red or bold)
+- "Job #{orderId}"
+- "Order Info" section: Order Name, "Project & CV Label #:" (blank field for manual entry)
+
+**Body**: Same SKU grouping as Invoice/Customer Packing Slip, but with these column differences:
+
+**For panel/shelf/part/molding items** (exportType = ORD, items with dimensions and edge banding):
+- Columns: ID, Qty, Height, Width, **hidden attribute for aligning** (always 0), Thickness, Edge Left, Edge Right, Edge Top, Edge Bottom, product type
+- The "hidden attribute for aligning" column contains the value 0 for every row. It exists between Width and Thickness to maintain column alignment across different product types in the printed layout.
+- **No Price or Total columns**
+
+**For drawer box items** (melamine and dovetail):
+- Columns: ID, Qty, Height, Width, Length, Thickness, product type
+- **No Price or Total columns**
+
+**For drawer front items**:
+- Columns: ID, Qty, Height, Width, **hidden attribute for aligning** (always 0), Thickness, product type
+- **No Price or Total columns**
+
+**For CTS rod items** (exportType = CTS):
+- Columns: ID, Qty, Height, Width, Length, **Buyout Or Stock?**, **Rack Location**
+- Rack Location comes from the product's grid data if available, otherwise blank
+
+**For hardware items** (exportType = HARDWARE, non-CTS):
+- Columns: ID, Qty, **Buyout Or Stock?**
+- Some hardware items also show **Rack Location** if configured (e.g. hanging rails: "Rack B Slot 17 / 18")
+- Items WITHOUT a rack location: ID, Qty, Buyout Or Stock? (3 columns)
+- Items WITH a rack location: ID, Qty, Buyout Or Stock?, Rack Location (4 columns)
+
+**Section footer**: "{totalItems} Total Items" (no dollar subtotal).
+
+**SKU code shown prominently** below each section (e.g. "34SHFF", "DBX36_18_167") — in the reference PDF this appears as a standalone line below the item count, before the "Color:" line.
+
+**No pricing shown anywhere. No order totals section.**
+
+**Page footer**: "Order #{orderId} Page {n} of {total}".
+
+---
+
+## Part 2 — Backend: Rack Location resolution
+
+The Internal Packing Slip needs rack location data. This comes from the product's attribute grid. When building the sections JSON for the Python script:
+
+1. For each CTS or HARDWARE item, check if the matched product has a grid binding
+2. Look up the grid row for this item's SKU
+3. If the row data contains a `rack_location` or `RACK_LOCATION` field, include it
+4. Otherwise, set rackLocation to null
+
+Add `rackLocation` and `supplyType` fields to the section items in the JSON passed to the script.
+
+---
+
+## Part 3 — Backend route
+
+Add to `server/routes.ts`:
+
+```
+GET /api/orders/:id/pdf/internal-packing-slip
+```
+
+Same data assembly as Invoice/Customer routes, but also resolves rack locations for hardware and CTS items. Pass to the internal packing slip Python script. Return the PDF.
+
+Require `isAuthenticated`.
+
+---
+
+## Part 4 — Frontend button
+
+In `client/src/pages/OrderDetails.tsx`, add to the download buttons area:
+
+```tsx
+<Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/pdf/internal-packing-slip`, '_blank')}>
+  <FileText className="w-4 h-4 mr-1.5" />
+  Internal Packing Slip
+</Button>
+```
+
+---
+
+## After completing, confirm:
+
+1. "Internal Packing Slip" button appears on Order Details
+2. PDF opens with "INTERNAL PACKING LIST" and "(DO NOT SEND WITH JOB)" header
+3. Panel/shelf items show the extra "hidden attribute for aligning" column (value 0) between Width and Thickness
+4. CTS items show "Buyout Or Stock?" and "Rack Location" columns
+5. Hardware items show "Buyout Or Stock?" column
+6. Items with configured rack locations show the location (e.g. "Rack B Slot 13 / 14")
+7. No pricing anywhere in the document
+8. SKU codes appear prominently below each section
+9. Page numbers on every page

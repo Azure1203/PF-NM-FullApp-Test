@@ -1,0 +1,76 @@
+# Prompt F — Customer Packing Slip PDF
+
+Paste this entire prompt into Replit.
+
+Generate a Customer Packing Slip PDF matching the reference `Customer_Packing_Slip.pdf`. This is the customer-facing document that is **physically printed and sent with the shipment**. It contains all the same item detail and grouping as the Invoice but with **no pricing whatsoever**.
+
+---
+
+## Part 1 — Python PDF script
+
+Create `server/scripts/generate_customer_packing_slip.py`.
+
+This script is nearly identical to the Invoice script (`generate_invoice.py`) with these differences:
+
+**Header changes**:
+- Title: "CUSTOMER PACKING SLIP" (large, bold, centered)
+- Subtitle: "SEND WITH ORDER IN MARKED ENVELOPE" (centered, slightly smaller)
+- Shows "Order Name:" and "Packing List #{orderId}" (with barcode if possible, or just the number)
+- Does NOT show: Bill To, Order Status, Date Ordered, Payment Due By, Shipping Method
+- Does NOT show any Netley Millwork company info
+
+**Body changes**:
+- Same SKU grouping and section structure as Invoice
+- Same column sets per product type EXCEPT:
+  - **Remove the Price column** from all product types
+  - **Remove the Total column** from all product types
+  - **Remove "Buyout Or Stock?" column** — hardware items show only ID and Qty
+  - CTS rods show: ID, Qty, Length (no Buyout/Stock, no Price)
+- Section footer shows item count only: "{totalItems} Total Items" (no dollar subtotal)
+
+**No Order Totals section** at the bottom.
+
+**Page footer**: "Order #{orderId} Page {n} of {total}" (same as Invoice).
+
+The input JSON is the same shape as the Invoice script — the Python script simply ignores the price fields.
+
+---
+
+## Part 2 — Backend route
+
+Add to `server/routes.ts`:
+
+```
+GET /api/orders/:id/pdf/customer-packing-slip
+```
+
+Same data assembly logic as the Invoice route — load project, load order_items, group by SKU, build sections. Pass to the customer packing slip Python script. Return the PDF.
+
+Require `isAuthenticated`.
+
+---
+
+## Part 3 — Frontend button
+
+In `client/src/pages/OrderDetails.tsx`, add to the download buttons area:
+
+```tsx
+<Button variant="outline" size="sm" onClick={() => window.open(`/api/orders/${id}/pdf/customer-packing-slip`, '_blank')}>
+  <FileText className="w-4 h-4 mr-1.5" />
+  Customer Packing Slip
+</Button>
+```
+
+---
+
+## After completing, confirm:
+
+1. "Customer Packing Slip" button appears on Order Details
+2. PDF opens with "CUSTOMER PACKING SLIP" and "SEND WITH ORDER IN MARKED ENVELOPE" header
+3. All item groups appear in the same order as the Invoice
+4. NO price or total columns appear anywhere in the document
+5. Hardware items show only ID and Qty (no Buyout/Stock column)
+6. CTS rods show ID, Qty, Length (no Buyout/Stock)
+7. Section footers show item count only, no dollar amounts
+8. No order totals section at the bottom
+9. Page numbers appear on every page

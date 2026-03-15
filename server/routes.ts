@@ -8,7 +8,7 @@ import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
 import { evaluatePrice } from "./services/pricingEngine";
 import { generateOrdItemBlock, generateOrdHeader } from "./services/ordExporter";
-import { generateInvoicePdf } from "./services/pdfGenerator";
+import { generateInvoicePdf, generateCustomerPackingSlipPdf } from "./services/pdfGenerator";
 import { getAsanaApiInstances } from "./lib/asana";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import path from 'path';
@@ -1017,6 +1017,115 @@ export async function registerRoutes(
       res.send(pdfBuf);
     } catch (e: any) {
       console.error('[Invoice PDF]', e.message);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // GET Customer Packing Slip PDF
+  app.get('/api/orders/:id/pdf/customer-packing-slip', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      const items = await storage.getOrderItemsByProject(projectId);
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+
+      const STRIP_COLS = new Set(['Price', 'Total', 'Buyout Or Stock?']);
+
+      const columnsForType = (exportType: string | null): string[] => {
+        let cols: string[];
+        switch (exportType) {
+          case 'ELIAS':    cols = ['ID', 'Qty', 'Height', 'Width', 'Length', 'type']; break;
+          case 'MJ':       cols = ['ID', 'Qty', 'Height', 'Width', 'Thickness', 'type']; break;
+          case 'CTS':      cols = ['ID', 'Qty', 'Length']; break;
+          case 'HARDWARE': cols = ['ID', 'Qty']; break;
+          case 'GLASS':    cols = ['ID', 'Qty', 'Height', 'Width', 'Thickness']; break;
+          case 'ORD':      cols = ['ID', 'Qty', 'Height', 'Width', 'Thickness', 'Edge Left', 'Edge Right', 'Edge Top', 'Edge Bottom', 'type']; break;
+          default:         cols = ['ID', 'Qty', 'Height', 'Width']; break;
+        }
+        return cols.filter(c => !STRIP_COLS.has(c));
+      };
+
+      const groupedMap = new Map<string, typeof items>();
+      const groupOrder: string[] = [];
+      for (const item of items) {
+        const key = item.productId != null ? `p:${item.productId}` : `s:${item.sku ?? item.description ?? 'unknown'}`;
+        if (!groupedMap.has(key)) {
+          groupedMap.set(key, []);
+          groupOrder.push(key);
+        }
+        groupedMap.get(key)!.push(item);
+      }
+
+      let sectionIndex = 0;
+      const sections = groupOrder.map(key => {
+        const groupItems = groupedMap.get(key)!;
+        const firstItem = groupItems[0];
+        const product = firstItem.productId != null ? productMap.get(firstItem.productId) : null;
+        const exportType = firstItem.exportType ?? null;
+        const columns = columnsForType(exportType);
+
+        const raw0 = (firstItem.rawRowData ?? {}) as Record<string, any>;
+        const color: string | null = raw0['Material'] ?? raw0['Color'] ?? raw0['Colour'] ?? raw0['color'] ?? null;
+
+        const invoiceItems = groupItems.map((item, idx) => {
+          const raw = (item.rawRowData ?? {}) as Record<string, any>;
+          const edgeLeft   = (raw['Left']   === '1' || raw['Left']   === 1) ? 'E' : 'N';
+          const edgeRight  = (raw['Right']  === '1' || raw['Right']  === 1) ? 'E' : 'N';
+          const edgeTop    = (raw['Top']    === '1' || raw['Top']    === 1) ? 'E' : 'N';
+          const edgeBottom = (raw['Bottom'] === '1' || raw['Bottom'] === 1) ? 'E' : 'N';
+          return {
+            id: `${sectionIndex + 1} ${String(idx + 1).padStart(2, '0')}`,
+            qty: item.quantity ?? 1,
+            height: item.height ?? null,
+            width: item.width ?? null,
+            length: item.depth ?? null,
+            thickness: item.depth ?? null,
+            edgeLeft, edgeRight, edgeTop, edgeBottom,
+            type: product?.name ?? item.description ?? '',
+            supplyType: item.supplyType ?? 'STOCK',
+            unitPrice: 0,
+            totalPrice: 0,
+          };
+        });
+
+        const totalItems = groupItems.reduce((s, i) => s + (i.quantity ?? 1), 0);
+        const subtotal   = groupItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0);
+
+        sectionIndex++;
+        return {
+          sku: firstItem.sku ?? product?.skuPrefix ?? `Item ${sectionIndex}`,
+          color,
+          categoryLabel: product?.description ?? exportType ?? '',
+          productDescription: product?.name ?? firstItem.description ?? '',
+          columns,
+          items: invoiceItems,
+          totalItems,
+          subtotal: Math.round(subtotal * 100) / 100,
+        };
+      });
+
+      const grandTotal = sections.reduce((s, sec) => s + sec.subtotal, 0);
+
+      const packingData = {
+        orderId: projectId,
+        orderName: project.name ?? `Order ${projectId}`,
+        orderStatus: project.status ?? 'Bid',
+        sections,
+        originalTotal: Math.round(grandTotal * 100) / 100,
+        discountAmount: 0,
+        finalTotal: Math.round(grandTotal * 100) / 100,
+        outputPath: `/tmp/packing_slip_${projectId}_${Date.now()}.pdf`,
+      };
+
+      const pdfBuf = await generateCustomerPackingSlipPdf(packingData);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="PackingSlip_${projectId}.pdf"`);
+      res.send(pdfBuf);
+    } catch (e: any) {
+      console.error('[Customer Packing Slip PDF]', e.message);
       res.status(500).json({ message: e.message });
     }
   });

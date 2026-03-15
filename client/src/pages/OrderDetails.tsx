@@ -1353,6 +1353,15 @@ export default function OrderDetails() {
                     <FileText className="w-4 h-4 mr-1.5" />
                     Invoice PDF
                   </Button>
+                  <Button
+                    data-testid="button-customer-packing-slip"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`/api/orders/${id}/pdf/customer-packing-slip`, '_blank')}
+                  >
+                    <FileText className="w-4 h-4 mr-1.5" />
+                    Customer Packing Slip
+                  </Button>
                 </div>
 
                 {/* Loading skeleton */}

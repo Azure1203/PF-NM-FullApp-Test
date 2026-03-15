@@ -47,7 +47,8 @@ export interface InvoiceData {
   outputPath: string;
 }
 
-const SCRIPT_PATH = path.join(process.cwd(), 'server', 'scripts', 'generate_invoice.py');
+const SCRIPT_PATH         = path.join(process.cwd(), 'server', 'scripts', 'generate_invoice.py');
+const PACKING_SLIP_SCRIPT = path.join(process.cwd(), 'server', 'scripts', 'generate_customer_packing_slip.py');
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
   const tmpPath = path.join(os.tmpdir(), `invoice_${data.orderId}_${Date.now()}.pdf`);
@@ -87,6 +88,48 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
 
     py.on('error', (err) => {
       reject(new Error(`Failed to spawn Python: ${err.message}`));
+    });
+  });
+}
+
+export async function generateCustomerPackingSlipPdf(data: InvoiceData): Promise<Buffer> {
+  const tmpPath = path.join(os.tmpdir(), `packing_slip_${data.orderId}_${Date.now()}.pdf`);
+  const payload: InvoiceData = { ...data, outputPath: tmpPath };
+
+  return new Promise((resolve, reject) => {
+    const py = spawn('python3', [PACKING_SLIP_SCRIPT], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    py.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    py.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    py.stdin.write(JSON.stringify(payload));
+    py.stdin.end();
+
+    py.on('close', (code) => {
+      if (code !== 0) {
+        return reject(new Error(`Packing slip generator failed (exit ${code}): ${stderr.slice(0, 500)}`));
+      }
+      const successLine = stdout.trim().split('\n').find(l => l.startsWith('SUCCESS:'));
+      if (!successLine) {
+        return reject(new Error(`Packing slip generator gave no SUCCESS line. stderr: ${stderr.slice(0, 500)}`));
+      }
+      const pdfPath = successLine.replace('SUCCESS:', '').trim();
+      try {
+        const buf = fs.readFileSync(pdfPath);
+        try { fs.unlinkSync(pdfPath); } catch { }
+        resolve(buf);
+      } catch (e: any) {
+        reject(new Error(`Could not read generated packing slip PDF: ${e.message}`));
+      }
+    });
+
+    py.on('error', (err) => {
+      reject(new Error(`Failed to spawn Python for packing slip: ${err.message}`));
     });
   });
 }
