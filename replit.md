@@ -1,5 +1,12 @@
 # replit.md
 
+## Master Architecture Reference
+
+The authoritative specification for this system lives at:
+**`docs/MASTER_ARCHITECTURE_SPEC_v4.md`**
+
+It defines every data model, formula pattern, output document, admin UI, and build prompt for the Perfect Fit Closets / Netley Millwork order management system. Read it first when planning any new feature. Section 14 of that file tracks the current implementation status and known gaps vs. the spec.
+
 ## Overview
 
 This is an order management dashboard application designed for closet orders. It enables users to upload and parse CSV files containing order data, store this information in a PostgreSQL database, and then review and edit the extracted order details. A key feature is the synchronization of orders with Asana for project management, and automated integration with Outlook for fetching packing slips and hardware CSVs. The system also includes detailed inventory management for hardware and components, along with a comprehensive packing checklist system.
