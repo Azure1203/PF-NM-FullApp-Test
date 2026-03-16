@@ -100,6 +100,8 @@ export default function AllmoxyProductManager() {
   const [bindings, setBindings] = useState<LocalBinding[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
+  const [sortBy, setSortBy] = useState<string>("name-asc");
+  const [filterExportType, setFilterExportType] = useState<string>("all");
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -148,12 +150,41 @@ export default function AllmoxyProductManager() {
     }
   }, [fetchedBindings]);
 
+  const EXPORT_TYPE_ORDER: Record<string, number> = {
+    'ORD': 0, 'ELIAS': 1, 'MJ': 2, 'CTS': 3, 'GLASS': 4, 'HARDWARE': 5, 'NONE': 6,
+  };
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    return products.filter(p =>
-      p.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [products, search]);
+    let list = products.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
+      const matchesType = filterExportType === "all" || (p.exportType ?? "ORD") === filterExportType;
+      return matchesSearch && matchesType;
+    });
+    list = [...list].sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":  return a.name.localeCompare(b.name);
+        case "name-desc": return b.name.localeCompare(a.name);
+        case "export-type": {
+          const aO = EXPORT_TYPE_ORDER[a.exportType ?? 'ORD'] ?? 99;
+          const bO = EXPORT_TYPE_ORDER[b.exportType ?? 'ORD'] ?? 99;
+          return aO !== bO ? aO - bO : a.name.localeCompare(b.name);
+        }
+        case "sku-prefix": {
+          const aS = a.skuPrefix ?? "";
+          const bS = b.skuPrefix ?? "";
+          return aS !== bS ? aS.localeCompare(bS) : a.name.localeCompare(b.name);
+        }
+        case "status": {
+          const aActive = a.status === "active" ? 0 : 1;
+          const bActive = b.status === "active" ? 0 : 1;
+          return aActive !== bActive ? aActive - bActive : a.name.localeCompare(b.name);
+        }
+        default: return a.name.localeCompare(b.name);
+      }
+    });
+    return list;
+  }, [products, search, sortBy, filterExportType]);
 
   const pricingProxies = proxyVars?.filter((v) => v.type === "pricing") ?? [];
   const exportProxies = proxyVars?.filter((v) => v.type === "export") ?? [];
@@ -405,7 +436,33 @@ export default function AllmoxyProductManager() {
                   className="pl-8"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  data-testid="input-search-products"
                 />
+              </div>
+              <div className="flex gap-2">
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="h-7 text-xs flex-1" data-testid="select-sort-products">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name A→Z</SelectItem>
+                    <SelectItem value="name-desc">Name Z→A</SelectItem>
+                    <SelectItem value="export-type">Export Type</SelectItem>
+                    <SelectItem value="sku-prefix">SKU Prefix</SelectItem>
+                    <SelectItem value="status">Status</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterExportType} onValueChange={setFilterExportType}>
+                  <SelectTrigger className="h-7 text-xs flex-1" data-testid="select-filter-export-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {EXPORT_TYPE_OPTIONS.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <ScrollArea className="flex-1">
