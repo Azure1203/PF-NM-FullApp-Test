@@ -23,7 +23,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Code, ChevronRight, CheckSquare } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Search, Code, ChevronRight, CheckSquare, Upload, FileText } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ProxyVariable } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -69,9 +77,14 @@ export default function ProxyVariableManager() {
     },
   });
 
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<Array<{ name: string; type: "pricing" | "export"; formula: string }>>([]);
+
   const { data: variables, isLoading } = useQuery<ProxyVariable[]>({
     queryKey: ["/api/admin/proxy-variables"],
   });
+
+  const existingNames = useMemo(() => new Set((variables || []).map(v => v.name)), [variables]);
 
   const filteredVariables = useMemo(() => {
     if (!variables) return [];
@@ -140,6 +153,49 @@ export default function ProxyVariableManager() {
     },
   });
 
+  const bulkImportMutation = useMutation({
+    mutationFn: async (items: Array<{ name: string; type: string; formula: string }>) => {
+      const res = await apiRequest("POST", "/api/admin/proxy-variables/bulk-import", { items });
+      return res.json();
+    },
+    onSuccess: (data: { created: number; updated: number; results: Array<{ name: string; action: string }>; errors: Array<{ name: string; error: string }> }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/proxy-variables"] });
+      const total = data.created + data.updated;
+      const parts = [];
+      if (data.created > 0) parts.push(`${data.created} created`);
+      if (data.updated > 0) parts.push(`${data.updated} updated`);
+      if (data.errors?.length > 0) parts.push(`${data.errors.length} failed`);
+      toast({ title: `${total} variable${total !== 1 ? "s" : ""} imported`, description: parts.join(", ") });
+      setImportOpen(false);
+      setImportRows([]);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const readers = files.map(
+      file =>
+        new Promise<{ name: string; type: "pricing" | "export"; formula: string }>(resolve => {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            const name = file.name.replace(/\.txt$/i, "");
+            const formula = (ev.target?.result as string) || "";
+            resolve({ name, type: "pricing", formula });
+          };
+          reader.readAsText(file);
+        })
+    );
+    Promise.all(readers).then(rows => {
+      setImportRows(rows);
+      setImportOpen(true);
+    });
+    e.target.value = "";
+  };
+
   const onSubmit = (values: ProxyVariableValues) => {
     saveMutation.mutate(values);
   };
@@ -163,6 +219,7 @@ export default function ProxyVariableManager() {
   };
 
   return (
+    <>
     <div className="h-[calc(100vh-120px)] border rounded-lg bg-card overflow-hidden">
       <ResizablePanelGroup direction="horizontal">
         {/* Left Pane: List View */}
@@ -185,6 +242,19 @@ export default function ProxyVariableManager() {
                       <Button size="icon" variant="ghost" onClick={() => setSelectMode(true)} title="Select multiple" data-testid="button-toggle-select-mode">
                         <CheckSquare className="h-4 w-4" />
                       </Button>
+                      <label title="Import .txt files" className="cursor-pointer">
+                        <Button size="icon" variant="ghost" asChild data-testid="button-import-variables">
+                          <span><Upload className="h-4 w-4" /></span>
+                        </Button>
+                        <input
+                          type="file"
+                          accept=".txt"
+                          multiple
+                          className="hidden"
+                          onChange={handleFileSelect}
+                          data-testid="input-import-files"
+                        />
+                      </label>
                       <Button size="icon" variant="ghost" onClick={handleNew} title="New Variable" data-testid="button-new-variable">
                         <Plus className="h-4 w-4" />
                       </Button>
@@ -445,5 +515,113 @@ export default function ProxyVariableManager() {
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
+
+    <Dialog open={importOpen} onOpenChange={open => { if (!open) { setImportOpen(false); setImportRows([]); } }}>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Import Variables from Files
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 py-2 border-b">
+          <span className="text-sm text-muted-foreground mr-1">Set all to:</span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            data-testid="button-set-all-pricing"
+            onClick={() => setImportRows(rows => rows.map(r => ({ ...r, type: "pricing" as const })))}
+          >
+            Pricing
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            data-testid="button-set-all-export"
+            onClick={() => setImportRows(rows => rows.map(r => ({ ...r, type: "export" as const })))}
+          >
+            Export
+          </Button>
+          <span className="ml-auto text-xs text-muted-foreground">{importRows.length} file{importRows.length !== 1 ? "s" : ""} selected</span>
+        </div>
+
+        <ScrollArea className="flex-1 min-h-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[220px]">Variable Name</TableHead>
+                <TableHead className="w-[130px]">Type</TableHead>
+                <TableHead>Formula Preview</TableHead>
+                <TableHead className="w-[110px]">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {importRows.map((row, i) => (
+                <TableRow key={i} data-testid={`import-row-${i}`}>
+                  <TableCell className="font-mono text-xs font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      {row.name}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={row.type}
+                      onValueChange={(val: "pricing" | "export") =>
+                        setImportRows(rows => rows.map((r, j) => j === i ? { ...r, type: val } : r))
+                      }
+                    >
+                      <SelectTrigger className="h-7 text-xs w-[110px]" data-testid={`select-import-type-${i}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pricing">Pricing</SelectItem>
+                        <SelectItem value="export">Export</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground max-w-[260px]">
+                    <span className="truncate block">{row.formula.slice(0, 90)}{row.formula.length > 90 ? "…" : ""}</span>
+                  </TableCell>
+                  <TableCell>
+                    {existingNames.has(row.name) ? (
+                      <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                        Will Update
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50 dark:bg-green-950/30">
+                        New
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+
+        <DialogFooter className="pt-2 border-t">
+          <Button variant="outline" onClick={() => { setImportOpen(false); setImportRows([]); }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => bulkImportMutation.mutate(importRows)}
+            disabled={bulkImportMutation.isPending || importRows.length === 0}
+            data-testid="button-confirm-import"
+          >
+            {bulkImportMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-4 w-4" />
+            )}
+            Import {importRows.length} variable{importRows.length !== 1 ? "s" : ""}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

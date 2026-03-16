@@ -726,6 +726,37 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/admin/proxy-variables/bulk-import', isAuthenticated, async (req, res) => {
+    try {
+      const { items } = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: 'items array is required' });
+      }
+      const existing = await storage.getProxyVariables();
+      const existingNames = new Set(existing.map((v: any) => v.name));
+      const results: Array<{ name: string; action: 'created' | 'updated' }> = [];
+      const errors: Array<{ name: string; error: string }> = [];
+      for (const item of items) {
+        const { name, type, formula } = item;
+        if (!name || !type || !formula) {
+          errors.push({ name: name || '(unknown)', error: 'name, type, and formula are required' });
+          continue;
+        }
+        try {
+          await storage.upsertProxyVariable({ name, type, formula });
+          results.push({ name, action: existingNames.has(name) ? 'updated' : 'created' });
+        } catch (e: any) {
+          errors.push({ name, error: e.message });
+        }
+      }
+      const created = results.filter(r => r.action === 'created').length;
+      const updated = results.filter(r => r.action === 'updated').length;
+      res.json({ results, errors, created, updated });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.delete('/api/admin/proxy-variables/:id', isAuthenticated, async (req, res) => {
     try {
       const success = await storage.deleteProxyVariable(Number(req.params.id));
