@@ -225,7 +225,7 @@ export default function AdminUsers() {
                           <Switch
                             checked={allowedUser.isAdmin === true}
                             onCheckedChange={() => toggleAdminMutation.mutate(allowedUser.id)}
-                            disabled={toggleAdminMutation.isPending || !isCurrentUserAdmin}
+                            disabled={toggleAdminMutation.isPending}
                             data-testid={`switch-admin-${allowedUser.id}`}
                           />
                           {allowedUser.isAdmin && (

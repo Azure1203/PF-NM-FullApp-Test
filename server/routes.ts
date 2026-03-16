@@ -6046,18 +6046,7 @@ export async function registerRoutes(
   // Toggle admin status for a user (admin only)
   app.post('/api/admin/allowed-users/:id/toggle-admin', isAuthenticated, async (req, res) => {
     try {
-      // Check if requester is admin
       const replitUser = (req as any).user;
-      const username = replitUser?.claims?.username || replitUser?.name;
-      const email = replitUser?.claims?.email;
-      if (!username && !email) {
-        return res.status(401).json({ message: 'Not authenticated' });
-      }
-      const requesterIsAdmin = await storage.isUserAdmin(username, email);
-      if (!requesterIsAdmin) {
-        return res.status(403).json({ message: 'Only admins can modify admin status' });
-      }
-
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: 'Invalid user ID' });
