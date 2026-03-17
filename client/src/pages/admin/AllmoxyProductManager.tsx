@@ -42,8 +42,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2 } from "lucide-react";
-import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding } from "@shared/schema";
+import { Loader2, Plus, Save, Trash2, Search, Package, ChevronRight, Upload, Link2, CheckSquare, CheckCircle2, Tags, Pencil } from "lucide-react";
+import type { AllmoxyProduct, ProxyVariable, AttributeGrid, ProductGridBinding, ProductCategory } from "@shared/schema";
 import { EXPORT_TYPE_OPTIONS, SUPPLY_TYPE_OPTIONS, type ExportType } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -64,6 +64,7 @@ const productSchema = z.object({
   notes: z.string().nullable(),
   exportType: z.string().default('ORD'),
   supplyType: z.string().nullable().default('STOCK'),
+  categoryId: z.number().nullable(),
 });
 
 const EXPORT_TYPE_COLORS: Record<string, string> = {
@@ -102,6 +103,13 @@ export default function AllmoxyProductManager() {
   const [selectMode, setSelectMode] = useState(false);
   const [sortBy, setSortBy] = useState<string>("name-asc");
   const [filterExportType, setFilterExportType] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [categoriesModalOpen, setCategoriesModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [importCategoryId, setImportCategoryId] = useState<string>("none");
+  const [deleteCategoryConfirmId, setDeleteCategoryConfirmId] = useState<number | null>(null);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -115,11 +123,16 @@ export default function AllmoxyProductManager() {
       notes: null,
       exportType: "ORD",
       supplyType: "STOCK",
+      categoryId: null,
     },
   });
 
   const { data: products, isLoading: isLoadingProducts } = useQuery<AllmoxyProduct[]>({
     queryKey: ["/api/admin/allmoxy-products"],
+  });
+
+  const { data: categories } = useQuery<ProductCategory[]>({
+    queryKey: ["/api/admin/product-categories"],
   });
 
   const { data: proxyVars } = useQuery<ProxyVariable[]>({
@@ -157,9 +170,10 @@ export default function AllmoxyProductManager() {
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     let list = products.filter(p => {
+      const matchesCategory = selectedCategory === "all" || (p as any).categoryId === Number(selectedCategory);
       const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
       const matchesType = filterExportType === "all" || (p.exportType ?? "ORD") === filterExportType;
-      return matchesSearch && matchesType;
+      return matchesCategory && matchesSearch && matchesType;
     });
     list = [...list].sort((a, b) => {
       switch (sortBy) {
@@ -184,7 +198,7 @@ export default function AllmoxyProductManager() {
       }
     });
     return list;
-  }, [products, search, sortBy, filterExportType]);
+  }, [products, search, sortBy, filterExportType, selectedCategory]);
 
   const pricingProxies = proxyVars?.filter((v) => v.type === "pricing") ?? [];
   const exportProxies = proxyVars?.filter((v) => v.type === "export") ?? [];
@@ -255,6 +269,53 @@ export default function AllmoxyProductManager() {
     },
   });
 
+  const createCategoryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/admin/product-categories", { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/product-categories"] });
+      setNewCategoryName("");
+      toast({ title: "Category created" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/product-categories/${id}`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/product-categories"] });
+      setEditingCategoryId(null);
+      setEditingCategoryName("");
+      toast({ title: "Category renamed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/product-categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/product-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+      setDeleteCategoryConfirmId(null);
+      if (selectedCategory !== "all") setSelectedCategory("all");
+      toast({ title: "Category deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleImport = async () => {
     if (!importFile) return;
     setImportLoading(true);
@@ -268,6 +329,7 @@ export default function AllmoxyProductManager() {
       if (importGridId !== "none") formData.append("gridId", importGridId);
       if (importAlias.trim()) formData.append("alias", importAlias.trim());
       if (importLookupColumn.trim()) formData.append("lookupColumn", importLookupColumn.trim());
+      if (importCategoryId !== "none") formData.append("categoryId", importCategoryId);
       const res = await fetch("/api/admin/allmoxy-products/import-csv", {
         method: "POST",
         body: formData,
@@ -300,6 +362,7 @@ export default function AllmoxyProductManager() {
       notes: product.notes ?? null,
       exportType: product.exportType ?? "ORD",
       supplyType: product.supplyType ?? "STOCK",
+      categoryId: (product as any).categoryId ?? null,
     });
   };
 
@@ -316,6 +379,7 @@ export default function AllmoxyProductManager() {
       notes: null,
       exportType: "ORD",
       supplyType: "STOCK",
+      categoryId: null,
     });
   };
 
@@ -418,6 +482,15 @@ export default function AllmoxyProductManager() {
                   <Button
                     size="icon"
                     variant="ghost"
+                    title="Manage Categories"
+                    data-testid="button-manage-categories"
+                    onClick={() => setCategoriesModalOpen(true)}
+                  >
+                    <Tags className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     title="Import Products CSV"
                     data-testid="button-import-csv"
                     onClick={() => { setImportModalOpen(true); setImportFile(null); setImportResult(null); }}
@@ -429,15 +502,31 @@ export default function AllmoxyProductManager() {
                   </Button>
                 </div>
               </div>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  className="pl-8"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="input-search-products"
-                />
+              <div className="flex items-center border rounded-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 bg-background">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger
+                    className="border-0 border-r rounded-none rounded-l-md h-9 text-xs w-28 shrink-0 focus:ring-0 focus:ring-offset-0"
+                    data-testid="select-category-scope"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {(categories ?? []).map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Search products..."
+                    className="pl-8 border-0 rounded-none rounded-r-md focus-visible:ring-0 focus-visible:ring-offset-0 h-9"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    data-testid="input-search-products"
+                  />
+                </div>
               </div>
               <div className="flex gap-2">
                 <Select value={sortBy} onValueChange={setSortBy}>
@@ -649,6 +738,33 @@ export default function AllmoxyProductManager() {
                           )}
                         />
                       </div>
+
+                      <FormField
+                        control={form.control}
+                        name="categoryId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Category</FormLabel>
+                            <Select
+                              onValueChange={(val) => field.onChange(val === "none" ? null : Number(val))}
+                              value={field.value != null ? String(field.value) : "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-product-category">
+                                  <SelectValue placeholder="Uncategorized" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">Uncategorized</SelectItem>
+                                {(categories ?? []).map(c => (
+                                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
                       <FormField
                         control={form.control}
@@ -953,11 +1069,145 @@ export default function AllmoxyProductManager() {
         </ResizablePanel>
       </ResizablePanelGroup>
 
+      {/* Manage Categories Modal */}
+      <Dialog open={categoriesModalOpen} onOpenChange={setCategoriesModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tags className="h-4 w-4" />
+              Manage Categories
+            </DialogTitle>
+            <DialogDescription>
+              Create and manage product categories for organizing your product list.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Add new category */}
+            <div className="flex gap-2">
+              <Input
+                placeholder="New category name..."
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCategoryName.trim()) {
+                    createCategoryMutation.mutate(newCategoryName.trim());
+                  }
+                }}
+                data-testid="input-new-category-name"
+              />
+              <Button
+                disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                onClick={() => createCategoryMutation.mutate(newCategoryName.trim())}
+                data-testid="button-create-category"
+              >
+                {createCategoryMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            {/* Category list */}
+            <div className="space-y-1 max-h-64 overflow-y-auto">
+              {(categories ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No categories yet. Add one above.</p>
+              ) : (categories ?? []).map(cat => (
+                <div key={cat.id} className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/40">
+                  {editingCategoryId === cat.id ? (
+                    <>
+                      <Input
+                        className="h-7 text-sm flex-1"
+                        value={editingCategoryName}
+                        autoFocus
+                        onChange={(e) => setEditingCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && editingCategoryName.trim()) {
+                            updateCategoryMutation.mutate({ id: cat.id, name: editingCategoryName.trim() });
+                          }
+                          if (e.key === "Escape") {
+                            setEditingCategoryId(null);
+                            setEditingCategoryName("");
+                          }
+                        }}
+                        data-testid={`input-edit-category-${cat.id}`}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!editingCategoryName.trim() || updateCategoryMutation.isPending}
+                        onClick={() => updateCategoryMutation.mutate({ id: cat.id, name: editingCategoryName.trim() })}
+                      >
+                        {updateCategoryMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { setEditingCategoryId(null); setEditingCategoryName(""); }}
+                      >
+                        ✕
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm">{cat.name}</span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        title="Rename"
+                        onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
+                        data-testid={`button-rename-category-${cat.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <AlertDialog
+                        open={deleteCategoryConfirmId === cat.id}
+                        onOpenChange={(open) => { if (!open) setDeleteCategoryConfirmId(null); }}
+                      >
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            title="Delete"
+                            onClick={() => setDeleteCategoryConfirmId(cat.id)}
+                            data-testid={`button-delete-category-${cat.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete "{cat.name}"?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Products assigned to this category will become uncategorized. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => deleteCategoryMutation.mutate(cat.id)}
+                            >
+                              {deleteCategoryMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoriesModalOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Import Products CSV Modal */}
       <Dialog
         open={importModalOpen}
         onOpenChange={(open) => {
-          if (!open) { setImportFile(null); setImportResult(null); setImportExportType("ORD"); }
+          if (!open) { setImportFile(null); setImportResult(null); setImportExportType("ORD"); setImportCategoryId("none"); }
           setImportModalOpen(open);
         }}
       >
@@ -1044,19 +1294,35 @@ export default function AllmoxyProductManager() {
                 </div>
               </div>
 
-              {/* Export Type */}
-              <div>
-                <label className="text-sm font-medium block mb-1.5">Export Type</label>
-                <Select value={importExportType} onValueChange={setImportExportType}>
-                  <SelectTrigger data-testid="select-import-export-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EXPORT_TYPE_OPTIONS.map(t => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Export Type + Category */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium block mb-1.5">Export Type</label>
+                  <Select value={importExportType} onValueChange={setImportExportType}>
+                    <SelectTrigger data-testid="select-import-export-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXPORT_TYPE_OPTIONS.map(t => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium block mb-1.5">Category</label>
+                  <Select value={importCategoryId} onValueChange={setImportCategoryId}>
+                    <SelectTrigger data-testid="select-import-category">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {(categories ?? []).map(c => (
+                        <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Grid Binding */}

@@ -422,6 +422,51 @@ export async function registerRoutes(
     }
   });
 
+  // Product Categories Routes
+  app.get('/api/admin/product-categories', isAuthenticated, async (_req, res) => {
+    try {
+      const cats = await storage.getProductCategories();
+      res.json(cats);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/product-categories', isAuthenticated, async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: 'name is required' });
+      const cat = await storage.createProductCategory(name.trim());
+      res.json(cat);
+    } catch (e: any) {
+      if (e.code === '23505') return res.status(409).json({ message: 'A category with that name already exists' });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch('/api/admin/product-categories/:id', isAuthenticated, async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: 'name is required' });
+      const cat = await storage.updateProductCategory(Number(req.params.id), name.trim());
+      if (!cat) return res.status(404).json({ message: 'Category not found' });
+      res.json(cat);
+    } catch (e: any) {
+      if (e.code === '23505') return res.status(409).json({ message: 'A category with that name already exists' });
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.delete('/api/admin/product-categories/:id', isAuthenticated, async (req, res) => {
+    try {
+      const success = await storage.deleteProductCategory(Number(req.params.id));
+      if (!success) return res.status(404).json({ message: 'Category not found' });
+      res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // Allmoxy Product Routes
   app.get('/api/admin/allmoxy-products', isAuthenticated, async (_req, res) => {
     try {
@@ -434,7 +479,7 @@ export async function registerRoutes(
 
   app.post('/api/admin/allmoxy-products', isAuthenticated, async (req, res) => {
     try {
-      const { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes, exportType, supplyType } = req.body;
+      const { name, status, pricingProxyId, exportProxyId, skuPrefix, description, notes, exportType, supplyType, categoryId } = req.body;
       if (!name) {
         return res.status(400).json({ message: 'name is required' });
       }
@@ -450,6 +495,7 @@ export async function registerRoutes(
         notes: notes ?? null,
         exportType: validExportType,
         supplyType: validSupplyType,
+        categoryId: categoryId ? Number(categoryId) : null,
       });
       res.json(product);
     } catch (e: any) {
@@ -637,7 +683,7 @@ export async function registerRoutes(
     try {
       if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-      const { pricingProxyId, exportProxyId, exportType, gridId, alias, lookupColumn } = req.body;
+      const { pricingProxyId, exportProxyId, exportType, gridId, alias, lookupColumn, categoryId } = req.body;
 
       const records: any[] = parseSync(req.file.buffer.toString('utf-8'), {
         columns: true,
@@ -663,6 +709,8 @@ export async function registerRoutes(
 
       const resolvedExportType = exportType && exportType !== 'ORD' ? exportType : 'ORD';
 
+      const resolvedCategoryId = categoryId ? Number(categoryId) : null;
+
       const productsToInsert = records
         .filter(r => r['PRODUCT NAME']?.trim())
         .map(r => ({
@@ -675,6 +723,7 @@ export async function registerRoutes(
           description: categoryName,
           notes: null,
           supplyType: 'STOCK' as const,
+          categoryId: resolvedCategoryId,
         }));
 
       if (!productsToInsert.length) {

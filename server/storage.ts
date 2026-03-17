@@ -34,6 +34,7 @@ import {
   type InsertAllowedUser,
   colorGrid,
   type ColorGridEntry,
+  productCategories,
   allmoxyProducts,
   type AllmoxyProduct,
   type InsertAllmoxyProduct,
@@ -144,6 +145,11 @@ export interface IStorage {
 
   getColorGrid(): Promise<ColorGridEntry[]>;
   getColorByCode(code: string): Promise<ColorGridEntry | undefined>;
+
+  getProductCategories(): Promise<import('@shared/schema').ProductCategory[]>;
+  createProductCategory(name: string): Promise<import('@shared/schema').ProductCategory>;
+  updateProductCategory(id: number, name: string): Promise<import('@shared/schema').ProductCategory | undefined>;
+  deleteProductCategory(id: number): Promise<boolean>;
 
   getAllmoxyProducts(): Promise<AllmoxyProduct[]>;
   upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct>;
@@ -710,6 +716,25 @@ export class DatabaseStorage implements IStorage {
     return entry;
   }
 
+  async getProductCategories(): Promise<import('@shared/schema').ProductCategory[]> {
+    return await db.select().from(productCategories).orderBy(productCategories.name);
+  }
+
+  async createProductCategory(name: string): Promise<import('@shared/schema').ProductCategory> {
+    const [cat] = await db.insert(productCategories).values({ name: name.trim() }).returning();
+    return cat;
+  }
+
+  async updateProductCategory(id: number, name: string): Promise<import('@shared/schema').ProductCategory | undefined> {
+    const [cat] = await db.update(productCategories).set({ name: name.trim() }).where(eq(productCategories.id, id)).returning();
+    return cat;
+  }
+
+  async deleteProductCategory(id: number): Promise<boolean> {
+    const result = await db.delete(productCategories).where(eq(productCategories.id, id)).returning();
+    return result.length > 0;
+  }
+
   async getAllmoxyProducts(): Promise<AllmoxyProduct[]> {
     return await db.select().from(allmoxyProducts).orderBy(allmoxyProducts.name);
   }
@@ -730,6 +755,7 @@ export class DatabaseStorage implements IStorage {
           exportType: product.exportType,
           supplyType: product.supplyType,
           imagePath: product.imagePath,
+          categoryId: product.categoryId,
         },
       })
       .returning();

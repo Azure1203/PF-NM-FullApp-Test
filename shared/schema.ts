@@ -438,6 +438,15 @@ export type ExportType = typeof EXPORT_TYPE_OPTIONS[number];
 export const SUPPLY_TYPE_OPTIONS = ['STOCK', 'BUYOUT'] as const;
 export type SupplyType = typeof SUPPLY_TYPE_OPTIONS[number];
 
+export const productCategories = pgTable("product_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+});
+
+export const insertProductCategorySchema = createInsertSchema(productCategories).omit({ id: true });
+export type ProductCategory = typeof productCategories.$inferSelect;
+export type InsertProductCategory = z.infer<typeof insertProductCategorySchema>;
+
 export const allmoxyProducts = pgTable("allmoxy_products", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull().unique(),
@@ -450,6 +459,7 @@ export const allmoxyProducts = pgTable("allmoxy_products", {
   exportType: varchar("export_type", { length: 20 }).default('ORD'),
   supplyType: varchar("supply_type", { length: 20 }).default('STOCK'),
   imagePath: text("image_path"),
+  categoryId: integer("category_id").references(() => productCategories.id, { onDelete: 'set null' }),
 });
 
 export const insertAllmoxyProductSchema = createInsertSchema(allmoxyProducts);
