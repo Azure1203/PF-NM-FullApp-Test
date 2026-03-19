@@ -317,6 +317,7 @@ export default function AllmoxyProductManager() {
   });
 
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const uploadImageMutation = useMutation({
     mutationFn: async ({ productId, file }: { productId: number; file: File }) => {
@@ -746,8 +747,7 @@ export default function AllmoxyProductManager() {
                           />
                           <div className="relative group w-24 h-24">
                             <div
-                              className="w-24 h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 cursor-pointer flex items-center justify-center overflow-hidden transition-colors"
-                              onClick={() => imageFileInputRef.current?.click()}
+                              className="w-24 h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center overflow-hidden transition-colors"
                               data-testid="button-upload-product-image"
                             >
                               {isUploading ? (
@@ -757,17 +757,24 @@ export default function AllmoxyProductManager() {
                                   <img
                                     src={imgSrc}
                                     alt={currentProduct.name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain cursor-zoom-in"
+                                    onClick={() => setLightboxUrl(imgSrc)}
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     data-testid="img-product-edit-thumbnail"
                                   />
-                                  <div className="absolute inset-0 rounded-lg bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                                  <div
+                                    className="absolute inset-0 rounded-lg bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer"
+                                    onClick={() => imageFileInputRef.current?.click()}
+                                  >
                                     <Upload className="w-5 h-5 text-white" />
                                     <span className="text-white text-[10px] font-medium">Change image</span>
                                   </div>
                                 </>
                               ) : (
-                                <div className="flex flex-col items-center gap-1 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors">
+                                <div
+                                  className="flex flex-col items-center gap-1 text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors cursor-pointer w-full h-full justify-center"
+                                  onClick={() => imageFileInputRef.current?.click()}
+                                >
                                   <Package className="w-8 h-8" />
                                   <span className="text-[10px] font-medium">Upload image</span>
                                 </div>
@@ -1474,6 +1481,24 @@ export default function AllmoxyProductManager() {
                 </Button>
               </DialogFooter>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox for full-size image preview */}
+      <Dialog open={!!lightboxUrl} onOpenChange={(open) => { if (!open) setLightboxUrl(null); }}>
+        <DialogContent className="max-w-4xl w-full p-2 bg-black/95 border-none" data-testid="dialog-image-lightbox">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Image Preview</DialogTitle>
+            <DialogDescription>Full-size product image</DialogDescription>
+          </DialogHeader>
+          {lightboxUrl && (
+            <img
+              src={lightboxUrl}
+              alt="Product image"
+              className="max-h-[85vh] w-full object-contain rounded"
+              data-testid="img-product-lightbox"
+            />
           )}
         </DialogContent>
       </Dialog>
