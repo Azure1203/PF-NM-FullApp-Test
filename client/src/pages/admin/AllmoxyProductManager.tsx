@@ -744,45 +744,48 @@ export default function AllmoxyProductManager() {
                             onChange={handleImageFileChange}
                             data-testid="input-product-image"
                           />
-                          <div
-                            className="relative group w-24 h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 cursor-pointer flex items-center justify-center overflow-hidden transition-colors"
-                            onClick={() => imageFileInputRef.current?.click()}
-                            data-testid="button-upload-product-image"
-                          >
-                            {isUploading ? (
-                              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                            ) : imgSrc ? (
-                              <>
-                                <img
-                                  src={imgSrc}
-                                  alt={currentProduct.name}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                  data-testid="img-product-edit-thumbnail"
-                                />
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                                  <Upload className="w-5 h-5 text-white" />
-                                  <span className="text-white text-[10px] font-medium">Change</span>
+                          <div className="relative group w-24 h-24">
+                            <div
+                              className="w-24 h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 cursor-pointer flex items-center justify-center overflow-hidden transition-colors"
+                              onClick={() => imageFileInputRef.current?.click()}
+                              data-testid="button-upload-product-image"
+                            >
+                              {isUploading ? (
+                                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                              ) : imgSrc ? (
+                                <>
+                                  <img
+                                    src={imgSrc}
+                                    alt={currentProduct.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    data-testid="img-product-edit-thumbnail"
+                                  />
+                                  <div className="absolute inset-0 rounded-lg bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                                    <Upload className="w-5 h-5 text-white" />
+                                    <span className="text-white text-[10px] font-medium">Change image</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex flex-col items-center gap-1 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors">
+                                  <Package className="w-8 h-8" />
+                                  <span className="text-[10px] font-medium">Upload image</span>
                                 </div>
-                              </>
-                            ) : (
-                              <div className="flex flex-col items-center gap-1 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors">
-                                <Package className="w-8 h-8" />
-                                <span className="text-[10px] font-medium">Add image</span>
-                              </div>
+                              )}
+                            </div>
+                            {imgSrc && !isUploading && (
+                              <button
+                                type="button"
+                                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/80 z-10"
+                                onClick={(e) => { e.stopPropagation(); clearImageMutation.mutate(editingId); }}
+                                disabled={isClearing}
+                                data-testid="button-clear-product-image"
+                                title="Remove image"
+                              >
+                                {isClearing ? <Loader2 className="w-3 h-3 animate-spin" /> : <span className="text-[11px] font-bold leading-none">×</span>}
+                              </button>
                             )}
                           </div>
-                          {imgSrc && (
-                            <button
-                              type="button"
-                              className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
-                              onClick={() => clearImageMutation.mutate(editingId)}
-                              disabled={isClearing}
-                              data-testid="button-clear-product-image"
-                            >
-                              {isClearing ? "Removing…" : "Remove image"}
-                            </button>
-                          )}
                         </div>
                       );
                     })()}
