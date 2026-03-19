@@ -6562,155 +6562,100 @@ export async function registerRoutes(
   const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
   const imageUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { files: 200, fileSize: 5 * 1024 * 1024 },
+    limits: { files: 500, fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
       cb(null, allowedImageMimes.includes(file.mimetype));
     }
   });
 
-  app.post('/api/admin/products/bulk-upload-images', isAuthenticated, imageUpload.array('images', 200), async (req, res) => {
+  app.post('/api/admin/products/bulk-upload-images', isAuthenticated, imageUpload.array('images', 500), async (req, res) => {
     try {
       const files = req.files as Express.Multer.File[] | undefined;
       if (!files || files.length === 0) {
         return res.status(400).json({ message: 'No files uploaded' });
       }
 
-      const targetFilter = (req.body.targetTable as string) || (req.body.target as string) || 'both';
-
-      const allHardwareProducts = targetFilter !== 'allmoxy' ? await storage.getProducts() : [];
-      const allAllmoxyProducts = targetFilter !== 'hardware' ? await storage.getAllmoxyProducts() : [];
-
-      const results: Array<{
-        filename: string;
-        storagePath: string;
-        matchedProduct: string | null;
-        targetTable: 'allmoxy' | 'hardware' | null;
-        productId: number | null;
-        confidence: 'exact' | 'prefix' | 'partial' | 'none';
-      }> = [];
-
-      for (const file of files) {
-        const ext = path.extname(file.originalname).toLowerCase();
-        const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
-        if (!allowedExts.includes(ext)) continue;
-
-        const baseName = path.basename(file.originalname, ext);
-        const storagePath = `product-images/${file.originalname}`;
-
-        const contentTypeMap: Record<string, string> = {
-          '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-          '.png': 'image/png', '.webp': 'image/webp'
-        };
-        await objectStorageService.uploadBuffer(file.buffer, storagePath, contentTypeMap[ext] || 'application/octet-stream');
-
-        const searchVariants = new Set<string>([baseName]);
-        const dottedPrefixes = ['H.', 'M.', 'S.', 'R.'];
-        const dashedPrefixes = ['M-', 'R-', 'S-'];
-        const allPrefixes = [...dottedPrefixes, ...dashedPrefixes];
-        for (const pfx of allPrefixes) {
-          searchVariants.add(`${pfx}${baseName}`);
-        }
-        for (const pfx of allPrefixes) {
-          if (baseName.startsWith(pfx)) {
-            searchVariants.add(baseName.substring(pfx.length));
-          }
-        }
-        const variantArray = Array.from(searchVariants);
-
-        type MatchResult = { productId: number; displayName: string; table: 'allmoxy' | 'hardware'; confidence: 'exact' | 'prefix' | 'partial' };
-        let match: MatchResult | null = null;
-
-        // Stage 1: Allmoxy exact (name or skuPrefix) across ALL variants
-        if (!match && targetFilter !== 'hardware') {
-          for (const variant of variantArray) {
-            const lv = variant.toLowerCase();
-            const found = allAllmoxyProducts.find(p =>
-              p.name.toLowerCase() === lv ||
-              (p.skuPrefix && p.skuPrefix.toLowerCase() === lv)
-            );
-            if (found) { match = { productId: found.id, displayName: found.name, table: 'allmoxy', confidence: 'exact' }; break; }
-          }
-        }
-
-        // Stage 2: Hardware exact (code) across ALL variants
-        if (!match && targetFilter !== 'allmoxy') {
-          for (const variant of variantArray) {
-            const lv = variant.toLowerCase();
-            const found = allHardwareProducts.find(p => p.code.toLowerCase() === lv);
-            if (found) { match = { productId: found.id, displayName: `${found.code} - ${found.name || ''}`, table: 'hardware', confidence: 'exact' }; break; }
-          }
-        }
-
-        // Stage 3: Allmoxy prefix (variant starts with product name/sku)
-        if (!match && targetFilter !== 'hardware') {
-          for (const variant of variantArray) {
-            const lv = variant.toLowerCase();
-            const found = allAllmoxyProducts.find(p => {
-              const pName = p.name.toLowerCase();
-              const pSku = p.skuPrefix?.toLowerCase();
-              return (pName.length >= 3 && lv.startsWith(pName)) ||
-                     (pSku && pSku.length >= 3 && lv.startsWith(pSku));
-            });
-            if (found) { match = { productId: found.id, displayName: found.name, table: 'allmoxy', confidence: 'prefix' }; break; }
-          }
-        }
-
-        // Stage 4: Hardware prefix (variant starts with product code)
-        if (!match && targetFilter !== 'allmoxy') {
-          for (const variant of variantArray) {
-            const lv = variant.toLowerCase();
-            const found = allHardwareProducts.find(p => {
-              const pCode = p.code.toLowerCase();
-              return pCode.length >= 3 && lv.startsWith(pCode);
-            });
-            if (found) { match = { productId: found.id, displayName: `${found.code} - ${found.name || ''}`, table: 'hardware', confidence: 'prefix' }; break; }
-          }
-        }
-
-        // Stage 5: Allmoxy partial (substring containment, min 4 chars)
-        if (!match && targetFilter !== 'hardware') {
-          for (const variant of variantArray) {
-            const lv = variant.toLowerCase();
-            if (lv.length < 4) continue;
-            const found = allAllmoxyProducts.find(p => {
-              const pName = p.name.toLowerCase();
-              const pSku = p.skuPrefix?.toLowerCase();
-              return (pName.length >= 4 && (pName.includes(lv) || lv.includes(pName))) ||
-                     (pSku && pSku.length >= 4 && (pSku.includes(lv) || lv.includes(pSku)));
-            });
-            if (found) { match = { productId: found.id, displayName: found.name, table: 'allmoxy', confidence: 'partial' }; break; }
-          }
-        }
-
-        // Stage 6: Hardware partial (substring containment, min 4 chars)
-        if (!match && targetFilter !== 'allmoxy') {
-          for (const variant of variantArray) {
-            const lv = variant.toLowerCase();
-            if (lv.length < 4) continue;
-            const found = allHardwareProducts.find(p => {
-              const pCode = p.code.toLowerCase();
-              return pCode.length >= 4 && (pCode.includes(lv) || lv.includes(pCode));
-            });
-            if (found) { match = { productId: found.id, displayName: `${found.code} - ${found.name || ''}`, table: 'hardware', confidence: 'partial' }; break; }
-          }
-        }
-
-        if (match) {
-          results.push({ filename: file.originalname, storagePath, matchedProduct: match.displayName, targetTable: match.table, productId: match.productId, confidence: match.confidence });
-        } else {
-          results.push({ filename: file.originalname, storagePath, matchedProduct: null, targetTable: null, productId: null, confidence: 'none' });
-        }
-      }
-
-      const summary = {
-        total: results.length,
-        exact: results.filter(r => r.confidence === 'exact').length,
-        prefix: results.filter(r => r.confidence === 'prefix').length,
-        partial: results.filter(r => r.confidence === 'partial').length,
-        unmatched: results.filter(r => r.confidence === 'none').length,
+      const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+      const contentTypeMap: Record<string, string> = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png', '.webp': 'image/webp'
       };
 
-      res.json({ results, summary });
+      // Build in-memory lookup maps (no GCS calls yet)
+      const [allAllmoxyProductsList, allHardwareProductsList] = await Promise.all([
+        storage.getAllmoxyProducts(),
+        storage.getProducts(),
+      ]);
+
+      const allmoxyByName = new Map<string, typeof allAllmoxyProductsList[0]>();
+      const allmoxyBySku = new Map<string, typeof allAllmoxyProductsList[0]>();
+      for (const p of allAllmoxyProductsList) {
+        allmoxyByName.set(p.name.toLowerCase(), p);
+        if (p.skuPrefix) allmoxyBySku.set(p.skuPrefix.toLowerCase(), p);
+      }
+      const hardwareByCode = new Map<string, typeof allHardwareProductsList[0]>();
+      for (const p of allHardwareProductsList) {
+        hardwareByCode.set(p.code.toLowerCase(), p);
+      }
+
+      type MatchedFile = {
+        file: Express.Multer.File;
+        ext: string;
+        storagePath: string;
+        productId: number;
+        productName: string;
+        table: 'allmoxy' | 'hardware';
+      };
+
+      const matchedFiles: MatchedFile[] = [];
+      const unmatchedFiles: { filename: string }[] = [];
+
+      // Exact match only — no GCS calls at this stage
+      for (const file of files) {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (!allowedExts.includes(ext)) continue;
+        const baseName = path.basename(file.originalname, ext).toLowerCase();
+        const storagePath = `product-images/${file.originalname}`;
+
+        const allmoxyMatch = allmoxyByName.get(baseName) || allmoxyBySku.get(baseName);
+        if (allmoxyMatch) {
+          matchedFiles.push({ file, ext, storagePath, productId: allmoxyMatch.id, productName: allmoxyMatch.name, table: 'allmoxy' });
+          continue;
+        }
+        const hwMatch = hardwareByCode.get(baseName);
+        if (hwMatch) {
+          matchedFiles.push({ file, ext, storagePath, productId: hwMatch.id, productName: `${hwMatch.code}${hwMatch.name ? ` - ${hwMatch.name}` : ''}`, table: 'hardware' });
+          continue;
+        }
+        unmatchedFiles.push({ filename: file.originalname });
+      }
+
+      // Upload matched files in parallel batches of 10, then save to DB immediately
+      const saved: { filename: string; productName: string; storagePath: string }[] = [];
+      const uploadErrors: { filename: string; error: string }[] = [];
+      const BATCH_SIZE = 10;
+
+      for (let i = 0; i < matchedFiles.length; i += BATCH_SIZE) {
+        const batch = matchedFiles.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (m) => {
+          try {
+            await objectStorageService.uploadBuffer(m.file.buffer, m.storagePath, contentTypeMap[m.ext] || 'application/octet-stream');
+            if (m.table === 'allmoxy') {
+              await db.update(allmoxyProducts)
+                .set({ imagePath: m.storagePath })
+                .where(eq(allmoxyProducts.id, m.productId));
+            } else {
+              await storage.updateProduct(m.productId, { imagePath: m.storagePath });
+            }
+            saved.push({ filename: m.file.originalname, productName: m.productName, storagePath: m.storagePath });
+          } catch (e: any) {
+            uploadErrors.push({ filename: m.file.originalname, error: e.message });
+          }
+        }));
+      }
+
+      console.log(`[BulkImageUpload] Saved ${saved.length}, unmatched ${unmatchedFiles.length}, errors ${uploadErrors.length}`);
+      res.json({ saved, unmatched: unmatchedFiles, uploadErrors, total: files.length });
     } catch (e: any) {
       console.error('[BulkImageUpload] Error:', e);
       res.status(500).json({ message: 'Failed to process bulk image upload', error: e.message });
