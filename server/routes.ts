@@ -6678,7 +6678,16 @@ export async function registerRoutes(
             }
             saved.push({ filename: m.file.originalname, productName: m.productName, storagePath: m.storagePath });
           } catch (e: any) {
-            uploadErrors.push({ filename: m.file.originalname, error: e.message });
+            const errMsg =
+              (typeof e.message === 'string' && e.message && e.message !== 'undefined' && !e.message.includes('Error code undefined'))
+                ? e.message
+                : e.code
+                  ? `Storage error (code ${e.code})`
+                  : e.errors?.[0]?.message
+                    ? e.errors[0].message
+                    : 'Storage upload failed — check connectivity and retry';
+            console.error(`[BulkImageUpload] GCS error for ${m.file.originalname}:`, e);
+            uploadErrors.push({ filename: m.file.originalname, error: errMsg });
           }
         }));
       }

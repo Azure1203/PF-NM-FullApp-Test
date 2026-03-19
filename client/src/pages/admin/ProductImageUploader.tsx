@@ -165,8 +165,11 @@ export default function ProductImageUploader() {
             <p className="text-sm text-muted-foreground" data-testid="text-summary">
               {uploadResult.total} file{uploadResult.total !== 1 ? 's' : ''} processed —{' '}
               <span className="text-green-600 font-medium">{uploadResult.saved.length} saved</span>
-              {(uploadResult.unmatched.length + uploadResult.uploadErrors.length) > 0 && (
-                <>, <span className="text-red-600 font-medium">{uploadResult.unmatched.length + uploadResult.uploadErrors.length} unmatched</ span></>
+              {uploadResult.unmatched.length > 0 && (
+                <>, <span className="text-red-600 font-medium">{uploadResult.unmatched.length} unmatched</span></>
+              )}
+              {uploadResult.uploadErrors.length > 0 && (
+                <>, <span className="text-orange-600 font-medium">{uploadResult.uploadErrors.length} failed</span></>
               )}
             </p>
             <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-upload-more">
@@ -201,13 +204,13 @@ export default function ProductImageUploader() {
             </Card>
           )}
 
-          {(uploadResult.unmatched.length > 0 || uploadResult.uploadErrors.length > 0) && (
+          {uploadResult.unmatched.length > 0 && (
             <Card>
               <CardContent className="p-0">
                 <div className="px-4 py-3 border-b bg-red-50 dark:bg-red-950/20 rounded-t-lg">
                   <h2 className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center gap-2">
                     <XCircle className="h-4 w-4" />
-                    No matching product ({uploadResult.unmatched.length + uploadResult.uploadErrors.length})
+                    No matching product ({uploadResult.unmatched.length})
                   </h2>
                   <p className="text-xs text-red-600 dark:text-red-500 mt-0.5">
                     Rename these files to match a product name exactly, then upload again.
@@ -223,13 +226,31 @@ export default function ProductImageUploader() {
                       <span className="text-xs text-muted-foreground ml-auto">No matching product found</span>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {uploadResult.uploadErrors.length > 0 && (
+            <Card>
+              <CardContent className="p-0">
+                <div className="px-4 py-3 border-b bg-orange-50 dark:bg-orange-950/20 rounded-t-lg">
+                  <h2 className="text-sm font-semibold text-orange-700 dark:text-orange-400 flex items-center gap-2">
+                    <XCircle className="h-4 w-4" />
+                    Upload failed ({uploadResult.uploadErrors.length})
+                  </h2>
+                  <p className="text-xs text-orange-600 dark:text-orange-500 mt-0.5">
+                    Product matched but the file could not be saved. Try uploading again.
+                  </p>
+                </div>
+                <div className="divide-y max-h-96 overflow-y-auto">
                   {uploadResult.uploadErrors.map((item, idx) => (
                     <div key={`err-${idx}`} className="flex items-center gap-3 px-4 py-2.5" data-testid={`row-error-${idx}`}>
-                      <XCircle className="h-4 w-4 text-red-400 shrink-0" />
-                      <span className="font-mono text-xs truncate">
+                      <XCircle className="h-4 w-4 text-orange-400 shrink-0" />
+                      <span className="font-mono text-xs truncate" data-testid={`text-error-filename-${idx}`}>
                         {item.filename}
                       </span>
-                      <span className="text-xs text-red-500 ml-auto">{item.error}</span>
+                      <span className="text-xs text-orange-600 ml-auto" data-testid={`text-error-message-${idx}`}>{item.error}</span>
                     </div>
                   ))}
                 </div>
