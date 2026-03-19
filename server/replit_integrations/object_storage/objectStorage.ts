@@ -1,6 +1,8 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Response } from "express";
 import { randomUUID } from "crypto";
+import fs from "fs";
+import path from "path";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -8,6 +10,8 @@ import {
   getObjectAclPolicy,
   setObjectAclPolicy,
 } from "./objectAcl";
+
+const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
@@ -238,36 +242,59 @@ export class ObjectStorageService {
     });
   }
 
-  // Uploads a buffer to object storage at the specified path
+  // Uploads a buffer to object storage at the specified path.
+  // Tries GCS (via signed URL) first; falls back to local filesystem when the
+  // Replit workspace sidecar is not configured for GCS access.
   async uploadBuffer(buffer: Buffer, objectPath: string, contentType: string = 'application/octet-stream'): Promise<void> {
     const privateObjectDir = this.getPrivateObjectDir();
     const fullPath = `${privateObjectDir}/${objectPath}`;
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
-    const signedUrl = await signObjectURL({
-      bucketName,
-      objectName,
-      method: 'PUT',
-      ttlSec: 300,
-    });
+    let gcsError: Error | null = null;
+    try {
+      const signedUrl = await signObjectURL({
+        bucketName,
+        objectName,
+        method: 'PUT',
+        ttlSec: 300,
+      });
 
-    const res = await fetch(signedUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': contentType },
-      body: buffer,
-    });
+      const res = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: buffer,
+      });
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`GCS upload failed: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        gcsError = new Error(`GCS upload failed: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+      } else {
+        console.log(`[ObjectStorage] Uploaded ${buffer.length} bytes to GCS: ${fullPath}`);
+        return;
+      }
+    } catch (e: any) {
+      gcsError = e;
     }
 
-    console.log(`[ObjectStorage] Uploaded ${buffer.length} bytes to ${fullPath}`);
+    console.warn(`[ObjectStorage] GCS unavailable (${gcsError?.message}), falling back to local filesystem`);
+    const localPath = path.join(LOCAL_UPLOAD_DIR, objectPath);
+    await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
+    await fs.promises.writeFile(localPath, buffer);
+    console.log(`[ObjectStorage] Saved ${buffer.length} bytes locally: ${localPath}`);
   }
 
-  // Downloads an object as a buffer from object storage
+  // Downloads an object as a buffer from object storage.
+  // Checks local filesystem first (workspace fallback), then GCS.
   async downloadBuffer(objectPath: string): Promise<Buffer | null> {
+    const localPath = path.join(LOCAL_UPLOAD_DIR, objectPath);
+    try {
+      const data = await fs.promises.readFile(localPath);
+      return data;
+    } catch {
+      // Not in local storage — try GCS
+    }
+
     try {
       const privateObjectDir = this.getPrivateObjectDir();
       const fullPath = `${privateObjectDir}/${objectPath}`;
@@ -289,8 +316,21 @@ export class ObjectStorageService {
     }
   }
 
-  // Deletes an object from object storage
+  // Deletes an object from object storage.
+  // Checks both local filesystem and GCS (deletes from whichever has it).
   async deleteObject(objectPath: string): Promise<boolean> {
+    let deleted = false;
+
+    // Check local filesystem first
+    const localPath = path.join(LOCAL_UPLOAD_DIR, objectPath);
+    try {
+      await fs.promises.unlink(localPath);
+      console.log(`[ObjectStorage] Deleted locally: ${localPath}`);
+      deleted = true;
+    } catch {
+      // Not in local storage — try GCS
+    }
+
     try {
       const privateObjectDir = this.getPrivateObjectDir();
       const fullPath = `${privateObjectDir}/${objectPath}`;
@@ -300,18 +340,18 @@ export class ObjectStorageService {
       const file = bucket.file(objectName);
       
       const [exists] = await file.exists();
-      if (!exists) {
-        console.log(`[ObjectStorage] File does not exist: ${fullPath}`);
-        return false;
+      if (exists) {
+        await file.delete();
+        console.log(`[ObjectStorage] Deleted from GCS: ${fullPath}`);
+        deleted = true;
       }
-      
-      await file.delete();
-      console.log(`[ObjectStorage] Deleted: ${fullPath}`);
-      return true;
     } catch (error) {
-      console.error('[ObjectStorage] Error deleting object:', error);
-      return false;
+      if (!deleted) {
+        console.error('[ObjectStorage] Error deleting object from GCS:', error);
+      }
     }
+
+    return deleted;
   }
 }
 
