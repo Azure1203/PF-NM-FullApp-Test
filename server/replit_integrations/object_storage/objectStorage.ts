@@ -387,6 +387,21 @@ async function signObjectURL({
   method: "GET" | "PUT" | "DELETE" | "HEAD";
   ttlSec: number;
 }): Promise<string> {
+  // Fetch the Repl's own credential token so the sidecar can identify this repl
+  const credRes = await fetch(`${REPLIT_SIDECAR_ENDPOINT}/credential`);
+  if (!credRes.ok) {
+    throw new Error(
+      `Failed to fetch sidecar credential, errorcode: ${credRes.status}, ` +
+        `make sure you're running on Replit`
+    );
+  }
+  const { access_token } = await credRes.json() as { access_token: string };
+  if (!access_token) {
+    throw new Error(
+      "Sidecar credential response missing access_token — make sure you're running on Replit"
+    );
+  }
+
   const request = {
     bucket_name: bucketName,
     object_name: objectName,
@@ -399,6 +414,7 @@ async function signObjectURL({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${access_token}`,
       },
       body: JSON.stringify(request),
     }
