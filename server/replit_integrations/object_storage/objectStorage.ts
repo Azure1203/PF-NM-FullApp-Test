@@ -242,16 +242,27 @@ export class ObjectStorageService {
   async uploadBuffer(buffer: Buffer, objectPath: string, contentType: string = 'application/octet-stream'): Promise<void> {
     const privateObjectDir = this.getPrivateObjectDir();
     const fullPath = `${privateObjectDir}/${objectPath}`;
-    
+
     const { bucketName, objectName } = parseObjectPath(fullPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-    
-    await file.save(buffer, {
-      contentType,
-      resumable: false,
+
+    const signedUrl = await signObjectURL({
+      bucketName,
+      objectName,
+      method: 'PUT',
+      ttlSec: 300,
     });
-    
+
+    const res = await fetch(signedUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: buffer,
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`GCS upload failed: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 200)}` : ''}`);
+    }
+
     console.log(`[ObjectStorage] Uploaded ${buffer.length} bytes to ${fullPath}`);
   }
 
