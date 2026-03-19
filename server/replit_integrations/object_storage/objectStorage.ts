@@ -388,7 +388,15 @@ async function signObjectURL({
   ttlSec: number;
 }): Promise<string> {
   // Fetch the Repl's own credential token so the sidecar can identify this repl
-  const credRes = await fetch(`${REPLIT_SIDECAR_ENDPOINT}/credential`);
+  let credRes: Response;
+  try {
+    credRes = await fetch(`${REPLIT_SIDECAR_ENDPOINT}/credential`);
+  } catch (e: any) {
+    throw new Error(
+      `Failed to reach sidecar credential endpoint: ${e?.message ?? e} — ` +
+        `make sure you're running on Replit`
+    );
+  }
   if (!credRes.ok) {
     throw new Error(
       `Failed to fetch sidecar credential, errorcode: ${credRes.status}, ` +
