@@ -539,6 +539,35 @@ export async function registerRoutes(
     }
   });
 
+  // Per-product image upload / clear
+  app.post('/api/admin/allmoxy-products/:id/image', isAuthenticated, upload.single('image'), async (req, res) => {
+    try {
+      const productId = Number(req.params.id);
+      if (!req.file) return res.status(400).json({ message: 'No image file provided' });
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+      if (!allowedExts.includes(ext)) return res.status(400).json({ message: 'Invalid file type. Use jpg, png, or webp.' });
+      const contentTypeMap: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
+      const storagePath = `product-images/${req.file.originalname}`;
+      await objectStorageService.uploadBuffer(req.file.buffer, storagePath, contentTypeMap[ext]);
+      await db.update(allmoxyProducts).set({ imagePath: storagePath }).where(eq(allmoxyProducts.id, productId));
+      res.json({ imagePath: storagePath });
+    } catch (e: any) {
+      console.error('[ProductImage] Upload error:', e);
+      res.status(500).json({ message: 'Failed to upload image', error: e.message });
+    }
+  });
+
+  app.delete('/api/admin/allmoxy-products/:id/image', isAuthenticated, async (req, res) => {
+    try {
+      const productId = Number(req.params.id);
+      await db.update(allmoxyProducts).set({ imagePath: null }).where(eq(allmoxyProducts.id, productId));
+      res.status(204).send();
+    } catch (e: any) {
+      res.status(500).json({ message: 'Failed to clear image', error: e.message });
+    }
+  });
+
   // Formula tester / pricing sandbox
   app.post('/api/admin/formula-test', isAuthenticated, async (req, res) => {
     try {

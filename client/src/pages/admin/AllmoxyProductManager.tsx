@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -315,6 +315,56 @@ export default function AllmoxyProductManager() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadImageMutation = useMutation({
+    mutationFn: async ({ productId, file }: { productId: number; file: File }) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      const res = await fetch(`/api/admin/allmoxy-products/${productId}/image`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message);
+      }
+      return res.json() as Promise<{ imagePath: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+      toast({ title: "Image saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const clearImageMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const res = await fetch(`/api/admin/allmoxy-products/${productId}/image`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to clear image");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/allmoxy-products"] });
+      toast({ title: "Image removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleImageFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingId) return;
+    uploadImageMutation.mutate({ productId: editingId, file });
+    e.target.value = "";
+  }, [editingId, uploadImageMutation]);
 
   const handleImport = async () => {
     if (!importFile) return;
@@ -677,25 +727,62 @@ export default function AllmoxyProductManager() {
                     {editingId && (() => {
                       const currentProduct = products?.find(p => p.id === editingId);
                       if (!currentProduct) return null;
-                      if (!currentProduct.imagePath) {
-                        return (
-                          <div className="flex justify-center">
-                            <Package className="w-16 h-16 text-muted-foreground/20" />
-                          </div>
-                        );
-                      }
-                      const imgSrc = currentProduct.imagePath.startsWith('product-images/')
-                        ? `/api/product-images/${encodeURIComponent(currentProduct.imagePath.replace('product-images/', ''))}`
-                        : currentProduct.imagePath;
+                      const isUploading = uploadImageMutation.isPending;
+                      const isClearing = clearImageMutation.isPending;
+                      const imgSrc = currentProduct.imagePath
+                        ? (currentProduct.imagePath.startsWith('product-images/')
+                            ? `/api/product-images/${encodeURIComponent(currentProduct.imagePath.replace('product-images/', ''))}`
+                            : currentProduct.imagePath)
+                        : null;
                       return (
-                        <div className="flex justify-center">
-                          <img
-                            src={imgSrc}
-                            alt={currentProduct.name}
-                            className="w-16 h-16 object-cover rounded-lg border shadow-sm"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            data-testid="img-product-edit-thumbnail"
+                        <div className="flex flex-col items-center gap-2">
+                          <input
+                            ref={imageFileInputRef}
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp"
+                            className="hidden"
+                            onChange={handleImageFileChange}
+                            data-testid="input-product-image"
                           />
+                          <div
+                            className="relative group w-24 h-24 rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 cursor-pointer flex items-center justify-center overflow-hidden transition-colors"
+                            onClick={() => imageFileInputRef.current?.click()}
+                            data-testid="button-upload-product-image"
+                          >
+                            {isUploading ? (
+                              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                            ) : imgSrc ? (
+                              <>
+                                <img
+                                  src={imgSrc}
+                                  alt={currentProduct.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  data-testid="img-product-edit-thumbnail"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                                  <Upload className="w-5 h-5 text-white" />
+                                  <span className="text-white text-[10px] font-medium">Change</span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex flex-col items-center gap-1 text-muted-foreground/40 group-hover:text-muted-foreground/70 transition-colors">
+                                <Package className="w-8 h-8" />
+                                <span className="text-[10px] font-medium">Add image</span>
+                              </div>
+                            )}
+                          </div>
+                          {imgSrc && (
+                            <button
+                              type="button"
+                              className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+                              onClick={() => clearImageMutation.mutate(editingId)}
+                              disabled={isClearing}
+                              data-testid="button-clear-product-image"
+                            >
+                              {isClearing ? "Removing…" : "Remove image"}
+                            </button>
+                          )}
                         </div>
                       );
                     })()}
