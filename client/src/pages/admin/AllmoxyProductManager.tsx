@@ -763,7 +763,7 @@ export default function AllmoxyProductManager() {
                                     data-testid="img-product-edit-thumbnail"
                                   />
                                   <div
-                                    className="absolute inset-0 rounded-lg bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer"
+                                    className="absolute inset-0 rounded-lg bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer pointer-events-none group-hover:pointer-events-auto"
                                     onClick={() => imageFileInputRef.current?.click()}
                                   >
                                     <Upload className="w-5 h-5 text-white" />
