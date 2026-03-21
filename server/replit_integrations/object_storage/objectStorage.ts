@@ -243,8 +243,8 @@ export class ObjectStorageService {
   }
 
   // Uploads a buffer to object storage at the specified path.
-  // Tries GCS (via signed URL) first; falls back to local filesystem when the
-  // Replit workspace sidecar is not configured for GCS access.
+  // Tries GCS client directly first; falls back to local filesystem when GCS
+  // is unavailable (e.g. missing credentials in dev).
   async uploadBuffer(buffer: Buffer, objectPath: string, contentType: string = 'application/octet-stream'): Promise<void> {
     const privateObjectDir = this.getPrivateObjectDir();
     const fullPath = `${privateObjectDir}/${objectPath}`;
@@ -253,26 +253,11 @@ export class ObjectStorageService {
 
     let gcsError: Error | null = null;
     try {
-      const signedUrl = await signObjectURL({
-        bucketName,
-        objectName,
-        method: 'PUT',
-        ttlSec: 300,
-      });
-
-      const res = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': contentType },
-        body: buffer,
-      });
-
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        gcsError = new Error(`GCS upload failed: ${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 200)}` : ''}`);
-      } else {
-        console.log(`[ObjectStorage] Uploaded ${buffer.length} bytes to GCS: ${fullPath}`);
-        return;
-      }
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      await file.save(buffer, { contentType, resumable: false });
+      console.log(`[ObjectStorage] Uploaded ${buffer.length} bytes to GCS: ${fullPath}`);
+      return;
     } catch (e: any) {
       gcsError = e;
     }
