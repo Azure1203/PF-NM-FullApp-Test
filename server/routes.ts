@@ -758,14 +758,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: 'No valid product rows found in file' });
       }
 
-      await storage.deleteAllmoxyProductsByCategory(categoryName);
-      const inserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);
+      // Upsert: new products are inserted; existing products (matched by name) have
+      // their import-driven fields updated while admin-configured fields (skuPrefix,
+      // images, notes) are preserved. No products are deleted on re-import.
+      const upserted = await storage.bulkInsertAllmoxyProducts(productsToInsert);
 
       let bindingsCreated = 0;
       if (gridId) {
         const bindingAlias = alias?.trim() || categoryName.toLowerCase().replace(/[^a-z0-9]/g, '_');
         const bindingLookupColumn = lookupColumn?.trim() || 'MANU_CODE';
-        for (const product of inserted) {
+        for (const product of upserted) {
           await storage.replaceProductGridBindings(product.id, [{
             productId: product.id,
             gridId: Number(gridId),
@@ -778,7 +780,7 @@ export async function registerRoutes(
 
       res.json({
         categoryName,
-        productsInserted: inserted.length,
+        productsUpserted: upserted.length,
         bindingsCreated,
         gridId: gridId ? Number(gridId) : null,
         pricingProxyId: pricingProxyId ? Number(pricingProxyId) : null,

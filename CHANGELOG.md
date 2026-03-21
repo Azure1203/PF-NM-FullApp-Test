@@ -1,6 +1,6 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-21
+> Last updated: 2026-03-21 (r2)
 
 ---
 
@@ -138,6 +138,12 @@
 | `outlook_sync_status` | Outlook scheduler metadata |
 | `agentmail_sync_status` | AgentMail scheduler metadata |
 | `app_settings` | Key-value config store (ORD header template, etc.) |
+
+---
+
+## Recent Fixes
+
+- **Allmoxy product import — upsert on re-import**: Re-importing a product CSV no longer crashes on duplicate names or wipes proxy assignments, images, or SKU prefixes. New products are inserted; existing products (matched by name) have their form-selected fields updated (exportType, supplyType, categoryId, proxy IDs if specified), while admin-configured fields (skuPrefix, imagePath, imageData, notes) are preserved. Products absent from the new CSV are left untouched.
 
 ---
 

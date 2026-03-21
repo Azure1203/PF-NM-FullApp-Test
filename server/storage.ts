@@ -782,7 +782,25 @@ export class DatabaseStorage implements IStorage {
 
   async bulkInsertAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]> {
     if (!products.length) return [];
-    return await db.insert(allmoxyProducts).values(products).returning();
+    return await db
+      .insert(allmoxyProducts)
+      .values(products)
+      .onConflictDoUpdate({
+        target: allmoxyProducts.name,
+        set: {
+          // Update import-driven fields from the CSV/form
+          status: sql`EXCLUDED.status`,
+          description: sql`EXCLUDED.description`,
+          exportType: sql`EXCLUDED.export_type`,
+          supplyType: sql`EXCLUDED.supply_type`,
+          categoryId: sql`EXCLUDED.category_id`,
+          // Only overwrite proxy IDs if the import specifies them; otherwise preserve existing
+          pricingProxyId: sql`COALESCE(EXCLUDED.pricing_proxy_id, allmoxy_products.pricing_proxy_id)`,
+          exportProxyId: sql`COALESCE(EXCLUDED.export_proxy_id, allmoxy_products.export_proxy_id)`,
+          // Preserve admin-configured fields: skuPrefix, imagePath, imageData, notes
+        },
+      })
+      .returning();
   }
 
   async getAttributeGrids(): Promise<AttributeGrid[]> {

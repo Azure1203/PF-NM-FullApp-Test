@@ -91,7 +91,7 @@ export default function AllmoxyProductManager() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importLoading, setImportLoading] = useState(false);
-  const [importResult, setImportResult] = useState<{ categoryName: string; productsInserted: number; bindingsCreated: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ categoryName: string; productsUpserted: number; bindingsCreated: number } | null>(null);
   const [importPricingProxyId, setImportPricingProxyId] = useState<string>("none");
   const [importExportProxyId, setImportExportProxyId] = useState<string>("none");
   const [importExportType, setImportExportType] = useState<string>("ORD");
@@ -1316,8 +1316,8 @@ export default function AllmoxyProductManager() {
                   Category: <span className="font-medium text-foreground">{importResult.categoryName}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {importResult.productsInserted} products imported
-                  {importResult.bindingsCreated > 0 && `, ${importResult.bindingsCreated} grid bindings created`}
+                  {importResult.productsUpserted} products added or updated
+                  {importResult.bindingsCreated > 0 && `, ${importResult.bindingsCreated} grid bindings set`}
                 </p>
               </div>
               <DialogFooter>
