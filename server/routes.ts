@@ -547,11 +547,10 @@ export async function registerRoutes(
       const ext = path.extname(req.file.originalname).toLowerCase();
       const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
       if (!allowedExts.includes(ext)) return res.status(400).json({ message: 'Invalid file type. Use jpg, png, or webp.' });
-      const contentTypeMap: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
-      const storagePath = `product-images/${req.file.originalname}`;
-      await objectStorageService.uploadBuffer(req.file.buffer, storagePath, contentTypeMap[ext]);
-      await db.update(allmoxyProducts).set({ imagePath: storagePath }).where(eq(allmoxyProducts.id, productId));
-      res.json({ imagePath: storagePath });
+      const imagePath = `product-images/${req.file.originalname}`;
+      const imageData = req.file.buffer.toString('base64');
+      await db.update(allmoxyProducts).set({ imagePath, imageData }).where(eq(allmoxyProducts.id, productId));
+      res.json({ imagePath });
     } catch (e: any) {
       console.error('[ProductImage] Upload error:', e);
       res.status(500).json({ message: 'Failed to upload image', error: e.message });
@@ -561,7 +560,7 @@ export async function registerRoutes(
   app.delete('/api/admin/allmoxy-products/:id/image', isAuthenticated, async (req, res) => {
     try {
       const productId = Number(req.params.id);
-      await db.update(allmoxyProducts).set({ imagePath: null }).where(eq(allmoxyProducts.id, productId));
+      await db.update(allmoxyProducts).set({ imagePath: null, imageData: null }).where(eq(allmoxyProducts.id, productId));
       res.status(204).send();
     } catch (e: any) {
       res.status(500).json({ message: 'Failed to clear image', error: e.message });
@@ -6659,7 +6658,7 @@ export async function registerRoutes(
         unmatchedFiles.push({ filename: file.originalname });
       }
 
-      // Upload matched files in parallel batches of 10, then save to DB immediately
+      // Store matched files in DB (base64 image_data) in parallel batches of 10
       const saved: { filename: string; productName: string; storagePath: string }[] = [];
       const uploadErrors: { filename: string; error: string }[] = [];
       const BATCH_SIZE = 10;
@@ -6668,26 +6667,18 @@ export async function registerRoutes(
         const batch = matchedFiles.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (m) => {
           try {
-            await objectStorageService.uploadBuffer(m.file.buffer, m.storagePath, contentTypeMap[m.ext] || 'application/octet-stream');
+            const imageData = m.file.buffer.toString('base64');
             if (m.table === 'allmoxy') {
               await db.update(allmoxyProducts)
-                .set({ imagePath: m.storagePath })
+                .set({ imagePath: m.storagePath, imageData })
                 .where(eq(allmoxyProducts.id, m.productId));
             } else {
-              await storage.updateProduct(m.productId, { imagePath: m.storagePath });
+              await storage.updateProduct(m.productId, { imagePath: m.storagePath, imageData });
             }
             saved.push({ filename: m.file.originalname, productName: m.productName, storagePath: m.storagePath });
           } catch (e: any) {
-            const errMsg =
-              (typeof e.message === 'string' && e.message && e.message !== 'undefined' && !e.message.includes('Error code undefined'))
-                ? e.message
-                : e.code
-                  ? `Storage error (code ${e.code})`
-                  : e.errors?.[0]?.message
-                    ? e.errors[0].message
-                    : 'Storage upload failed — check connectivity and retry';
-            console.error(`[BulkImageUpload] GCS error for ${m.file.originalname}:`, e);
-            uploadErrors.push({ filename: m.file.originalname, error: errMsg });
+            console.error(`[BulkImageUpload] DB write error for ${m.file.originalname}:`, e);
+            uploadErrors.push({ filename: m.file.originalname, error: e.message || 'DB write failed' });
           }
         }));
       }
@@ -6738,6 +6729,40 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error('[ConfirmImageAssignments] Error:', e);
       res.status(500).json({ message: 'Failed to confirm assignments', error: e.message });
+    }
+  });
+
+  app.get('/api/product-images/by-id/:id', isAuthenticated, async (req, res) => {
+    try {
+      const productId = Number(req.params.id);
+      if (!productId || isNaN(productId)) return res.status(400).json({ message: 'Invalid product id' });
+
+      const [product] = await db.select({
+        imageData: allmoxyProducts.imageData,
+        imagePath: allmoxyProducts.imagePath,
+      }).from(allmoxyProducts).where(eq(allmoxyProducts.id, productId));
+
+      if (!product?.imageData) {
+        return res.status(404).json({ message: 'Image not found' });
+      }
+
+      const buffer = Buffer.from(product.imageData, 'base64');
+      const ext = product.imagePath ? path.extname(product.imagePath).toLowerCase() : '';
+      const contentTypeMap: Record<string, string> = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png', '.webp': 'image/webp',
+        '.gif': 'image/gif', '.svg': 'image/svg+xml',
+      };
+
+      res.set({
+        'Content-Type': contentTypeMap[ext] || 'image/jpeg',
+        'Cache-Control': 'public, max-age=86400',
+        'Content-Length': String(buffer.length),
+      });
+      res.send(buffer);
+    } catch (e: any) {
+      console.error('[ProductImages] Error serving image by-id:', e);
+      res.status(500).json({ message: 'Failed to serve image' });
     }
   });
 

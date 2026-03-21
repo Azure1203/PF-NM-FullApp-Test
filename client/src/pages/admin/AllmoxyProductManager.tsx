@@ -646,7 +646,7 @@ export default function AllmoxyProductManager() {
                     )}
                     {p.imagePath ? (
                       <img
-                        src={p.imagePath.startsWith('product-images/') ? `/api/product-images/${encodeURIComponent(p.imagePath.replace('product-images/', ''))}` : p.imagePath}
+                        src={`/api/product-images/by-id/${p.id}`}
                         alt={p.name}
                         className="w-8 h-8 object-cover rounded border shrink-0"
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -731,9 +731,7 @@ export default function AllmoxyProductManager() {
                       const isUploading = uploadImageMutation.isPending;
                       const isClearing = clearImageMutation.isPending;
                       const imgSrc = currentProduct.imagePath
-                        ? (currentProduct.imagePath.startsWith('product-images/')
-                            ? `/api/product-images/${encodeURIComponent(currentProduct.imagePath.replace('product-images/', ''))}`
-                            : currentProduct.imagePath)
+                        ? `/api/product-images/by-id/${currentProduct.id}`
                         : null;
                       return (
                         <div className="flex flex-col items-center gap-2">
