@@ -89,6 +89,7 @@ export default function ProductImageUploader() {
       chunks.push(selectedFiles.slice(i, i + BATCH_SIZE));
     }
 
+    let processedCount = 0;
     for (const chunk of chunks) {
       if (cancelledRef.current) break;
 
@@ -110,14 +111,16 @@ export default function ProductImageUploader() {
           const err = await res.json().catch(() => ({ message: 'Batch failed' }));
           chunk.forEach(f => accumulated.uploadErrors.push({ filename: f.name, error: err.message || 'Batch failed' }));
         }
-      } catch (e: any) {
+      } catch (_err: unknown) {
         chunk.forEach(f => accumulated.uploadErrors.push({ filename: f.name, error: 'Network error' }));
       }
 
-      setProcessed(prev => prev + chunk.length);
+      processedCount += chunk.length;
+      setProcessed(processedCount);
       setLiveResult({ ...accumulated });
     }
 
+    accumulated.total = processedCount;
     setIsUploading(false);
     setFinalResult({ ...accumulated });
     setLiveResult(null);
