@@ -1641,7 +1641,20 @@ export async function registerRoutes(
         if (!file.rawContent) continue;
         await storage.deleteOrderItemsByFile(file.id);
 
-        const itemObjects: any[] = parseSync(file.rawContent, { columns: true, skip_empty_lines: true });
+        const rawRecords: string[][] = parseSync(file.rawContent, { columns: false, skip_empty_lines: true });
+        const headerRowIndex = rawRecords.findIndex(row => (row[0] ?? '').toLowerCase().includes('manuf'));
+        console.log(`[Pipeline] Header row found at index ${headerRowIndex}:`, headerRowIndex !== -1 ? rawRecords[headerRowIndex] : 'NOT FOUND');
+        const itemObjects: Record<string, string>[] = [];
+        if (headerRowIndex !== -1) {
+          const headerRow = rawRecords[headerRowIndex].map(h => (h ?? '').trim());
+          for (let ri = headerRowIndex + 1; ri < rawRecords.length; ri++) {
+            const row = rawRecords[ri];
+            if (!row.some(cell => (cell ?? '').trim())) continue;
+            const obj: Record<string, string> = {};
+            headerRow.forEach((h, idx) => { if (h) obj[h] = (row[idx] ?? '').trim(); });
+            itemObjects.push(obj);
+          }
+        }
         for (const item of itemObjects) {
           const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
           if (!sku) continue;

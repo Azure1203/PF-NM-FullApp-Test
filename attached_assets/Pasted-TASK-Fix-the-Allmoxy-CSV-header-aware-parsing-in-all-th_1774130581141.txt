@@ -1,0 +1,60 @@
+TASK: Fix the Allmoxy CSV header-aware parsing in all three pipeline locations 
+where it is still broken.
+
+BACKGROUND:
+Allmoxy order CSVs have a metadata preamble (PO number, dealer name, address) 
+before the real data header row. The real header row is the first row whose 
+first cell contains the text "manuf" (case-insensitive). All rows after that 
+are the actual line items.
+
+The r4 fix added header-aware parsing in one location, but the pricing loop 
+in the upload handler, the /reprice route, and the Asana import scheduler all 
+still use:
+
+  const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+
+This treats the first row of the CSV as the header, so item.MANU_CODE is 
+always undefined, the "if (!sku) continue" guard fires on every row, and zero 
+order_items are ever created. This is why all output pages (invoice, packing 
+slip, ORD export, Elias, MJ, CTS, hardware) are empty.
+
+THE FIX:
+Replace the broken parseSync pattern with header-aware parsing in all three 
+locations. The correct pattern already exists in server/csvHelpers.ts 
+(used by countPartsFromCSV and extractCTSParts). Replicate it here.
+
+Correct pattern:
+  1. Call parseSync(content, { columns: false, skip_empty_lines: true }) 
+     to get string[][] records
+  2. Find headerRowIndex: first index where row[0].toLowerCase().includes('manuf')
+  3. Use records[headerRowIndex] as the column name array
+  4. Build item objects for all rows after headerRowIndex by zipping the 
+     header array with each data row
+  5. Proceed with item.MANU_CODE / item.SKU / item['Manuf Code'] lookups as before
+
+LOCATIONS TO FIX — update all three:
+
+1. server/routes.ts — upload handler pricing loop
+   Find: const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+   Inside the block beginning: "// ── Product-driven per-item pricing ──"
+
+2. server/routes.ts — /reprice route
+   Find: const itemObjects: any[] = parseSync(file.rawContent, { columns: true, skip_empty_lines: true });
+   Inside: app.post('/api/orders/:id/reprice', ...)
+
+3. server/asanaImportScheduler.ts — pricing loop
+   Find: const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+   Inside: "// ── Product-driven pricing loop (same as upload handler) ──"
+
+Do not change any other parseSync calls (hardware import, component import, 
+etc.) — only these three pricing pipeline locations.
+
+After each fix, add a console.log immediately after the header row is found:
+  console.log(`[Pipeline] Header row found at index ${headerRowIndex}:`, headerRow);
+
+VERIFICATION:
+- Upload a test order CSV
+- Server console should show "[Pipeline] Header row found at index N" with 
+  real column names like MANU_CODE, HEIGHT, WIDTH, etc.
+- Order detail page should now show line items instead of being empty
+- Re-run the /reprice endpoint and confirm order_items are created

@@ -1,0 +1,136 @@
+TASK: Fix the grid row lookup in all three pipeline locations to use the 
+in-memory cache instead of making a DB call per item.
+
+BACKGROUND:
+The r4 performance fix built a gridRowCache (Map<number, rows[]>) and defined 
+findGridRowInCache(), but the contextScope builder inside the per-item loop 
+was never updated to use it. It still calls:
+
+  const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn);
+
+This fires a DB query for every grid binding on every line item. It is also 
+the reason grid alias data (e.g. "parts.base_price") may not be appearing 
+correctly in the formula scope, causing $0.00 prices.
+
+THE FIX:
+
+Step 1 — Confirm or add findGridRowInCache in each file.
+The function signature:
+  function findGridRowInCache(
+    cache: Map<number, any[]>,
+    gridId: number,
+    lookupValue: string,
+    lookupColumn: string
+  ): any | null
+
+Lookup logic:
+  1. rows = cache.get(gridId) — if undefined, return null
+  2. Exact match: rows.find(r => r.lookupKey === lookupValue)
+  3. Case-insensitive: rows.find(r => r.lookupKey?.toLowerCase() === lookupValue.toLowerCase())
+  4. rowData column fallback: rows.find(r => {
+       const rd = r.rowData as Record<string, any>;
+       return rd && Object.values(rd).some(v => String(v).toLowerCase() === lookupValue.toLowerCase());
+     })
+  5. Return match or null
+
+Step 2 — Confirm or add gridRowCache pre-load before each per-item loop.
+The pre-load block should be:
+  const allGrids = await storage.getAttributeGrids();
+  const gridRowCache = new Map<number, any[]>();
+  await Promise.all(allGrids.map(async (grid) => {
+    const rows = await storage.getAttributeGridRows(grid.id);
+    gridRowCache.set(grid.id, rows);
+  }));
+
+Step 3 — In the contextScope builder, replace the DB call with the cache lookup.
+Replace:
+  const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn);
+With:
+  const row = findGridRowInCache(gridRowCache, binding.gridId, lookupValue, binding.lookupColumn);
+(remove the await — this is now synchronous)
+
+Step 4 — Fix alias casing.
+When setting the resolved grid row onto contextScope, always lowercase the alias key:
+  contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
+    Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
+  );
+
+Apply all four steps in all three pipeline locations:
+  - server/routes.ts upload handler
+  - server/routes.ts /reprice route  
+  - server/asanaImportScheduler.ts
+
+VERIFICATION:
+- Upload a test CSV — server console should not show repeated DB queries 
+  for grid lookups during the per-item loop
+- Open the formula tester, select a product with a grid binding, run the test
+- The Full Formula Scope panel (dark JSON panel) should show the grid alias 
+  as a populated object, e.g. "parts": { "base_price": "0", "sq_ft_price": "5.35", ... }
+- If the scope shows the alias data correctly and price is still $0.00, 
+  proceed to Prompt 3
+```
+
+---
+
+## Prompt 3 — Surface formula evaluation errors and fix $0.00 pricing
+```
+TASK: Make formula evaluation errors visible instead of silently returning 
+$0.00, and fix the proxy variable resolution so formulas evaluate correctly.
+
+BACKGROUND:
+The formula tester shows the parts grid row resolving correctly (row data 
+visible in the scope JSON panel) but the price is $0.00 with no error message. 
+This means either the formula is evaluating to 0 because a variable name is 
+wrong, or the mathjs evaluate() call is throwing and the error is swallowed 
+silently. There is no way to tell which without surfacing the error.
+
+THE FIX — five changes:
+
+1. In server/services/pricingEngine.ts (or wherever mathjs.evaluate is called):
+   Wrap the evaluate call in try/catch. On error, do NOT return 0 silently.
+   Return an object: { price: 0, error: error.message, formulaUsed: formulaString }
+   Store error.message in the order_items.pricingError column (the column 
+   already exists in the schema).
+   Also add a console.log on error:
+     console.error(`[PricingEngine] Formula eval error for product ${product?.name}:`, error.message);
+     console.error(`[PricingEngine] Formula was:`, formulaString);
+     console.error(`[PricingEngine] Scope was:`, JSON.stringify(scope, null, 2));
+
+2. In the formula tester endpoint (POST /api/admin/formula-test in server/routes.ts):
+   If the pricing engine returns an error object, include the error string 
+   in the JSON response under key "error". Always include the resolved 
+   formula string under key "formulaUsed" in every response (success or error).
+
+3. In client/src/pages/admin/FormulaTester.tsx:
+   If the response contains an "error" field, display it in a red alert box 
+   directly below the price result panel. Show the full error message and the 
+   formula string that was evaluated. This will immediately reveal undefined 
+   variable names or invalid expressions.
+
+4. In the pricing engine scope builder:
+   Before calling mathjs.evaluate, log the complete scope to the console:
+     console.log(`[PricingEngine] Scope for ${product?.name}:`, JSON.stringify(scope, null, 2));
+   This runs only in the formula tester path (or always during development) 
+   so the full variable resolution is visible in server logs.
+
+5. Confirm proxy variable resolution order in the scope:
+   The mathjs scope is built in layers. Confirm the order is:
+     a. CSV dimensions first (height, width, length, depth, quantity)
+     b. Proxy variable computed values second (each proxy variable's formula 
+        is evaluated against the dimensions scope and the result is added 
+        to the scope under the proxy variable's name)
+     c. Grid alias objects third (e.g. scope["parts"] = { base_price, ... })
+   If proxy variables are added AFTER grid aliases, or if proxy variable 
+   names collide with grid alias names, formulas will produce wrong results.
+   Fix the order if it is wrong.
+
+VERIFICATION:
+- Open the formula tester, select 34BACK, click Run Pricing Test
+- If there is a formula error, a red error box should now appear showing 
+  the exact error (e.g. "Undefined symbol parts.base_price" or similar)
+- Check server console for the full scope log — confirm the "parts" key 
+  exists with non-zero values
+- If the error reveals a variable name mismatch (e.g. formula says 
+  "parts.base_price" but scope has "parts.Base Price"), fix the column 
+  name normalization in the grid row cache loader to lowercase all keys
+- Once errors are visible, fix any mismatches and re-run until price is non-zero
