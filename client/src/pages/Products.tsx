@@ -275,7 +275,7 @@ export default function Products() {
                     {product.imagePath && (
                       <div className="flex-shrink-0">
                         <img 
-                          src={product.imagePath.startsWith('product-images/') ? `/api/product-images/${encodeURIComponent(product.imagePath.replace('product-images/', ''))}` : product.imagePath} 
+                          src={`/api/product-images/hardware/by-id/${product.id}`}
                           alt={product.code}
                           className="w-10 h-10 object-cover rounded border"
                           onError={(e) => (e.currentTarget.style.display = 'none')}

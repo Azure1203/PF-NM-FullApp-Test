@@ -6732,6 +6732,40 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/product-images/hardware/by-id/:id', isAuthenticated, async (req, res) => {
+    try {
+      const productId = Number(req.params.id);
+      if (!productId || isNaN(productId)) return res.status(400).json({ message: 'Invalid product id' });
+
+      const [product] = await db.select({
+        imageData: products.imageData,
+        imagePath: products.imagePath,
+      }).from(products).where(eq(products.id, productId));
+
+      if (!product?.imageData) {
+        return res.status(404).json({ message: 'Image not found' });
+      }
+
+      const buffer = Buffer.from(product.imageData, 'base64');
+      const ext = product.imagePath ? path.extname(product.imagePath).toLowerCase() : '';
+      const contentTypeMap: Record<string, string> = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png', '.webp': 'image/webp',
+        '.gif': 'image/gif', '.svg': 'image/svg+xml',
+      };
+
+      res.set({
+        'Content-Type': contentTypeMap[ext] || 'image/jpeg',
+        'Cache-Control': 'public, max-age=86400',
+        'Content-Length': String(buffer.length),
+      });
+      res.send(buffer);
+    } catch (e: any) {
+      console.error('[ProductImages] Error serving hardware image by-id:', e);
+      res.status(500).json({ message: 'Failed to serve image' });
+    }
+  });
+
   app.get('/api/product-images/by-id/:id', isAuthenticated, async (req, res) => {
     try {
       const productId = Number(req.params.id);
