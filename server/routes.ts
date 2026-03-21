@@ -6604,12 +6604,8 @@ export async function registerRoutes(
       }
 
       const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
-      const contentTypeMap: Record<string, string> = {
-        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-        '.png': 'image/png', '.webp': 'image/webp'
-      };
 
-      // Build in-memory lookup maps (no GCS calls yet)
+      // Build in-memory lookup maps
       const [allAllmoxyProductsList, allHardwareProductsList] = await Promise.all([
         storage.getAllmoxyProducts(),
         storage.getProducts(),
