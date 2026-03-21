@@ -739,7 +739,7 @@ export async function registerRoutes(
 
       const resolvedCategoryId = categoryId ? Number(categoryId) : null;
 
-      const productsToInsert = records
+      const rawProducts = records
         .filter(r => r['PRODUCT NAME']?.trim())
         .map(r => ({
           name: r['PRODUCT NAME'].trim(),
@@ -753,6 +753,12 @@ export async function registerRoutes(
           supplyType: 'STOCK' as const,
           categoryId: resolvedCategoryId,
         }));
+
+      // Deduplicate by name so PostgreSQL's ON CONFLICT DO UPDATE never targets
+      // the same row twice in a single statement (last occurrence wins).
+      const nameMap = new Map<string, typeof rawProducts[0]>();
+      for (const p of rawProducts) nameMap.set(p.name, p);
+      const productsToInsert = Array.from(nameMap.values());
 
       if (!productsToInsert.length) {
         return res.status(400).json({ message: 'No valid product rows found in file' });
