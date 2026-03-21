@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "IdZCbqXuLIVK61s4YSnZo"
+uri = "file://CHANGELOG.md"
+type = "text"
+title = "CHANGELOG.md — Perfect Fit Closets / Netley Millwork"
