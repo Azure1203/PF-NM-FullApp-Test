@@ -27,7 +27,7 @@ import { buildAsanaTaskNotes, syncAsanaTaskNotes, syncAsanaOrderType } from "./a
 import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks, productGridBindings, orderItems, allmoxyProducts, attributeGridRows, attributeGrids } from "@shared/schema";
-import type { AllmoxyProduct, ProductGridBinding } from "@shared/schema";
+import type { AllmoxyProduct, ProductGridBinding, AttributeGridRow } from "@shared/schema";
 import { EXPORT_TYPE_OPTIONS, SUPPLY_TYPE_OPTIONS } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -2068,22 +2068,62 @@ export async function registerRoutes(
       const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
 
       // ── Product-driven pipeline pre-load ──────────────────────────────
-      const allProxyVars = await storage.getProxyVariables();
+      // All four lookups run in parallel — one round-trip per table.
+      const [allProxyVars, allProducts, allBindings, allGrids] = await Promise.all([
+        storage.getProxyVariables(),
+        storage.getAllmoxyProducts(),
+        storage.getAllProductGridBindings(),
+        storage.getAttributeGrids(),
+      ]);
+
       const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
 
-      const allProducts = await storage.getAllmoxyProducts();
       const activeProducts = allProducts.filter(
         (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
       );
 
+      // Group bindings by productId — O(1) lookup per item, no per-product DB queries.
       const productBindingsMap = new Map<number, ProductGridBinding[]>();
-      for (const product of activeProducts) {
-        const bindings = await storage.getProductGridBindings(product.id);
-        productBindingsMap.set(product.id, bindings);
+      for (const binding of allBindings) {
+        const list = productBindingsMap.get(binding.productId) ?? [];
+        list.push(binding);
+        productBindingsMap.set(binding.productId, list);
       }
 
-      const allGrids = await storage.getAttributeGrids();
       const gridMap = new Map(allGrids.map(g => [g.id, g]));
+
+      // Pre-load all grid rows into memory: gridId → rows[].
+      // Replaces per-item DB lookups with in-memory matching.
+      const gridRowsCache = new Map<number, AttributeGridRow[]>();
+      await Promise.all(
+        allGrids.map(async (g) => {
+          const rows = await storage.getAttributeGridRows(g.id);
+          gridRowsCache.set(g.id, rows);
+        })
+      );
+
+      // In-memory equivalent of storage.getAttributeGridRowByKey —
+      // tries exact → case-insensitive → rowData column search.
+      const findGridRowInCache = (
+        gridId: number,
+        lookupValue: string,
+        rowDataColumn?: string
+      ): AttributeGridRow | undefined => {
+        const rows = gridRowsCache.get(gridId) ?? [];
+        const trimmed = lookupValue.trim();
+        const exact = rows.find(r => r.lookupKey === trimmed);
+        if (exact) return exact;
+        const ci = rows.find(r => r.lookupKey.trim().toLowerCase() === trimmed.toLowerCase());
+        if (ci) return ci;
+        if (rowDataColumn) {
+          return rows.find(r => {
+            const rd = r.rowData as Record<string, any>;
+            const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
+            return String(val ?? '').trim().toLowerCase() === trimmed.toLowerCase();
+          });
+        }
+        return undefined;
+      };
 
       // Build products map for countPartsFromCSV (MJ/Richelieu door detection)
       const allProductsForCounting = await storage.getProducts();
@@ -2153,7 +2193,30 @@ export async function registerRoutes(
         // Delete any stale order_items for this file (safe for re-uploads)
         await storage.deleteOrderItemsByFile(orderFile.id);
 
-        const itemObjects: any[] = parseSync(pf.content, { columns: true, skip_empty_lines: true });
+        // ── Header-aware CSV parsing ───────────────────────────────────
+        // Allmoxy CSVs have metadata rows at the top before the real header.
+        // Scan pf.records (string[][]) for the first row whose first cell
+        // contains "manuf"; that row is the column header row.
+        let headerRowIdx = -1;
+        for (let ri = 0; ri < pf.records.length; ri++) {
+          if ((pf.records[ri][0] ?? '').toLowerCase().includes('manuf')) {
+            headerRowIdx = ri;
+            break;
+          }
+        }
+        const itemObjects: Record<string, string>[] = [];
+        if (headerRowIdx !== -1) {
+          const headers = pf.records[headerRowIdx].map(h => (h ?? '').trim());
+          for (let ri = headerRowIdx + 1; ri < pf.records.length; ri++) {
+            const row = pf.records[ri];
+            if (!row.some(cell => (cell ?? '').trim())) continue; // skip blank rows
+            const obj: Record<string, string> = {};
+            headers.forEach((h, idx) => { if (h) obj[h] = (row[idx] ?? '').trim(); });
+            itemObjects.push(obj);
+          }
+        }
+        // ─────────────────────────────────────────────────────────────
+
         for (const item of itemObjects) {
           // Resolve SKU from common column name variants
           const sku: string = (
@@ -2179,7 +2242,7 @@ export async function registerRoutes(
               if (!grid) continue;
               const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
               if (!lookupValue) continue;
-              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn);
+              const row = findGridRowInCache(binding.gridId, lookupValue, binding.lookupColumn);
               if (row) {
                 const rawData = row.rowData as Record<string, any>;
                 contextScope[binding.alias] = Object.fromEntries(

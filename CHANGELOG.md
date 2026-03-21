@@ -1,6 +1,28 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-21 (r3)
+> Last updated: 2026-03-21 (r4)
+
+---
+
+## Recent Fixes (2026-03-21 r4) — Task #25
+
+### Fix: Order CSV import created zero order_items (critical)
+**Root cause:** `parseSync(content, { columns: true })` treated the *first* row of the Allmoxy CSV as column headers. Allmoxy order CSVs have a metadata preamble (PO number, dealer name, address), so the real `MANU_CODE` header was buried further down. Every parsed object had metadata labels as keys, `item.MANU_CODE` was always undefined, and every row was skipped by `if (!sku) continue` — resulting in zero `order_items` ever being created.
+
+**Fix:** Replaced `parseSync` with header-aware parsing directly on `pf.records` (`string[][]`). Scans for the first row whose first cell contains `"manuf"`, uses that row as the column headers, then builds objects for all subsequent data rows — matching the existing pattern in `countPartsFromCSV` / `extractCTSParts` in `csvHelpers.ts`.
+
+**Impact:** All output pages (invoice, packing slip, ORD export, Elias export, MJ export, CTS export, hardware export) were empty because they are driven by `order_items`. These will now populate correctly after any order CSV upload.
+
+### Fix: Import pipeline was extremely slow (2,363+ sequential DB queries)
+**Root cause:** The pre-load block before processing called `storage.getProductGridBindings(productId)` once per active product in a sequential `for` loop. With 2,363 active products in production this was 2,363 round-trips. Additionally, each order item fired `storage.getAttributeGridRowByKey()` — another DB hit per binding per item.
+
+**Fix — Bulk binding load:** Added `getAllProductGridBindings()` to the storage interface and implementation (single `SELECT` on `product_grid_bindings` with no `WHERE`). The pre-load loop is replaced with one bulk call; results are grouped into a `Map<productId, bindings[]>` in memory.
+
+**Fix — In-memory grid row cache:** All grid rows are loaded upfront via `Promise.all` over `storage.getAttributeGridRows()` per grid (grids run in parallel). A `Map<gridId, rows[]>` is built in memory. Per-item grid lookups are replaced with `findGridRowInCache()` — an in-memory function implementing the same exact → case-insensitive → rowData column fallback logic as the original DB method.
+
+**Fix — Parallel table pre-load:** The four pre-load queries (proxy vars, products, bindings, grids) now run concurrently via `Promise.all` instead of sequentially.
+
+**Net result:** Import time drops from O(N_products) sequential DB queries to a small constant number of parallel bulk queries, followed by O(1) in-memory lookups during per-item processing.
 
 ---
 

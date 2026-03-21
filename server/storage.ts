@@ -178,6 +178,7 @@ export interface IStorage {
   replaceProxyVariables(vars: InsertProxyVariable[]): Promise<ProxyVariable[]>;
 
   getProductGridBindings(productId: number): Promise<ProductGridBinding[]>;
+  getAllProductGridBindings(): Promise<ProductGridBinding[]>;
   createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding>;
   deleteProductGridBinding(id: number): Promise<boolean>;
   replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]>;
@@ -935,6 +936,10 @@ export class DatabaseStorage implements IStorage {
 
   async getProductGridBindings(productId: number): Promise<ProductGridBinding[]> {
     return await db.select().from(productGridBindings).where(eq(productGridBindings.productId, productId));
+  }
+
+  async getAllProductGridBindings(): Promise<ProductGridBinding[]> {
+    return await db.select().from(productGridBindings);
   }
 
   async createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding> {
