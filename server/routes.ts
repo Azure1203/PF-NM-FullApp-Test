@@ -6591,13 +6591,13 @@ export async function registerRoutes(
   const allowedImageMimes = ['image/jpeg', 'image/png', 'image/webp'];
   const imageUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { files: 500, fileSize: 10 * 1024 * 1024 },
+    limits: { files: 100, fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
       cb(null, allowedImageMimes.includes(file.mimetype));
     }
   });
 
-  app.post('/api/admin/products/bulk-upload-images', isAuthenticated, imageUpload.array('images', 500), async (req, res) => {
+  app.post('/api/admin/products/bulk-upload-images', isAuthenticated, imageUpload.array('images', 100), async (req, res) => {
     try {
       const files = req.files as Express.Multer.File[] | undefined;
       if (!files || files.length === 0) {
