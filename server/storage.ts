@@ -493,11 +493,23 @@ export class DatabaseStorage implements IStorage {
 
   // Product catalog methods
   async getProducts(search?: string, category?: string): Promise<Product[]> {
-    let query = db.select().from(products);
-    
+    const productCols = {
+      id: products.id,
+      code: products.code,
+      name: products.name,
+      supplier: products.supplier,
+      category: products.category,
+      stockStatus: products.stockStatus,
+      weight: products.weight,
+      imagePath: products.imagePath,
+      notes: products.notes,
+      importRowNumber: products.importRowNumber,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+    };
+
     const conditions = [];
     if (search) {
-      // Search both product code and supplier
       conditions.push(
         or(
           ilike(products.code, `%${search}%`),
@@ -508,11 +520,13 @@ export class DatabaseStorage implements IStorage {
     if (category) {
       conditions.push(eq(products.category, category));
     }
-    
+
     if (conditions.length > 0) {
-      return await db.select().from(products).where(and(...conditions)).orderBy(products.code);
+      const result = await db.select(productCols).from(products).where(and(...conditions)).orderBy(products.code);
+      return result as Product[];
     }
-    return await db.select().from(products).orderBy(products.code);
+    const result = await db.select(productCols).from(products).orderBy(products.code);
+    return result as Product[];
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
@@ -737,7 +751,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllmoxyProducts(): Promise<AllmoxyProduct[]> {
-    return await db.select().from(allmoxyProducts).orderBy(allmoxyProducts.name);
+    const result = await db.select({
+      id: allmoxyProducts.id,
+      name: allmoxyProducts.name,
+      status: allmoxyProducts.status,
+      pricingProxyId: allmoxyProducts.pricingProxyId,
+      exportProxyId: allmoxyProducts.exportProxyId,
+      skuPrefix: allmoxyProducts.skuPrefix,
+      description: allmoxyProducts.description,
+      notes: allmoxyProducts.notes,
+      exportType: allmoxyProducts.exportType,
+      supplyType: allmoxyProducts.supplyType,
+      imagePath: allmoxyProducts.imagePath,
+      categoryId: allmoxyProducts.categoryId,
+    }).from(allmoxyProducts).orderBy(allmoxyProducts.name);
+    return result as AllmoxyProduct[];
   }
 
   async upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct> {
