@@ -1,6 +1,6 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-21 (r2)
+> Last updated: 2026-03-21 (r3)
 
 ---
 
@@ -141,9 +141,11 @@
 
 ---
 
-## Recent Fixes
+## Recent Fixes (this session — 2026-03-21)
 
-- **Allmoxy product import — upsert on re-import**: Re-importing a product CSV no longer crashes on duplicate names or wipes proxy assignments, images, or SKU prefixes. New products are inserted; existing products (matched by name) have their form-selected fields updated (exportType, supplyType, categoryId, proxy IDs if specified), while admin-configured fields (skuPrefix, imagePath, imageData, notes) are preserved. Products absent from the new CSV are left untouched.
+- **Allmoxy product import — upsert on re-import** (Task #23): Re-importing a product CSV no longer crashes on duplicate names or wipes proxy assignments, images, or SKU prefixes. New products are inserted; existing products (matched by name) have their form-selected fields updated (exportType, supplyType, categoryId, proxy IDs if specified), while admin-configured fields (skuPrefix, imagePath, imageData, notes) are preserved. Products absent from the new CSV are left untouched.
+
+- **Allmoxy product import — deduplicate rows before upsert** (Task #24): If the CSV itself contains two or more rows with the same product name, the import previously crashed with "ON CONFLICT DO UPDATE command cannot affect a row a second time". The CSV rows are now deduplicated by name (last row wins) before the database call, eliminating this error entirely.
 
 ---
 
