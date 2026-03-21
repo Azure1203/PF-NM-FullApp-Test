@@ -334,6 +334,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
 });
 
 export type Product = typeof products.$inferSelect;
+export type ProductListItem = Omit<Product, 'imageData'>;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 
 // Hardware checklist items - items from hardware CSV attached to order files
@@ -466,6 +467,7 @@ export const allmoxyProducts = pgTable("allmoxy_products", {
 
 export const insertAllmoxyProductSchema = createInsertSchema(allmoxyProducts);
 export type AllmoxyProduct = typeof allmoxyProducts.$inferSelect;
+export type AllmoxyProductListItem = Omit<AllmoxyProduct, 'imageData'>;
 export type InsertAllmoxyProduct = z.infer<typeof insertAllmoxyProductSchema>;
 
 export const attributeGrids = pgTable("attribute_grids", {

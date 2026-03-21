@@ -27,6 +27,7 @@ import {
   type PackingSlipItem,
   type InsertPackingSlipItem,
   type Product,
+  type ProductListItem,
   type InsertProduct,
   type HardwareChecklistItem,
   type InsertHardwareChecklistItem,
@@ -37,6 +38,7 @@ import {
   productCategories,
   allmoxyProducts,
   type AllmoxyProduct,
+  type AllmoxyProductListItem,
   type InsertAllmoxyProduct,
   attributeGrids,
   type AttributeGrid,
@@ -113,7 +115,7 @@ export interface IStorage {
   replacePackingSlipItems(fileId: number, items: InsertPackingSlipItem[]): Promise<PackingSlipItem[]>;
   
   // Product catalog methods
-  getProducts(search?: string, category?: string): Promise<Product[]>;
+  getProducts(search?: string, category?: string): Promise<ProductListItem[]>;
   getProduct(id: number): Promise<Product | undefined>;
   getProductByCode(code: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
@@ -151,7 +153,7 @@ export interface IStorage {
   updateProductCategory(id: number, name: string): Promise<import('@shared/schema').ProductCategory | undefined>;
   deleteProductCategory(id: number): Promise<boolean>;
 
-  getAllmoxyProducts(): Promise<AllmoxyProduct[]>;
+  getAllmoxyProducts(): Promise<AllmoxyProductListItem[]>;
   upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct>;
   deleteAllmoxyProduct(id: number): Promise<boolean>;
   replaceAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]>;
@@ -492,7 +494,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Product catalog methods
-  async getProducts(search?: string, category?: string): Promise<Product[]> {
+  async getProducts(search?: string, category?: string): Promise<ProductListItem[]> {
     const productCols = {
       id: products.id,
       code: products.code,
@@ -522,11 +524,9 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      const result = await db.select(productCols).from(products).where(and(...conditions)).orderBy(products.code);
-      return result as Product[];
+      return db.select(productCols).from(products).where(and(...conditions)).orderBy(products.code);
     }
-    const result = await db.select(productCols).from(products).orderBy(products.code);
-    return result as Product[];
+    return db.select(productCols).from(products).orderBy(products.code);
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
@@ -750,8 +750,8 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllmoxyProducts(): Promise<AllmoxyProduct[]> {
-    const result = await db.select({
+  async getAllmoxyProducts(): Promise<AllmoxyProductListItem[]> {
+    return db.select({
       id: allmoxyProducts.id,
       name: allmoxyProducts.name,
       status: allmoxyProducts.status,
@@ -765,7 +765,6 @@ export class DatabaseStorage implements IStorage {
       imagePath: allmoxyProducts.imagePath,
       categoryId: allmoxyProducts.categoryId,
     }).from(allmoxyProducts).orderBy(allmoxyProducts.name);
-    return result as AllmoxyProduct[];
   }
 
   async upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct> {
