@@ -83,33 +83,22 @@ export default function FormulaTester() {
 
   const selectedProduct = products?.find(p => p.id === selectedProductId) ?? null;
 
+  const isAutoBinding = (lookupColumn: string) =>
+    lookupColumn.toLowerCase().includes("manu");
+
   const testMutation = useMutation({
     mutationFn: async () => {
-      // Auto-populate lookup inputs from the product's own name (which is the MANU_CODE)
-      // for any binding where the user hasn't manually provided a value
-      const autoLookups: Record<string, string> = {};
-      if (selectedProduct && bindings) {
-        for (const binding of bindings) {
-          if (!lookupInputs[binding.lookupColumn] && selectedProduct.name) {
-            autoLookups[binding.lookupColumn] = selectedProduct.name;
-          }
-        }
-      }
-
-      console.log('[FormulaTester] autoLookups:', autoLookups, 'selectedProduct:', selectedProduct?.name, 'bindings:', bindings);
-
       const inputs: Record<string, any> = {
         width: parseFloat(width) || 0,
         height: parseFloat(height) || 0,
         length: parseFloat(length) || 0,
         depth: parseFloat(length) || 0,
         quantity: parseInt(quantity) || 1,
-        ...autoLookups,
-        ...lookupInputs, // manual entries still override auto ones
       };
       const res = await apiRequest("POST", "/api/admin/formula-test", {
         productId: selectedProductId,
         inputs,
+        gridLookups: lookupInputs,
       });
       return res.json() as Promise<TestResult>;
     },
@@ -215,12 +204,50 @@ export default function FormulaTester() {
               </div>
             </div>
 
-            {/* Grid binding auto-lookup note */}
-            {bindings && bindings.length > 0 && bindings.some(b => !lookupInputs[b.lookupColumn]) && (
-              <div className="space-y-1 rounded-md bg-muted/40 border px-3 py-2 text-xs text-muted-foreground">
-                <p>
-                  Lookup: using product SKU <span className="font-mono text-foreground">{selectedProduct?.name}</span> automatically
-                </p>
+            {/* Grid Lookup Overrides */}
+            {bindings && bindings.length > 0 && (
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Grid Lookup Overrides</label>
+                <div className="space-y-2">
+                  {bindings.map(binding => {
+                    const auto = isAutoBinding(binding.lookupColumn);
+                    return (
+                      <div key={binding.id} className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-medium capitalize">
+                            {binding.alias} lookup
+                          </label>
+                          {auto && (
+                            <span className="text-[10px] font-mono rounded bg-muted px-1.5 py-0.5 text-muted-foreground border">
+                              auto · {selectedProduct?.name}
+                            </span>
+                          )}
+                        </div>
+                        {auto ? (
+                          <div className="h-9 flex items-center px-3 rounded-md border bg-muted/40 text-xs text-muted-foreground font-mono">
+                            {selectedProduct?.name}
+                          </div>
+                        ) : (
+                          <Input
+                            data-testid={`input-lookup-${binding.alias}`}
+                            placeholder={`e.g. TFL1W`}
+                            value={lookupInputs[binding.alias] ?? ""}
+                            onChange={e =>
+                              setLookupInputs(prev => ({
+                                ...prev,
+                                [binding.alias]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={handleKeyDown}
+                          />
+                        )}
+                        <p className="text-[10px] text-muted-foreground">
+                          Column: <span className="font-mono">{binding.lookupColumn}</span>
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

@@ -1,6 +1,26 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-21 (r5)
+> Last updated: 2026-03-21 (r6)
+
+---
+
+## Fixes (2026-03-21 r6)
+
+### Fix: Multi-line formulas crash with "Syntax error (char N)"
+**Root cause:** `stripComments` in `pricingEngine.ts` removed block/line comments but left internal newlines intact. mathjs cannot parse ternary operators when the `?` or branches are on a separate line — it sees a line break as an expression terminator and throws a syntax error. Every multi-line formula was broken by this.
+
+**Fix:** Added `result.replace(/\s+/g, " ")` after comment removal in `stripComments`. All newlines and runs of whitespace are collapsed to a single space before the formula is handed to mathjs. No changes needed to calling code.
+
+### Feature: Per-binding Grid Lookup Overrides in Formula Tester
+**Problem:** The Formula Tester had no way to supply lookup values for grid bindings that resolve from something other than the product SKU (e.g., color/material codes like `TFL1W`). Those bindings always missed, `color.*` was never in scope, and pricing formulas that depend on color grids always returned an error.
+
+**Frontend — `FormulaTester.tsx`:**
+- Removed the combined "Lookup: using product SKU automatically" note
+- Added "Grid Lookup Overrides" section that renders one row per binding
+- Auto-resolved bindings (`lookupColumn` contains `manu`) show a read-only pill with the product SKU so the user knows they're handled automatically
+- Manual bindings (e.g., `COLOR`, `MATERIAL`) render an editable `Input` with placeholder "e.g. TFL1W" and a helper showing the column name
+- `lookupInputs` state is now keyed by `binding.alias` (was mixed with `lookupColumn`)
+- Mutation now sends `{ inputs: { dimensions }, gridLookups: lookupInputs }` to the endpoint; `inputs` is dimensions-only. The endpoint already checked `gridLookups[binding.alias]` first — no backend change needed.
 
 ---
 

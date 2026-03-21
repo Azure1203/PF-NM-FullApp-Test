@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-03-21 (r5) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-03-21 (r6) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -230,6 +230,10 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r6 — 2026-03-21
+**Fix:** `stripComments` now collapses internal whitespace — multi-line formulas with newlines before `?` or branches no longer throw "Syntax error (char N)"
+**Feature:** Formula Tester "Grid Lookup Overrides" — per-binding inputs for non-SKU lookup columns (color, material, etc.); auto-resolved bindings show read-only pill; `gridLookups` sent separately from `inputs` in request body
 
 ### r5 — 2026-03-21
 

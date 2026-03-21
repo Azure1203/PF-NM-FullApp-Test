@@ -10,6 +10,8 @@ export function stripComments(formula: string): string {
   let result = formula.replace(/\/\*[\s\S]*?\*\//g, "");
   // Remove line comments
   result = result.replace(/\/\/.*$/gm, "");
+  // Collapse all internal newlines and extra whitespace to single spaces
+  result = result.replace(/\s+/g, " ");
   return result.trim();
 }
 

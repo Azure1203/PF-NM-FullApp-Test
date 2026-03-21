@@ -1,0 +1,68 @@
+TASK: Fix the pricing engine formula whitespace handling, and add a 
+color/material input to the Formula Tester.
+
+BACKGROUND:
+There are two code fixes and one data/configuration fix needed.
+
+--- FIX 1: Normalize whitespace in pricingEngine.ts ---
+
+The stripComments function in server/services/pricingEngine.ts removes 
+comments and trims the formula string, but does NOT collapse internal 
+newlines and extra whitespace. mathjs cannot parse a ternary operator 
+when there is a newline between the condition and the ? or between ? 
+and the branches. This causes "Syntax error (char N)" failures on any 
+multi-line formula.
+
+In server/services/pricingEngine.ts, update the stripComments function 
+to collapse all internal whitespace after removing comments:
+
+  export function stripComments(formula: string): string {
+    let result = formula.replace(/\/\*[\s\S]*?\*\//g, "");
+    result = result.replace(/\/\/.*$/gm, "");
+    // Collapse all internal newlines and extra whitespace to single spaces
+    result = result.replace(/\s+/g, " ");
+    return result.trim();
+  }
+
+This is the root cause of the current "Syntax error in part ... (char 33)" 
+error. All multi-line formulas will fail until this is fixed.
+
+--- FIX 2: Add color/material input to the Formula Tester ---
+
+The Formula Tester currently has inputs for Width, Height, Length, and 
+Quantity. Many products have a grid binding that requires a color/material 
+lookup key (e.g. TFL1W, TFL2F, HGFU) to resolve pricing. Without a way 
+to provide this lookup value, those grid bindings always miss, color.* 
+variables are never in scope, and the formula fails.
+
+BACKEND — server/routes.ts, POST /api/admin/formula-test:
+The endpoint already handles arbitrary lookup values via 
+req.body.gridLookups[alias] or req.body.gridLookups[lookupColumn]. 
+No backend change needed.
+
+FRONTEND — client/src/pages/admin/FormulaTester.tsx:
+After the four dimension inputs (Width, Height, Length, Quantity), add 
+a new section titled "Grid Lookup Overrides".
+
+When a product is selected and it has grid bindings 
+(fetched from GET /api/admin/products/:id/bindings or equivalent), 
+render one text input per binding that does NOT already auto-resolve 
+from the SKU. Display each input as:
+
+  Label: "[alias] lookup" (e.g. "color lookup", "shelves lookup")
+  Placeholder: "e.g. TFL1W"
+  Helper text: "Column: [binding.lookupColumn] in [grid name]"
+
+These values should be sent to the formula-test endpoint in the 
+req.body.gridLookups object keyed by the binding alias:
+  { gridLookups: { color: "TFL1W", shelves: "1" } }
+
+The existing endpoint lookup logic already checks 
+req.body.gridLookups[binding.alias] — so sending values this way will 
+automatically route them to the right grid binding without any other 
+backend change.
+
+The auto-resolved bindings (where lookupColumn is MANU_CODE or similar 
+and the product SKU is used) should show a read-only "auto" indicator 
+rather than an editable field, so the user knows those are handled 
+automatically.
