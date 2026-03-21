@@ -635,13 +635,15 @@ export async function registerRoutes(
         ...contextScope,
       };
 
+      console.log('[formula-test] Resolved scope:', JSON.stringify(finalScope, null, 2));
+
       // Pricing evaluation
       let unitPrice = 0;
       let pricingError: string | null = null;
       const pricingProxy = product.pricingProxyId ? proxyVarMap.get(product.pricingProxyId) : null;
       if (pricingProxy) {
         try {
-          unitPrice = evaluatePrice(pricingProxy.formula, finalScope, contextScope);
+          unitPrice = evaluatePrice(pricingProxy.formula, finalScope, contextScope, [...proxyVarMap.values()]);
         } catch (e: any) {
           pricingError = e.message;
         }
@@ -1620,19 +1622,53 @@ export async function registerRoutes(
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
       // Pre-load the same pipeline data as the upload handler
-      const allProxyVars = await storage.getProxyVariables();
+      const [allProxyVars, allProducts, allBindings, allGrids] = await Promise.all([
+        storage.getProxyVariables(),
+        storage.getAllmoxyProducts(),
+        storage.getAllProductGridBindings(),
+        storage.getAttributeGrids(),
+      ]);
       const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
-      const allProducts = await storage.getAllmoxyProducts();
       const activeProducts = allProducts.filter(
         (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
       );
       const productBindingsMap = new Map<number, ProductGridBinding[]>();
-      for (const product of activeProducts) {
-        const bindings = await storage.getProductGridBindings(product.id);
-        productBindingsMap.set(product.id, bindings);
+      for (const binding of allBindings) {
+        const list = productBindingsMap.get(binding.productId) ?? [];
+        list.push(binding);
+        productBindingsMap.set(binding.productId, list);
       }
-      const allGrids = await storage.getAttributeGrids();
       const gridMap = new Map(allGrids.map(g => [g.id, g]));
+
+      // Pre-load all grid rows into memory
+      const gridRowsCache = new Map<number, AttributeGridRow[]>();
+      await Promise.all(
+        allGrids.map(async (g) => {
+          const rows = await storage.getAttributeGridRows(g.id);
+          gridRowsCache.set(g.id, rows);
+        })
+      );
+
+      const findGridRowInCache = (
+        gridId: number,
+        lookupValue: string,
+        rowDataColumn?: string
+      ): AttributeGridRow | undefined => {
+        const rows = gridRowsCache.get(gridId) ?? [];
+        const trimmed = lookupValue.trim();
+        const exact = rows.find(r => r.lookupKey === trimmed);
+        if (exact) return exact;
+        const ci = rows.find(r => r.lookupKey.trim().toLowerCase() === trimmed.toLowerCase());
+        if (ci) return ci;
+        if (rowDataColumn) {
+          return rows.find(r => {
+            const rd = r.rowData as Record<string, any>;
+            const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
+            return String(val ?? '').trim().toLowerCase() === trimmed.toLowerCase();
+          });
+        }
+        return undefined;
+      };
 
       const files = await storage.getProjectFiles(projectId);
       let totalProjectPrice = 0;
@@ -1670,10 +1706,10 @@ export async function registerRoutes(
               if (!grid) continue;
               const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
               if (!lookupValue) continue;
-              const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn);
+              const row = findGridRowInCache(binding.gridId, lookupValue, binding.lookupColumn);
               if (row) {
                 const rawData = row.rowData as Record<string, any>;
-                contextScope[binding.alias] = Object.fromEntries(
+                contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
                   Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
                 );
               }
@@ -1694,7 +1730,7 @@ export async function registerRoutes(
           if (product && product.pricingProxyId != null) {
             const proxy = proxyVarMap.get(product.pricingProxyId);
             if (proxy) {
-              try { unitPrice = evaluatePrice(proxy.formula, pricingItem, contextScope); }
+              try { unitPrice = evaluatePrice(proxy.formula, pricingItem, contextScope, [...proxyVarMap.values()]); }
               catch (e: any) { pricingError = e.message; unitPrice = 0; }
             }
           } else if (!product) {
@@ -2258,7 +2294,7 @@ export async function registerRoutes(
               const row = findGridRowInCache(binding.gridId, lookupValue, binding.lookupColumn);
               if (row) {
                 const rawData = row.rowData as Record<string, any>;
-                contextScope[binding.alias] = Object.fromEntries(
+                contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
                   Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
                 );
               }
@@ -2284,7 +2320,7 @@ export async function registerRoutes(
             const pricingProxy = proxyVarMap.get(product.pricingProxyId);
             if (pricingProxy) {
               try {
-                unitPrice = evaluatePrice(pricingProxy.formula, pricingItem, contextScope);
+                unitPrice = evaluatePrice(pricingProxy.formula, pricingItem, contextScope, [...proxyVarMap.values()]);
               } catch (e: any) {
                 pricingError = e.message;
                 unitPrice = 0;

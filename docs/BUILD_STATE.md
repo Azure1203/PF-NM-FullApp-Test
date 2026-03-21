@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-03-21 (r4) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-03-21 (r5) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -230,6 +230,21 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r5 — 2026-03-21
+
+**Prompt 1 — Grid row cache in all three pipeline locations**
+- `findGridRowInCache` + `gridRowsCache` added to reprice route and Asana scheduler (was only in upload handler)
+- Per-product `getProductGridBindings` sequential loops replaced with `getAllProductGridBindings()` bulk fetch + `Promise.all` in both locations
+- All three locations now lowercase `binding.alias` and all rowData column keys when building `contextScope` — fixes alias lookup mismatches like `Parts` vs `parts`
+- Asana scheduler `createOrderItem` now stores normalized numeric dimensions from `pricingItem` instead of raw CSV strings
+
+**Prompt 2 — Proxy variable values pre-computed into formula scope**
+- `evaluatePrice` in `pricingEngine.ts` accepts an optional 4th arg `allProxyVars: Array<{name, formula}>`
+- Before evaluating the main formula, every proxy variable is evaluated in order and its result added to the mathjs scope — so formulas can reference `sq_ft`, `margin`, and other named proxy vars by name
+- Errors re-thrown instead of silently returning `0` — callers' existing `try/catch` blocks populate `pricingError`; Formula Tester UI shows them in a red box (already existed)
+- All callers pass `[...proxyVarMap.values()]` as the 4th argument: upload handler, reprice route, Asana scheduler, formula tester endpoint
+- Full scope JSON logged to console before each evaluation; formula + scope logged on error
 
 ### r4 — 2026-03-21
 

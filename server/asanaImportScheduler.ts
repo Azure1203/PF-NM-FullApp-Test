@@ -168,19 +168,53 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
         });
 
         // ── Product-driven pipeline pre-load (mirrors upload handler) ──
-        const allProxyVars = await storage.getProxyVariables();
+        const [allProxyVars, allProducts, allBindings, allGrids] = await Promise.all([
+          storage.getProxyVariables(),
+          storage.getAllmoxyProducts(),
+          storage.getAllProductGridBindings(),
+          storage.getAttributeGrids(),
+        ]);
         const proxyVarMap = new Map(allProxyVars.map(v => [v.id, v]));
-        const allProducts = await storage.getAllmoxyProducts();
         const activeProducts = allProducts.filter(
           (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
         );
         const productBindingsMap = new Map<number, ProductGridBinding[]>();
-        for (const prod of activeProducts) {
-          const binds = await storage.getProductGridBindings(prod.id);
-          productBindingsMap.set(prod.id, binds);
+        for (const binding of allBindings) {
+          const list = productBindingsMap.get(binding.productId) ?? [];
+          list.push(binding);
+          productBindingsMap.set(binding.productId, list);
         }
-        const allGrids = await storage.getAttributeGrids();
         const gridMap = new Map(allGrids.map(g => [g.id, g]));
+
+        // Pre-load all grid rows into memory
+        const gridRowsCache = new Map<number, any[]>();
+        await Promise.all(
+          allGrids.map(async (g) => {
+            const rows = await storage.getAttributeGridRows(g.id);
+            gridRowsCache.set(g.id, rows);
+          })
+        );
+
+        const findGridRowInCache = (
+          gridId: number,
+          lookupValue: string,
+          rowDataColumn?: string
+        ): any | undefined => {
+          const rows = gridRowsCache.get(gridId) ?? [];
+          const trimmed = lookupValue.trim();
+          const exact = rows.find((r: any) => r.lookupKey === trimmed);
+          if (exact) return exact;
+          const ci = rows.find((r: any) => r.lookupKey?.trim().toLowerCase() === trimmed.toLowerCase());
+          if (ci) return ci;
+          if (rowDataColumn) {
+            return rows.find((r: any) => {
+              const rd = r.rowData as Record<string, any>;
+              const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
+              return String(val ?? '').trim().toLowerCase() === trimmed.toLowerCase();
+            });
+          }
+          return undefined;
+        };
 
         let totalDovetails = 0;
         let totalFivePiece = 0;
@@ -274,17 +308,31 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
                 if (!grid) continue;
                 const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
                 if (!lookupValue) continue;
-                const row = await storage.getAttributeGridRowByKey(binding.gridId, lookupValue);
-                if (row) contextScope[binding.alias] = row.rowData;
+                const row = findGridRowInCache(binding.gridId, lookupValue, binding.lookupColumn);
+                if (row) {
+                  const rawData = row.rowData as Record<string, any>;
+                  contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
+                    Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
+                  );
+                }
               }
             }
+
+            const pricingItem = {
+              ...item,
+              width:    Number(item.Width    || item.width    || 0),
+              height:   Number(item.Height   || item.height   || 0),
+              length:   Number(item.Length   || item.length   || 0),
+              depth:    Number(item.Length   || item.length   || 0),
+              quantity: Number(item.Qty      || item.quantity || item.QUANTITY || 1),
+            };
 
             let unitPrice = 0;
             let pricingError: string | null = null;
             if (product && product.pricingProxyId != null) {
               const proxy = proxyVarMap.get(product.pricingProxyId);
               if (proxy) {
-                try { unitPrice = evaluatePrice(proxy.formula, item, contextScope); }
+                try { unitPrice = evaluatePrice(proxy.formula, pricingItem, contextScope, [...proxyVarMap.values()]); }
                 catch (e: any) { pricingError = e.message; unitPrice = 0; }
               }
             } else if (!product) {
@@ -300,16 +348,16 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
               }
             }
 
-            const qty = parseInt(item.Qty || item.qty || item.Quantity || '1') || 1;
+            const qty = pricingItem.quantity;
             await storage.createOrderItem({
               projectId: project.id,
               fileId: orderFile.id,
               productId: product?.id ?? null,
               sku,
               description: item.NAME || item['Part Name'] || item.Description || '',
-              width: parseFloat(item.Width || item.width || '0') || null,
-              height: parseFloat(item.Height || item.height || '0') || null,
-              depth: parseFloat(item.Thickness || item.thickness || item.Depth || '0') || null,
+              width: pricingItem.width || null,
+              height: pricingItem.height || null,
+              depth: pricingItem.depth || null,
               quantity: qty,
               unitPrice,
               totalPrice: unitPrice * qty,

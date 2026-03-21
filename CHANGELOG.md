@@ -1,6 +1,33 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-21 (r4)
+> Last updated: 2026-03-21 (r5)
+
+---
+
+## Recent Fixes (2026-03-21 r5) — Prompts 1 & 2
+
+### Fix: Grid row cache not used in reprice / Asana pipeline (Prompt 1)
+**Root cause:** `findGridRowInCache` and `gridRowsCache` were only built in the upload handler. The reprice route and Asana import scheduler still called `await storage.getAttributeGridRowByKey(...)` per item — a DB round-trip per binding per line item. Grid alias keys were also not lowercased, so formulas like `parts.base_price` couldn't find the alias `Parts` in `contextScope`.
+
+**Fix — all three locations (upload handler, reprice route, Asana scheduler):**
+- Bulk `getAllProductGridBindings()` + `Promise.all` for grids and grid rows instead of sequential per-product fetches
+- `findGridRowInCache` closure (exact → case-insensitive → rowData column fallback) added to reprice route and Asana scheduler, matching the upload handler
+- `contextScope[binding.alias.toLowerCase()]` with `Object.fromEntries(...k.toLowerCase())` — alias and all column keys now consistently lowercase in all three locations
+- Asana scheduler `createOrderItem` now uses `pricingItem` (normalized numeric dimensions) instead of raw CSV strings
+
+### Fix: Proxy variable values not in formula scope (Prompt 2 — pricing engine)
+**Root cause:** The mathjs formula for a product can reference other proxy variable names (e.g., `sq_ft`, `margin`). Those names were never pre-computed and added to the scope before the main formula ran, so they evaluated to `undefined` (mathjs silently returns 0 or throws), causing `$0.00` prices.
+
+**Fix — `server/services/pricingEngine.ts`:**
+- Added optional `allProxyVars: Array<{name, formula}>` 4th parameter to `evaluatePrice`
+- Before the main formula runs, each proxy var's formula is evaluated against the current scope (dimensions + grid aliases) and its result is added to the scope under its name — so `sq_ft`, `margin`, etc. are available to the main formula
+- Re-throw on evaluation error instead of returning 0 silently — callers' existing `try/catch` blocks now populate `pricingError` correctly
+- Added `console.log` of the full scope before evaluation and `console.error` with formula + scope on failure
+
+**All callers updated:**
+- Upload handler, reprice route, Asana scheduler, formula tester endpoint — all now pass `[...proxyVarMap.values()]` as the 4th argument
+- Formula tester endpoint logs the resolved scope to console before calling `evaluatePrice`
+- Formula tester UI (FormulaTester.tsx) already displayed `pricingError` in a red box — no frontend change needed
 
 ---
 
