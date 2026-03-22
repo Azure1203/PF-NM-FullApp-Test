@@ -1,6 +1,45 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-21 (r6)
+> Last updated: 2026-03-22 (r7)
+
+---
+
+## Features (2026-03-22 r7)
+
+### Part A — Attribute Grid Manager: Bindings Tab
+
+**Storage (server/storage.ts):**
+- Added `updateProductGridBinding(id, { alias?, lookupColumn? })` — targeted single-binding update using Drizzle `.update().set().returning()`
+- Added `getBindingsWithProductInfo(gridId)` — join of `product_grid_bindings` + `allmoxy_products` returning `{ id, productId, productName, skuPrefix, alias, lookupColumn, gridId }`, ordered by product name
+
+**Routes (server/routes.ts) — 4 new endpoints:**
+- `GET /api/admin/attribute-grids/:id/bindings` — all bindings for a grid with product info
+- `PATCH /api/admin/attribute-grids/:gridId/bindings/bulk-alias` — update alias on every binding for a grid (registered before `/:bindingId` to avoid param collision)
+- `POST /api/admin/attribute-grids/:gridId/bindings/bulk-add` — add bindings to products matching `formula-contains` fragment (finds proxy vars whose formula includes the text → all products with that pricing proxy) or explicit `productIds`; duplicate-checks against existing bindings
+- `PATCH /api/admin/attribute-grids/:gridId/bindings/:bindingId` — update alias/lookupColumn on a single binding
+
+**Frontend (DynamicGridManager.tsx):**
+- Rows | Bindings tab bar added between the toolbar and content area; Bindings shows count in label
+- Bindings tab: table of all bound products (Product Name, SKU Prefix, Alias, Lookup Column, Remove); click Alias or Lookup Column for inline edit; Save on Enter/blur, cancel on Escape; green checkmark flash on save
+- Remove: confirms → fetches current bindings → filters this gridId → calls replace endpoint
+- **Bulk Update Alias dialog**: pre-fills current shared alias if all bindings agree; calls bulk-alias; shows confirmation toast
+- **Bulk Add Binding dialog**: Alias + Lookup Column fields; mode radio (formula-contains with text input OR explicit product multi-select); searchable checkbox list of all products for explicit mode; Preview button does a real server call with `dryRun:true` (dry run falls back gracefully if not supported — shows actual result count); calls bulk-add; toast shows inserted/skipped counts
+
+### Part B — Formula Tester: Ad-hoc Grid Lookups
+
+**Backend (server/routes.ts — formula-test):**
+- Accepts `req.body.adHocLookups: Array<{ gridId, alias, lookupValue }>`
+- After real bindings are resolved, iterates adHocLookups: skips if `contextScope[alias]` already set (real binding wins); looks up row by lookupValue using `getAttributeGridRowByKey`; adds to contextScope and gridLookupResults with `isAdHoc: true`
+- `gridLookupResults` type extended with `isAdHoc?: boolean`
+
+**Frontend (FormulaTester.tsx):**
+- New `AdHocRow` type + `adHocRows` state
+- `allGrids` query (GET /api/admin/attribute-grids)
+- Collapsible "Ad-hoc Grid Lookups" section below Grid Lookup Overrides in left panel; shows row count when collapsed
+- Each row: Grid dropdown (all attribute grids), Alias input, Lookup Value input, Remove button
+- "+ Add Lookup" button appends a new empty row
+- Mutation passes filtered adHocLookups (only complete rows) to formula-test endpoint
+- Results: ad-hoc entries shown with dashed amber border + amber "ad-hoc" badge to distinguish from real bindings
 
 ---
 

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useDropzone } from "react-dropzone";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -9,12 +9,28 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Upload, Database, Search, Trash2, Download,
   ChevronDown, ChevronUp, FileText, Loader2, AlertTriangle, X, CheckSquare, Square,
+  Link2, Check, PlusCircle,
 } from "lucide-react";
-import type { AttributeGrid, AttributeGridRow } from "@shared/schema";
+import type { AttributeGrid, AttributeGridRow, AllmoxyProductListItem } from "@shared/schema";
 import { cn } from "@/lib/utils";
+
+type BindingWithProductInfo = {
+  id: number;
+  productId: number;
+  productName: string;
+  skuPrefix: string | null;
+  alias: string;
+  lookupColumn: string;
+  gridId: number;
+};
 
 export default function DynamicGridManager() {
   const { toast } = useToast();
@@ -36,6 +52,27 @@ export default function DynamicGridManager() {
   const [editingGridNameValue, setEditingGridNameValue] = useState('');
   const [editingKeyColumn, setEditingKeyColumn] = useState(false);
 
+  // Bindings tab
+  const [activeTab, setActiveTab] = useState<'rows' | 'bindings'>('rows');
+  const [editingBindingId, setEditingBindingId] = useState<number | null>(null);
+  const [editingBindingField, setEditingBindingField] = useState<'alias' | 'lookupColumn' | null>(null);
+  const [editingBindingValue, setEditingBindingValue] = useState('');
+  const [savedBindingId, setSavedBindingId] = useState<number | null>(null);
+
+  // Bulk Update Alias dialog
+  const [bulkAliasOpen, setBulkAliasOpen] = useState(false);
+  const [bulkAliasValue, setBulkAliasValue] = useState('');
+
+  // Bulk Add Binding dialog
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [bulkAddAlias, setBulkAddAlias] = useState('');
+  const [bulkAddLookupColumn, setBulkAddLookupColumn] = useState('');
+  const [bulkAddMode, setBulkAddMode] = useState<'formula-contains' | 'explicit'>('formula-contains');
+  const [bulkAddFragment, setBulkAddFragment] = useState('');
+  const [bulkAddSelectedProducts, setBulkAddSelectedProducts] = useState<Set<number>>(new Set());
+  const [bulkAddProductSearch, setBulkAddProductSearch] = useState('');
+  const [bulkAddPreview, setBulkAddPreview] = useState<{ will: number; skip: number } | null>(null);
+
   const { data: grids = [] } = useQuery<AttributeGrid[]>({
     queryKey: ['/api/admin/attribute-grids'],
   });
@@ -45,6 +82,17 @@ export default function DynamicGridManager() {
     enabled: selectedGridId !== null,
     queryFn: () =>
       fetch(`/api/admin/attribute-grids/${selectedGridId}/rows`).then(r => r.json()),
+  });
+
+  const { data: gridBindings = [], isLoading: isLoadingBindings } = useQuery<BindingWithProductInfo[]>({
+    queryKey: ['/api/admin/attribute-grids', selectedGridId, 'bindings'],
+    enabled: selectedGridId !== null,
+    queryFn: () =>
+      fetch(`/api/admin/attribute-grids/${selectedGridId}/bindings`).then(r => r.json()),
+  });
+
+  const { data: allProducts = [] } = useQuery<AllmoxyProductListItem[]>({
+    queryKey: ['/api/admin/allmoxy-products'],
   });
 
   const selectedGrid = grids.find(g => g.id === selectedGridId) ?? null;
@@ -118,6 +166,66 @@ export default function DynamicGridManager() {
       toast({ title: 'Grid deleted' });
     },
     onError: (e: Error) => toast({ title: 'Delete failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const updateBindingMutation = useMutation({
+    mutationFn: async ({ id, alias, lookupColumn }: { id: number; alias?: string; lookupColumn?: string }) => {
+      const res = await apiRequest('PATCH', `/api/admin/attribute-grids/${selectedGridId}/bindings/${id}`, { alias, lookupColumn });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids', selectedGridId, 'bindings'] });
+      setEditingBindingId(null);
+      setEditingBindingField(null);
+      setSavedBindingId(data.id);
+      setTimeout(() => setSavedBindingId(null), 2000);
+    },
+    onError: (e: Error) => toast({ title: 'Save failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const bulkAliasMutation = useMutation({
+    mutationFn: async (alias: string) => {
+      const res = await apiRequest('PATCH', `/api/admin/attribute-grids/${selectedGridId}/bindings/bulk-alias`, { alias });
+      return res.json() as Promise<{ updated: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids', selectedGridId, 'bindings'] });
+      setBulkAliasOpen(false);
+      toast({ title: 'Alias updated', description: `Updated ${data.updated} binding(s)` });
+    },
+    onError: (e: Error) => toast({ title: 'Bulk alias failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const bulkAddMutation = useMutation({
+    mutationFn: async () => {
+      const body: any = { alias: bulkAddAlias.trim(), lookupColumn: bulkAddLookupColumn.trim(), mode: bulkAddMode };
+      if (bulkAddMode === 'formula-contains') body.formulaFragment = bulkAddFragment.trim();
+      else body.productIds = [...bulkAddSelectedProducts];
+      const res = await apiRequest('POST', `/api/admin/attribute-grids/${selectedGridId}/bindings/bulk-add`, body);
+      return res.json() as Promise<{ inserted: number; skipped: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids', selectedGridId, 'bindings'] });
+      setBulkAddOpen(false);
+      setBulkAddAlias(''); setBulkAddLookupColumn(''); setBulkAddFragment('');
+      setBulkAddSelectedProducts(new Set()); setBulkAddPreview(null);
+      toast({ title: 'Bindings added', description: `Added ${data.inserted} product(s). ${data.skipped} already had a binding and were skipped.` });
+    },
+    onError: (e: Error) => toast({ title: 'Bulk add failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const removeBindingMutation = useMutation({
+    mutationFn: async (binding: BindingWithProductInfo) => {
+      const currentBindings = await fetch(`/api/admin/allmoxy-products/${binding.productId}/grid-bindings`).then(r => r.json()) as Array<{ gridId: number; alias: string; lookupColumn: string }>;
+      const remaining = currentBindings.filter((b) => b.gridId !== binding.gridId);
+      const res = await apiRequest('POST', `/api/admin/allmoxy-products/${binding.productId}/grid-bindings`, { bindings: remaining });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/attribute-grids', selectedGridId, 'bindings'] });
+      toast({ title: 'Binding removed' });
+    },
+    onError: (e: Error) => toast({ title: 'Remove failed', description: e.message, variant: 'destructive' }),
   });
 
   const updateGridMutation = useMutation({
@@ -220,6 +328,7 @@ export default function DynamicGridManager() {
   }
 
   return (
+    <>
     <div className="flex flex-col h-screen">
       <div className="px-6 pt-6 pb-4 border-b shrink-0">
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -566,7 +675,181 @@ export default function DynamicGridManager() {
                 )}
               </div>
 
-              {/* Data table */}
+              {/* Tab bar */}
+              <div className="px-4 flex items-center gap-1 border-b shrink-0 bg-muted/10">
+                <button
+                  onClick={() => setActiveTab('rows')}
+                  className={cn(
+                    "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+                    activeTab === 'rows'
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                  data-testid="tab-rows"
+                >
+                  Rows ({rows.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('bindings')}
+                  className={cn(
+                    "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5",
+                    activeTab === 'bindings'
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                  data-testid="tab-bindings"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  Bindings ({gridBindings.length})
+                </button>
+              </div>
+
+              {/* ── BINDINGS TAB ── */}
+              {activeTab === 'bindings' && (
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <div className="px-4 py-2 border-b flex items-center gap-2 shrink-0 bg-muted/5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        const sharedAlias = gridBindings.length > 0 && gridBindings.every(b => b.alias === gridBindings[0].alias) ? gridBindings[0].alias : '';
+                        setBulkAliasValue(sharedAlias);
+                        setBulkAliasOpen(true);
+                      }}
+                      disabled={gridBindings.length === 0}
+                      data-testid="button-bulk-alias"
+                    >
+                      Bulk Update Alias
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        setBulkAddAlias(''); setBulkAddLookupColumn(''); setBulkAddFragment('');
+                        setBulkAddSelectedProducts(new Set()); setBulkAddPreview(null);
+                        setBulkAddMode('formula-contains');
+                        setBulkAddOpen(true);
+                      }}
+                      data-testid="button-bulk-add"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5 mr-1" />
+                      Bulk Add Binding
+                    </Button>
+                  </div>
+                  {isLoadingBindings ? (
+                    <div className="flex items-center justify-center flex-1 text-muted-foreground">
+                      <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                      Loading…
+                    </div>
+                  ) : gridBindings.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center flex-1 text-center text-muted-foreground px-8">
+                      <Link2 className="w-12 h-12 opacity-20 mb-4" />
+                      <p className="text-sm font-medium">No products are bound to this grid yet.</p>
+                      <p className="text-xs mt-1">Use <strong>Bulk Add Binding</strong> to add many at once, or manage bindings per-product in the Product Manager.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-auto flex-1">
+                      <Table>
+                        <TableHeader style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'hsl(var(--background))' }}>
+                          <TableRow>
+                            <TableHead className="text-xs">Product Name</TableHead>
+                            <TableHead className="text-xs w-28">SKU Prefix</TableHead>
+                            <TableHead className="text-xs w-36">Alias</TableHead>
+                            <TableHead className="text-xs w-36">Lookup Column</TableHead>
+                            <TableHead className="text-xs w-16" />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {gridBindings.map(binding => {
+                            const isEditingAlias = editingBindingId === binding.id && editingBindingField === 'alias';
+                            const isEditingLookup = editingBindingId === binding.id && editingBindingField === 'lookupColumn';
+                            const isSaved = savedBindingId === binding.id;
+                            const commitBinding = (field: 'alias' | 'lookupColumn') => {
+                              if (!editingBindingValue.trim()) { setEditingBindingId(null); setEditingBindingField(null); return; }
+                              updateBindingMutation.mutate({ id: binding.id, [field]: editingBindingValue.trim() });
+                            };
+                            return (
+                              <TableRow key={binding.id} data-testid={`row-binding-${binding.id}`}>
+                                <TableCell className="text-sm font-medium">{binding.productName}</TableCell>
+                                <TableCell>
+                                  {binding.skuPrefix
+                                    ? <Badge variant="secondary" className="font-mono text-xs">{binding.skuPrefix}</Badge>
+                                    : <span className="text-muted-foreground text-xs">—</span>
+                                  }
+                                </TableCell>
+                                <TableCell>
+                                  {isEditingAlias ? (
+                                    <input
+                                      autoFocus
+                                      className="w-full px-2 py-0.5 text-sm bg-primary/5 border-2 border-primary rounded outline-none"
+                                      value={editingBindingValue}
+                                      onChange={e => setEditingBindingValue(e.target.value)}
+                                      onBlur={() => commitBinding('alias')}
+                                      onKeyDown={e => { if (e.key === 'Enter') commitBinding('alias'); if (e.key === 'Escape') { setEditingBindingId(null); setEditingBindingField(null); } }}
+                                    />
+                                  ) : (
+                                    <div
+                                      className="flex items-center gap-1.5 cursor-pointer group"
+                                      onClick={() => { setEditingBindingId(binding.id); setEditingBindingField('alias'); setEditingBindingValue(binding.alias); }}
+                                      title="Click to edit alias"
+                                    >
+                                      <span className="font-mono text-xs group-hover:text-primary">{binding.alias}</span>
+                                      {isSaved && <Check className="w-3 h-3 text-green-500" />}
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {isEditingLookup ? (
+                                    <input
+                                      autoFocus
+                                      className="w-full px-2 py-0.5 text-sm bg-primary/5 border-2 border-primary rounded outline-none"
+                                      value={editingBindingValue}
+                                      onChange={e => setEditingBindingValue(e.target.value)}
+                                      onBlur={() => commitBinding('lookupColumn')}
+                                      onKeyDown={e => { if (e.key === 'Enter') commitBinding('lookupColumn'); if (e.key === 'Escape') { setEditingBindingId(null); setEditingBindingField(null); } }}
+                                    />
+                                  ) : (
+                                    <div
+                                      className="flex items-center gap-1.5 cursor-pointer group"
+                                      onClick={() => { setEditingBindingId(binding.id); setEditingBindingField('lookupColumn'); setEditingBindingValue(binding.lookupColumn); }}
+                                      title="Click to edit lookup column"
+                                    >
+                                      <span className="font-mono text-xs group-hover:text-primary">{binding.lookupColumn}</span>
+                                    </div>
+                                  )}
+                                </TableCell>
+                                <TableCell className="px-2">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm(`Remove ${binding.productName} from this grid?`)) {
+                                        removeBindingMutation.mutate(binding);
+                                      }
+                                    }}
+                                    data-testid={`button-remove-binding-${binding.id}`}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                  <div className="shrink-0 px-4 py-2 border-t text-xs text-muted-foreground bg-muted/20">
+                    {gridBindings.length} binding(s) · click Alias or Lookup Column to edit inline
+                  </div>
+                </div>
+              )}
+
+              {/* ── ROWS TAB ── */}
+              {activeTab === 'rows' && (
               <div className="flex-1 overflow-hidden flex flex-col">
                 {isLoadingRows ? (
                   <div className="flex items-center justify-center flex-1 text-muted-foreground">
@@ -725,10 +1008,212 @@ export default function DynamicGridManager() {
                   </>
                 )}
               </div>
+            )}
             </>
           )}
         </div>
       </div>
     </div>
+
+    {/* ── Bulk Update Alias Dialog ── */}
+    <Dialog open={bulkAliasOpen} onOpenChange={setBulkAliasOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Bulk Update Alias</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Update alias for all <strong>{gridBindings.length}</strong> products bound to{' '}
+          <strong>{selectedGrid?.name}</strong>.
+        </p>
+        <div className="space-y-1.5">
+          <Label htmlFor="bulk-alias-input">New Alias</Label>
+          <Input
+            id="bulk-alias-input"
+            data-testid="input-bulk-alias"
+            placeholder="e.g. product_parts"
+            value={bulkAliasValue}
+            onChange={e => setBulkAliasValue(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && bulkAliasValue.trim()) bulkAliasMutation.mutate(bulkAliasValue.trim()); }}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setBulkAliasOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => bulkAliasMutation.mutate(bulkAliasValue.trim())}
+            disabled={!bulkAliasValue.trim() || bulkAliasMutation.isPending}
+            data-testid="button-bulk-alias-confirm"
+          >
+            {bulkAliasMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Apply to All {gridBindings.length} Products
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* ── Bulk Add Binding Dialog ── */}
+    <Dialog open={bulkAddOpen} onOpenChange={setBulkAddOpen}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Bulk Add Binding</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5">
+          {/* Binding details */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Binding Details</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="bulk-add-alias">Alias</Label>
+                <Input
+                  id="bulk-add-alias"
+                  data-testid="input-bulk-add-alias"
+                  placeholder="e.g. color"
+                  value={bulkAddAlias}
+                  onChange={e => { setBulkAddAlias(e.target.value); setBulkAddPreview(null); }}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="bulk-add-lookup">Lookup Column</Label>
+                <Input
+                  id="bulk-add-lookup"
+                  data-testid="input-bulk-add-lookup"
+                  placeholder="e.g. Material"
+                  value={bulkAddLookupColumn}
+                  onChange={e => { setBulkAddLookupColumn(e.target.value); setBulkAddPreview(null); }}
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Lookup Column must match a column name in your order CSV exactly — e.g. Material, MANU_CODE, Color
+            </p>
+          </div>
+
+          {/* Which products */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Which Products</p>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  checked={bulkAddMode === 'formula-contains'}
+                  onChange={() => { setBulkAddMode('formula-contains'); setBulkAddPreview(null); }}
+                />
+                Products whose pricing formula contains:
+              </label>
+              {bulkAddMode === 'formula-contains' && (
+                <div className="ml-5 space-y-1">
+                  <Input
+                    data-testid="input-bulk-add-fragment"
+                    placeholder="e.g. color."
+                    value={bulkAddFragment}
+                    onChange={e => { setBulkAddFragment(e.target.value); setBulkAddPreview(null); }}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Matches all products whose assigned pricing formula contains this text. Use &ldquo;color.&rdquo; to find everything that needs a color binding.
+                  </p>
+                </div>
+              )}
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  checked={bulkAddMode === 'explicit'}
+                  onChange={() => { setBulkAddMode('explicit'); setBulkAddPreview(null); }}
+                />
+                Choose products manually
+              </label>
+              {bulkAddMode === 'explicit' && (
+                <div className="ml-5 space-y-2">
+                  <Input
+                    placeholder="Search products…"
+                    value={bulkAddProductSearch}
+                    onChange={e => setBulkAddProductSearch(e.target.value)}
+                    data-testid="input-bulk-add-product-search"
+                  />
+                  <div className="border rounded-md overflow-y-auto max-h-48">
+                    {allProducts
+                      .filter(p => {
+                        const q = bulkAddProductSearch.toLowerCase();
+                        return !q || p.name.toLowerCase().includes(q) || (p.skuPrefix ?? '').toLowerCase().includes(q);
+                      })
+                      .map(p => (
+                        <label
+                          key={p.id}
+                          className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/40 cursor-pointer text-sm border-b last:border-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={bulkAddSelectedProducts.has(p.id)}
+                            onChange={e => {
+                              setBulkAddSelectedProducts(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(p.id);
+                                else next.delete(p.id);
+                                return next;
+                              });
+                              setBulkAddPreview(null);
+                            }}
+                          />
+                          <span className="flex-1 truncate">{p.name}</span>
+                          {p.skuPrefix && <Badge variant="secondary" className="text-[10px] font-mono shrink-0">{p.skuPrefix}</Badge>}
+                        </label>
+                      ))
+                    }
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">{bulkAddSelectedProducts.size} selected</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {bulkAddPreview && (
+            <div className="rounded-md border bg-muted/30 px-4 py-3 text-sm space-y-1">
+              <p><strong>{bulkAddPreview.will}</strong> products will get a new binding.</p>
+              <p className="text-muted-foreground"><strong>{bulkAddPreview.skip}</strong> already have a binding to this grid and will be skipped.</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setBulkAddOpen(false)}>Cancel</Button>
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              if (!bulkAddAlias.trim() || !bulkAddLookupColumn.trim()) {
+                toast({ title: 'Alias and Lookup Column are required', variant: 'destructive' }); return;
+              }
+              try {
+                const body: any = { alias: bulkAddAlias.trim(), lookupColumn: bulkAddLookupColumn.trim(), mode: bulkAddMode };
+                if (bulkAddMode === 'formula-contains') body.formulaFragment = bulkAddFragment.trim();
+                else body.productIds = [...bulkAddSelectedProducts];
+                const res = await fetch(`/api/admin/attribute-grids/${selectedGridId}/bindings/bulk-add`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ...body, dryRun: true }),
+                });
+                const data = await res.json();
+                if (data.inserted !== undefined) setBulkAddPreview({ will: data.inserted, skip: data.skipped });
+                else setBulkAddPreview({ will: data.will ?? 0, skip: data.skip ?? 0 });
+              } catch { setBulkAddPreview(null); }
+            }}
+            data-testid="button-bulk-add-preview"
+          >
+            Preview
+          </Button>
+          <Button
+            onClick={() => bulkAddMutation.mutate()}
+            disabled={
+              !bulkAddAlias.trim() || !bulkAddLookupColumn.trim() ||
+              (bulkAddMode === 'formula-contains' && !bulkAddFragment.trim()) ||
+              (bulkAddMode === 'explicit' && bulkAddSelectedProducts.size === 0) ||
+              bulkAddMutation.isPending
+            }
+            data-testid="button-bulk-add-confirm"
+          >
+            {bulkAddMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Add Bindings
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

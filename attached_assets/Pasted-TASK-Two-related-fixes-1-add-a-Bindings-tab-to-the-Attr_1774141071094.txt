@@ -1,0 +1,245 @@
+TASK: Two related fixes — (1) add a Bindings tab to the Attribute Grid 
+Manager for bulk binding management, and (2) add an ad-hoc grid lookup 
+section to the Formula Tester so pricing can be tested even when a 
+binding doesn't exist yet.
+
+═══════════════════════════════════════════════════
+PART A — ATTRIBUTE GRID MANAGER: BINDINGS TAB
+═══════════════════════════════════════════════════
+
+BACKGROUND:
+product_grid_bindings can only be managed one product at a time through 
+the Product Manager. There is no way to see all products bound to a 
+given grid or fix bindings across all of them at once. Two specific 
+problems need to be resolved through this UI:
+
+1. All ~45 products bound to "Parts 02202026" have alias "parts" but 
+   the formula references "product_parts" — needs a bulk alias rename.
+
+2. ~400+ products whose pricing formulas reference "color.*" have no 
+   binding to "Main Color Attribute 02202026" at all — needs a bulk 
+   binding creation with alias "color" and lookupColumn "Material".
+
+── Backend: add 4 new routes to server/routes.ts ───
+
+1. GET /api/admin/attribute-grids/:id/bindings
+   Returns all product_grid_bindings for this gridId joined with 
+   productName and skuPrefix from allmoxy_products.
+   Response array shape per row:
+   { id, productId, productName, skuPrefix, alias, lookupColumn, gridId }
+
+2. PATCH /api/admin/attribute-grids/:gridId/bindings/:bindingId
+   Updates alias and/or lookupColumn on a single binding.
+   Body: { alias?: string, lookupColumn?: string }
+   Returns the updated binding.
+
+3. PATCH /api/admin/attribute-grids/:gridId/bindings/bulk-alias
+   Updates the alias on ALL bindings for this gridId.
+   Body: { alias: string }
+   Returns: { updated: number }
+
+4. POST /api/admin/attribute-grids/:gridId/bindings/bulk-add
+   Adds a new binding to a set of products.
+   Body: {
+     alias: string,
+     lookupColumn: string,
+     mode: 'formula-contains' | 'explicit',
+     formulaFragment?: string,   // used when mode = formula-contains
+     productIds?: number[]       // used when mode = explicit
+   }
+   
+   When mode = 'formula-contains':
+   - Find all proxy_variables where formula contains formulaFragment
+   - Find all allmoxy_products where pricingProxyId is in that set
+   - Skip products that already have a binding to this gridId
+   - Insert new bindings for the rest
+   - Returns: { inserted: number, skipped: number }
+   
+   When mode = 'explicit':
+   - Use provided productIds directly, same duplicate-check logic
+   - Returns: { inserted: number, skipped: number }
+
+── Backend: add 2 new methods to server/storage.ts ─
+
+1. async updateProductGridBinding(
+     id: number,
+     data: { alias?: string; lookupColumn?: string }
+   ): Promise<ProductGridBinding>
+   db.update(productGridBindings).set(data)
+     .where(eq(productGridBindings.id, id)).returning()
+
+2. async getBindingsWithProductInfo(gridId: number): Promise<Array<{
+     id: number, productId: number, productName: string,
+     skuPrefix: string | null, alias: string,
+     lookupColumn: string, gridId: number
+   }>>
+   Join productGridBindings with allmoxyProducts on productId,
+   filtered by gridId, ordered by productName.
+
+── Frontend: Bindings tab in Attribute Grid Manager ─
+
+When a grid is selected/expanded, add a "Bindings" tab alongside the 
+existing "Rows" tab. Show the binding count in the tab label:
+  "Bindings (45)" or "Bindings (0)"
+
+Top action bar: [ Bulk Update Alias ]  [ Bulk Add Binding ]
+
+If 0 bindings: empty state —
+  "No products are bound to this grid yet. Use Bulk Add Binding to add 
+   many at once, or manage bindings per-product in the Product Manager."
+
+If bindings exist: table with columns:
+  Product Name | SKU Prefix | Alias | Lookup Column | Remove
+
+Inline editing: clicking Alias or Lookup Column opens an inline text 
+input. Save on Enter/blur, cancel on Escape. Calls 
+PATCH .../bindings/:bindingId. Show green checkmark on success.
+
+Remove: confirm dialog → fetch product's current bindings → filter out 
+this gridId → call POST /api/admin/allmoxy-products/:id/grid-bindings 
+with the remaining bindings.
+
+── Bulk Update Alias dialog ────────────────────────
+
+Modal with:
+- Message: "Update alias for all X products bound to [Grid Name]"
+- Text input pre-filled with current alias (if all rows share one)
+- [ Cancel ] [ Apply to All X Products ]
+On confirm: PATCH .../bulk-alias → refresh table → toast confirmation.
+
+── Bulk Add Binding dialog ─────────────────────────
+
+Modal with:
+
+Section 1 — Binding details:
+  Alias:          text input  (e.g. "color")
+  Lookup Column:  text input  (e.g. "Material")
+  Helper text: "Lookup Column must match a column name in your order 
+                CSV exactly — e.g. Material, MANU_CODE, Color"
+
+Section 2 — Which products:
+  Two radio options:
+
+  ○ Products whose pricing formula contains:
+    Text input — e.g. type "color." to find all formulas that 
+    reference color.*
+    Helper: "Matches all products whose assigned pricing formula 
+             contains this text. Use 'color.' to find everything 
+             that needs a color binding."
+
+  ○ Choose products manually
+    Searchable multi-select list of all allmoxy_products with 
+    checkboxes (name + skuPrefix shown per row).
+
+Preview button: computes client-side how many products will be added 
+vs skipped and shows the count before committing.
+
+[ Cancel ] [ Add Bindings ]
+On confirm: POST .../bulk-add → refresh tab → toast with 
+"Added bindings for N products. M already had a binding and were 
+skipped."
+
+═══════════════════════════════════════════════════
+PART B — FORMULA TESTER: AD-HOC GRID LOOKUP SECTION
+═══════════════════════════════════════════════════
+
+BACKGROUND:
+The formula tester currently only shows Grid Lookup Override inputs for 
+bindings that already exist in the database for the selected product. 
+If a binding is missing (e.g. the color binding hasn't been added yet), 
+there is no color input, color is never in scope, and the formula throws 
+"Undefined symbol color" with no way to test around it.
+
+This creates a chicken-and-egg problem: you can't verify pricing works 
+until the binding exists, but you can't confirm the binding is correct 
+without testing it first.
+
+THE FIX — add an "Ad-hoc Grid Lookups" section below the existing 
+Grid Lookup Overrides in the Formula Tester left panel.
+
+── Frontend: client/src/pages/admin/FormulaTester.tsx ─
+
+Below the existing Grid Lookup Overrides section (which shows 
+auto-resolved and manual inputs for configured bindings), add a new 
+collapsible section titled "Ad-hoc Grid Lookups" with a subtitle: 
+"Inject additional grid values for testing — even if no binding is 
+configured for this product yet."
+
+The section contains a dynamic list of ad-hoc lookup rows. Each row has:
+  - Grid dropdown: searchable select of all attribute grids
+  - Alias: text input (the variable name to use in the formula scope, 
+    e.g. "color")
+  - Lookup Value: text input (the value to look up in that grid, 
+    e.g. "TFL1W")
+  - Remove button (×)
+
+An "+ Add Lookup" button appends a new empty row.
+
+When the user clicks "Run Pricing Test", these ad-hoc lookups are 
+resolved server-side and merged into the formula scope under their 
+alias, exactly like a real binding would be. They take lower priority 
+than real configured bindings — if a real binding already resolves the 
+same alias, the real binding wins.
+
+── Backend: update POST /api/admin/formula-test ───
+
+The endpoint already accepts req.body.gridLookups keyed by alias. 
+Extend it to also accept:
+  req.body.adHocLookups: Array<{
+    gridId: number,
+    alias: string,
+    lookupValue: string
+  }>
+
+For each adHocLookup:
+- Fetch the grid rows (use the existing gridRowsCache pattern)
+- Look up the row by lookupValue using the same 3-step exact → 
+  case-insensitive → rowData fallback logic
+- If found, add to contextScope under alias (lowercased, all keys 
+  lowercased) — but only if contextScope[alias] is not already set 
+  by a real configured binding
+
+Include the ad-hoc lookup results in the gridLookupResults response 
+array with a flag: { ...result, isAdHoc: true }
+So the UI can display them distinctly (e.g. with a dashed border or 
+"ad-hoc" badge) to make clear they are test-only injections.
+
+═══════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════
+
+Test 1 — Ad-hoc color lookup before binding exists:
+- Open Formula Tester → select 15SHFA (shelves product)
+- Grid Lookup Overrides shows "Shelves Lookup: auto · 15SHFA" — correct
+- Expand "Ad-hoc Grid Lookups" → click "+ Add Lookup"
+- Grid: select "Main Color Attribute 02202026"
+- Alias: "color"
+- Lookup Value: "TFL1W"
+- Click Run Pricing Test
+- Error should be gone — scope should show both "shelves" and "color" 
+  objects populated
+- Price should be non-zero
+- Change lookup value to a Level 2 color (e.g. TFL2F) → price should 
+  increase by the upcharge percentage
+
+Test 2 — Parts alias bulk fix:
+- Open Attribute Grid Manager → select "Parts 02202026"
+- Click Bindings tab → shows ~45 products with alias "parts"
+- Bulk Update Alias → type "product_parts" → Apply to All
+- All rows refresh to show alias "product_parts"
+
+Test 3 — Color binding bulk add:
+- Open Attribute Grid Manager → select "Main Color Attribute 02202026"
+- Bindings tab shows 0 bindings
+- Bulk Add Binding → Alias: "color", Lookup Column: "Material"
+- Mode: "formula contains" → type "color."
+- Preview → should show ~400+ products
+- Add Bindings → success toast
+- Bindings tab refreshes showing ~400+ rows
+
+Test 4 — End to end after bulk add:
+- Open Formula Tester → select 15SHFA again
+- Grid Lookup Overrides should now show BOTH "Shelves Lookup" (auto) 
+  AND "Color Lookup" (manual input) since the real binding now exists
+- The ad-hoc section should no longer be needed for this product
+- Type "TFL1W" in Color Lookup → Run Pricing Test → non-zero price

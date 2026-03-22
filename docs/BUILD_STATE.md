@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-03-21 (r6) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-03-22 (r7) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -81,7 +81,7 @@ and produces all downstream documents needed for production, shipping, and suppl
 | `agentmail_sync_status` | AgentMail scheduler metadata |
 | `app_settings` | Key-value config store (ORD header template, etc.) |
 
-**Production DB state (as of 2026-03-21):** 2,363 active Allmoxy products (all with images matched), 2 projects.
+**Production DB state (as of 2026-03-22):** 2,363 active Allmoxy products (all with images matched), 2 projects.
 
 ---
 

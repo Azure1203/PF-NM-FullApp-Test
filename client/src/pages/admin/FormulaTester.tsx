@@ -28,8 +28,20 @@ import {
   FlaskConical,
   AlertTriangle,
   Info,
+  PlusCircle,
+  Trash2,
 } from "lucide-react";
-import type { AllmoxyProduct, ProductGridBinding } from "@shared/schema";
+import type { AllmoxyProduct, ProductGridBinding, AttributeGrid } from "@shared/schema";
+
+type GridLookupResult = {
+  alias: string;
+  gridName: string;
+  lookupColumn: string;
+  lookupValue: string;
+  matched: boolean;
+  rowData: any | null;
+  isAdHoc?: boolean;
+};
 
 type TestResult = {
   productName: string;
@@ -37,20 +49,15 @@ type TestResult = {
   pricingFormulaName: string | null;
   exportFormulaName: string | null;
   finalScope: Record<string, any>;
-  gridLookupResults: Array<{
-    alias: string;
-    gridName: string;
-    lookupColumn: string;
-    lookupValue: string;
-    matched: boolean;
-    rowData: any | null;
-  }>;
+  gridLookupResults: GridLookupResult[];
   unitPrice: number;
   totalPrice: number;
   pricingError: string | null;
   exportText: string | null;
   exportError: string | null;
 };
+
+type AdHocRow = { gridId: number | null; alias: string; lookupValue: string };
 
 export default function FormulaTester() {
   const { toast } = useToast();
@@ -62,6 +69,8 @@ export default function FormulaTester() {
   const [length, setLength] = useState("19");
   const [quantity, setQuantity] = useState("1");
   const [lookupInputs, setLookupInputs] = useState<Record<string, string>>({});
+  const [adHocRows, setAdHocRows] = useState<AdHocRow[]>([]);
+  const [adHocOpen, setAdHocOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [scopeOpen, setScopeOpen] = useState(false);
   const [lookupsOpen, setLookupsOpen] = useState(true);
@@ -69,6 +78,10 @@ export default function FormulaTester() {
 
   const { data: products } = useQuery<AllmoxyProduct[]>({
     queryKey: ["/api/admin/allmoxy-products"],
+  });
+
+  const { data: allGrids = [] } = useQuery<AttributeGrid[]>({
+    queryKey: ["/api/admin/attribute-grids"],
   });
 
   const { data: bindings } = useQuery<ProductGridBinding[]>({
@@ -95,10 +108,15 @@ export default function FormulaTester() {
         depth: parseFloat(length) || 0,
         quantity: parseInt(quantity) || 1,
       };
+      const adHocLookups = adHocRows
+        .filter(r => r.gridId && r.alias.trim() && r.lookupValue.trim())
+        .map(r => ({ gridId: r.gridId!, alias: r.alias.trim(), lookupValue: r.lookupValue.trim() }));
+
       const res = await apiRequest("POST", "/api/admin/formula-test", {
         productId: selectedProductId,
         inputs,
         gridLookups: lookupInputs,
+        adHocLookups,
       });
       return res.json() as Promise<TestResult>;
     },
@@ -251,6 +269,77 @@ export default function FormulaTester() {
               </div>
             )}
 
+            {/* Ad-hoc Grid Lookups */}
+            <Collapsible open={adHocOpen} onOpenChange={setAdHocOpen}>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
+                <span className="text-sm font-medium">Ad-hoc Grid Lookups</span>
+                <span className="text-xs text-muted-foreground ml-auto mr-1">
+                  {adHocRows.length > 0 ? `${adHocRows.length} row(s)` : 'none'}
+                </span>
+                {adHocOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 pt-2">
+                <p className="text-[11px] text-muted-foreground">
+                  Inject additional grid values for testing — even if no binding is configured for this product yet.
+                </p>
+                {adHocRows.map((row, idx) => (
+                  <div key={idx} className="space-y-1.5 rounded-md border p-2.5 bg-muted/10 relative">
+                    <button
+                      className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                      onClick={() => setAdHocRows(prev => prev.filter((_, i) => i !== idx))}
+                      data-testid={`button-remove-adhoc-${idx}`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground font-medium">Grid</label>
+                      <select
+                        className="w-full text-sm border rounded-md px-2 py-1.5 bg-background"
+                        value={row.gridId ?? ''}
+                        onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, gridId: Number(e.target.value) || null } : r))}
+                        data-testid={`select-adhoc-grid-${idx}`}
+                      >
+                        <option value="">Select grid…</option>
+                        {allGrids.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground font-medium">Alias (scope var)</label>
+                        <Input
+                          placeholder="e.g. color"
+                          className="h-7 text-xs"
+                          value={row.alias}
+                          onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, alias: e.target.value } : r))}
+                          data-testid={`input-adhoc-alias-${idx}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted-foreground font-medium">Lookup Value</label>
+                        <Input
+                          placeholder="e.g. TFL1W"
+                          className="h-7 text-xs"
+                          value={row.lookupValue}
+                          onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, lookupValue: e.target.value } : r))}
+                          data-testid={`input-adhoc-value-${idx}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-7 text-xs"
+                  onClick={() => setAdHocRows(prev => [...prev, { gridId: null, alias: '', lookupValue: '' }])}
+                  data-testid="button-add-adhoc"
+                >
+                  <PlusCircle className="w-3 h-3 mr-1.5" />
+                  + Add Lookup
+                </Button>
+              </CollapsibleContent>
+            </Collapsible>
+
             {/* Run button */}
             <Button
               data-testid="button-run-test"
@@ -371,14 +460,19 @@ export default function FormulaTester() {
                     {lookupsOpen ? <ChevronDown className="h-4 w-4 ml-auto text-muted-foreground" /> : <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />}
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-2 pt-2">
-                    {result.gridLookupResults.map(lr => (
-                      <div key={lr.alias} className="rounded-lg border bg-background overflow-hidden">
+                    {result.gridLookupResults.map((lr, lrIdx) => (
+                      <div key={`${lr.alias}-${lrIdx}`} className={cn("rounded-lg border bg-background overflow-hidden", lr.isAdHoc && "border-dashed border-amber-300 dark:border-amber-700")}>
                         <div className="flex items-center gap-3 px-4 py-3">
                           {lr.matched
                             ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                             : <XCircle className="h-4 w-4 text-red-400 shrink-0" />
                           }
                           <Badge variant="outline" className="font-mono text-xs shrink-0">{lr.alias}</Badge>
+                          {lr.isAdHoc && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0 bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                              ad-hoc
+                            </Badge>
+                          )}
                           <span className="text-sm text-muted-foreground truncate">
                             {lr.gridName} · <span className="font-mono">{lr.lookupColumn}</span> = &quot;{lr.lookupValue || <em>empty</em>}&quot;
                           </span>

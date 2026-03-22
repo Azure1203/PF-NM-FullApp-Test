@@ -184,6 +184,11 @@ export interface IStorage {
   createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding>;
   deleteProductGridBinding(id: number): Promise<boolean>;
   replaceProductGridBindings(productId: number, bindings: InsertProductGridBinding[]): Promise<ProductGridBinding[]>;
+  updateProductGridBinding(id: number, data: { alias?: string; lookupColumn?: string }): Promise<ProductGridBinding>;
+  getBindingsWithProductInfo(gridId: number): Promise<Array<{
+    id: number; productId: number; productName: string;
+    skuPrefix: string | null; alias: string; lookupColumn: string; gridId: number;
+  }>>;
   getProductBySkuPrefix(sku: string): Promise<AllmoxyProduct | undefined>;
   getProxyVariableById(id: number): Promise<ProxyVariable | undefined>;
 
@@ -967,6 +972,31 @@ export class DatabaseStorage implements IStorage {
 
   async getAllProductGridBindings(): Promise<ProductGridBinding[]> {
     return await db.select().from(productGridBindings);
+  }
+
+  async updateProductGridBinding(id: number, data: { alias?: string; lookupColumn?: string }): Promise<ProductGridBinding> {
+    const [updated] = await db.update(productGridBindings).set(data).where(eq(productGridBindings.id, id)).returning();
+    return updated;
+  }
+
+  async getBindingsWithProductInfo(gridId: number): Promise<Array<{
+    id: number; productId: number; productName: string;
+    skuPrefix: string | null; alias: string; lookupColumn: string; gridId: number;
+  }>> {
+    return await db
+      .select({
+        id: productGridBindings.id,
+        productId: productGridBindings.productId,
+        productName: allmoxyProducts.name,
+        skuPrefix: allmoxyProducts.skuPrefix,
+        alias: productGridBindings.alias,
+        lookupColumn: productGridBindings.lookupColumn,
+        gridId: productGridBindings.gridId,
+      })
+      .from(productGridBindings)
+      .innerJoin(allmoxyProducts, eq(productGridBindings.productId, allmoxyProducts.id))
+      .where(eq(productGridBindings.gridId, gridId))
+      .orderBy(allmoxyProducts.name);
   }
 
   async createProductGridBinding(binding: InsertProductGridBinding): Promise<ProductGridBinding> {

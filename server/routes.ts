@@ -338,6 +338,101 @@ export async function registerRoutes(
     }
   });
 
+  // ── Grid binding management routes ──────────────────────────────────────────
+
+  app.get('/api/admin/attribute-grids/:id/bindings', isAuthenticated, async (req, res) => {
+    try {
+      const gridId = Number(req.params.id);
+      const bindings = await storage.getBindingsWithProductInfo(gridId);
+      res.json(bindings);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // bulk-alias MUST be registered before /:bindingId to avoid param collision
+  app.patch('/api/admin/attribute-grids/:gridId/bindings/bulk-alias', isAuthenticated, async (req, res) => {
+    try {
+      const gridId = Number(req.params.gridId);
+      const { alias } = req.body as { alias: string };
+      if (!alias?.trim()) return res.status(400).json({ message: 'alias is required' });
+      const bindings = await storage.getBindingsWithProductInfo(gridId);
+      let updated = 0;
+      for (const b of bindings) {
+        await storage.updateProductGridBinding(b.id, { alias: alias.trim() });
+        updated++;
+      }
+      res.json({ updated });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.post('/api/admin/attribute-grids/:gridId/bindings/bulk-add', isAuthenticated, async (req, res) => {
+    try {
+      const gridId = Number(req.params.gridId);
+      const { alias, lookupColumn, mode, formulaFragment, productIds } = req.body as {
+        alias: string;
+        lookupColumn: string;
+        mode: 'formula-contains' | 'explicit';
+        formulaFragment?: string;
+        productIds?: number[];
+      };
+      if (!alias?.trim() || !lookupColumn?.trim()) {
+        return res.status(400).json({ message: 'alias and lookupColumn are required' });
+      }
+
+      // Determine target product IDs
+      let targetProductIds: number[] = [];
+      if (mode === 'formula-contains') {
+        if (!formulaFragment?.trim()) return res.status(400).json({ message: 'formulaFragment is required for formula-contains mode' });
+        const allProxies = await storage.getProxyVariables();
+        const matchingProxyIds = new Set(
+          allProxies.filter(p => p.formula.includes(formulaFragment.trim())).map(p => p.id)
+        );
+        const allProducts = await storage.getAllmoxyProducts();
+        targetProductIds = allProducts
+          .filter(p => p.pricingProxyId != null && matchingProxyIds.has(p.pricingProxyId))
+          .map(p => p.id);
+      } else if (mode === 'explicit') {
+        targetProductIds = Array.isArray(productIds) ? productIds : [];
+      } else {
+        return res.status(400).json({ message: 'mode must be formula-contains or explicit' });
+      }
+
+      // Check for existing bindings to this grid
+      const existingBindings = await storage.getAllProductGridBindings();
+      const alreadyBound = new Set(
+        existingBindings.filter(b => b.gridId === gridId).map(b => b.productId)
+      );
+
+      let inserted = 0;
+      let skipped = 0;
+      for (const productId of targetProductIds) {
+        if (alreadyBound.has(productId)) { skipped++; continue; }
+        await storage.createProductGridBinding({ productId, gridId, alias: alias.trim(), lookupColumn: lookupColumn.trim() });
+        inserted++;
+      }
+      res.json({ inserted, skipped });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.patch('/api/admin/attribute-grids/:gridId/bindings/:bindingId', isAuthenticated, async (req, res) => {
+    try {
+      const bindingId = Number(req.params.bindingId);
+      const { alias, lookupColumn } = req.body as { alias?: string; lookupColumn?: string };
+      const updated = await storage.updateProductGridBinding(bindingId, {
+        ...(alias !== undefined ? { alias } : {}),
+        ...(lookupColumn !== undefined ? { lookupColumn } : {}),
+      });
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/upload-dynamic-grid', isAuthenticated, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -595,6 +690,7 @@ export async function registerRoutes(
         lookupValue: string;
         matched: boolean;
         rowData: any | null;
+        isAdHoc?: boolean;
       }> = [];
 
       for (const binding of bindings) {
@@ -623,6 +719,34 @@ export async function registerRoutes(
           lookupValue,
           matched: !!row,
           rowData: row ? row.rowData : null,
+        });
+      }
+
+      // Ad-hoc lookups — resolve after real bindings (real bindings win on alias collision)
+      const adHocLookups = (req.body.adHocLookups ?? []) as Array<{
+        gridId: number; alias: string; lookupValue: string;
+      }>;
+      for (const ah of adHocLookups) {
+        const alias = ah.alias.trim();
+        if (!alias || !ah.lookupValue.trim()) continue;
+        if (contextScope[alias] !== undefined) continue; // real binding wins
+        const grid = gridMap.get(Number(ah.gridId));
+        if (!grid) continue;
+        const row = await storage.getAttributeGridRowByKey(Number(ah.gridId), ah.lookupValue.trim(), grid.keyColumn);
+        if (row) {
+          const rawData = row.rowData as Record<string, any>;
+          contextScope[alias] = Object.fromEntries(
+            Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
+          );
+        }
+        gridLookupResults.push({
+          alias,
+          gridName: grid.name,
+          lookupColumn: grid.keyColumn,
+          lookupValue: ah.lookupValue.trim(),
+          matched: !!row,
+          rowData: row ? row.rowData : null,
+          isAdHoc: true,
         });
       }
 
