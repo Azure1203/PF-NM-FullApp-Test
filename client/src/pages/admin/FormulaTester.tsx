@@ -363,13 +363,13 @@ export default function FormulaTester() {
                           </label>
                           {auto && (
                             <span className="text-[10px] font-mono rounded bg-muted px-1.5 py-0.5 text-muted-foreground border">
-                              auto · {selectedProduct?.name}
+                              auto · {selectedProduct?.skuPrefix || selectedProduct?.name}
                             </span>
                           )}
                         </div>
                         {auto ? (
                           <div className="h-9 flex items-center px-3 rounded-md border bg-muted/40 text-xs text-muted-foreground font-mono">
-                            {selectedProduct?.name}
+                            {selectedProduct?.skuPrefix || selectedProduct?.name}
                           </div>
                         ) : (
                           <GridRowCombobox

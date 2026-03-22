@@ -731,12 +731,15 @@ export async function registerRoutes(
       for (const binding of bindings) {
         const grid = gridMap.get(binding.gridId);
         if (!grid) continue;
+        const isManuCodeBinding = binding.lookupColumn.toLowerCase().includes('manu');
+        const autoValue = isManuCodeBinding
+          ? (product.skuPrefix || product.name || '')
+          : (product.name || '');
         const lookupValue = String(
           (req.body.inputs || {})[binding.lookupColumn] ||
           (req.body.gridLookups || {})[binding.alias] ||
           (req.body.gridLookups || {})[binding.lookupColumn] ||
-          product.name ||
-          ''
+          autoValue
         );
         const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, grid.keyColumn) : undefined;
         if (row) {
@@ -744,9 +747,9 @@ export async function registerRoutes(
           contextScope[binding.alias] = Object.fromEntries(
             Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
           );
-        } else {
-          contextScope[binding.alias] = null;
         }
+        // No else — omitting alias from scope gives a clearer formula error
+        // than setting it to null (which causes "Cannot read properties of null")
         gridLookupResults.push({
           alias: binding.alias,
           gridName: grid.name,

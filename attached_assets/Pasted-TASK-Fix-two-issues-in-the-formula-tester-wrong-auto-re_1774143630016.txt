@@ -1,0 +1,124 @@
+TASK: Fix two issues in the formula tester — wrong auto-resolve 
+fallback for MANU_CODE bindings, and restore the missing Grid Lookup 
+Overrides section.
+
+═══════════════════════════════════════════════════
+FIX 1 — Use product.skuPrefix as fallback for MANU_CODE bindings
+(server/routes.ts — formula-test endpoint)
+═══════════════════════════════════════════════════
+
+The lookupValue resolution for grid bindings currently falls back to 
+product.name when no explicit value is provided. product.name is a 
+human-readable label (e.g. "15\" Divider Panel (TFL)") that does not 
+match the MANU_CODE in the grid.
+
+For bindings where lookupColumn contains "manu" (case-insensitive), 
+the correct auto-resolve value is product.skuPrefix — which IS the 
+MANU_CODE (e.g. "15DIVFBC").
+
+Change the lookupValue resolution from:
+  const lookupValue = String(
+    (req.body.inputs || {})[binding.lookupColumn] ||
+    (req.body.gridLookups || {})[binding.alias] ||
+    (req.body.gridLookups || {})[binding.lookupColumn] ||
+    product.name ||
+    ''
+  );
+
+To:
+  const isManuCodeBinding = binding.lookupColumn
+    .toLowerCase().includes('manu');
+  const autoValue = isManuCodeBinding 
+    ? (product.skuPrefix || product.name || '')
+    : (product.name || '');
+  const lookupValue = String(
+    (req.body.inputs || {})[binding.lookupColumn] ||
+    (req.body.gridLookups || {})[binding.alias] ||
+    (req.body.gridLookups || {})[binding.lookupColumn] ||
+    autoValue
+  );
+
+Also fix: when a lookup returns no row, do NOT set 
+contextScope[binding.alias] = null. Simply don't set it at all:
+
+  if (row) {
+    const rawData = row.rowData as Record<string, any>;
+    contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
+      Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
+    );
+  }
+  // No else — leaving alias out of scope gives a clearer error
+  // than setting it to null which causes "Cannot read properties of null"
+
+═══════════════════════════════════════════════════
+FIX 2 — Restore Grid Lookup Overrides section in FormulaTester.tsx
+═══════════════════════════════════════════════════
+
+The Grid Lookup Overrides section was lost in the last build. It must 
+be restored above the Ad-hoc Grid Lookups section.
+
+In client/src/pages/admin/FormulaTester.tsx:
+
+The left panel must render this sequence when a product is selected:
+
+1. Dimensions (Width, Height, Length, Quantity) — already present
+
+2. Grid Lookup Overrides — RESTORE THIS SECTION
+   Only shown when the selected product has at least one binding.
+   Fetch bindings from:
+     GET /api/admin/allmoxy-products/:productId/grid-bindings
+   when productId changes.
+
+   For each binding render one row:
+
+   If binding.lookupColumn.toLowerCase().includes('manu'):
+     → Read-only display:
+       Label: "[binding.alias] Lookup"
+       Value: a pill showing "auto · [product.skuPrefix]"
+       Helper: "Column: [binding.lookupColumn] — resolved from SKU"
+     → Do NOT include in gridLookups payload (backend handles it)
+
+   Otherwise (e.g. color, material):
+     → Searchable Combobox:
+       Label: "[binding.alias] Lookup" 
+         (capitalize first letter, e.g. "Color Lookup")
+       Options: loaded from 
+         GET /api/admin/attribute-grids/:binding.gridId/row-keys
+       Placeholder: "Search colors..." or "Search [gridName]..."
+       Helper: "Column: [binding.lookupColumn]"
+     → Value stored in lookupInputs[binding.alias]
+     → Included in gridLookups payload as gridLookups[binding.alias]
+
+3. Ad-hoc Grid Lookups — already present, keep as-is
+
+Mutation payload must be:
+  {
+    productId,
+    inputs: { width, height, length, quantity },
+    gridLookups: { ...lookupInputs },
+    adHocLookups: [ ...complete adHocRows ]
+  }
+
+═══════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════
+
+1. Open Formula Tester → select 15DIVFBC
+   - Grid Lookup Overrides shows:
+       "Divider_panels Lookup  auto · 15DIVFBC"  (read-only pill)
+       "Color Lookup  [searchable dropdown]"
+   - Pick "TFL1W" from the color dropdown
+   - Run Pricing Test
+   - Both grid lookups show green checkmarks
+   - Price is non-zero, no pricing error
+
+2. Select a product with only a MANU_CODE binding (no color)
+   - Grid Lookup Overrides shows the auto pill only
+   - Run Pricing Test without any extra inputs
+   - Should resolve and price correctly
+
+3. Select 15SHFA (shelves product with color binding)
+   - "Shelves Lookup  auto · 15SHFA"
+   - "Color Lookup  [dropdown]"
+   - Pick TFL1W → non-zero price
+   - Pick a Level 3 color → higher price due to upcharge
