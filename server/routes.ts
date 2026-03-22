@@ -240,7 +240,16 @@ export async function registerRoutes(
       const gridId = Number(req.params.id);
       const rows = await storage.getAttributeGridRows(gridId);
       const result = rows
-        .filter(r => r.lookupKey && r.lookupKey.trim())
+        .filter(r => {
+          if (!r.lookupKey || !r.lookupKey.trim()) return false;
+          const rd = (r.rowData ?? {}) as Record<string, any>;
+          // Filter out header/group rows and unavailable options
+          const selectable = rd['SELECTABLE'] ?? rd['Selectable'] ?? rd['selectable'] ?? '';
+          if (String(selectable).trim().toLowerCase() === 'header') return false;
+          const available = rd['AVAILABLE'] ?? rd['Available'] ?? rd['available'] ?? '';
+          if (String(available).trim().toLowerCase() === 'no') return false;
+          return true;
+        })
         .map(r => {
           const rd = (r.rowData ?? {}) as Record<string, any>;
           // If lookupKey looks like a numeric ID, try to find a friendlier NAME field
@@ -472,10 +481,12 @@ export async function registerRoutes(
       }
       const headers = Object.keys(records[0]);
       let keyColumn = 'NAME';
-      if (headers.includes('EXISTING OPTION ID')) {
-        keyColumn = 'EXISTING OPTION ID';
-      } else if (headers.includes('MANU_CODE')) {
+      if (headers.includes('MANU_CODE')) {
         keyColumn = 'MANU_CODE';
+      } else if (headers.includes('NAME')) {
+        keyColumn = 'NAME';
+      } else if (headers.includes('EXISTING OPTION ID')) {
+        keyColumn = 'EXISTING OPTION ID';
       }
       let grid = await storage.getAttributeGridByName(name);
       if (!grid) {
@@ -510,8 +521,9 @@ export async function registerRoutes(
         }
         const headers = Object.keys(records[0]);
         let keyColumn = 'NAME';
-        if (headers.includes('EXISTING OPTION ID')) keyColumn = 'EXISTING OPTION ID';
-        else if (headers.includes('MANU_CODE')) keyColumn = 'MANU_CODE';
+        if (headers.includes('MANU_CODE')) keyColumn = 'MANU_CODE';
+        else if (headers.includes('NAME')) keyColumn = 'NAME';
+        else if (headers.includes('EXISTING OPTION ID')) keyColumn = 'EXISTING OPTION ID';
         let grid = await storage.getAttributeGridByName(gridName);
         if (!grid) {
           grid = await storage.createAttributeGrid({ name: gridName, columns: headers, keyColumn });
@@ -1808,13 +1820,17 @@ export async function registerRoutes(
         const ci = rows.find(r => r.lookupKey.trim().toLowerCase() === trimmed.toLowerCase());
         if (ci) return ci;
         if (rowDataColumn) {
-          return rows.find(r => {
+          const byCol = rows.find(r => {
             const rd = r.rowData as Record<string, any>;
             const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
             return String(val ?? '').trim().toLowerCase() === trimmed.toLowerCase();
           });
+          if (byCol) return byCol;
         }
-        return undefined;
+        return rows.find(r => {
+          const rd = r.rowData as Record<string, any>;
+          return Object.values(rd).some(v => String(v ?? '').trim().toLowerCase() === trimmed.toLowerCase());
+        });
       };
 
       const files = await storage.getProjectFiles(projectId);
@@ -2299,7 +2315,7 @@ export async function registerRoutes(
       );
 
       // In-memory equivalent of storage.getAttributeGridRowByKey —
-      // tries exact → case-insensitive → rowData column search.
+      // tries exact → case-insensitive → rowData column → all rowData values.
       const findGridRowInCache = (
         gridId: number,
         lookupValue: string,
@@ -2312,13 +2328,17 @@ export async function registerRoutes(
         const ci = rows.find(r => r.lookupKey.trim().toLowerCase() === trimmed.toLowerCase());
         if (ci) return ci;
         if (rowDataColumn) {
-          return rows.find(r => {
+          const byCol = rows.find(r => {
             const rd = r.rowData as Record<string, any>;
             const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
             return String(val ?? '').trim().toLowerCase() === trimmed.toLowerCase();
           });
+          if (byCol) return byCol;
         }
-        return undefined;
+        return rows.find(r => {
+          const rd = r.rowData as Record<string, any>;
+          return Object.values(rd).some(v => String(v ?? '').trim().toLowerCase() === trimmed.toLowerCase());
+        });
       };
 
       // Build products map for countPartsFromCSV (MJ/Richelieu door detection)

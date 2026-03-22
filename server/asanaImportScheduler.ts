@@ -207,13 +207,17 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
           const ci = rows.find((r: any) => r.lookupKey?.trim().toLowerCase() === trimmed.toLowerCase());
           if (ci) return ci;
           if (rowDataColumn) {
-            return rows.find((r: any) => {
+            const byCol = rows.find((r: any) => {
               const rd = r.rowData as Record<string, any>;
               const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
               return String(val ?? '').trim().toLowerCase() === trimmed.toLowerCase();
             });
+            if (byCol) return byCol;
           }
-          return undefined;
+          return rows.find((r: any) => {
+            const rd = r.rowData as Record<string, any>;
+            return Object.values(rd).some((v: any) => String(v ?? '').trim().toLowerCase() === trimmed.toLowerCase());
+          });
         };
 
         let totalDovetails = 0;

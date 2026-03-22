@@ -874,17 +874,23 @@ export class DatabaseStorage implements IStorage {
     );
     if (ciMatch) return ciMatch;
 
-    // Third: search within rowData by the binding's lookup column
-    // (handles grids imported with wrong keyColumn, e.g. EXISTING OPTION ID instead of MANU_CODE)
+    // Third: search within rowData by the specified column (e.g. grid's keyColumn)
     if (rowDataColumn) {
-      return allRows.find(r => {
+      const byColumn = allRows.find(r => {
         const rd = r.rowData as Record<string, any>;
         const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
         return String(val ?? '').trim().toLowerCase() === trimmedKey.toLowerCase();
       });
+      if (byColumn) return byColumn;
     }
 
-    return undefined;
+    // Fourth: search ALL rowData values as a last resort (resilient fallback)
+    return allRows.find(r => {
+      const rd = r.rowData as Record<string, any>;
+      return Object.values(rd).some(v =>
+        String(v ?? '').trim().toLowerCase() === trimmedKey.toLowerCase()
+      );
+    });
   }
 
   async replaceAttributeGridRows(gridId: number, rows: InsertAttributeGridRow[]): Promise<AttributeGridRow[]> {
