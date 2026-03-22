@@ -70,7 +70,6 @@ export default function FormulaTester() {
   const [quantity, setQuantity] = useState("1");
   const [lookupInputs, setLookupInputs] = useState<Record<string, string>>({});
   const [adHocRows, setAdHocRows] = useState<AdHocRow[]>([]);
-  const [adHocOpen, setAdHocOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [scopeOpen, setScopeOpen] = useState(false);
   const [lookupsOpen, setLookupsOpen] = useState(true);
@@ -82,6 +81,10 @@ export default function FormulaTester() {
 
   const { data: allGrids = [] } = useQuery<AttributeGrid[]>({
     queryKey: ["/api/admin/attribute-grids"],
+    select: (data) => {
+      console.log("[FormulaTester] allGrids loaded:", data.length, data.map(g => g.name));
+      return data;
+    },
   });
 
   const { data: bindings } = useQuery<ProductGridBinding[]>({
@@ -112,12 +115,15 @@ export default function FormulaTester() {
         .filter(r => r.gridId && r.alias.trim() && r.lookupValue.trim())
         .map(r => ({ gridId: r.gridId!, alias: r.alias.trim(), lookupValue: r.lookupValue.trim() }));
 
-      const res = await apiRequest("POST", "/api/admin/formula-test", {
+      const payload = {
         productId: selectedProductId,
         inputs,
         gridLookups: lookupInputs,
         adHocLookups,
-      });
+      };
+      console.log("[FormulaTester] Sending formula-test payload:", JSON.stringify(payload, null, 2));
+
+      const res = await apiRequest("POST", "/api/admin/formula-test", payload);
       return res.json() as Promise<TestResult>;
     },
     onSuccess: (data) => {
@@ -269,76 +275,78 @@ export default function FormulaTester() {
               </div>
             )}
 
-            {/* Ad-hoc Grid Lookups */}
-            <Collapsible open={adHocOpen} onOpenChange={setAdHocOpen}>
-              <CollapsibleTrigger className="flex items-center gap-2 w-full text-left">
-                <span className="text-sm font-medium">Ad-hoc Grid Lookups</span>
-                <span className="text-xs text-muted-foreground ml-auto mr-1">
-                  {adHocRows.length > 0 ? `${adHocRows.length} row(s)` : 'none'}
-                </span>
-                {adHocOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-3 pt-2">
-                <p className="text-[11px] text-muted-foreground">
-                  Inject additional grid values for testing — even if no binding is configured for this product yet.
+            {/* Ad-hoc Grid Lookups — always visible */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium">Ad-hoc Grid Lookups</label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Inject a grid value for testing even if no binding is configured yet — useful for testing color/material pricing before bindings are set up.
                 </p>
-                {adHocRows.map((row, idx) => (
-                  <div key={idx} className="space-y-1.5 rounded-md border p-2.5 bg-muted/10 relative">
-                    <button
-                      className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
-                      onClick={() => setAdHocRows(prev => prev.filter((_, i) => i !== idx))}
-                      data-testid={`button-remove-adhoc-${idx}`}
+              </div>
+              {adHocRows.map((row, idx) => (
+                <div key={idx} className="space-y-1.5 rounded-md border p-2.5 bg-muted/10 relative">
+                  <button
+                    className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                    onClick={() => setAdHocRows(prev => prev.filter((_, i) => i !== idx))}
+                    data-testid={`button-remove-adhoc-${idx}`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground font-medium">Grid</label>
+                    <select
+                      className="w-full text-sm border rounded-md px-2 py-1.5 bg-background"
+                      value={row.gridId ?? ''}
+                      onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, gridId: Number(e.target.value) || null } : r))}
+                      data-testid={`select-adhoc-grid-${idx}`}
                     >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                      <option value="">Select grid… ({allGrids.length} available)</option>
+                      {allGrids.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-muted-foreground font-medium">Grid</label>
-                      <select
-                        className="w-full text-sm border rounded-md px-2 py-1.5 bg-background"
-                        value={row.gridId ?? ''}
-                        onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, gridId: Number(e.target.value) || null } : r))}
-                        data-testid={`select-adhoc-grid-${idx}`}
-                      >
-                        <option value="">Select grid…</option>
-                        {allGrids.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                      </select>
+                      <label className="text-[10px] text-muted-foreground font-medium">Alias (scope var)</label>
+                      <Input
+                        placeholder="e.g. color"
+                        className="h-7 text-xs"
+                        value={row.alias}
+                        onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, alias: e.target.value } : r))}
+                        data-testid={`input-adhoc-alias-${idx}`}
+                      />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground font-medium">Alias (scope var)</label>
-                        <Input
-                          placeholder="e.g. color"
-                          className="h-7 text-xs"
-                          value={row.alias}
-                          onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, alias: e.target.value } : r))}
-                          data-testid={`input-adhoc-alias-${idx}`}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground font-medium">Lookup Value</label>
-                        <Input
-                          placeholder="e.g. TFL1W"
-                          className="h-7 text-xs"
-                          value={row.lookupValue}
-                          onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, lookupValue: e.target.value } : r))}
-                          data-testid={`input-adhoc-value-${idx}`}
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground font-medium">Lookup Value</label>
+                      <Input
+                        placeholder="e.g. TFL1W"
+                        className="h-7 text-xs"
+                        value={row.lookupValue}
+                        onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, lookupValue: e.target.value } : r))}
+                        data-testid={`input-adhoc-value-${idx}`}
+                      />
                     </div>
                   </div>
-                ))}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full h-7 text-xs"
-                  onClick={() => setAdHocRows(prev => [...prev, { gridId: null, alias: '', lookupValue: '' }])}
-                  data-testid="button-add-adhoc"
-                >
-                  <PlusCircle className="w-3 h-3 mr-1.5" />
-                  + Add Lookup
-                </Button>
-              </CollapsibleContent>
-            </Collapsible>
+                </div>
+              ))}
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-7 text-xs"
+                onClick={() => setAdHocRows(prev => [...prev, { gridId: null, alias: '', lookupValue: '' }])}
+                data-testid="button-add-adhoc"
+              >
+                <PlusCircle className="w-3 h-3 mr-1.5" />
+                + Add Lookup
+              </Button>
+            </div>
+
+            {/* Missing lookup warning banner */}
+            {bindings && bindings.filter(b => !isAutoBinding(b.lookupColumn) && !lookupInputs[b.alias]?.trim()).map(b => (
+              <div key={b.id} className="flex items-start gap-2 rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 text-xs text-yellow-700 dark:text-yellow-400">
+                <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                This product&apos;s formula references <span className="font-mono font-semibold">{b.alias}</span> — enter a lookup value above or add an ad-hoc lookup to get a valid price.
+              </div>
+            ))}
 
             {/* Run button */}
             <Button
@@ -487,7 +495,10 @@ export default function FormulaTester() {
                         </div>
                         {!lr.matched && (
                           <div className="px-4 pb-3 text-xs text-amber-600 dark:text-amber-400">
-                            No row found in &quot;{lr.gridName}&quot; for {lr.lookupColumn} = &quot;{lr.lookupValue}&quot;
+                            {lr.isAdHoc
+                              ? <>No row found for &quot;<span className="font-mono">{lr.lookupValue}</span>&quot; in {lr.gridName} — check the value matches a row key exactly.</>
+                              : <>No row found in &quot;{lr.gridName}&quot; for {lr.lookupColumn} = &quot;{lr.lookupValue}&quot;</>
+                            }
                           </div>
                         )}
                         {lr.matched && expandedRows.has(lr.alias) && (

@@ -1,0 +1,68 @@
+TASK: Fix the Ad-hoc Grid Lookups section in the Formula Tester so it 
+is visible, functional, and clearly explained to the user.
+
+BACKGROUND:
+The ad-hoc lookup section was added to FormulaTester.tsx in r6 but the 
+user reports it either is not visible or does not work. The backend 
+already handles adHocLookups correctly in the formula-test endpoint.
+The issue is in the frontend.
+
+INVESTIGATE AND FIX the following in 
+client/src/pages/admin/FormulaTester.tsx:
+
+1. VISIBILITY — The "Ad-hoc Grid Lookups" section must always be 
+   visible in the left panel below the Grid Lookup Overrides section, 
+   even when there are no rows added yet. If it is currently only 
+   shown when rows exist, change it to always render with the 
+   "+ Add Lookup" button visible. Add a subtitle:
+   "Inject a grid value for testing even if no binding is configured 
+   yet — useful for testing color/material pricing before bindings 
+   are set up."
+
+2. GRID DROPDOWN — Verify the grid dropdown is populated. It should 
+   load from GET /api/admin/attribute-grids. If allGrids is empty or 
+   the query is failing, add a console.log to confirm it loads. 
+   The dropdown should show the grid name as the label.
+
+3. SENDING THE DATA — Confirm the mutation sends adHocLookups to the 
+   endpoint correctly. The payload must be:
+   {
+     productId,
+     inputs: { width, height, length, quantity },
+     gridLookups: { ...lookupInputs },
+     adHocLookups: [
+       { gridId: number, alias: string, lookupValue: string },
+       ...
+     ]
+   }
+   Only include rows where gridId, alias, AND lookupValue are all 
+   non-empty. Log the full payload to console before sending so it 
+   can be verified in the browser console.
+
+4. RESULT DISPLAY — Ad-hoc lookup results come back in 
+   gridLookupResults with isAdHoc: true. Confirm these are rendered 
+   in the Grid Lookups section with an amber "ad-hoc" badge. If the 
+   result shows matched: false, display a warning: "No row found for 
+   '[lookupValue]' in [gridName] — check the value matches a row key 
+   exactly."
+
+5. ADD A HELPFUL CALLOUT — If the product has any grid bindings whose 
+   alias is NOT auto-resolved (i.e. lookupColumn does not contain 
+   "manu"), and those bindings have no value entered yet, show a 
+   yellow info banner above the Run button:
+   "This product's formula references [alias] — enter a lookup value 
+   above or add an ad-hoc lookup to get a valid price."
+   This makes it obvious when a required lookup value is missing.
+
+VERIFICATION:
+- Open Formula Tester, select 15SHFA
+- Ad-hoc section should be visible with "+ Add Lookup" button
+- Click + Add Lookup → select "Main Color Attribute 02202026" from 
+  the grid dropdown
+- Set Alias = "color", Lookup Value = "TFL1W"
+- Click Run Pricing Test
+- Grid Lookups section should show both the Shelves auto-resolved 
+  entry AND an amber "ad-hoc" entry for color showing matched: true
+- Price should be non-zero
+- Change lookup value to an invalid code like "XXXXXX" → should show 
+  "No row found" warning in the grid lookups section
