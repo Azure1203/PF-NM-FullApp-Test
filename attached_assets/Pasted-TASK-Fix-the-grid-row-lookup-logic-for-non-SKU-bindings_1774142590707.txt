@@ -1,0 +1,96 @@
+TASK: Fix the grid row lookup logic for non-SKU bindings, and replace 
+manual text inputs in Grid Lookup Overrides with searchable dropdowns 
+populated from the actual grid rows.
+
+BACKGROUND:
+Two problems visible in the Formula Tester:
+
+PROBLEM 1 — Lookup failing for color binding
+The color binding has lookupColumn = "Material". This means "get the 
+value from the Material column of the order CSV". The value (e.g. 
+"TFL1W") is then used to look up a row in the Main Color Attribute 
+grid. However the lookup is failing because the current logic passes 
+"Material" as the rowDataColumn fallback, which doesn't exist in the 
+color grid — TFL1W lives in the "NAME" column (the grid's keyColumn), 
+not a column called "Material".
+
+The three-step lookup is:
+  1. Exact match: row.lookupKey === "TFL1W"  ← this should work
+  2. Case-insensitive match on lookupKey
+  3. rowData column fallback using rowDataColumn param
+
+Step 1 should succeed IF the grid was imported with keyColumn = "NAME" 
+and lookupKey was set to the NAME value for each row (TFL1W, TFL2F, 
+etc.). If it's failing, the grid's keyColumn is likely set to something 
+else (e.g. "EXISTING OPTION ID" which would make lookupKey = "7057" 
+not "TFL1W").
+
+FIX for the formula tester endpoint (POST /api/admin/formula-test):
+When doing the grid row lookup for a binding, pass the grid's own 
+keyColumn as the rowDataColumn fallback instead of binding.lookupColumn:
+
+  const row = await storage.getAttributeGridRowByKey(
+    binding.gridId, 
+    lookupValue, 
+    grid.keyColumn   // ← use grid's keyColumn, not binding.lookupColumn
+  );
+
+This way if the lookupKey doesn't match directly, it falls back to 
+searching the correct column in rowData. Apply the same fix to the 
+ad-hoc lookup resolution in the same endpoint.
+
+Also apply this same fix in the upload pipeline and reprice route 
+in server/routes.ts — in the findGridRowInCache calls, pass 
+grid.keyColumn as the rowDataColumn argument instead of 
+binding.lookupColumn.
+
+PROBLEM 2 — Manual text input for grid lookups is error-prone
+Users have to type color codes like "TFL1W" exactly from memory. 
+A dropdown populated from the actual grid rows is far better.
+
+FIX — Replace text inputs in Grid Lookup Overrides with searchable 
+dropdowns in client/src/pages/admin/FormulaTester.tsx:
+
+For each binding that is NOT auto-resolved (i.e. lookupColumn does 
+not contain "manu" case-insensitive), instead of a plain text Input, 
+render a searchable Select/Combobox populated from the grid's rows.
+
+To populate it:
+- Add a new backend endpoint:
+  GET /api/admin/attribute-grids/:id/row-keys
+  Returns an array of { lookupKey, displayLabel } for all rows in 
+  the grid, where displayLabel = lookupKey + any NAME/name field 
+  from rowData if it differs from lookupKey, e.g.:
+    { lookupKey: "TFL1W", displayLabel: "TFL1W" }
+    { lookupKey: "7057",  displayLabel: "7057 — TFL1W" }
+  Filter out rows where lookupKey is empty or null.
+  Order by lookupKey.
+
+- In FormulaTester.tsx, for each manual binding input:
+  - Fetch GET /api/admin/attribute-grids/:binding.gridId/row-keys 
+    when the product is selected (or lazily on first focus)
+  - Render a Combobox (searchable dropdown using shadcn Command 
+    or a simple filterable Select) showing the displayLabel options
+  - On select, set the value in lookupInputs[binding.alias]
+  - Still allow typing a custom value in case the user wants to 
+    test an edge case not in the dropdown
+  - Show a placeholder: "Search colors..." or "Search [gridName]..."
+
+- Apply the same dropdown treatment to the Lookup Value field in 
+  the Ad-hoc Grid Lookups section — once a grid is selected in 
+  the grid dropdown, load and show its row keys as options in the 
+  Lookup Value field.
+
+VERIFICATION:
+- Open Formula Tester → select 15DIVF (divider panels product)
+- Grid Lookup Overrides shows "Color Lookup" with a searchable 
+  dropdown instead of a text box
+- Click the dropdown → type "TFL" → filtered list shows all TFL 
+  color options
+- Select "TFL1W" → Run Pricing Test
+- Grid Lookups section should show color matched: true (green)
+- Price should be non-zero
+- Select a Level 3+ color → price should be higher due to upcharge
+- Test the ad-hoc section: add a lookup, select 
+  "Main Color Attribute 02202026", the Lookup Value field should 
+  show the color dropdown
