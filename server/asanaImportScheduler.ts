@@ -308,7 +308,7 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
                 if (!grid) continue;
                 const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
                 if (!lookupValue) continue;
-                const row = findGridRowInCache(binding.gridId, lookupValue, binding.lookupColumn);
+                const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
                 if (row) {
                   const rawData = row.rowData as Record<string, any>;
                   contextScope[binding.alias.toLowerCase()] = Object.fromEntries(

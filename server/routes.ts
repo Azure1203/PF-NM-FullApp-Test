@@ -235,6 +235,29 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/attribute-grids/:id/row-keys', isAuthenticated, async (req, res) => {
+    try {
+      const gridId = Number(req.params.id);
+      const rows = await storage.getAttributeGridRows(gridId);
+      const result = rows
+        .filter(r => r.lookupKey && r.lookupKey.trim())
+        .map(r => {
+          const rd = (r.rowData ?? {}) as Record<string, any>;
+          // If lookupKey looks like a numeric ID, try to find a friendlier NAME field
+          const nameVal = rd['NAME'] ?? rd['name'] ?? rd['Name'] ?? '';
+          const displayLabel =
+            nameVal && String(nameVal).trim() && String(nameVal).trim() !== r.lookupKey.trim()
+              ? `${r.lookupKey} — ${String(nameVal).trim()}`
+              : r.lookupKey;
+          return { lookupKey: r.lookupKey, displayLabel };
+        })
+        .sort((a, b) => a.lookupKey.localeCompare(b.lookupKey));
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.put('/api/admin/attribute-grids/rows/:rowId', isAuthenticated, async (req, res) => {
     try {
       const { rowData } = req.body;
@@ -703,7 +726,7 @@ export async function registerRoutes(
           product.name ||
           ''
         );
-        const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, binding.lookupColumn) : undefined;
+        const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, grid.keyColumn) : undefined;
         if (row) {
           const rawData = row.rowData as Record<string, any>;
           contextScope[binding.alias] = Object.fromEntries(
@@ -1830,7 +1853,7 @@ export async function registerRoutes(
               if (!grid) continue;
               const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
               if (!lookupValue) continue;
-              const row = findGridRowInCache(binding.gridId, lookupValue, binding.lookupColumn);
+              const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
               if (row) {
                 const rawData = row.rowData as Record<string, any>;
                 contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
@@ -2415,7 +2438,7 @@ export async function registerRoutes(
               if (!grid) continue;
               const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
               if (!lookupValue) continue;
-              const row = findGridRowInCache(binding.gridId, lookupValue, binding.lookupColumn);
+              const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
               if (row) {
                 const rawData = row.rowData as Record<string, any>;
                 contextScope[binding.alias.toLowerCase()] = Object.fromEntries(

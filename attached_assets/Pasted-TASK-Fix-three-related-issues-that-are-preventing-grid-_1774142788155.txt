@@ -1,0 +1,145 @@
+TASK: Fix three related issues that are preventing grid row lookups 
+from working in both the formula tester and the order pipeline.
+
+═══════════════════════════════════════════════════
+FIX 1 — Grid import keyColumn priority (critical)
+═══════════════════════════════════════════════════
+
+BACKGROUND:
+In server/routes.ts, the grid CSV upload handler determines keyColumn 
+in this order:
+  1. If headers include "EXISTING OPTION ID" → keyColumn = that
+  2. Else if headers include "MANU_CODE" → keyColumn = MANU_CODE
+  3. Else → NAME
+
+This is wrong. "EXISTING OPTION ID" is a database ID with no meaning 
+to the pricing pipeline. The correct priority is:
+  1. MANU_CODE (most specific — directly matches order CSV SKUs)
+  2. NAME (human-readable code like TFL1W — matches color CSV values)
+  3. EXISTING OPTION ID (last resort only)
+
+EVERY grid that has been imported already has the wrong keyColumn and 
+wrong lookupKey values stored. The rows need to be re-imported once 
+the priority is fixed.
+
+FIX in server/routes.ts — the upload handler for single grids 
+(POST /api/admin/upload-dynamic-grid) and the batch upload handler 
+if one exists:
+
+Change the keyColumn detection from:
+  if (headers.includes('EXISTING OPTION ID')) {
+    keyColumn = 'EXISTING OPTION ID';
+  } else if (headers.includes('MANU_CODE')) {
+    keyColumn = 'MANU_CODE';
+  }
+
+To:
+  if (headers.includes('MANU_CODE')) {
+    keyColumn = 'MANU_CODE';
+  } else if (headers.includes('NAME')) {
+    keyColumn = 'NAME';
+  } else if (headers.includes('EXISTING OPTION ID')) {
+    keyColumn = 'EXISTING OPTION ID';
+  }
+
+After this fix is deployed, every grid must be re-imported by 
+uploading its CSV again through the Attribute Grid Manager. The 
+admin will need to do this manually for each grid — this is a 
+one-time operation after the code is deployed.
+
+═══════════════════════════════════════════════════
+FIX 2 — rowDataColumn fallback uses wrong column
+═══════════════════════════════════════════════════
+
+BACKGROUND:
+The three-step grid row lookup (exact → case-insensitive → rowData 
+column fallback) currently passes binding.lookupColumn as the 
+rowDataColumn fallback. For the color binding, lookupColumn = 
+"Material" (the order CSV column name) — but "Material" doesn't 
+exist in the color grid's rowData. This makes the fallback useless.
+
+The fallback should search ALL rowData columns for the value, not 
+just one specific column. This makes the lookup resilient regardless 
+of how the grid was imported or what lookupColumn is set to.
+
+FIX in server/storage.ts — getAttributeGridRowByKey:
+Replace the current third step (which only searches one column) with 
+a search across all rowData values:
+
+  // Step 3: search ALL rowData values for a match
+  if (rowDataColumn) {
+    const byColumn = allRows.find(r => {
+      const rd = r.rowData as Record<string, any>;
+      const val = rd[rowDataColumn] 
+        ?? rd[rowDataColumn.toLowerCase()] 
+        ?? rd[rowDataColumn.toUpperCase()];
+      return String(val ?? '').trim().toLowerCase() 
+        === trimmedKey.toLowerCase();
+    });
+    if (byColumn) return byColumn;
+  }
+  // Step 4 (new): search ALL rowData values as a last resort
+  return allRows.find(r => {
+    const rd = r.rowData as Record<string, any>;
+    return Object.values(rd).some(v => 
+      String(v ?? '').trim().toLowerCase() === trimmedKey.toLowerCase()
+    );
+  });
+
+Apply the same change to findGridRowInCache in server/routes.ts 
+(the in-memory equivalent used in the upload pipeline and reprice 
+route) — add the same "search all rowData values" step after the 
+existing three steps.
+
+═══════════════════════════════════════════════════
+FIX 3 — Formula tester dropdowns + lookupColumn fix
+═══════════════════════════════════════════════════
+
+Add a backend endpoint:
+  GET /api/admin/attribute-grids/:id/row-keys
+  Returns all non-empty lookupKey values for a grid as:
+  [{ lookupKey: string, displayLabel: string }]
+  where displayLabel = lookupKey, unless rowData has a "NAME" or 
+  "name" field that differs from lookupKey, in which case:
+  displayLabel = lookupKey + " — " + rowData.name
+  Filter out rows where SELECTABLE = "Header" or AVAILABLE = "No" 
+  if those columns exist in rowData, so header/group rows don't 
+  appear in the dropdown.
+  Order alphabetically by lookupKey.
+
+In client/src/pages/admin/FormulaTester.tsx:
+For each manual binding input (lookupColumn does not contain "manu"), 
+replace the plain text Input with a searchable Combobox:
+- Loads options from GET /api/admin/attribute-grids/:binding.gridId/row-keys
+- Filters options as user types
+- Allows typing a custom value not in the list
+- Placeholder: "Search [gridName]..."
+
+Apply the same dropdown to the Lookup Value field in the Ad-hoc 
+Grid Lookups section once a grid is selected.
+
+═══════════════════════════════════════════════════
+VERIFICATION
+═══════════════════════════════════════════════════
+
+After deploying, the admin must re-import all attribute grids through 
+the Attribute Grid Manager (upload the same CSV files again). Once 
+re-imported, verify:
+
+1. Open Attribute Grid Manager → Main Color Attribute 02202026 → 
+   Rows tab → check that lookupKey values are now "TFL1W", "TFL2F" 
+   etc. (not numbers like 7057)
+
+2. Open Attribute Grid Manager → Parts 02202026 → Rows tab → 
+   check that lookupKey values are "34BACK", "34TOPS" etc.
+   (not numbers)
+
+3. Open Formula Tester → select 15DIVF
+   - Color Lookup shows a searchable dropdown
+   - Type "TFL" → filtered list shows TFL color options
+   - Select "TFL1W" → Run Pricing Test
+   - Both grid lookups show green (matched)
+   - Price is non-zero
+
+4. Upload a real order CSV → check Order Details → line items 
+   should have non-zero prices and no pricingError values

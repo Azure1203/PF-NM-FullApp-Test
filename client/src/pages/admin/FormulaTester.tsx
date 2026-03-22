@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,18 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import {
   CheckCircle2,
@@ -30,6 +42,7 @@ import {
   Info,
   PlusCircle,
   Trash2,
+  ChevronsUpDown,
 } from "lucide-react";
 import type { AllmoxyProduct, ProductGridBinding, AttributeGrid } from "@shared/schema";
 
@@ -58,6 +71,113 @@ type TestResult = {
 };
 
 type AdHocRow = { gridId: number | null; alias: string; lookupValue: string };
+type RowKey = { lookupKey: string; displayLabel: string };
+
+function GridRowCombobox({
+  gridId,
+  value,
+  onChange,
+  placeholder,
+  testId,
+  className,
+  onKeyDown,
+}: {
+  gridId: number;
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  testId?: string;
+  className?: string;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState(value);
+
+  const { data: rowKeys = [], isLoading } = useQuery<RowKey[]>({
+    queryKey: ["/api/admin/attribute-grids", gridId, "row-keys"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/attribute-grids/${gridId}/row-keys`);
+      if (!res.ok) throw new Error("Failed to load row keys");
+      return res.json();
+    },
+    enabled: !!gridId,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => { setSearch(value); }, [value]);
+
+  const filtered = rowKeys.filter(rk =>
+    rk.displayLabel.toLowerCase().includes(search.toLowerCase()) ||
+    rk.lookupKey.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className={cn("relative", className)}>
+          <Input
+            data-testid={testId}
+            placeholder={isLoading ? "Loading…" : (placeholder ?? `Search ${rowKeys.length} options…`)}
+            value={search}
+            onChange={e => {
+              const v = e.target.value;
+              setSearch(v);
+              onChange(v);
+              if (!open) setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={e => {
+              if (e.key === "Escape") { setOpen(false); }
+              onKeyDown?.(e);
+            }}
+            className="pr-7"
+            autoComplete="off"
+          />
+          <ChevronsUpDown
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none shrink-0"
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-0 w-[var(--radix-popover-trigger-width)]"
+        align="start"
+        onOpenAutoFocus={e => e.preventDefault()}
+      >
+        <Command shouldFilter={false}>
+          <CommandList>
+            {filtered.length === 0 ? (
+              <CommandEmpty className="py-3 text-xs text-center text-muted-foreground">
+                {isLoading
+                  ? "Loading row keys…"
+                  : search
+                  ? `No match — "${search}" will be sent as-is`
+                  : "No row keys found"}
+              </CommandEmpty>
+            ) : (
+              <CommandGroup>
+                {filtered.slice(0, 150).map(rk => (
+                  <CommandItem
+                    key={rk.lookupKey}
+                    value={rk.lookupKey}
+                    onSelect={() => {
+                      onChange(rk.lookupKey);
+                      setSearch(rk.lookupKey);
+                      setOpen(false);
+                    }}
+                    className="text-xs font-mono"
+                    data-testid={`option-rowkey-${rk.lookupKey}`}
+                  >
+                    {rk.displayLabel}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function FormulaTester() {
   const { toast } = useToast();
@@ -252,16 +372,12 @@ export default function FormulaTester() {
                             {selectedProduct?.name}
                           </div>
                         ) : (
-                          <Input
-                            data-testid={`input-lookup-${binding.alias}`}
-                            placeholder={`e.g. TFL1W`}
+                          <GridRowCombobox
+                            gridId={binding.gridId}
                             value={lookupInputs[binding.alias] ?? ""}
-                            onChange={e =>
-                              setLookupInputs(prev => ({
-                                ...prev,
-                                [binding.alias]: e.target.value,
-                              }))
-                            }
+                            onChange={v => setLookupInputs(prev => ({ ...prev, [binding.alias]: v }))}
+                            placeholder={`Search ${allGrids.find(g => g.id === binding.gridId)?.name ?? 'values'}…`}
+                            testId={`input-lookup-${binding.alias}`}
                             onKeyDown={handleKeyDown}
                           />
                         )}
@@ -317,13 +433,22 @@ export default function FormulaTester() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground font-medium">Lookup Value</label>
-                      <Input
-                        placeholder="e.g. TFL1W"
-                        className="h-7 text-xs"
-                        value={row.lookupValue}
-                        onChange={e => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, lookupValue: e.target.value } : r))}
-                        data-testid={`input-adhoc-value-${idx}`}
-                      />
+                      {row.gridId ? (
+                        <GridRowCombobox
+                          gridId={row.gridId}
+                          value={row.lookupValue}
+                          onChange={v => setAdHocRows(prev => prev.map((r, i) => i === idx ? { ...r, lookupValue: v } : r))}
+                          placeholder="Search values…"
+                          testId={`input-adhoc-value-${idx}`}
+                        />
+                      ) : (
+                        <Input
+                          placeholder="Select a grid first"
+                          className="h-7 text-xs"
+                          disabled
+                          data-testid={`input-adhoc-value-${idx}`}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
