@@ -24,6 +24,24 @@ export function stripComments(formula: string): string {
  * @param allProxyVars   All proxy variables — each is pre-evaluated in order and added to scope
  *                       so that the main formula can reference them by name (e.g. sq_ft, margin).
  */
+
+/**
+ * Converts a grid row's rowData into a scope-friendly object:
+ * - All keys lowercased
+ * - Numeric strings coerced to numbers for mathjs
+ */
+export function gridRowToScope(rowData: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(rowData).map(([k, v]) => {
+      const lower = k.toLowerCase();
+      if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v))) {
+        return [lower, Number(v)];
+      }
+      return [lower, v];
+    })
+  );
+}
+
 export function evaluatePrice(
   formula: string,
   orderItem: any,

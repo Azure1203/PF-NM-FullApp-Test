@@ -6,7 +6,7 @@ import { z } from "zod";
 import multer from 'multer';
 import { parse } from 'csv-parse';
 import { parse as parseSync } from 'csv-parse/sync';
-import { evaluatePrice } from "./services/pricingEngine";
+import { evaluatePrice, gridRowToScope } from "./services/pricingEngine";
 import { generateOrdItemBlock, generateOrdHeader } from "./services/ordExporter";
 import { generateInvoicePdf, generateCustomerPackingSlipPdf, generateEliasPdf, generateInternalPackingSlipPdf, generateMJPdf, generateCutToSizePdf } from "./services/pdfGenerator";
 import { getAsanaApiInstances } from "./lib/asana";
@@ -27,7 +27,7 @@ import { buildAsanaTaskNotes, syncAsanaTaskNotes, syncAsanaOrderType } from "./a
 import { triggerManualAsanaNoteSync } from "./asanaNotesScheduler";
 import { db } from "./db";
 import { packingSlipItems, insertProductSchema, BuyoutHardwareOption, processedAsanaTasks, productGridBindings, orderItems, allmoxyProducts, attributeGridRows, attributeGrids } from "@shared/schema";
-import type { AllmoxyProduct, ProductGridBinding, AttributeGridRow } from "@shared/schema";
+import type { AllmoxyProduct, ProductGridBinding, AttributeGridRow, InsertOrderItem } from "@shared/schema";
 import { EXPORT_TYPE_OPTIONS, SUPPLY_TYPE_OPTIONS } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -728,28 +728,75 @@ export async function registerRoutes(
         isAdHoc?: boolean;
       }> = [];
 
+      // Pre-load grid rows for all bindings + ad-hoc lookups into memory cache
+      const adHocLookups = (req.body.adHocLookups ?? []) as Array<{
+        gridId: number; alias: string; lookupValue: string;
+      }>;
+      const relevantGridIds = new Set([
+        ...bindings.map(b => b.gridId),
+        ...adHocLookups.map(ah => Number(ah.gridId)).filter(Boolean),
+      ]);
+      const ftGridRowsCache = new Map<number, AttributeGridRow[]>();
+      await Promise.all(
+        [...relevantGridIds].map(async (gid) => {
+          const rows = await storage.getAttributeGridRows(gid);
+          ftGridRowsCache.set(gid, rows);
+        })
+      );
+
+      const findFtGridRow = (
+        gridId: number, lookupValue: string, rowDataColumn?: string
+      ): AttributeGridRow | undefined => {
+        const rows = ftGridRowsCache.get(gridId) ?? [];
+        const trimmed = lookupValue.trim();
+        const exact = rows.find(r => r.lookupKey === trimmed);
+        if (exact) return exact;
+        const ci = rows.find(r => r.lookupKey.trim().toLowerCase() === trimmed.toLowerCase());
+        if (ci) return ci;
+        if (rowDataColumn) {
+          const byCol = rows.find(r => {
+            const rd = r.rowData as Record<string, any>;
+            const val = rd[rowDataColumn] ?? rd[rowDataColumn.toLowerCase()] ?? rd[rowDataColumn.toUpperCase()];
+            return String(val ?? '').trim().toLowerCase() === trimmed.toLowerCase();
+          });
+          if (byCol) return byCol;
+        }
+        return rows.find(r => {
+          const rd = r.rowData as Record<string, any>;
+          return Object.values(rd).some(v => String(v ?? '').trim().toLowerCase() === trimmed.toLowerCase());
+        });
+      };
+
       for (const binding of bindings) {
         const grid = gridMap.get(binding.gridId);
         if (!grid) continue;
         const isManuCodeBinding = binding.lookupColumn.toLowerCase().includes('manu');
         const autoValue = isManuCodeBinding
           ? (product.skuPrefix || product.name || '')
-          : (product.name || '');
-        const lookupValue = String(
-          (req.body.inputs || {})[binding.lookupColumn] ||
+          : '';  // Don't auto-fill non-MANU bindings — product name never matches a color code
+        const lookupValue = (
           (req.body.gridLookups || {})[binding.alias] ||
           (req.body.gridLookups || {})[binding.lookupColumn] ||
+          (req.body.inputs || {})[binding.lookupColumn] ||
           autoValue
-        );
-        const row = lookupValue ? await storage.getAttributeGridRowByKey(binding.gridId, lookupValue, grid.keyColumn) : undefined;
-        if (row) {
-          const rawData = row.rowData as Record<string, any>;
-          contextScope[binding.alias] = Object.fromEntries(
-            Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
-          );
+        ).toString().trim();
+
+        if (!lookupValue) {
+          gridLookupResults.push({
+            alias: binding.alias,
+            gridName: grid.name,
+            lookupColumn: binding.lookupColumn,
+            lookupValue: '',
+            matched: false,
+            rowData: null,
+          });
+          continue;
         }
-        // No else — omitting alias from scope gives a clearer formula error
-        // than setting it to null (which causes "Cannot read properties of null")
+
+        const row = findFtGridRow(binding.gridId, lookupValue, grid.keyColumn);
+        if (row) {
+          contextScope[binding.alias.toLowerCase()] = gridRowToScope(row.rowData as Record<string, any>);
+        }
         gridLookupResults.push({
           alias: binding.alias,
           gridName: grid.name,
@@ -761,21 +808,15 @@ export async function registerRoutes(
       }
 
       // Ad-hoc lookups — resolve after real bindings (real bindings win on alias collision)
-      const adHocLookups = (req.body.adHocLookups ?? []) as Array<{
-        gridId: number; alias: string; lookupValue: string;
-      }>;
       for (const ah of adHocLookups) {
         const alias = ah.alias.trim();
         if (!alias || !ah.lookupValue.trim()) continue;
-        if (contextScope[alias] !== undefined) continue; // real binding wins
+        if (contextScope[alias.toLowerCase()] !== undefined) continue; // real binding wins
         const grid = gridMap.get(Number(ah.gridId));
         if (!grid) continue;
-        const row = await storage.getAttributeGridRowByKey(Number(ah.gridId), ah.lookupValue.trim(), grid.keyColumn);
+        const row = findFtGridRow(Number(ah.gridId), ah.lookupValue.trim(), grid.keyColumn);
         if (row) {
-          const rawData = row.rowData as Record<string, any>;
-          contextScope[alias] = Object.fromEntries(
-            Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
-          );
+          contextScope[alias.toLowerCase()] = gridRowToScope(row.rowData as Record<string, any>);
         }
         gridLookupResults.push({
           alias,
@@ -1857,6 +1898,7 @@ export async function registerRoutes(
             itemObjects.push(obj);
           }
         }
+        const itemBatch: InsertOrderItem[] = [];
         for (const item of itemObjects) {
           const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
           if (!sku) continue;
@@ -1870,14 +1912,19 @@ export async function registerRoutes(
             for (const binding of bindings) {
               const grid = gridMap.get(binding.gridId);
               if (!grid) continue;
-              const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
+              const col = binding.lookupColumn;
+              const lookupValue = (
+                item[col] ||
+                item[col.toLowerCase()] ||
+                item[col.toUpperCase()] ||
+                ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
+                  ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || '')
+                  : '')
+              ).toString().trim();
               if (!lookupValue) continue;
               const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
               if (row) {
-                const rawData = row.rowData as Record<string, any>;
-                contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
-                  Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
-                );
+                contextScope[binding.alias.toLowerCase()] = gridRowToScope(row.rowData as Record<string, any>);
               }
             }
           }
@@ -1915,7 +1962,7 @@ export async function registerRoutes(
           const qty = pricingItem.quantity;
           const totalPrice = unitPrice * qty;
 
-          await storage.createOrderItem({
+          itemBatch.push({
             projectId,
             fileId: file.id,
             productId: product?.id ?? null,
@@ -1935,6 +1982,7 @@ export async function registerRoutes(
           });
           totalProjectPrice += totalPrice;
         }
+        await storage.createOrderItemsBatch(itemBatch);
 
         if (file.rawContent) {
           const hwResult = await generateHardwareChecklistForFile(file.id, file.rawContent);
@@ -2436,6 +2484,7 @@ export async function registerRoutes(
         }
         // ─────────────────────────────────────────────────────────────
 
+        const itemBatch: InsertOrderItem[] = [];
         for (const item of itemObjects) {
           // Resolve SKU from common column name variants
           const sku: string = (
@@ -2459,14 +2508,19 @@ export async function registerRoutes(
             for (const binding of bindings) {
               const grid = gridMap.get(binding.gridId);
               if (!grid) continue;
-              const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
+              const col = binding.lookupColumn;
+              const lookupValue = (
+                item[col] ||
+                item[col.toLowerCase()] ||
+                item[col.toUpperCase()] ||
+                ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
+                  ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || '')
+                  : '')
+              ).toString().trim();
               if (!lookupValue) continue;
               const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
               if (row) {
-                const rawData = row.rowData as Record<string, any>;
-                contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
-                  Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
-                );
+                contextScope[binding.alias.toLowerCase()] = gridRowToScope(row.rowData as Record<string, any>);
               }
             }
           }
@@ -2516,7 +2570,7 @@ export async function registerRoutes(
           const qty = pricingItem.quantity;
           const totalPrice = unitPrice * qty;
 
-          await storage.createOrderItem({
+          itemBatch.push({
             projectId: project.id,
             fileId: orderFile.id,
             productId: product?.id ?? null,
@@ -2538,6 +2592,7 @@ export async function registerRoutes(
           totalProjectPrice += totalPrice;
           if (exportText) fileOrdText += exportText + "\n";
         }
+        await storage.createOrderItemsBatch(itemBatch);
 
         combinedOrdText += fileOrdText;
         

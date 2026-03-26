@@ -193,6 +193,7 @@ export interface IStorage {
   getProxyVariableById(id: number): Promise<ProxyVariable | undefined>;
 
   createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
+  createOrderItemsBatch(items: InsertOrderItem[]): Promise<OrderItem[]>;
   getOrderItemsByProject(projectId: number): Promise<OrderItem[]>;
   getOrderItemsByFile(fileId: number): Promise<OrderItem[]>;
   deleteOrderItemsByFile(fileId: number): Promise<void>;
@@ -1037,6 +1038,11 @@ export class DatabaseStorage implements IStorage {
   async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {
     const [created] = await db.insert(orderItems).values(item).returning();
     return created;
+  }
+
+  async createOrderItemsBatch(items: InsertOrderItem[]): Promise<OrderItem[]> {
+    if (items.length === 0) return [];
+    return await db.insert(orderItems).values(items).returning();
   }
 
   async getOrderItemsByProject(projectId: number): Promise<OrderItem[]> {

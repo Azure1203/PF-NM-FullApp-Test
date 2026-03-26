@@ -2,10 +2,10 @@ import { getAsanaApiInstances } from './lib/asana';
 import { storage } from './storage';
 import { db } from './db';
 import { processedAsanaTasks, asanaImportSyncStatus } from '@shared/schema';
-import type { AsanaImportSyncStatus, AllmoxyProduct, ProductGridBinding } from '@shared/schema';
+import type { AsanaImportSyncStatus, AllmoxyProduct, ProductGridBinding, InsertOrderItem } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { parse as parseSync } from 'csv-parse/sync';
-import { evaluatePrice } from './services/pricingEngine';
+import { evaluatePrice, gridRowToScope } from './services/pricingEngine';
 import { generateOrdItemBlock } from './services/ordExporter';
 import {
   parseCSV,
@@ -297,6 +297,7 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
               itemObjects.push(obj);
             }
           }
+          const itemBatch: InsertOrderItem[] = [];
           for (const item of itemObjects) {
             const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
             if (!sku) continue;
@@ -310,14 +311,19 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
               for (const binding of bindings) {
                 const grid = gridMap.get(binding.gridId);
                 if (!grid) continue;
-                const lookupValue = (item[binding.lookupColumn] || '').toString().trim();
+                const col = binding.lookupColumn;
+                const lookupValue = (
+                  item[col] ||
+                  item[col.toLowerCase()] ||
+                  item[col.toUpperCase()] ||
+                  ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
+                    ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || '')
+                    : '')
+                ).toString().trim();
                 if (!lookupValue) continue;
                 const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
                 if (row) {
-                  const rawData = row.rowData as Record<string, any>;
-                  contextScope[binding.alias.toLowerCase()] = Object.fromEntries(
-                    Object.entries(rawData).map(([k, v]) => [k.toLowerCase(), v])
-                  );
+                  contextScope[binding.alias.toLowerCase()] = gridRowToScope(row.rowData as Record<string, any>);
                 }
               }
             }
@@ -353,7 +359,7 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
             }
 
             const qty = pricingItem.quantity;
-            await storage.createOrderItem({
+            itemBatch.push({
               projectId: project.id,
               fileId: orderFile.id,
               productId: product?.id ?? null,
@@ -370,6 +376,7 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
               rawRowData: item,
             });
           }
+          await storage.createOrderItemsBatch(itemBatch);
         }
 
         const autoStatuses = computeAutoProductionStatuses({
