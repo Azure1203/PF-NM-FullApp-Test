@@ -81,6 +81,7 @@ function GridRowCombobox({
   testId,
   className,
   onKeyDown,
+  autoSelect,
 }: {
   gridId: number;
   value: string;
@@ -89,6 +90,7 @@ function GridRowCombobox({
   testId?: string;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent) => void;
+  autoSelect?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(value);
@@ -105,6 +107,13 @@ function GridRowCombobox({
   });
 
   useEffect(() => { setSearch(value); }, [value]);
+
+  useEffect(() => {
+    if (autoSelect && rowKeys.length > 0 && !value) {
+      onChange(rowKeys[0].lookupKey);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowKeys, autoSelect]);
 
   const filtered = rowKeys.filter(rk =>
     rk.displayLabel.toLowerCase().includes(search.toLowerCase()) ||
@@ -229,6 +238,11 @@ export default function FormulaTester() {
     queryKey: ["/api/admin/proxy-variables"],
   });
 
+  const { data: diagnostic } = useQuery<{ stats: Record<string, number> }>({
+    queryKey: ["/api/admin/pricing-diagnostic"],
+    staleTime: 60_000,
+  });
+
   const { data: bindings } = useQuery<ProductGridBinding[]>({
     queryKey: ["/api/admin/allmoxy-products", selectedProductId, "grid-bindings"],
     queryFn: async () => {
@@ -315,6 +329,26 @@ export default function FormulaTester() {
 
         <ScrollArea className="flex-1">
           <div className="p-5 space-y-6">
+            {/* Diagnostic banner — shown when pricing is not configured */}
+            {diagnostic && (
+              (diagnostic.stats.withPricingProxy === 0 || diagnostic.stats.withBindings === 0) && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-semibold">Pricing is not fully configured.</p>
+                    <p>
+                      {diagnostic.stats.withPricingProxy}/{diagnostic.stats.activeProducts} products have pricing formulas
+                      &nbsp;·&nbsp;
+                      {diagnostic.stats.withBindings}/{diagnostic.stats.activeProducts} have grid bindings.
+                    </p>
+                    <a href="/admin/diagnostic" className="underline font-medium">
+                      Go to Diagnostic Page →
+                    </a>
+                  </div>
+                </div>
+              )
+            )}
+
             {/* Product selector */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Product</label>
@@ -448,6 +482,7 @@ export default function FormulaTester() {
                             placeholder={`Search ${allGrids.find(g => g.id === binding.gridId)?.name ?? 'values'}…`}
                             testId={`input-lookup-${binding.alias}`}
                             onKeyDown={handleKeyDown}
+                            autoSelect
                           />
                         )}
                         <p className="text-[10px] text-muted-foreground">
