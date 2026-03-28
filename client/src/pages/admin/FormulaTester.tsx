@@ -44,7 +44,7 @@ import {
   Trash2,
   ChevronsUpDown,
 } from "lucide-react";
-import type { AllmoxyProduct, ProductGridBinding, AttributeGrid } from "@shared/schema";
+import type { AllmoxyProduct, ProductGridBinding, AttributeGrid, ProxyVariable } from "@shared/schema";
 
 type GridLookupResult = {
   alias: string;
@@ -179,6 +179,24 @@ function GridRowCombobox({
   );
 }
 
+function formatPricingError(error: string): React.ReactNode {
+  const undefinedMatch = error.match(/Undefined symbol\s+"?([a-zA-Z_][a-zA-Z0-9_]*)"?/);
+  if (undefinedMatch) {
+    const sym = undefinedMatch[1];
+    return (
+      <div className="space-y-2">
+        <p className="font-mono text-sm">{error}</p>
+        <div className="text-sm bg-red-100 dark:bg-red-950/40 rounded p-3 space-y-1.5 border border-red-200 dark:border-red-900">
+          <p>The formula references <code className="font-mono font-bold">{sym}.*</code> but no grid binding with alias <code className="font-mono font-bold">{sym}</code> exists for this product.</p>
+          <p className="text-muted-foreground">Go to <strong className="text-foreground">Allmoxy Products</strong> → select this product → add a grid binding with alias <code className="font-mono">{sym}</code>.</p>
+          <p className="text-muted-foreground">Or use <a href="/admin/diagnostic" className="underline font-medium text-primary">Auto-Create Bindings</a> to generate all missing bindings at once.</p>
+        </div>
+      </div>
+    );
+  }
+  return <p className="font-mono text-sm">{error}</p>;
+}
+
 export default function FormulaTester() {
   const { toast } = useToast();
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -205,6 +223,10 @@ export default function FormulaTester() {
       console.log("[FormulaTester] allGrids loaded:", data.length, data.map(g => g.name));
       return data;
     },
+  });
+
+  const { data: proxyVars = [] } = useQuery<ProxyVariable[]>({
+    queryKey: ["/api/admin/proxy-variables"],
   });
 
   const { data: bindings } = useQuery<ProductGridBinding[]>({
@@ -322,6 +344,53 @@ export default function FormulaTester() {
                   This product has no pricing formula assigned. Assign a Pricing Proxy Variable first.
                 </div>
               )}
+
+              {/* Binding status checklist */}
+              {selectedProduct && selectedProduct.pricingProxyId && bindings !== undefined && (() => {
+                const proxy = proxyVars.find(v => v.id === selectedProduct.pricingProxyId);
+                if (!proxy) return null;
+                const nonAliases = new Set(['math', 'number', 'string', 'object', 'array', 'json', 'console']);
+                const aliasRefs = [...new Set(
+                  [...proxy.formula.toLowerCase().matchAll(/([a-z_][a-z0-9_]*)\./g)]
+                    .map(m => m[1])
+                    .filter(a => !nonAliases.has(a))
+                )].sort();
+                if (aliasRefs.length === 0) return null;
+                const boundAliases = new Set(bindings.map(b => b.alias.toLowerCase()));
+                const missingCount = aliasRefs.filter(a => !boundAliases.has(a)).length;
+                return (
+                  <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+                    <div className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+                      <span>Grid Binding Status</span>
+                      {missingCount > 0 && (
+                        <a href="/admin/diagnostic" className="text-primary underline underline-offset-2">
+                          Auto-fix →
+                        </a>
+                      )}
+                    </div>
+                    {aliasRefs.map(alias => {
+                      const binding = bindings.find(b => b.alias.toLowerCase() === alias);
+                      const grid = allGrids.find(g => g.id === binding?.gridId);
+                      return (
+                        <div key={alias} className="flex items-start gap-2 text-xs">
+                          {binding
+                            ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                            : <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />}
+                          <div className="min-w-0">
+                            <code className="font-mono font-medium">{alias}</code>
+                            {binding && grid && (
+                              <span className="text-muted-foreground ml-1.5">→ {grid.name}</span>
+                            )}
+                            {!binding && (
+                              <span className="text-red-500 font-medium ml-1.5">NOT BOUND — pricing will fail</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Dimensions */}
@@ -554,9 +623,9 @@ export default function FormulaTester() {
                       <XCircle className="h-5 w-5" />
                       Pricing Error
                     </div>
-                    <p className="text-sm text-red-600 dark:text-red-400 font-mono bg-red-100 dark:bg-red-950/40 rounded p-2">
-                      {result.pricingError}
-                    </p>
+                    <div className="text-red-600 dark:text-red-400">
+                      {formatPricingError(result.pricingError)}
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-1">

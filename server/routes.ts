@@ -884,6 +884,230 @@ export async function registerRoutes(
     }
   });
 
+  // ── Pricing Diagnostic ────────────────────────────────────────────────────
+  app.get('/api/admin/pricing-diagnostic', isAuthenticated, async (req, res) => {
+    try {
+      const allProducts = await storage.getAllmoxyProducts();
+      const allBindings = await storage.getAllProductGridBindings();
+      const allProxyVars = await storage.getProxyVariables();
+      const allGrids = await storage.getAttributeGrids();
+
+      const bindingsByProduct = new Map<number, ProductGridBinding[]>();
+      for (const b of allBindings) {
+        const list = bindingsByProduct.get(b.productId) ?? [];
+        list.push(b);
+        bindingsByProduct.set(b.productId, list);
+      }
+
+      const proxyMap = new Map(allProxyVars.map(v => [v.id, v]));
+      const gridMap = new Map(allGrids.map(g => [g.id, g]));
+
+      const issues: Array<{
+        productId: number;
+        productName: string;
+        skuPrefix: string | null;
+        issue: string;
+        severity: 'error' | 'warning';
+      }> = [];
+
+      const stats = {
+        totalProducts: allProducts.length,
+        activeProducts: 0,
+        withSkuPrefix: 0,
+        withPricingProxy: 0,
+        withExportProxy: 0,
+        withBindings: 0,
+        withNoBindings: 0,
+        totalBindings: allBindings.length,
+        totalProxyVars: allProxyVars.length,
+        totalGrids: allGrids.length,
+        pricingProxies: allProxyVars.filter(v => v.type === 'pricing').length,
+        exportProxies: allProxyVars.filter(v => v.type === 'export').length,
+      };
+
+      const nonAliases = new Set(['math', 'number', 'string', 'object', 'array', 'json', 'console']);
+
+      for (const product of allProducts) {
+        if (product.status !== 'active') continue;
+        stats.activeProducts++;
+
+        if (!product.skuPrefix) {
+          issues.push({ productId: product.id, productName: product.name, skuPrefix: null, issue: 'No SKU prefix — will never match a CSV line item', severity: 'error' });
+          continue;
+        }
+        stats.withSkuPrefix++;
+
+        if (!product.pricingProxyId) {
+          issues.push({ productId: product.id, productName: product.name, skuPrefix: product.skuPrefix, issue: 'No pricing formula assigned (pricingProxyId is null)', severity: 'error' });
+        } else {
+          stats.withPricingProxy++;
+          const proxy = proxyMap.get(product.pricingProxyId);
+          if (proxy) {
+            const formulaText = proxy.formula.toLowerCase();
+            const bindings = bindingsByProduct.get(product.id) ?? [];
+            const boundAliases = new Set(bindings.map(b => b.alias.toLowerCase()));
+            const aliasRefs = [...formulaText.matchAll(/([a-z_][a-z0-9_]*)\./g)].map(m => m[1]);
+            for (const ref of new Set(aliasRefs)) {
+              if (nonAliases.has(ref)) continue;
+              if (!boundAliases.has(ref)) {
+                issues.push({ productId: product.id, productName: product.name, skuPrefix: product.skuPrefix, issue: `Formula references "${ref}.*" but no grid binding with alias "${ref}" exists`, severity: 'error' });
+              }
+            }
+          }
+        }
+
+        if (!product.exportProxyId) {
+          issues.push({ productId: product.id, productName: product.name, skuPrefix: product.skuPrefix ?? null, issue: 'No export formula assigned (exportProxyId is null)', severity: 'warning' });
+        } else {
+          stats.withExportProxy++;
+        }
+
+        const bindings = bindingsByProduct.get(product.id) ?? [];
+        if (bindings.length > 0) {
+          stats.withBindings++;
+          for (const b of bindings) {
+            if (!gridMap.has(b.gridId)) {
+              issues.push({ productId: product.id, productName: product.name, skuPrefix: product.skuPrefix ?? null, issue: `Binding alias "${b.alias}" references grid ID ${b.gridId} which does not exist`, severity: 'error' });
+            }
+          }
+        } else {
+          stats.withNoBindings++;
+        }
+      }
+
+      const errorCount = issues.filter(i => i.severity === 'error').length;
+      const warningCount = issues.filter(i => i.severity === 'warning').length;
+      res.json({ stats, errorCount, warningCount, issues: issues.slice(0, 300), totalIssues: issues.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── Auto-Create Grid Bindings ─────────────────────────────────────────────
+  app.post('/api/admin/auto-create-bindings', isAuthenticated, async (req, res) => {
+    try {
+      const { dryRun = true } = req.body;
+      const allProducts = await storage.getAllmoxyProducts();
+      const allBindings = await storage.getAllProductGridBindings();
+      const allProxyVars = await storage.getProxyVariables();
+      const allGrids = await storage.getAttributeGrids();
+
+      const proxyMap = new Map(allProxyVars.map(v => [v.id, v]));
+      const gridNameMap = new Map<string, typeof allGrids[0]>();
+      for (const g of allGrids) {
+        gridNameMap.set(g.name.toLowerCase(), g);
+        const noDate = g.name.replace(/_\d{8}$/, '').toLowerCase();
+        gridNameMap.set(noDate, g);
+      }
+
+      const aliasToGridPatterns: Record<string, string[]> = {
+        'shelves':                ['shelves', 'shelf'],
+        'divider_panels':         ['divider_panels', 'divider'],
+        'floor_panels':           ['floor_panels', 'floor_panel'],
+        'wall_panels':            ['wall_panels', 'wall_panel'],
+        'corner_shelves':         ['corner_shelves', 'corner_shelf'],
+        'outside_corner_shelves': ['outside_corner_shelves', 'outside_corner'],
+        'island_panels':          ['island_panels', 'island_panel'],
+        'garage_panels':          ['garage_panels', 'garage_panel'],
+        'product_parts':          ['product_parts', 'parts'],
+        'parts':                  ['product_parts', 'parts'],
+        'doors':                  ['doors', 'door'],
+        'drawer_fronts':          ['drawer_fronts', 'drawer_front'],
+        'drawer_boxes':           ['drawer_boxes', 'drawer_box'],
+        'moldings':               ['moldings', 'molding'],
+        'handles':                ['handles', 'handle'],
+        'hinges':                 ['hinges', 'hinge'],
+        'slides':                 ['slides', 'slide'],
+        'closet_rod':             ['closet_rod', 'closet_rods'],
+        'closet_accessories':     ['closet_accessories', 'closet_accessory'],
+        'closet_led_lighting':    ['closet_led_lighting', 'closet_led'],
+        'door_drawer_locks':      ['door_drawer_locks', 'door_drawer_lock'],
+        'floating_shelf_hardware':['floating_shelf_hardware'],
+        'garage_accessories':     ['garage_accessories', 'garage_accessory'],
+        'hanging_rails_hardware': ['hanging_rail', 'hanging_rails'],
+        'hardware':               ['hardware'],
+        'jigs_tools':             ['jigs_tools', 'jigs__tools', 'jigs'],
+        'office_accessories':     ['office_accessories', 'office_accessory'],
+        'touch_up_sticks':        ['touch_up_sticks', 'touch_up'],
+        'glass':                  ['glass'],
+        'color':                  ['main_color_attribute', 'main_color', 'color'],
+        'mj_doors':               ['mj_doors', 'mj_door'],
+        'mj_colors':              ['mj_colors', 'mj_color'],
+        'richelieu_doors':        ['richelieu_doors', 'richelieu_door'],
+        'richelieu_colors':       ['richelieu_colors', 'richelieu_color'],
+        'edgebanding':            ['edgebanding', 'edgebanding_options'],
+      };
+
+      const colorAliases = new Set(['color', 'mj_colors', 'richelieu_colors', 'edgebanding']);
+
+      function findGridForAlias(alias: string): typeof allGrids[0] | undefined {
+        const patterns = aliasToGridPatterns[alias] ?? [alias];
+        for (const pattern of patterns) {
+          for (const [key, grid] of gridNameMap) {
+            if (key.includes(pattern)) return grid;
+          }
+        }
+        return undefined;
+      }
+
+      const existingBindingSet = new Set(
+        allBindings.map(b => `${b.productId}:${b.gridId}:${b.alias.toLowerCase()}`)
+      );
+
+      const toCreate: Array<{ productId: number; productName: string; gridId: number; gridName: string; alias: string; lookupColumn: string }> = [];
+      const skipped: string[] = [];
+      const nonAliases = new Set(['math', 'number', 'string', 'object', 'array', 'json', 'console']);
+
+      for (const product of allProducts) {
+        if (product.status !== 'active' || !product.pricingProxyId) continue;
+        const proxy = proxyMap.get(product.pricingProxyId);
+        if (!proxy) continue;
+
+        const aliasRefs = new Set(
+          [...proxy.formula.toLowerCase().matchAll(/([a-z_][a-z0-9_]*)\./g)].map(m => m[1])
+        );
+        if (product.exportProxyId) {
+          const ep = proxyMap.get(product.exportProxyId);
+          if (ep) {
+            [...ep.formula.toLowerCase().matchAll(/([a-z_][a-z0-9_]*)\./g)]
+              .forEach(m => aliasRefs.add(m[1]));
+          }
+        }
+
+        for (const alias of aliasRefs) {
+          if (nonAliases.has(alias)) continue;
+          const grid = findGridForAlias(alias);
+          if (!grid) {
+            skipped.push(`${product.name}: alias "${alias}" — no matching grid`);
+            continue;
+          }
+          const key = `${product.id}:${grid.id}:${alias}`;
+          if (existingBindingSet.has(key)) continue;
+          const lookupColumn = colorAliases.has(alias) ? 'Material' : 'MANU_CODE';
+          toCreate.push({ productId: product.id, productName: product.name, gridId: grid.id, gridName: grid.name, alias, lookupColumn });
+          existingBindingSet.add(key);
+        }
+      }
+
+      if (!dryRun) {
+        let created = 0;
+        for (const binding of toCreate) {
+          try {
+            await storage.createProductGridBinding({ productId: binding.productId, gridId: binding.gridId, alias: binding.alias, lookupColumn: binding.lookupColumn });
+            created++;
+          } catch (e: any) {
+            skipped.push(`${binding.productName}: ${binding.alias} → ${e.message}`);
+          }
+        }
+        res.json({ dryRun: false, created, wouldCreate: toCreate.length, skipped, sample: toCreate.slice(0, 20) });
+      } else {
+        res.json({ dryRun: true, wouldCreate: toCreate.length, skipped, sample: toCreate.slice(0, 50) });
+      }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/upload-allmoxy-products', isAuthenticated, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });

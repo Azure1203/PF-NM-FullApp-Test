@@ -11,6 +11,7 @@ import {
   Users,
   Settings,
   ImagePlus,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ const navItems = [
       { name: "Attribute Grids", href: "/admin/attribute-grids", icon: Grid3X3 },
       { name: "Proxy Variables", href: "/admin/proxy-variables", icon: Code },
       { name: "Formula Tester", href: "/admin/formula-tester", icon: FlaskConical },
+      { name: "Pricing Diagnostic", href: "/admin/diagnostic", icon: Zap },
       { name: "Settings", href: "/admin/settings", icon: Settings },
       { name: "Users", href: "/admin/users", icon: Users },
     ]

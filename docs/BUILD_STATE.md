@@ -42,8 +42,9 @@ and produces all downstream documents needed for production, shipping, and suppl
 | `/admin/allmoxy-products` | Allmoxy Product Manager | Full CRUD for products, images, category, formula assignments |
 | `/admin/attribute-grids` | Attribute Grid Manager | Import grids from CSV, edit rows, manage product-grid bindings |
 | `/admin/proxy-variables` | Proxy Variable Manager | Create/edit/delete formula variables, live preview |
-| `/admin/formula-tester` | Formula Tester | Test any formula with a custom scope, live result |
+| `/admin/formula-tester` | Formula Tester | Test any formula with a custom scope, live result — binding status panel, better error messages |
 | `/admin/product-images` | Bulk Image Uploader | Match + upload images to products by filename (batched, progress bar) |
+| `/admin/diagnostic` | Pricing Diagnostic | Health check: stats, issue list, auto-create missing grid bindings |
 | `/admin/settings` | ORD Settings | Cabinet Vision header template configuration |
 | `/admin/users` | Admin Users | Allowed-users whitelist management |
 | `/how-it-works` | How It Works | Internal documentation page |
