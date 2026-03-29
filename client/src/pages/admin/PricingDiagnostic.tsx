@@ -26,6 +26,7 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
+  RotateCcw,
   Wand2,
   XCircle,
   Zap,
@@ -125,13 +126,26 @@ export default function PricingDiagnostic() {
   const applyMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/admin/auto-create-bindings", { dryRun: false });
-      return res.json() as Promise<BindingResult>;
+      return res.json() as Promise<BindingResult & { deleted?: number }>;
     },
     onSuccess: (data) => {
       setBindingResult(data);
       toast({ title: "Bindings created", description: `Created ${data.created} bindings`, variant: "default" });
     },
     onError: (e: Error) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/auto-create-bindings", { dryRun: false, reset: true });
+      return res.json() as Promise<BindingResult & { deleted?: number }>;
+    },
+    onSuccess: (data) => {
+      setBindingResult(data);
+      const d = (data as any).deleted ?? 0;
+      toast({ title: "Reset & Recreate complete", description: `Deleted ${d} old bindings, created ${data.created} new bindings` });
+    },
+    onError: (e: Error) => toast({ title: "Reset failed", description: e.message, variant: "destructive" }),
   });
 
   const filteredIssues = diagResult?.issues.filter(i =>
@@ -241,7 +255,7 @@ export default function PricingDiagnostic() {
                   <Button
                     data-testid="button-apply-bindings"
                     onClick={() => applyMutation.mutate()}
-                    disabled={applyMutation.isPending}
+                    disabled={applyMutation.isPending || resetMutation.isPending}
                   >
                     {applyMutation.isPending
                       ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -249,6 +263,18 @@ export default function PricingDiagnostic() {
                     Create {bindingResult.wouldCreate} Bindings
                   </Button>
                 )}
+                <Button
+                  data-testid="button-reset-recreate"
+                  variant="destructive"
+                  onClick={() => resetMutation.mutate()}
+                  disabled={resetMutation.isPending || applyMutation.isPending || dryRunMutation.isPending}
+                  title="Delete all auto-created bindings and recreate them fresh. Fixes wrong-grid matches."
+                >
+                  {resetMutation.isPending
+                    ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    : <RotateCcw className="h-4 w-4 mr-2" />}
+                  Reset & Recreate
+                </Button>
               </div>
             </div>
 
@@ -258,7 +284,7 @@ export default function PricingDiagnostic() {
                 <div className={`rounded-md p-3 text-sm flex items-center gap-2 ${bindingResult.dryRun ? "bg-blue-50 dark:bg-blue-950/20 border border-blue-200" : "bg-green-50 dark:bg-green-950/20 border border-green-200"}`}>
                   {bindingResult.dryRun
                     ? <><RefreshCw className="h-4 w-4 text-blue-500 shrink-0" /> <span><strong>Dry run:</strong> Would create {bindingResult.wouldCreate} bindings. Click "Create {bindingResult.wouldCreate} Bindings" to apply.</span></>
-                    : <><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" /> <span><strong>Done:</strong> Created {bindingResult.created} bindings successfully.</span></>}
+                    : <><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" /> <span><strong>Done:</strong>{(bindingResult as any).deleted ? ` Deleted ${(bindingResult as any).deleted} old bindings,` : ''} Created {bindingResult.created} new bindings successfully.</span></>}
                 </div>
 
                 {/* Sample table */}

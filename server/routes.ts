@@ -951,6 +951,19 @@ export async function registerRoutes(
               if (nonAliases.has(ref)) continue;
               if (!boundAliases.has(ref)) {
                 issues.push({ productId: product.id, productName: product.name, skuPrefix: product.skuPrefix, issue: `Formula references "${ref}.*" but no grid binding with alias "${ref}" exists`, severity: 'error' });
+              } else {
+                // Check that the binding points to a sensible grid (wrong-grid detection)
+                const productBindings = bindingsByProduct.get(product.id) ?? [];
+                const binding = productBindings.find(b => b.alias.toLowerCase() === ref);
+                if (binding) {
+                  const grid = gridMap.get(binding.gridId);
+                  if (grid) {
+                    const gridNorm = grid.name.toLowerCase().replace(/\s+/g, '_');
+                    if (ref === 'color' && gridNorm.includes('mj_color')) {
+                      issues.push({ productId: product.id, productName: product.name, skuPrefix: product.skuPrefix, issue: `Binding "color" → "${grid.name}" — likely wrong grid. Should point to "Main Color Attribute", not "MJ Colors". Run Reset & Recreate on Diagnostic page.`, severity: 'error' });
+                    }
+                  }
+                }
               }
             }
           }
@@ -986,18 +999,54 @@ export async function registerRoutes(
   // ── Auto-Create Grid Bindings ─────────────────────────────────────────────
   app.post('/api/admin/auto-create-bindings', isAuthenticated, async (req, res) => {
     try {
-      const { dryRun = true } = req.body;
+      const { dryRun = true, reset = false } = req.body;
       const allProducts = await storage.getAllmoxyProducts();
-      const allBindings = await storage.getAllProductGridBindings();
       const allProxyVars = await storage.getProxyVariables();
       const allGrids = await storage.getAttributeGrids();
 
+      // Reset mode: delete bindings whose alias matches a known auto-create pattern
+      // before re-running. This clears wrong bindings from previous (broken) runs.
+      let deletedCount = 0;
+      if (reset && !dryRun) {
+        const allCurrentBindings = await storage.getAllProductGridBindings();
+        const knownAliases = new Set(Object.keys({
+          shelves: 1, divider_panels: 1, floor_panels: 1, wall_panels: 1,
+          corner_shelves: 1, outside_corner_shelves: 1, island_panels: 1,
+          garage_panels: 1, product_parts: 1, parts: 1, doors: 1,
+          drawer_fronts: 1, drawer_boxes: 1, moldings: 1, handles: 1,
+          hinges: 1, slides: 1, closet_rod: 1, closet_accessories: 1,
+          closet_led_lighting: 1, door_drawer_locks: 1, floating_shelf_hardware: 1,
+          garage_accessories: 1, hanging_rails_hardware: 1, hardware: 1,
+          jigs_tools: 1, office_accessories: 1, touch_up_sticks: 1, glass: 1,
+          color: 1, mj_doors: 1, mj_colors: 1, richelieu_doors: 1,
+          richelieu_colors: 1, edgebanding: 1,
+        }));
+        const toDelete = allCurrentBindings.filter(b => knownAliases.has(b.alias.toLowerCase()));
+        for (const b of toDelete) {
+          await storage.deleteProductGridBinding(b.id);
+          deletedCount++;
+        }
+        console.log(`[auto-create-bindings] Reset: deleted ${deletedCount} auto-created bindings`);
+      }
+
+      const allBindings = reset && !dryRun ? [] : await storage.getAllProductGridBindings();
+
       const proxyMap = new Map(allProxyVars.map(v => [v.id, v]));
+
+      // Build gridNameMap with multiple normalized keys per grid so that
+      // space-separated names ("Main Color Attribute 02202026") and
+      // underscore-separated patterns ("main_color_attribute") both match.
       const gridNameMap = new Map<string, typeof allGrids[0]>();
       for (const g of allGrids) {
-        gridNameMap.set(g.name.toLowerCase(), g);
-        const noDate = g.name.replace(/_\d{8}$/, '').toLowerCase();
-        gridNameMap.set(noDate, g);
+        const lower = g.name.toLowerCase();
+        // Strip trailing date suffix (space or underscore separator before 8 digits)
+        const noDate = g.name.replace(/[\s_]?\d{8}$/, '').trim();
+        const noDateLower = noDate.toLowerCase();
+        // Register 4 variants: original + no-date, each with spaces and with underscores
+        gridNameMap.set(lower, g);
+        gridNameMap.set(lower.replace(/\s+/g, '_'), g);
+        gridNameMap.set(noDateLower, g);
+        gridNameMap.set(noDateLower.replace(/\s+/g, '_'), g);
       }
 
       const aliasToGridPatterns: Record<string, string[]> = {
@@ -1043,8 +1092,13 @@ export async function registerRoutes(
       function findGridForAlias(alias: string): typeof allGrids[0] | undefined {
         const patterns = aliasToGridPatterns[alias] ?? [alias];
         for (const pattern of patterns) {
+          // Normalize pattern: replace spaces with underscores for comparison
+          const normPattern = pattern.replace(/\s+/g, '_').toLowerCase();
           for (const [key, grid] of gridNameMap) {
-            if (key.includes(pattern)) return grid;
+            // Normalize key too — the map already has underscore variants stored,
+            // but extra normalization here is a safety net
+            const normKey = key.replace(/\s+/g, '_').toLowerCase();
+            if (normKey.includes(normPattern)) return grid;
           }
         }
         return undefined;
@@ -1099,7 +1153,7 @@ export async function registerRoutes(
             skipped.push(`${binding.productName}: ${binding.alias} → ${e.message}`);
           }
         }
-        res.json({ dryRun: false, created, wouldCreate: toCreate.length, skipped, sample: toCreate.slice(0, 20) });
+        res.json({ dryRun: false, created, deleted: deletedCount, wouldCreate: toCreate.length, skipped, sample: toCreate.slice(0, 20) });
       } else {
         res.json({ dryRun: true, wouldCreate: toCreate.length, skipped, sample: toCreate.slice(0, 50) });
       }
