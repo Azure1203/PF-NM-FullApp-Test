@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-03-26 (r8) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-03-29 (r10b) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -192,17 +192,22 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r4)
+## What's Working End-to-End (as of r10b)
 
 - [x] CSV upload → order items created (fixed r4 — header-aware parsing)
+- [x] Multi-file CSV upload → single project with all files merged
 - [x] SKU prefix matching → product resolved per line item
 - [x] mathjs pricing engine → unit price computed per line item
-- [x] Fast pipeline — O(1) in-memory lookups, no sequential DB queries (fixed r4)
+- [x] Proxy variables pre-computed into formula scope (r5)
+- [x] Grid row cache in all three pipeline locations — O(1) in-memory lookups (r5)
+- [x] Fast pipeline — no sequential DB queries (fixed r4)
 - [x] All output documents downloadable from Order Details page
+- [x] Re-run Pricing button on Order Details — reprices all items, shows ✅/⚠/$0 badges per item
 - [x] Allmoxy Product Manager — full CRUD, image upload/clear, category, formula assignment
-- [x] Attribute Grid Manager — CSV import, row editing, product binding management
+- [x] Attribute Grid Manager — CSV import, row editing, product binding management (Rows + Bindings tabs)
 - [x] Proxy Variable Manager — formula CRUD, live preview
-- [x] Formula Tester — live sandbox
+- [x] Formula Tester — live sandbox with: binding status panel, searchable color/grid dropdowns (auto-select first value), better error messages, diagnostic banner
+- [x] Ad-hoc grid lookups in Formula Tester — test any grid without a configured binding
 - [x] Bulk image uploader — matches 2,363 products by filename, batched with progress
 - [x] Product list endpoints — no `imageData` in list queries (fixed r4 — no more timeout)
 - [x] Asana sync — background scheduler, task creation/update, dedup
@@ -213,6 +218,7 @@ CHANGELOG.md                        Per-release fix log
 - [x] CTS parts page
 - [x] Pallet management
 - [x] Dark mode, responsive layout, sidebar navigation
+- [x] Pricing Diagnostic page — health check stats, issue list, auto-create bindings (dry-run → confirm), Reset & Recreate (fixes wrong-grid bindings)
 
 ---
 
@@ -231,6 +237,31 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r10b — 2026-03-29
+**Fix (critical):** Grid name matching bug in `auto-create-bindings` endpoint — alias patterns like `main_color_attribute` were failing to match grid names with spaces (`Main Color Attribute 02202026`), causing the `color` alias to fall through to `mj_colors` (wrong grid). Fixed by storing 4 normalized variants per grid in `gridNameMap` and normalizing both sides to underscores before `includes()` comparison. Also fixed date-suffix stripping regex to handle space-separated dates.
+**Feature:** `reset: true` parameter on auto-create-bindings — deletes all existing auto-created bindings (by known alias list) before recreating fresh. Clears ~1,790 wrong bindings from previous broken runs.
+**Feature:** Wrong-grid detection in pricing diagnostic — explicitly flags `color` bindings pointing to MJ Colors grid as errors.
+**Feature:** "Reset & Recreate Bindings" (destructive red) button on Pricing Diagnostic page — runs delete + recreate in one shot, shows deleted/created counts.
+
+### r10 — 2026-03-28
+**Feature:** Formula Tester auto-select — non-MANU grid bindings (color, material, etc.) now auto-select the first available row key when a product is chosen; `autoSelect` prop added to `GridRowCombobox`.
+**Feature:** Formula Tester diagnostic banner — on page load, fetches pricing diagnostic stats; shows amber warning when `withPricingProxy` or `withBindings` is 0, with link to Diagnostic page.
+
+### r9 — 2026-03-28
+**Feature:** `GET /api/admin/pricing-diagnostic` — full health check across all active products; returns stats (6+4 cards) + per-product issue list (severity: error/warning) + formula-alias cross-reference.
+**Feature:** `POST /api/admin/auto-create-bindings` (with `dryRun` support) — analyzes product pricing/export formulas for alias refs, maps to grids via `aliasToGridPatterns` dictionary (50+ patterns), creates missing `ProductGridBinding` rows. Color-type aliases use `lookupColumn: 'Material'`; all others use `MANU_CODE`. Idempotent.
+**Feature:** Pricing Diagnostic page (`/admin/diagnostic`) — stats grid, severity-filtered issue table, dry-run → confirm binding creation flow with sample table + skipped list collapsibles.
+**Feature:** Formula Tester binding status panel — shows ✅/❌ per alias referenced in pricing formula vs. bound grids; `formatPricingError()` parses "Undefined symbol" errors with contextual guidance.
+**Nav:** "Pricing Diagnostic" added to admin sidebar (Zap icon).
+
+### r8 — 2026-03-26
+**Fix (Bug 2):** Non-MANU bindings in formula-test endpoint incorrectly used `autoValue = skuPrefix`; changed to empty string so the grid lookup uses the user-supplied `gridLookups[alias]` value.
+**Fix (Bug 3):** Case-insensitive fallback column matching added to `findGridRowInCache` in all three pipeline locations (upload, reprice, Asana scheduler) — `divider_panels.BASE_PRICE` now resolves when formula says `divider_panels.base_price`.
+**Fix (Bug 4):** Batch insert for order items — `createOrderItemsBatch()` added to storage interface + implementation; all three pipeline locations now accumulate items in an array and bulk-insert after the loop instead of one-by-one.
+**Fix (Bug 5):** Replaced all inline `Object.fromEntries(Object.entries(rawData).map(...))` with `gridRowToScope()` helper — normalizes all rowData keys to lowercase AND coerces numeric strings to numbers.
+**Feature:** `gridRowToScope()` helper added to `pricingEngine.ts`.
+**Feature:** Formula Tester combobox for non-MANU bindings — `GridRowCombobox` component uses `GET /api/admin/attribute-grids/:id/row-keys` endpoint; replaces free-text input with searchable popover dropdown; ad-hoc lookups also use it.
 
 ### r6 — 2026-03-21
 **Fix:** `stripComments` now collapses internal whitespace — multi-line formulas with newlines before `?` or branches no longer throw "Syntax error (char N)"

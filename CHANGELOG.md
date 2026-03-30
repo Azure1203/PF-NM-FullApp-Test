@@ -1,6 +1,102 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-22 (r7)
+> Last updated: 2026-03-29 (r10b)
+
+---
+
+## r10b — 2026-03-29 — Grid-Name Matching Fix + Reset & Recreate
+
+### Fix (critical): Wrong-grid bindings from `auto-create-bindings`
+**Root cause:** `findGridForAlias` compared underscore-pattern strings like `main_color_attribute` against database grid names with spaces (`Main Color Attribute 02202026`). The substring match always failed. The `color` alias then fell through to the generic `'color'` fallback which matched `mj colors 02202026` (contains "color") — binding every product to the MJ Colors grid instead of Main Color Attribute. MJ Colors has completely different columns, so all pricing formulas that reference `color.sqft_price`, `color.level_percent_upcharge`, etc. failed.
+
+**Fix — `server/routes.ts` auto-create-bindings endpoint:**
+- `gridNameMap` now stores **4 normalized variants** per grid: original lowercase, underscore-normalized, date-stripped, and date-stripped + underscore-normalized
+- Date-suffix regex changed from `/_\d{8}$/` to `/[\s_]?\d{8}$/` — handles both space-separated (`Main Color Attribute 02202026`) and underscore-separated (`Main_Color_Attribute_02202026`) dates
+- `findGridForAlias` normalizes the alias pattern to underscores before comparing: `const normPattern = pattern.replace(/\s+/g, '_').toLowerCase()` — `main_color_attribute` now correctly resolves to `Main Color Attribute 02202026`
+
+### Feature: `reset: true` parameter on auto-create-bindings
+- `POST /api/admin/auto-create-bindings` now accepts `{ dryRun: false, reset: true }`
+- Deletes all existing bindings whose alias matches the known auto-create alias list before recreating
+- Response includes `deleted: N` count alongside `created: N`
+- Clears the ~1,790 wrong `color` bindings from previous broken runs
+
+### Feature: Wrong-grid detection in pricing diagnostic
+- After confirming a binding exists for an alias, now also checks if `color` alias points to a grid with `mj_color` in the normalized name
+- If so, adds an error issue: `Binding "color" → "<grid>" — likely wrong grid. Should point to "Main Color Attribute". Run Reset & Recreate.`
+
+### Feature: "Reset & Recreate Bindings" button on Pricing Diagnostic page
+- Destructive red button — always visible, no dry-run required
+- Calls `{ dryRun: false, reset: true }` and shows toast: "Deleted N old, Created N new bindings"
+- Result summary banner updated to show deleted count when present
+- Added `RotateCcw` icon import
+
+---
+
+## r10 — 2026-03-28 — Formula Tester Auto-Select + Diagnostic Banner
+
+### Feature: Auto-select first grid value for non-MANU bindings
+- `GridRowCombobox` in `FormulaTester.tsx` now accepts `autoSelect?: boolean` prop
+- When `autoSelect` is true, fires `onChange(rowKeys[0].lookupKey)` as soon as row keys load and the current value is empty
+- Non-MANU bindings (color, material, etc.) in the binding section pass `autoSelect` — no need to manually open the dropdown before running a test
+
+### Feature: Diagnostic banner on Formula Tester page
+- `GET /api/admin/pricing-diagnostic` fetched on page load with `staleTime: 60s`
+- When `withPricingProxy === 0` or `withBindings === 0`, shows amber banner: "Pricing is not fully configured. X/Y products have pricing formulas · X/Y have grid bindings. Go to Diagnostic Page →"
+
+---
+
+## r9 — 2026-03-28 — Pricing Diagnostic + Auto-Create Bindings
+
+### Feature: `GET /api/admin/pricing-diagnostic`
+Full health check across all active products. Returns:
+- Stats: totalProducts, activeProducts, withSkuPrefix, withPricingProxy, withExportProxy, withBindings, withNoBindings, totalBindings, totalProxyVars, totalGrids, pricingProxies, exportProxies
+- Per-product issue list with severity (error/warning), capped at 300 issues
+- Formula-alias cross-reference — detects aliases referenced in pricing formula that have no binding
+
+### Feature: `POST /api/admin/auto-create-bindings` (with dry-run)
+- Extracts all alias references (`word.`) from each product's pricing + export proxy formulas
+- Maps aliases to grids via `aliasToGridPatterns` dictionary (35+ aliases, 50+ patterns)
+- Color-type aliases (`color`, `mj_colors`, `richelieu_colors`, `edgebanding`) use `lookupColumn: 'Material'`; all others use `MANU_CODE`
+- `dryRun: true` (default) returns preview without writing; `dryRun: false` creates missing bindings
+- Idempotent — existing `productId:gridId:alias` combos skipped
+
+### Feature: Pricing Diagnostic page (`/admin/diagnostic`)
+- 6+4 stats cards (active/SKU/formula/binding/error counts)
+- Summary callout with assessment (all OK vs. N issues)
+- Severity filter (All / Errors / Warnings) on issue table
+- Auto-Create Bindings panel: Dry Run → review sample table + skipped collapsibles → Confirm button
+
+### Feature: Formula Tester binding status panel
+- After selecting a product, extracts alias refs from pricing formula
+- Shows ✅/❌ per alias vs. bound grids; links to Diagnostic page for missing ones
+- `formatPricingError()` parses "Undefined symbol X" errors → contextual explanation with fix link
+
+### Nav: "Pricing Diagnostic" added to admin sidebar (Zap icon)
+
+---
+
+## r8 — 2026-03-26 — Pipeline Fixes + Formula Tester Combobox
+
+### Fix (Bug 2): Non-MANU binding `autoValue` was wrong in formula-test endpoint
+- Was passing `autoValue = skuPrefix` for all bindings; non-MANU bindings should use the user-supplied `gridLookups[alias]` value (empty string as autoValue signals "use gridLookups")
+
+### Fix (Bug 3): Case-insensitive fallback column matching
+- `findGridRowInCache` in all three pipeline locations now falls back to case-insensitive column matching when exact `MANU_CODE` lookup fails
+- Fixes `divider_panels.BASE_PRICE` resolving correctly when formula uses `divider_panels.base_price`
+
+### Fix (Bug 4): Batch insert for order_items
+- `createOrderItemsBatch(items: InsertOrderItem[])` added to `IStorage` interface and `DatabaseStorage`
+- All three pipeline locations (upload handler, reprice route, Asana scheduler) now accumulate to an array then call one bulk insert after the loop
+
+### Fix (Bug 5): `gridRowToScope()` helper
+- Added to `pricingEngine.ts` — lowercases all rowData keys AND coerces numeric string values to numbers
+- Replaced all inline `Object.fromEntries(Object.entries(rawData).map(...))` in formula-test endpoint, reprice route, upload handler, and Asana scheduler
+
+### Feature: Formula Tester `GridRowCombobox`
+- Replaces free-text Input for non-MANU bindings with a searchable popover combobox
+- Fetches available row keys from `GET /api/admin/attribute-grids/:id/row-keys` (endpoint already existed)
+- Response format `[{ lookupKey, displayLabel }]` — filtered/sorted, no header rows, no unavailable rows
+- Ad-hoc grid lookup rows also use `GridRowCombobox` when a grid is selected
 
 ---
 
