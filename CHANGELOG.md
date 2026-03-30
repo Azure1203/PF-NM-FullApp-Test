@@ -1,6 +1,55 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-29 (r10b)
+> Last updated: 2026-03-30 (r11)
+
+---
+
+## r11 — 2026-03-30 — Import Pipeline Diagnostic Logging
+
+### Part 1 + 2: Comprehensive pipeline logging (upload + reprice)
+
+**Upload handler (`server/routes.ts`)** — `[Upload Pipeline]` logs added at 6 checkpoints:
+1. **Pre-load totals** — logs total products in DB, active products with skuPrefix, grid binding count, grid count, proxy var count. Logs ⚠ error if zero active products.
+2. **Sample products** — logs first 5 active products (id, name, skuPrefix, pricingProxyId, exportProxyId) for verification.
+3. **Header detection** — logs filename, total CSV rows, header row index. Logs all column headers if found, or dumps first 5 rows if not found.
+4. **Row parsing** — logs how many data rows were parsed from the file. Logs first item's MANU_CODE and Material column values for spot-check.
+5. **Per-item counters** — tracks matchCount / noMatchCount / pricingSuccessCount / pricingErrorCount inside the loop. Logs first 5 SKU no-matches and first 3 pricing errors inline.
+6. **Per-file summary + batch** — logs all 4 counters + items-in-batch after loop, then logs batch insert confirmation.
+
+**Reprice route** — same `[Reprice Pipeline]` structure added (active products count, header detection, row parsing, per-item counters, summary, batch insert confirmation).
+
+### Part 3: `GET /api/admin/import-readiness` endpoint
+New endpoint returning a fast system health check:
+```json
+{
+  "ready": true,
+  "products": { "total", "active", "activeWithSkuPrefix", "activeWithPricingFormula", "activeWithExportFormula", "sampleSkuPrefixes" },
+  "grids": { "count", "totalRows", "names" },
+  "bindings": { "total", "productsWithBindings" },
+  "proxyVariables": { "total", "pricing", "export" },
+  "issues": ["...actionable error strings..."]
+}
+```
+`ready` is `false` if any of: no active products with skuPrefix, no products with pricing formula, no grid bindings.
+
+### Part 4: Upload page readiness banner
+- `useQuery` on `GET /api/admin/import-readiness` with `staleTime: 60s`
+- **Amber banner** when `ready === false`: shows header, bullet-pointed issues list, and counts (products with SKU, with pricing, bindings total)
+- **Green strip** when `ready === true`: shows products-with-pricing, bindings, and formula counts
+
+### Part 5: Upload page results summary
+After successful upload, instead of auto-redirecting to dashboard, now shows:
+- Project name
+- Total items processed
+- ✅ N matched to products / ❌ N unmatched SKUs
+- 💰 N priced successfully / ⚠ N pricing errors
+- Total: $X.XX
+- "Go to Dashboard" button (explicit navigation)
+
+**Refactor:** Removed auto-redirect from `useUploadOrder` hook's `onSuccess`. Navigation is now handled by the component, giving the user time to read the summary first.
+
+### Part 6: Multi-file upload verified
+Confirmed `UploadOrder.tsx` already had: `files: File[]` state, `multiple={true}` on FileUpload, `formData.append("files", file)` loop — no fix needed.
 
 ---
 

@@ -60,11 +60,7 @@ export function useUploadOrder() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.orders.list.path] });
-      toast({
-        title: "Orders Uploaded",
-        description: "Multiple files were successfully processed.",
-      });
-      setLocation("/"); // Redirect to dashboard to see all new orders
+      // Navigation handled by the component after showing results summary
     },
     onError: (error) => {
       toast({

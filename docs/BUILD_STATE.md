@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-03-29 (r10b) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-03-30 (r11) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -219,6 +219,10 @@ CHANGELOG.md                        Per-release fix log
 - [x] Pallet management
 - [x] Dark mode, responsive layout, sidebar navigation
 - [x] Pricing Diagnostic page — health check stats, issue list, auto-create bindings (dry-run → confirm), Reset & Recreate (fixes wrong-grid bindings)
+- [x] Import Readiness endpoint — fast health check (`GET /api/admin/import-readiness`) covering products, grids, bindings, proxy vars
+- [x] Upload page readiness banner — green/amber pre-flight status before uploading, shows actionable issues
+- [x] Upload page results summary — after successful upload shows matched/unmatched/priced/error counts + "Go to Dashboard" button (no auto-redirect)
+- [x] Comprehensive pipeline logging — `[Upload Pipeline]` and `[Reprice Pipeline]` logs at every critical step: product count, header detection, rows parsed, SKU match/no-match, pricing success/error, batch insert size
 
 ---
 
@@ -237,6 +241,14 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r11 — 2026-03-30
+**Feature:** `GET /api/admin/import-readiness` — fast pre-flight health check returning: products (total/active/withSkuPrefix/withPricing/withExport), grids (count/totalRows/names), bindings (total/productsWithBindings), proxyVariables (total/pricing/export), `ready: bool`, `issues: string[]`.
+**Feature:** Upload page readiness banner — fetches import-readiness on load; shows amber warning with bullet-pointed issues when `ready === false`; shows green confirmation when ready. Includes counts of products with pricing and bindings.
+**Feature:** Upload page results summary — after successful upload, shows project name, total items processed, SKU matches, unmatched SKUs, pricing success count, pricing errors, total price. Replaced auto-redirect with explicit "Go to Dashboard" button.
+**Logging:** `[Upload Pipeline]` logs added at 6 checkpoints in the upload handler: pre-load totals (products/bindings/grids/proxy vars + ⚠ if zero), header row detection (index + columns or 5-row debug dump), data rows parsed (first item MANU_CODE + Material), per-item SKU match/no-match (first 5 no-matches shown), pricing error (first 3 shown), per-file summary (parsed/matched/no-match/success/error/batch size), batch insert confirmation.
+**Logging:** `[Reprice Pipeline]` logs added with the same structure in the reprice route.
+**Refactor:** `useUploadOrder` no longer auto-redirects on success — navigation handled by the component after the results summary is shown.
 
 ### r10b — 2026-03-29
 **Fix (critical):** Grid name matching bug in `auto-create-bindings` endpoint — alias patterns like `main_color_attribute` were failing to match grid names with spaces (`Main Color Attribute 02202026`), causing the `color` alias to fall through to `mj_colors` (wrong grid). Fixed by storing 4 normalized variants per grid in `gridNameMap` and normalizing both sides to underscores before `includes()` comparison. Also fixed date-suffix stripping regex to handle space-separated dates.

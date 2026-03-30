@@ -884,6 +884,63 @@ export async function registerRoutes(
     }
   });
 
+  // ── Import Readiness Check ───────────────────────────────────────────────
+  app.get('/api/admin/import-readiness', isAuthenticated, async (req, res) => {
+    try {
+      const allProducts = await storage.getAllmoxyProducts();
+      const activeWithPrefix = allProducts.filter(p => p.status === 'active' && p.skuPrefix);
+      const activeWithPricing = activeWithPrefix.filter(p => p.pricingProxyId != null);
+      const allBindings = await storage.getAllProductGridBindings();
+      const allProxyVars = await storage.getProxyVariables();
+      const allGrids = await storage.getAttributeGrids();
+
+      let totalGridRows = 0;
+      for (const g of allGrids) {
+        const rows = await storage.getAttributeGridRows(g.id);
+        totalGridRows += rows.length;
+      }
+
+      const ready = activeWithPrefix.length > 0 && activeWithPricing.length > 0 && allBindings.length > 0;
+
+      const issues: string[] = [
+        ...(activeWithPrefix.length === 0 ? ['No active products have skuPrefix set — SKU matching will fail for all rows'] : []),
+        ...(activeWithPricing.length === 0 ? ['No products have pricing formulas assigned — all prices will be $0'] : []),
+        ...(allBindings.length === 0 ? ['No grid bindings exist — grid lookups will fail'] : []),
+        ...(allProxyVars.length === 0 ? ['No proxy variables/formulas exist — pricing and export will not work'] : []),
+        ...(totalGridRows === 0 ? ['Grids exist but have no rows — grid lookups will return nothing'] : []),
+      ];
+
+      res.json({
+        ready,
+        products: {
+          total: allProducts.length,
+          active: allProducts.filter(p => p.status === 'active').length,
+          activeWithSkuPrefix: activeWithPrefix.length,
+          activeWithPricingFormula: activeWithPricing.length,
+          activeWithExportFormula: activeWithPrefix.filter(p => p.exportProxyId != null).length,
+          sampleSkuPrefixes: activeWithPrefix.slice(0, 10).map(p => p.skuPrefix),
+        },
+        grids: {
+          count: allGrids.length,
+          totalRows: totalGridRows,
+          names: allGrids.map(g => g.name),
+        },
+        bindings: {
+          total: allBindings.length,
+          productsWithBindings: new Set(allBindings.map(b => b.productId)).size,
+        },
+        proxyVariables: {
+          total: allProxyVars.length,
+          pricing: allProxyVars.filter(v => v.type === 'pricing').length,
+          export: allProxyVars.filter(v => v.type === 'export').length,
+        },
+        issues,
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── Pricing Diagnostic ────────────────────────────────────────────────────
   app.get('/api/admin/pricing-diagnostic', isAuthenticated, async (req, res) => {
     try {
@@ -2113,6 +2170,15 @@ export async function registerRoutes(
       const activeProducts = allProducts.filter(
         (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
       );
+
+      // ── DIAGNOSTIC LOGGING ──
+      console.log(`[Reprice Pipeline] Active products with skuPrefix: ${activeProducts.length}`);
+      console.log(`[Reprice Pipeline] Total grid bindings: ${allBindings.length}`);
+      console.log(`[Reprice Pipeline] Total proxy variables: ${allProxyVars.length}`);
+      if (activeProducts.length === 0) {
+        console.error(`[Reprice Pipeline] ⚠ ZERO active products with skuPrefix — no SKUs will match!`);
+      }
+
       const productBindingsMap = new Map<number, ProductGridBinding[]>();
       for (const binding of allBindings) {
         const list = productBindingsMap.get(binding.productId) ?? [];
@@ -2164,7 +2230,17 @@ export async function registerRoutes(
 
         const rawRecords: string[][] = parseSync(file.rawContent, { columns: false, skip_empty_lines: true });
         const headerRowIndex = rawRecords.findIndex(row => (row[0] ?? '').toLowerCase().includes('manuf'));
-        console.log(`[Pipeline] Header row found at index ${headerRowIndex}:`, headerRowIndex !== -1 ? rawRecords[headerRowIndex] : 'NOT FOUND');
+
+        // ── DIAGNOSTIC LOGGING ──
+        console.log(`[Reprice Pipeline] File: ${file.originalFilename}`);
+        console.log(`[Reprice Pipeline] Total CSV rows: ${rawRecords.length}`);
+        console.log(`[Reprice Pipeline] Header row found at index: ${headerRowIndex}`);
+        if (headerRowIndex !== -1) {
+          console.log(`[Reprice Pipeline] CSV headers: ${JSON.stringify(rawRecords[headerRowIndex])}`);
+        } else {
+          console.error(`[Reprice Pipeline] ⚠ NO HEADER ROW FOUND`);
+        }
+
         const itemObjects: Record<string, string>[] = [];
         if (headerRowIndex !== -1) {
           const headerRow = rawRecords[headerRowIndex].map(h => (h ?? '').trim());
@@ -2176,12 +2252,27 @@ export async function registerRoutes(
             itemObjects.push(obj);
           }
         }
+        console.log(`[Reprice Pipeline] Parsed ${itemObjects.length} data rows`);
+
         const itemBatch: InsertOrderItem[] = [];
+        let rpMatchCount = 0;
+        let rpNoMatchCount = 0;
+        let rpPricingSuccess = 0;
+        let rpPricingErrors = 0;
+
         for (const item of itemObjects) {
           const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
           if (!sku) continue;
 
           const product = matchProductToSku(sku, activeProducts);
+          if (product) {
+            rpMatchCount++;
+          } else {
+            rpNoMatchCount++;
+            if (rpNoMatchCount <= 5) {
+              console.log(`[Reprice Pipeline] SKU NO MATCH: "${sku}"`);
+            }
+          }
           console.log(`[Reprice] SKU: ${sku} → ${product ? `matched: ${product.name}` : 'NO MATCH'}`);
 
           const contextScope: any = {};
@@ -2221,11 +2312,21 @@ export async function registerRoutes(
           if (product && product.pricingProxyId != null) {
             const proxy = proxyVarMap.get(product.pricingProxyId);
             if (proxy) {
-              try { unitPrice = evaluatePrice(proxy.formula, pricingItem, contextScope, [...proxyVarMap.values()]); }
-              catch (e: any) { pricingError = e.message; unitPrice = 0; }
+              try {
+                unitPrice = evaluatePrice(proxy.formula, pricingItem, contextScope, [...proxyVarMap.values()]);
+                if (unitPrice > 0) rpPricingSuccess++;
+              } catch (e: any) {
+                pricingError = e.message;
+                unitPrice = 0;
+                rpPricingErrors++;
+                if (rpPricingErrors <= 3) {
+                  console.log(`[Reprice Pipeline] Pricing error for SKU "${sku}": ${pricingError}`);
+                }
+              }
             }
           } else if (!product) {
             pricingError = `No product matched SKU prefix for: ${sku}`;
+            rpPricingErrors++;
           }
 
           let exportText: string | null = null;
@@ -2260,7 +2361,17 @@ export async function registerRoutes(
           });
           totalProjectPrice += totalPrice;
         }
+
+        // ── DIAGNOSTIC LOGGING — per-file summary ──
+        console.log(`[Reprice Pipeline] File ${file.originalFilename} results:`);
+        console.log(`[Reprice Pipeline]   SKU matches: ${rpMatchCount}`);
+        console.log(`[Reprice Pipeline]   SKU no-match: ${rpNoMatchCount}`);
+        console.log(`[Reprice Pipeline]   Pricing success: ${rpPricingSuccess}`);
+        console.log(`[Reprice Pipeline]   Pricing errors: ${rpPricingErrors}`);
+        console.log(`[Reprice Pipeline]   Items in batch: ${itemBatch.length}`);
+
         await storage.createOrderItemsBatch(itemBatch);
+        console.log(`[Reprice Pipeline] Batch inserted ${itemBatch.length} order items`);
 
         if (file.rawContent) {
           const hwResult = await generateHardwareChecklistForFile(file.id, file.rawContent);
@@ -2623,6 +2734,20 @@ export async function registerRoutes(
         (p): p is AllmoxyProduct => p.status === 'active' && !!p.skuPrefix
       );
 
+      // ── DIAGNOSTIC LOGGING ──
+      console.log(`[Upload Pipeline] Total products in DB: ${allProducts.length}`);
+      console.log(`[Upload Pipeline] Active products with skuPrefix: ${activeProducts.length}`);
+      console.log(`[Upload Pipeline] Total grid bindings: ${allBindings.length}`);
+      console.log(`[Upload Pipeline] Total grids: ${allGrids.length}`);
+      console.log(`[Upload Pipeline] Total proxy variables: ${allProxyVars.length}`);
+      if (activeProducts.length === 0) {
+        console.error(`[Upload Pipeline] ⚠ ZERO active products with skuPrefix — no SKUs will match!`);
+      }
+      console.log(`[Upload Pipeline] Sample active products:`, activeProducts.slice(0, 5).map(p => ({
+        id: p.id, name: p.name, skuPrefix: p.skuPrefix, status: p.status,
+        pricingProxyId: p.pricingProxyId, exportProxyId: p.exportProxyId
+      })));
+
       // Group bindings by productId — O(1) lookup per item, no per-product DB queries.
       const productBindingsMap = new Map<number, ProductGridBinding[]>();
       for (const binding of allBindings) {
@@ -2749,6 +2874,21 @@ export async function registerRoutes(
             break;
           }
         }
+
+        // ── DIAGNOSTIC LOGGING ──
+        console.log(`[Upload Pipeline] File: ${pf.filename}`);
+        console.log(`[Upload Pipeline] Total CSV rows (records): ${pf.records.length}`);
+        console.log(`[Upload Pipeline] Header row found at index: ${headerRowIdx}`);
+        if (headerRowIdx !== -1) {
+          const hdrs = pf.records[headerRowIdx].map(h => (h ?? '').trim());
+          console.log(`[Upload Pipeline] CSV column headers: ${JSON.stringify(hdrs)}`);
+        } else {
+          console.error(`[Upload Pipeline] ⚠ NO HEADER ROW FOUND — scanning first 5 rows for debugging:`);
+          for (let i = 0; i < Math.min(5, pf.records.length); i++) {
+            console.log(`[Upload Pipeline]   Row ${i}: ${JSON.stringify(pf.records[i]?.slice(0, 5))}`);
+          }
+        }
+
         const itemObjects: Record<string, string>[] = [];
         if (headerRowIdx !== -1) {
           const headers = pf.records[headerRowIdx].map(h => (h ?? '').trim());
@@ -2760,9 +2900,24 @@ export async function registerRoutes(
             itemObjects.push(obj);
           }
         }
+
+        // ── DIAGNOSTIC LOGGING ──
+        console.log(`[Upload Pipeline] Parsed ${itemObjects.length} data rows from ${pf.filename}`);
+        if (itemObjects.length > 0) {
+          console.log(`[Upload Pipeline] First item columns: ${JSON.stringify(Object.keys(itemObjects[0]))}`);
+          console.log(`[Upload Pipeline] First item MANU_CODE: "${itemObjects[0].MANU_CODE || itemObjects[0].SKU || '(not found)'}"`);
+          console.log(`[Upload Pipeline] First item Material/Color: "${itemObjects[0].Material || itemObjects[0].Color || itemObjects[0].Colour || '(not found)'}"`);
+        } else {
+          console.error(`[Upload Pipeline] ⚠ ZERO data rows parsed — no order items will be created`);
+        }
         // ─────────────────────────────────────────────────────────────
 
         const itemBatch: InsertOrderItem[] = [];
+        let matchCount = 0;
+        let noMatchCount = 0;
+        let pricingSuccessCount = 0;
+        let pricingErrorCount = 0;
+
         for (const item of itemObjects) {
           // Resolve SKU from common column name variants
           const sku: string = (
@@ -2774,9 +2929,13 @@ export async function registerRoutes(
           const product = matchProductToSku(sku, activeProducts);
 
           if (product) {
+            matchCount++;
             console.log(`[Pipeline] SKU: ${sku} → matched product: ${product.name} (id=${product.id})`);
           } else {
-            console.log(`[Pipeline] SKU: ${sku} → NO MATCH`);
+            noMatchCount++;
+            if (noMatchCount <= 5) {
+              console.log(`[Upload Pipeline] SKU NO MATCH: "${sku}" — no active product has a skuPrefix that matches`);
+            }
           }
 
           // Build contextScope from this product's grid bindings
@@ -2823,13 +2982,19 @@ export async function registerRoutes(
             if (pricingProxy) {
               try {
                 unitPrice = evaluatePrice(pricingProxy.formula, pricingItem, contextScope, [...proxyVarMap.values()]);
+                if (unitPrice > 0) pricingSuccessCount++;
               } catch (e: any) {
                 pricingError = e.message;
                 unitPrice = 0;
+                pricingErrorCount++;
+                if (pricingErrorCount <= 3) {
+                  console.log(`[Upload Pipeline] Pricing error for SKU "${sku}": ${pricingError}`);
+                }
               }
             }
           } else if (!product) {
             pricingError = `No product matched SKU prefix for: ${sku}`;
+            pricingErrorCount++;
           }
 
           // Generate export block
@@ -2870,7 +3035,18 @@ export async function registerRoutes(
           totalProjectPrice += totalPrice;
           if (exportText) fileOrdText += exportText + "\n";
         }
+
+        // ── DIAGNOSTIC LOGGING — per-file summary ──
+        console.log(`[Upload Pipeline] File ${pf.filename} results:`);
+        console.log(`[Upload Pipeline]   Items parsed: ${itemObjects.length}`);
+        console.log(`[Upload Pipeline]   SKU matches: ${matchCount}`);
+        console.log(`[Upload Pipeline]   SKU no-match: ${noMatchCount}`);
+        console.log(`[Upload Pipeline]   Pricing success: ${pricingSuccessCount}`);
+        console.log(`[Upload Pipeline]   Pricing errors: ${pricingErrorCount}`);
+        console.log(`[Upload Pipeline]   Items in batch: ${itemBatch.length}`);
+
         await storage.createOrderItemsBatch(itemBatch);
+        console.log(`[Upload Pipeline] Batch inserted ${itemBatch.length} order items for file ${pf.filename}`);
 
         combinedOrdText += fileOrdText;
         

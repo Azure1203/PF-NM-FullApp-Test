@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useUploadOrder } from "@/hooks/use-orders";
 import { PageHeader } from "@/components/PageHeader";
 import { FileUpload } from "@/components/FileUpload";
@@ -8,32 +9,32 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2, CheckCircle2, FileText, Upload, Cog, FolderOpen } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle2, FileText, Upload, Cog, FolderOpen, AlertTriangle, LayoutDashboard } from "lucide-react";
 import { Link } from "wouter";
 
 type UploadStatus = "idle" | "uploading" | "processing" | "success" | "error";
 
-// Format filename to project name - removes extension, # and -, normalizes whitespace
+interface UploadResult {
+  name: string;
+  totalPrice: number;
+  items: Array<{ SKU: string; NAME: string; Qty: number; price: number; error: string | null; productMatched: boolean }>;
+}
+
 function formatFilenameToProjectName(filename: string): string {
-  // Remove file extension
   let name = filename.replace(/\.[^/.]+$/, "");
-  // Remove # and - characters, normalize whitespace
   name = name.replace(/[#\-]/g, ' ').replace(/\s+/g, ' ').trim();
   return name;
 }
 
-// Find common prefix among multiple filenames
 function findCommonPrefix(names: string[]): string | null {
   if (names.length === 0) return null;
   if (names.length === 1) return names[0];
   
-  // Try to find common prefix before parentheses (room suffix)
   const basenames = names.map(n => {
     const parenIndex = n.indexOf('(');
     return parenIndex > 0 ? n.substring(0, parenIndex).trim() : n;
   });
   
-  // Check if all basenames start the same
   const first = basenames[0];
   let commonLength = first.length;
   
@@ -58,20 +59,20 @@ export default function UploadOrder() {
   const [userEditedName, setUserEditedName] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const { mutate: uploadOrder, isPending } = useUploadOrder();
   const [, setLocation] = useLocation();
 
-  // Generate project name from files
+  const { data: readiness } = useQuery({
+    queryKey: ['import-readiness'],
+    queryFn: () => fetch('/api/admin/import-readiness', { credentials: 'include' }).then(r => r.json()),
+    staleTime: 60_000,
+  });
+
   const generateProjectName = useCallback((selectedFiles: File[]): string => {
     if (selectedFiles.length === 0) return "";
-    
     const formattedNames = selectedFiles.map(f => formatFilenameToProjectName(f.name));
-    
-    if (selectedFiles.length === 1) {
-      return formattedNames[0];
-    }
-    
-    // For multiple files, try to find common prefix
+    if (selectedFiles.length === 1) return formattedNames[0];
     const commonPrefix = findCommonPrefix(formattedNames);
     return commonPrefix || formattedNames[0];
   }, []);
@@ -80,8 +81,7 @@ export default function UploadOrder() {
     setFiles(newFiles);
     setUploadStatus("idle");
     setStatusMessage("");
-    
-    // Only auto-populate if user hasn't manually edited
+    setUploadResult(null);
     if (!userEditedName) {
       setProjectName(generateProjectName(newFiles));
     }
@@ -107,7 +107,6 @@ export default function UploadOrder() {
       formData.append("projectName", projectName.trim());
     }
     
-    // Short delay to show uploading state, then switch to processing
     setTimeout(() => {
       if (uploadStatus === "uploading") {
         setUploadStatus("processing");
@@ -116,9 +115,10 @@ export default function UploadOrder() {
     }, 500);
     
     uploadOrder(formData, {
-      onSuccess: () => {
+      onSuccess: (data) => {
         setUploadStatus("success");
         setStatusMessage("Orders processed successfully!");
+        setUploadResult(data as UploadResult);
       },
       onError: (error) => {
         setUploadStatus("error");
@@ -126,6 +126,11 @@ export default function UploadOrder() {
       }
     });
   };
+
+  const totalItems = uploadResult?.items?.length ?? 0;
+  const matchedItems = uploadResult?.items?.filter(i => i.productMatched).length ?? 0;
+  const errorItems = uploadResult?.items?.filter(i => i.error).length ?? 0;
+  const pricedItems = uploadResult?.items?.filter(i => i.price > 0).length ?? 0;
 
   return (
     <div className="min-h-screen bg-muted/30 pb-20">
@@ -143,6 +148,32 @@ export default function UploadOrder() {
           description="Upload multiple CSV files to extract order details automatically."
         />
 
+        {/* Readiness Banner */}
+        {readiness && !readiness.ready && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 dark:bg-amber-950/30 dark:border-amber-800">
+            <h3 className="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              System not ready for order import
+            </h3>
+            <ul className="mt-2 text-sm text-amber-700 dark:text-amber-400 space-y-1">
+              {readiness.issues.map((issue: string, i: number) => (
+                <li key={i}>• {issue}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-sm text-amber-600 dark:text-amber-500">
+              Products with SKU prefix: {readiness.products.activeWithSkuPrefix} · 
+              With pricing formula: {readiness.products.activeWithPricingFormula} · 
+              Grid bindings: {readiness.bindings.total}
+            </p>
+          </div>
+        )}
+
+        {readiness?.ready && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 text-sm text-green-700 dark:bg-green-950/30 dark:border-green-800 dark:text-green-400">
+            ✅ Ready: {readiness.products.activeWithPricingFormula} products with pricing · {readiness.bindings.total} grid bindings · {readiness.proxyVariables.total} formulas
+          </div>
+        )}
+
         <Card className="border-none shadow-lg shadow-slate-200/50 overflow-hidden">
           <CardContent className="p-4 sm:p-8">
             <div className="space-y-8">
@@ -152,7 +183,7 @@ export default function UploadOrder() {
                 multiple={true}
               />
 
-              {/* Project Name Input - shown when files are selected */}
+              {/* Project Name Input */}
               {files.length > 0 && uploadStatus === "idle" && (
                 <div className="space-y-2">
                   <Label htmlFor="projectName" className="flex items-center gap-2 text-base font-medium">
@@ -173,7 +204,7 @@ export default function UploadOrder() {
                 </div>
               )}
 
-              {/* Upload Progress Section */}
+              {/* Upload Progress / Status Section */}
               {uploadStatus !== "idle" && (
                 <div className={`rounded-xl p-4 border ${
                   uploadStatus === "error" 
@@ -210,7 +241,7 @@ export default function UploadOrder() {
                     </div>
                   </div>
                   
-                  {/* Show file list during upload */}
+                  {/* File list during upload */}
                   {(uploadStatus === "uploading" || uploadStatus === "processing") && files.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-orange-200/50">
                       <p className="text-xs text-orange-700 mb-2">Files being processed:</p>
@@ -222,6 +253,43 @@ export default function UploadOrder() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Import results summary */}
+                  {uploadStatus === "success" && uploadResult && (
+                    <div className="mt-4 pt-4 border-t border-green-200">
+                      <p className="text-sm font-semibold text-green-800 mb-2">
+                        Project: {uploadResult.name}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="text-green-700">
+                          <span className="font-medium">{totalItems}</span> line items processed
+                        </div>
+                        <div className="text-green-700">
+                          Total: <span className="font-medium">${(uploadResult.totalPrice ?? 0).toFixed(2)}</span>
+                        </div>
+                        <div className="text-green-700">
+                          ✅ <span className="font-medium">{matchedItems}</span> matched to products
+                        </div>
+                        <div className={errorItems > 0 ? "text-amber-700" : "text-green-700"}>
+                          {errorItems > 0 ? "⚠" : "✅"} <span className="font-medium">{errorItems}</span> pricing errors
+                        </div>
+                        <div className="text-green-700">
+                          💰 <span className="font-medium">{pricedItems}</span> priced successfully
+                        </div>
+                        <div className={totalItems - matchedItems > 0 ? "text-amber-700" : "text-green-700"}>
+                          {totalItems - matchedItems > 0 ? "❌" : "✅"} <span className="font-medium">{totalItems - matchedItems}</span> unmatched SKUs
+                        </div>
+                      </div>
+                      <Button
+                        className="mt-4 w-full"
+                        onClick={() => setLocation("/")}
+                        data-testid="button-go-to-dashboard"
+                      >
+                        <LayoutDashboard className="w-4 h-4 mr-2" />
+                        Go to Dashboard
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -237,24 +305,26 @@ export default function UploadOrder() {
                 </p>
               </div>
 
-              <div className="flex justify-end pt-4">
-                <Button 
-                  size="lg" 
-                  onClick={handleUpload}
-                  disabled={files.length === 0 || isPending}
-                  className="btn-primary w-full sm:w-auto min-w-[150px]"
-                  data-testid="button-process-orders"
-                >
-                  {isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {uploadStatus === "uploading" ? "Uploading..." : "Processing..."}
-                    </>
-                  ) : (
-                    "Process Orders"
-                  )}
-                </Button>
-              </div>
+              {uploadStatus !== "success" && (
+                <div className="flex justify-end pt-4">
+                  <Button 
+                    size="lg" 
+                    onClick={handleUpload}
+                    disabled={files.length === 0 || isPending}
+                    className="btn-primary w-full sm:w-auto min-w-[150px]"
+                    data-testid="button-process-orders"
+                  >
+                    {isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {uploadStatus === "uploading" ? "Uploading..." : "Processing..."}
+                      </>
+                    ) : (
+                      "Process Orders"
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
