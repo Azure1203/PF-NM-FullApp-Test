@@ -1,6 +1,59 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-03 (r12)
+> Last updated: 2026-04-03 (r13)
+
+---
+
+## r13 — 2026-04-03 — Order Details Tabbed Redesign
+
+### Part 1 — Backend: 6 JSON data endpoints (`server/routes.ts`)
+
+Added after `GET /api/orders/:id/items`:
+
+| Route | Returns |
+|---|---|
+| `GET /api/orders/:id/data/invoice` | Sections array with item rows + `pricingError` flag; grouped by section header |
+| `GET /api/orders/:id/data/elias` | All ELIAS items as JSON |
+| `GET /api/orders/:id/data/mj` | All MJ items as JSON |
+| `GET /api/orders/:id/data/hardware` | All HARDWARE items as JSON |
+| `GET /api/orders/:id/data/glass` | All GLASS items as JSON |
+| `GET /api/orders/:id/data/ord` | ORD items as JSON + assembled plain-text ORD block |
+
+### Part 2 — 10 tab components (`client/src/pages/order-tabs/`)
+
+All new files, each self-contained with its own `useQuery` / data rendering:
+
+| File | Tab | Data source |
+|---|---|---|
+| `AllItemsTab.tsx` | All Items | Props from parent (existing `orderItems`) |
+| `InvoiceTab.tsx` | Invoice | `/data/invoice` JSON + `/pdf/invoice` iframe |
+| `PackingSlipTab.tsx` | Customer / Internal Slip | `/data/invoice` JSON + `/pdf/*-packing-slip` iframes |
+| `OrdTab.tsx` | Cabinet Vision | `/data/ord` JSON — renders assembled `.ORD` in `<pre>` + download |
+| `EliasTab.tsx` | Elias | `/export/elias` text + `/pdf/elias` iframe |
+| `MJTab.tsx` | M&J Doors | `/export/mj` text + `/pdf/mj` iframe |
+| `ErpTab.tsx` | ERP Import | `/export/erp` text + download |
+| `CtsTab.tsx` | Cut-to-Size | `/export/cts` JSON + `/pdf/cut-to-size` iframe |
+| `HardwareTab.tsx` | Hardware | In-memory filter of `orderItems` props |
+| `GlassTab.tsx` | Glass | In-memory filter of `orderItems` props |
+
+### Part 3 — OrderDetails.tsx redesigned with top-level tabs
+
+- Removed `pricingOpen`, `outputDocsOpen`, `activeOutputTab` state variables
+- Removed `fileFilter` / `filteredItems` computed value (now handled inside `AllItemsTab`)
+- Removed lazily-fetched `eliasExportText`, `mjExportText`, `erpExportText` queries
+- Added `activeTab` state (default `"overview"`)
+- Removed entire "Pricing & Export" collapsible (~320 lines) and "Output Documents" collapsible (~240 lines)
+- Added persistent `<Tabs>` bar immediately after `<PageHeader>` with 12 triggers:
+
+  `Overview · All Items · Invoice · Customer Slip · Internal Slip · Cabinet Vision · Elias · M&J Doors · ERP Import · Cut-to-Size · Hardware · Glass`
+
+  Conditional tabs (Cabinet Vision, Elias, M&J, CTS, Hardware, Glass) render only when `has*` flag is true.
+
+- All existing management sections (Project Notes, Project Details, Order Status, Material Summary, Pallets, CSV Files, Sync Status) live inside `<TabsContent value="overview">`.
+
+### Part 4 — UploadOrder navigation verified (T004)
+
+- Confirmed "View Order Details" button uses `setLocation(\`/orders/${uploadResult.id}\`)` — correct from r12; no change needed.
 
 ---
 

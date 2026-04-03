@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-03 (r12) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-03 (r13) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -192,7 +192,7 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r10b)
+## What's Working End-to-End (as of r13)
 
 - [x] CSV upload → order items created (fixed r4 — header-aware parsing)
 - [x] Multi-file CSV upload → single project with all files merged
@@ -201,7 +201,13 @@ CHANGELOG.md                        Per-release fix log
 - [x] Proxy variables pre-computed into formula scope (r5)
 - [x] Grid row cache in all three pipeline locations — O(1) in-memory lookups (r5)
 - [x] Fast pipeline — no sequential DB queries (fixed r4)
-- [x] All output documents downloadable from Order Details page
+- [x] Order Details — tabbed layout with 12 tabs (r13):
+  - **Overview** — project notes, details, order status, material summary, pallets, CSV files, sync status
+  - **All Items** — line-item table with per-file filter pills, pricing badges, re-price / regenerate actions
+  - **Invoice** — PDF iframe + JSON section breakdown
+  - **Customer Slip / Internal Slip** — PDF iframes
+  - **Cabinet Vision** — assembled `.ORD` in `<pre>` + download (conditional: items with `exportText`)
+  - **Elias / M&J Doors / ERP Import / Cut-to-Size / Hardware / Glass** — conditional tabs per `exportType`
 - [x] Re-run Pricing button on Order Details — reprices all items, shows ✅/⚠/$0 badges per item
 - [x] Allmoxy Product Manager — full CRUD, image upload/clear, category, formula assignment
 - [x] Attribute Grid Manager — CSV import, row editing, product binding management (Rows + Bindings tabs)
