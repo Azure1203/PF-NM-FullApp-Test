@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-03-30 (r11) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-03 (r12) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -241,6 +241,13 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r12 — 2026-04-03
+**Fix (critical):** Console log flood — `evaluatePrice()` was calling `console.log` twice per item (formula text + full JSON scope), burying `[Upload Pipeline]` checkpoints in thousands of lines on large CSVs. Removed both per-item logs; simplified catch block to single `[PricingEngine] FAILED SKU="X": msg` line. Removed per-item match log from upload handler inner loop.
+**Feature:** Pipeline complete summary — 5-line block logged after `savedItems` is fetched: PIPELINE COMPLETE / Project id+name / Files processed / Total order items / Total price.
+**Feature:** Per-file filter on Order Details items table — pill buttons above table when project has >1 file; filters `orderItems` by `fileId`; summary row switches between "File Subtotal" and "Grand Total" and shows parenthetical order total when filtered.
+**Feature:** "Output Documents" collapsible card on Order Details — tabbed section with inline PDF viewers (`<iframe>`) for Invoice, Packing Slips, CTS, Elias PDF, M&J PDF; lazily-fetched CSV code blocks for Elias, M&J, ERP exports; ORD assembled from items in-memory; Hardware/Glass filtered item tables. Only tabs with content shown. Each tab has a Download button.
+**Docs:** Added 3-line comment to `POST /api/admin/products/bulk-upload-images` documenting intentional DB/base64 storage strategy (GCS unavailable).
 
 ### r11 — 2026-03-30
 **Feature:** `GET /api/admin/import-readiness` — fast pre-flight health check returning: products (total/active/withSkuPrefix/withPricing/withExport), grids (count/totalRows/names), bindings (total/productsWithBindings), proxyVariables (total/pricing/export), `ready: bool`, `issues: string[]`.

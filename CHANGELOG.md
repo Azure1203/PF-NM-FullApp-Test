@@ -1,6 +1,65 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-03-30 (r11)
+> Last updated: 2026-04-03 (r12)
+
+---
+
+## r12 — 2026-04-03 — Console Log Cleanup + Order Details Browsable Experience
+
+### Part 1 — Console log flood fixed (`server/services/pricingEngine.ts`, `server/routes.ts`)
+
+**Root cause:** `evaluatePrice()` called two `console.log` lines on every item: the full formula text and the entire JSON scope object. A 200-item CSV produced 400+ log lines just from the pricing engine, making `[Upload Pipeline]` checkpoints invisible.
+
+**Fixes:**
+- Removed `console.log([PricingEngine] Evaluating formula: ...)` and `console.log([PricingEngine] Scope: ...)` — both called per item
+- Simplified catch block to one line: `[PricingEngine] FAILED SKU="X": error.message`
+- Removed per-item `[Pipeline] SKU: ${sku} → matched product: ...` log from the upload handler inner loop
+- Added 5-line **pipeline complete summary** after `savedItems` is fetched and before `res.json`:
+  ```
+  [Upload Pipeline] ═══ PIPELINE COMPLETE ═══
+  [Upload Pipeline] Project: {id} — {name}
+  [Upload Pipeline] Files processed: N
+  [Upload Pipeline] Total order items: N
+  [Upload Pipeline] Total price: $X.XX
+  ```
+
+### Part 2 — Per-file filter on items table (`client/src/pages/OrderDetails.tsx`)
+
+- Added `fileFilter: 'all' | number` state
+- Added `filteredItems` computed value (filters `orderItems` by `fileId`)
+- When project has more than one file: shows pill-shaped filter buttons above the items table (one "All Files" + one per file, showing item count in each)
+- File labels use `originalFilename` stripped of extension
+- Summary row below table now shows:
+  - "File Subtotal" when filtered (with the full order total shown parenthetically)
+  - "Grand Total" when viewing all files
+  - Error/unmatched counts reflect the filtered view
+
+### Part 3 — Output Documents tabbed section (`client/src/pages/OrderDetails.tsx`)
+
+New "Output Documents" collapsible card added after the Pricing & Export card. Contains tabs for every output format; only tabs with content are shown.
+
+| Tab | Source | View type | Condition |
+|-----|--------|-----------|-----------|
+| Invoice | `/pdf/invoice` | PDF `<iframe>` (800px) | Always |
+| Customer Packing Slip | `/pdf/customer-packing-slip` | PDF `<iframe>` | Always |
+| Internal Packing Slip | `/pdf/internal-packing-slip` | PDF `<iframe>` | Always |
+| Cabinet Vision (.ORD) | Items `exportText` assembled inline | `<pre>` code block | `hasORD` |
+| Elias Export | `/export/elias` fetched lazily | `<pre>` code block | `hasElias` |
+| Elias PDF | `/pdf/elias` | PDF `<iframe>` | `hasElias` |
+| M&J Export | `/export/mj` fetched lazily | `<pre>` code block | `hasMJ \|\| hasGlass` |
+| M&J Shaker PDF | `/pdf/mj` | PDF `<iframe>` | `hasMJ \|\| hasGlass` |
+| ERP Import | `/export/erp` fetched lazily | `<pre>` code block | Always |
+| Cut-to-Size | `/pdf/cut-to-size` | PDF `<iframe>` | `hasCTS` |
+| Hardware | Filtered from items in memory | Items table | `hasHardware` |
+| Glass | Filtered from items in memory | Items table | `hasGlass` |
+
+- CSV tabs use `enabled: activeOutputTab === 'X' && outputDocsOpen` — zero fetch cost until you open the tab
+- Each tab has a **Download** button in the top-right corner
+- `Tabs` component from shadcn added to imports
+
+### Part 4 — Image storage strategy comment (`server/routes.ts`)
+
+Added 3-line comment above `POST /api/admin/products/bulk-upload-images` documenting that base64 DB storage is intentional (GCS/object storage unavailable in this deployment environment). Addresses code review comment from Task #16 merge.
 
 ---
 
