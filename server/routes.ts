@@ -2930,7 +2930,6 @@ export async function registerRoutes(
 
           if (product) {
             matchCount++;
-            console.log(`[Pipeline] SKU: ${sku} → matched product: ${product.name} (id=${product.id})`);
           } else {
             noMatchCount++;
             if (noMatchCount <= 5) {
@@ -3101,6 +3100,12 @@ export async function registerRoutes(
       
       // Fetch persisted order items and map to the shape the frontend expects
       const savedItems = await storage.getOrderItemsByProject(project.id);
+
+      console.log(`[Upload Pipeline] ═══ PIPELINE COMPLETE ═══`);
+      console.log(`[Upload Pipeline] Project: ${project.id} — ${projectName}`);
+      console.log(`[Upload Pipeline] Files processed: ${parsedFiles.length}`);
+      console.log(`[Upload Pipeline] Total order items: ${savedItems.length}`);
+      console.log(`[Upload Pipeline] Total price: $${totalProjectPrice.toFixed(2)}`);
 
       res.status(201).json({
         ...(updatedProject || project),

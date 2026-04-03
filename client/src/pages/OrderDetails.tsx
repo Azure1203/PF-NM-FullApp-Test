@@ -20,6 +20,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { ArrowLeft, RefreshCw, Save, Send, FileText, Loader2, ExternalLink, Trash2, FolderOpen, Download, CheckCircle, ChevronDown, ChevronUp, ChevronRight, Package, Layers, Weight, Ruler, Truck, AlertTriangle, Scissors, ClipboardList, Check, X, Plus, Edit2, Archive, StickyNote, Copy, Link as LinkIcon, Upload, Printer, Palette, DollarSign } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { printProjectLabel, printHardwareLabel, printPalletLabels } from "@/lib/qzTray";
 import pfcLogo from "@assets/logo-perfect-fit-closets-7_1768954555746.jpg";
@@ -92,6 +93,9 @@ export default function OrderDetails() {
   const [materialSummaryOpen, setMaterialSummaryOpen] = useState(false);
   const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
   const [pricingOpen, setPricingOpen] = useState(true);
+  const [outputDocsOpen, setOutputDocsOpen] = useState(false);
+  const [activeOutputTab, setActiveOutputTab] = useState("invoice");
+  const [fileFilter, setFileFilter] = useState<'all' | number>('all');
 
   const [editingCienappsJobNumber, setEditingCienappsJobNumber] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
@@ -752,6 +756,33 @@ export default function OrderDetails() {
   const hasMJ = (exportTypeCounts['MJ'] || 0) > 0;
   const hasGlass = (exportTypeCounts['GLASS'] || 0) > 0;
   const hasCTS = (exportTypeCounts['CTS'] || 0) > 0;
+  const hasHardware = (exportTypeCounts['HARDWARE'] || 0) > 0;
+  const hasORD = !!(orderItems?.some(i => i.exportText));
+
+  const filteredItems = fileFilter === 'all'
+    ? (orderItems ?? [])
+    : (orderItems ?? []).filter(i => i.fileId === fileFilter);
+
+  const { data: eliasExportText } = useQuery<string>({
+    queryKey: ['/api/orders', id, 'export', 'elias'],
+    queryFn: () => fetch(`/api/orders/${id}/export/elias`, { credentials: 'include' }).then(r => r.ok ? r.text() : Promise.reject(new Error('No Elias items'))),
+    enabled: !!id && hasElias && activeOutputTab === 'elias' && outputDocsOpen,
+    staleTime: 60_000,
+  });
+
+  const { data: mjExportText } = useQuery<string>({
+    queryKey: ['/api/orders', id, 'export', 'mj'],
+    queryFn: () => fetch(`/api/orders/${id}/export/mj`, { credentials: 'include' }).then(r => r.ok ? r.text() : Promise.reject(new Error('No M&J items'))),
+    enabled: !!id && hasMJ && activeOutputTab === 'mj' && outputDocsOpen,
+    staleTime: 60_000,
+  });
+
+  const { data: erpExportText } = useQuery<string>({
+    queryKey: ['/api/orders', id, 'export', 'erp'],
+    queryFn: () => fetch(`/api/orders/${id}/export/erp`, { credentials: 'include' }).then(r => r.ok ? r.text() : Promise.reject(new Error('No ERP items'))),
+    enabled: !!id && activeOutputTab === 'erp' && outputDocsOpen,
+    staleTime: 60_000,
+  });
 
   // Auto-select first file when preview loads
   useEffect(() => {
@@ -1429,6 +1460,29 @@ export default function OrderDetails() {
                 {/* Items table */}
                 {!itemsLoading && orderItems && orderItems.length > 0 && (
                   <>
+                    {/* Per-file filter */}
+                    {project?.files && project.files.length > 1 && (
+                      <div className="flex gap-1.5 flex-wrap mb-3">
+                        <button
+                          onClick={() => setFileFilter('all')}
+                          className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${fileFilter === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted border-border text-muted-foreground'}`}
+                        >
+                          All Files ({orderItems.length})
+                        </button>
+                        {project.files.map((f: any) => {
+                          const fileItemCount = orderItems.filter(i => i.fileId === f.id).length;
+                          return (
+                            <button
+                              key={f.id}
+                              onClick={() => setFileFilter(f.id)}
+                              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${fileFilter === f.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted border-border text-muted-foreground'}`}
+                            >
+                              {(f.originalFilename || f.filename || `File ${f.id}`).replace(/\.[^/.]+$/, '')} ({fileItemCount})
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                     <ScrollArea className="max-h-[500px] rounded-md border">
                       <Table>
                         <TableHeader className="sticky top-0 bg-background z-10">
@@ -1444,7 +1498,7 @@ export default function OrderDetails() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {orderItems.map((item) => {
+                          {filteredItems.map((item) => {
                             const hasError = !!item.pricingError;
                             const matched = item.productId !== null;
                             const zeroPriced = matched && !hasError && (item.unitPrice ?? 0) === 0;
@@ -1512,23 +1566,262 @@ export default function OrderDetails() {
 
                     {/* Summary row */}
                     <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t text-sm text-muted-foreground">
-                      <span><strong>{orderItems.length}</strong> items</span>
-                      {orderItems.filter(i => !!i.pricingError).length > 0 && (
+                      <span><strong>{filteredItems.length}</strong> items{fileFilter !== 'all' && <span className="text-xs ml-1">(filtered)</span>}</span>
+                      {filteredItems.filter(i => !!i.pricingError).length > 0 && (
                         <span className="text-red-500">
-                          <strong>{orderItems.filter(i => !!i.pricingError).length}</strong> errors
+                          <strong>{filteredItems.filter(i => !!i.pricingError).length}</strong> errors
                         </span>
                       )}
-                      {orderItems.filter(i => !i.productId).length > 0 && (
+                      {filteredItems.filter(i => !i.productId).length > 0 && (
                         <span className="text-amber-500">
-                          <strong>{orderItems.filter(i => !i.productId).length}</strong> unmatched SKUs
+                          <strong>{filteredItems.filter(i => !i.productId).length}</strong> unmatched SKUs
                         </span>
                       )}
                       <span className="ml-auto font-bold text-foreground">
-                        Grand Total: ${orderItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {fileFilter !== 'all' ? 'File Subtotal' : 'Grand Total'}: ${filteredItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {fileFilter !== 'all' && orderItems && (
+                          <span className="ml-2 font-normal text-muted-foreground text-xs">
+                            (Order: ${orderItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                          </span>
+                        )}
                       </span>
                     </div>
                   </>
                 )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* Output Documents - Collapsible */}
+        <Collapsible open={outputDocsOpen} onOpenChange={setOutputDocsOpen}>
+          <Card className="mb-6 border-none shadow-md" data-testid="output-docs-card">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-lg">
+                <CardTitle className="flex items-center justify-between gap-2 text-lg">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    Output Documents
+                  </div>
+                  {outputDocsOpen ? (
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <Tabs value={activeOutputTab} onValueChange={setActiveOutputTab}>
+                  <ScrollArea className="w-full">
+                    <TabsList className="flex w-max gap-1 h-auto flex-wrap p-1 mb-4">
+                      <TabsTrigger value="invoice" className="text-xs">Invoice</TabsTrigger>
+                      <TabsTrigger value="customer-packing-slip" className="text-xs">Customer Packing Slip</TabsTrigger>
+                      <TabsTrigger value="internal-packing-slip" className="text-xs">Internal Packing Slip</TabsTrigger>
+                      {hasORD && <TabsTrigger value="ord" className="text-xs">Cabinet Vision (.ORD)</TabsTrigger>}
+                      {hasElias && <TabsTrigger value="elias" className="text-xs">Elias Export ({exportTypeCounts['ELIAS']})</TabsTrigger>}
+                      {hasElias && <TabsTrigger value="elias-pdf" className="text-xs">Elias PDF</TabsTrigger>}
+                      {(hasMJ || hasGlass) && <TabsTrigger value="mj" className="text-xs">M&amp;J Export ({(exportTypeCounts['MJ'] || 0) + (exportTypeCounts['GLASS'] || 0)})</TabsTrigger>}
+                      {(hasMJ || hasGlass) && <TabsTrigger value="mj-pdf" className="text-xs">M&amp;J Shaker PDF</TabsTrigger>}
+                      <TabsTrigger value="erp" className="text-xs">ERP Import</TabsTrigger>
+                      {hasCTS && <TabsTrigger value="cts" className="text-xs">Cut-to-Size ({exportTypeCounts['CTS']})</TabsTrigger>}
+                      {hasHardware && <TabsTrigger value="hardware" className="text-xs">Hardware ({exportTypeCounts['HARDWARE']})</TabsTrigger>}
+                      {hasGlass && <TabsTrigger value="glass" className="text-xs">Glass ({exportTypeCounts['GLASS']})</TabsTrigger>}
+                    </TabsList>
+                  </ScrollArea>
+
+                  {/* PDF tabs — inline iframe viewer */}
+                  {(['invoice', 'customer-packing-slip', 'internal-packing-slip', 'cts', 'elias-pdf', 'mj-pdf'] as const).map(tab => {
+                    const urlMap: Record<string, string> = {
+                      'invoice': `/api/orders/${id}/pdf/invoice`,
+                      'customer-packing-slip': `/api/orders/${id}/pdf/customer-packing-slip`,
+                      'internal-packing-slip': `/api/orders/${id}/pdf/internal-packing-slip`,
+                      'cts': `/api/orders/${id}/pdf/cut-to-size`,
+                      'elias-pdf': `/api/orders/${id}/pdf/elias`,
+                      'mj-pdf': `/api/orders/${id}/pdf/mj`,
+                    };
+                    const labelMap: Record<string, string> = {
+                      'invoice': 'Invoice.pdf',
+                      'customer-packing-slip': 'Customer_Packing_Slip.pdf',
+                      'internal-packing-slip': 'Internal_Packing_Slip.pdf',
+                      'cts': 'Cut_to_Size.pdf',
+                      'elias-pdf': 'Elias_Export.pdf',
+                      'mj-pdf': 'MJ_Shaker.pdf',
+                    };
+                    const url = urlMap[tab];
+                    const label = labelMap[tab];
+                    return (
+                      <TabsContent key={tab} value={tab}>
+                        <div className="flex justify-end mb-2">
+                          <a href={url} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" size="sm">
+                              <Download className="w-3.5 h-3.5 mr-1.5" />
+                              Download {label}
+                            </Button>
+                          </a>
+                        </div>
+                        <iframe
+                          src={url}
+                          className="w-full rounded border"
+                          style={{ height: '800px' }}
+                          title={label}
+                        />
+                      </TabsContent>
+                    );
+                  })}
+
+                  {/* ORD tab — code block assembled from items */}
+                  {hasORD && (
+                    <TabsContent value="ord">
+                      {(() => {
+                        const ordItems = orderItems?.filter(i => i.exportText) ?? [];
+                        const fileMap = new Map((project?.files || []).map((f: any) => [f.id, f]));
+                        const headerTemplate = headerTemplateSetting?.value || '';
+                        const grouped = new Map<number, string[]>();
+                        for (const item of ordItems) {
+                          if (!grouped.has(item.fileId)) grouped.set(item.fileId, []);
+                          grouped.get(item.fileId)!.push(item.exportText!);
+                        }
+                        let ordText = '';
+                        for (const [fileId, lines] of grouped) {
+                          const file = fileMap.get(fileId);
+                          if (headerTemplate) {
+                            const designName = file?.poNumber || file?.originalFilename?.replace(/\.[^.]+$/, '') || '';
+                            const poNumber = file?.poNumber || '';
+                            ordText += headerTemplate
+                              .replace(/\{\{design_name\}\}/g, designName)
+                              .replace(/\{\{po_number\}\}/g, poNumber) + '\n';
+                          }
+                          ordText += lines.join('\n') + '\n';
+                        }
+                        return (
+                          <>
+                            <div className="flex justify-end mb-2">
+                              <Button variant="outline" size="sm" onClick={downloadOrd}>
+                                <Download className="w-3.5 h-3.5 mr-1.5" />
+                                Download .ORD
+                              </Button>
+                            </div>
+                            <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px] whitespace-pre-wrap">
+                              {ordText || 'No ORD export text found in this order.'}
+                            </pre>
+                            <p className="text-xs text-muted-foreground mt-1">{ordItems.length} items with export text</p>
+                          </>
+                        );
+                      })()}
+                    </TabsContent>
+                  )}
+
+                  {/* Elias CSV tab */}
+                  {hasElias && (
+                    <TabsContent value="elias">
+                      <div className="flex justify-end mb-2">
+                        <a href={`/api/orders/${id}/export/elias`} download="Elias_Export.csv">
+                          <Button variant="outline" size="sm">
+                            <Download className="w-3.5 h-3.5 mr-1.5" />
+                            Download Elias_Export.csv
+                          </Button>
+                        </a>
+                      </div>
+                      <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px]">
+                        {eliasExportText ?? 'Loading…'}
+                      </pre>
+                    </TabsContent>
+                  )}
+
+                  {/* M&J CSV tab */}
+                  {(hasMJ || hasGlass) && (
+                    <TabsContent value="mj">
+                      <div className="flex justify-end mb-2">
+                        <a href={`/api/orders/${id}/export/mj`} download="MJ_Export.csv">
+                          <Button variant="outline" size="sm">
+                            <Download className="w-3.5 h-3.5 mr-1.5" />
+                            Download MJ_Export.csv
+                          </Button>
+                        </a>
+                      </div>
+                      <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px]">
+                        {mjExportText ?? 'Loading…'}
+                      </pre>
+                    </TabsContent>
+                  )}
+
+                  {/* ERP tab */}
+                  <TabsContent value="erp">
+                    <div className="flex justify-end mb-2">
+                      <a href={`/api/orders/${id}/export/erp`} download="ERP_Import.csv">
+                        <Button variant="outline" size="sm">
+                          <Download className="w-3.5 h-3.5 mr-1.5" />
+                          Download ERP_Import.csv
+                        </Button>
+                      </a>
+                    </div>
+                    <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px]">
+                      {erpExportText ?? 'Loading…'}
+                    </pre>
+                  </TabsContent>
+
+                  {/* Hardware tab — filtered from items */}
+                  {hasHardware && (
+                    <TabsContent value="hardware">
+                      <ScrollArea className="max-h-[500px] rounded-md border">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead>SKU</TableHead>
+                              <TableHead>Product</TableHead>
+                              <TableHead className="text-center">Qty</TableHead>
+                              <TableHead className="text-right">Unit Price</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(orderItems ?? []).filter(i => i.exportType === 'HARDWARE').map(item => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                <TableCell className="text-sm">{item.productName || item.description || '—'}</TableCell>
+                                <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">${(item.unitPrice ?? 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">${(item.totalPrice ?? 0).toFixed(2)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </TabsContent>
+                  )}
+
+                  {/* Glass tab — filtered from items */}
+                  {hasGlass && (
+                    <TabsContent value="glass">
+                      <ScrollArea className="max-h-[500px] rounded-md border">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead>SKU</TableHead>
+                              <TableHead>Product</TableHead>
+                              <TableHead className="text-center">Qty</TableHead>
+                              <TableHead className="text-right">Unit Price</TableHead>
+                              <TableHead className="text-right">Total</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {(orderItems ?? []).filter(i => i.exportType === 'GLASS').map(item => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                <TableCell className="text-sm">{item.productName || item.description || '—'}</TableCell>
+                                <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">${(item.unitPrice ?? 0).toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-mono text-sm font-semibold">${(item.totalPrice ?? 0).toFixed(2)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </TabsContent>
+                  )}
+                </Tabs>
               </CardContent>
             </CollapsibleContent>
           </Card>

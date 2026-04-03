@@ -75,18 +75,12 @@ export function evaluatePrice(
 
   const cleanFormula = stripComments(formula);
 
-  console.log(`[PricingEngine] Evaluating formula: ${cleanFormula}`);
-  console.log(`[PricingEngine] Scope:`, JSON.stringify(scope, null, 2));
-
   try {
     const result = math.evaluate(cleanFormula, scope);
     return typeof result === "number" ? result : Number(result) || 0;
   } catch (error: any) {
     const sku = orderItem?.sku || orderItem?.MANU_CODE || orderItem?.manuCode || "UNKNOWN";
-    console.error(`[PricingEngine] Evaluation FAILED for SKU "${sku}"`);
-    console.error(`[PricingEngine] Error:`, error.message);
-    console.error(`[PricingEngine] Formula was:`, cleanFormula);
-    console.error(`[PricingEngine] Scope was:`, JSON.stringify(scope, null, 2));
-    throw error; // Re-throw so callers can capture in pricingError
+    console.error(`[PricingEngine] FAILED SKU="${sku}": ${error.message}`);
+    throw error;
   }
 }
