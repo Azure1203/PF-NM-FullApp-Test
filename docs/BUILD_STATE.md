@@ -248,6 +248,11 @@ CHANGELOG.md                        Per-release fix log
 
 ## Release History
 
+### r13 — 2026-04-03
+**Feature:** 6 new JSON data endpoints — `/api/orders/:id/data/{invoice,elias,mj,hardware,glass,ord}` — serve structured JSON for order output data consumed by tab components.
+**Refactor:** Order Details page fully redesigned with a persistent 12-tab layout. Replaced "Pricing & Export" and "Output Documents" collapsibles (~560 lines removed) with a `<Tabs>` bar. Overview tab holds all management sections; each output format has its own dedicated tab. 10 new self-contained tab components created in `client/src/pages/order-tabs/`.
+**Cleanup:** Removed `pricingOpen`, `outputDocsOpen`, `activeOutputTab`, `fileFilter` states and lazy export queries from `OrderDetails.tsx`; `fileFilter` now managed inside `AllItemsTab`.
+
 ### r12 — 2026-04-03
 **Fix (critical):** Console log flood — `evaluatePrice()` was calling `console.log` twice per item (formula text + full JSON scope), burying `[Upload Pipeline]` checkpoints in thousands of lines on large CSVs. Removed both per-item logs; simplified catch block to single `[PricingEngine] FAILED SKU="X": msg` line. Removed per-item match log from upload handler inner loop.
 **Feature:** Pipeline complete summary — 5-line block logged after `savedItems` is fetched: PIPELINE COMPLETE / Project id+name / Files processed / Total order items / Total price.
