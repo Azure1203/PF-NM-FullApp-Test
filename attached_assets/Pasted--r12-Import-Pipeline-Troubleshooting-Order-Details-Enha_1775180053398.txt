@@ -1,0 +1,215 @@
+# r12 — Import Pipeline Troubleshooting + Order Details Enhancement
+
+## Pre-Read (REQUIRED)
+
+Read these files:
+- `server/routes.ts` — upload handler (~line 2661), specifically the `[Upload Pipeline]` log lines
+- `client/src/pages/UploadOrder.tsx`
+- `client/src/pages/OrderDetails.tsx`
+
+---
+
+## Critical First Step — Check Console Logs
+
+The r11 prompt added comprehensive `[Upload Pipeline]` logging at 6 checkpoints. Before writing any new code, **upload a test CSV and read the Replit console output**. The logs will tell you exactly where it breaks.
+
+Look for these lines in the console after uploading:
+
+```
+[Upload Pipeline] Total products in DB: ???
+[Upload Pipeline] Active products with skuPrefix: ???
+[Upload Pipeline] Total grid bindings: ???
+[Upload Pipeline] Header row found at index: ???
+[Upload Pipeline] Parsed ??? data rows from <filename>
+[Upload Pipeline] File <filename> results:
+  Items parsed: ???
+  SKU matches: ???
+  SKU no-match: ???
+  Pricing success: ???
+  Pricing errors: ???
+  Items in batch: ???
+[Upload Pipeline] Batch inserted ??? order items
+```
+
+**If you see NONE of these log lines** after uploading, the upload request is not reaching the backend. This means the frontend is failing before it sends the request. Check the browser console (F12 → Console tab) for JavaScript errors.
+
+**If `Active products with skuPrefix: 0`** — products don't have skuPrefix set. The import-csv route sets skuPrefix from PRODUCT NAME, but the older upload-allmoxy-products route does not. You may need to re-import products via the correct route.
+
+**If `Header row found at index: -1`** — the CSV format doesn't contain "manuf" in column 0 of any row. This means the Allmoxy CSV structure is different from expected. Share the first 10 lines of the CSV with me so I can see the actual format.
+
+**If `Items parsed: 0`** — the header was found but there are no data rows after it, or all rows are blank.
+
+**If `SKU matches: 0` and `SKU no-match: N`** — none of the MANU_CODE values from the CSV match any product's skuPrefix. The log will show the first 5 unmatched SKUs. Share those so I can check if the product names match.
+
+**If `Pricing errors: N`** — grid lookups or formula evaluation failed. The log will show the first 3 error messages. Common causes:
+- "Undefined symbol X" → grid binding for alias X is missing or points to wrong grid
+- "Cannot read properties of undefined" → grid row lookup returned nothing for the lookup value
+
+---
+
+## Part 1 — If Upload Reaches Backend But Returns No Items to Frontend
+
+The upload handler returns items in the response at line ~2929:
+```ts
+res.status(201).json({
+  ...project,
+  totalPrice: totalProjectPrice,
+  items: savedItems.map(item => ({
+    SKU: item.sku,
+    NAME: item.description,
+    Qty: item.quantity,
+    ...
+  })),
+});
+```
+
+Check that the frontend `UploadOrder.tsx` correctly reads `result.items` from the response. If the mutation returns the response but the UI doesn't show the items, the issue is in how the results summary component reads the data.
+
+Also check: after upload, does the "Go to Dashboard" / "View Order" link correctly navigate to `/orders/{projectId}`? If the project ID isn't being extracted from the response, the user can't see the order details.
+
+---
+
+## Part 2 — Order Details Page: Show Items, Pricing Errors, Reprice Button
+
+The Order Details page at `/orders/:id` needs to clearly show all line items with their pricing status. Verify it does the following:
+
+### 2a. Fetch and display order items
+
+The page should call `GET /api/orders/:id/items` which returns all order items with `productName`, `sku`, `unitPrice`, `totalPrice`, `pricingError`, etc.
+
+If the page currently shows NO items even though the database has order_items for the project, the issue is in the frontend query or rendering.
+
+### 2b. Add pricing error column
+
+Each line item should show either:
+- ✅ and the price if `pricingError` is null and `unitPrice > 0`
+- ⚠ $0.00 if `pricingError` is null but `unitPrice === 0` (likely no pricing formula assigned)
+- ❌ with the error message if `pricingError` is not null
+
+Render as a tooltip or expandable row — clicking ❌ shows the full error text.
+
+### 2c. Add Reprice button
+
+The endpoint `POST /api/orders/:id/reprice` already exists and re-runs the entire pricing pipeline for all files in the project. Add a button:
+
+```tsx
+const repriceMutation = useMutation({
+  mutationFn: () => fetch(`/api/orders/${projectId}/reprice`, { method: 'POST' }).then(r => r.json()),
+  onSuccess: (data) => {
+    queryClient.invalidateQueries({ queryKey: ['order-items', projectId] });
+    toast({ title: `Repriced: $${data.totalPrice?.toFixed(2)}` });
+  },
+});
+
+// In the UI:
+<Button onClick={() => repriceMutation.mutate()} disabled={repriceMutation.isPending}>
+  {repriceMutation.isPending ? 'Repricing...' : 'Reprice Order'}
+</Button>
+```
+
+This is critical because after fixing grid bindings or formula assignments, existing orders need to be repriced without re-uploading.
+
+### 2d. Show order total
+
+Sum all `totalPrice` values from items and display prominently:
+```
+Order Total: $X,XXX.XX (N items, M pricing errors)
+```
+
+---
+
+## Part 3 — Formula Tester Verification
+
+Go to `/admin/formula-tester` and test with a known product:
+
+1. Select product `34SHFA` (3/4" Adjustable Shelf)
+2. The color dropdown should populate from Main Color Attribute grid
+3. Select `TFL1W`
+4. Enter: Width=355.625, Height=609.625, Length=19, Quantity=12
+5. Click "Run Pricing Test"
+
+Expected result: A non-zero unit price. The scope should contain:
+- `shelves: { base_price: ..., sq_ft_price: ..., margin: ..., pricing_id: ... }`
+- `color: { sqft_price: 24.64, level_percent_upcharge: 0, panel_export: "300 Classic White 5x9 19/300 Classic White 5x9 19", ... }`
+
+If this works in the formula tester but not during CSV import, the issue is in how the CSV columns map to binding lookupColumns.
+
+---
+
+## Part 4 — Verify the Allmoxy CSV Column Structure
+
+The pipeline reads CSV column values for grid lookups:
+```ts
+const col = binding.lookupColumn;  // e.g. "MANU_CODE" or "Material"
+const lookupValue = item[col] || item[col.toLowerCase()] || item[col.toUpperCase()] || ...
+```
+
+If the Allmoxy CSV column for color is named something other than "Material", "Color", or "Colour", the lookup will return empty and the color grid won't resolve.
+
+**To verify:** After the header detection logging, the console will show:
+```
+[Upload Pipeline] CSV column headers: ["MANU_CODE","...","..."]
+```
+
+Check this list. What is the actual column name for the color/material code? If it's something like `"Attr: Color"` or `"Option 1"` or anything else unexpected, the fallback won't catch it.
+
+If the column name is different, add it to the fallback chain in the grid lookup section:
+
+```ts
+const lookupValue = (
+  item[col] ||
+  item[col.toLowerCase()] ||
+  item[col.toUpperCase()] ||
+  // Add any newly discovered column names here
+  ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
+    ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || 
+       item['Attr: Color'] || item['Option 1'] || '')  // Add any new names here
+    : '')
+).toString().trim();
+```
+
+---
+
+## Part 5 — Check for Bulk Import Timing/Timeout Issues
+
+If the Replit console shows the pipeline starting but never finishing (no "Batch inserted" log), the upload may be hitting a timeout. Replit has a 60-second request timeout by default.
+
+With 2,363 products, loading all grids + grid rows could be slow. The pre-load uses `Promise.all` for grid rows, which fires all grid row fetches in parallel. With 35+ grids and potentially thousands of rows each, this might overwhelm the database connection pool.
+
+If this is the issue, add a timeout log and consider sequential grid loading:
+
+```ts
+// Instead of parallel:
+// await Promise.all(allGrids.map(async (g) => { ... }));
+
+// Use sequential with progress:
+console.log(`[Upload Pipeline] Loading grid rows for ${allGrids.length} grids...`);
+for (const g of allGrids) {
+  const rows = await storage.getAttributeGridRows(g.id);
+  gridRowsCache.set(g.id, rows);
+}
+console.log(`[Upload Pipeline] Grid rows loaded: ${[...gridRowsCache.values()].reduce((s, r) => s + r.length, 0)} total rows`);
+```
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `client/src/pages/OrderDetails.tsx` | Add pricing error column (✅/❌), reprice button, order total display |
+| `client/src/pages/UploadOrder.tsx` | Verify items display in results summary; add "View Order" link with project ID |
+| `server/routes.ts` | Only if CSV column name discovery reveals a new column name to add to the fallback chain |
+
+---
+
+## What to Report Back
+
+After deploying and testing, tell me:
+
+1. **What the Replit console shows** after uploading a CSV — specifically the `[Upload Pipeline]` lines
+2. **What the upload results summary shows** in the browser — items matched, pricing errors, etc.
+3. **What the Order Details page shows** for the uploaded order — do items appear? do they have prices?
+4. **What the formula tester shows** for product `34SHFA` with color `TFL1W` and dimensions 355.625 × 609.625 × 19
+
+This will let me pinpoint the exact remaining issue if there is one.

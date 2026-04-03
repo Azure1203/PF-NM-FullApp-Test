@@ -15,6 +15,7 @@ import { Link } from "wouter";
 type UploadStatus = "idle" | "uploading" | "processing" | "success" | "error";
 
 interface UploadResult {
+  id: number;
   name: string;
   totalPrice: number;
   items: Array<{ SKU: string; NAME: string; Qty: number; price: number; error: string | null; productMatched: boolean }>;
@@ -282,14 +283,27 @@ export default function UploadOrder() {
                           {totalItems - matchedItems > 0 ? "❌" : "✅"} <span className="font-medium">{totalItems - matchedItems}</span> unmatched SKUs
                         </div>
                       </div>
-                      <Button
-                        className="mt-4 w-full"
-                        onClick={() => setLocation("/")}
-                        data-testid="button-go-to-dashboard"
-                      >
-                        <LayoutDashboard className="w-4 h-4 mr-2" />
-                        Go to Dashboard
-                      </Button>
+                      <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        {uploadResult.id > 0 && (
+                          <Button
+                            className="flex-1 btn-primary"
+                            onClick={() => setLocation(`/orders/${uploadResult.id}`)}
+                            data-testid="button-view-order"
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            View Order Details
+                          </Button>
+                        )}
+                        <Button
+                          className="flex-1"
+                          variant="outline"
+                          onClick={() => setLocation("/")}
+                          data-testid="button-go-to-dashboard"
+                        >
+                          <LayoutDashboard className="w-4 h-4 mr-2" />
+                          Go to Dashboard
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
