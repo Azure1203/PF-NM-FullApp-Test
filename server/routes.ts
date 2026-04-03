@@ -7400,6 +7400,9 @@ export async function registerRoutes(
     }
   });
 
+  // Storage strategy: images are stored as base64 in the DB image_data column.
+  // Object storage (GCS) is not used here — it is unavailable in this deployment environment.
+  // See migration 0007_image_data_columns.sql and shared/schema.ts imageData fields.
   app.post('/api/admin/products/bulk-upload-images', isAuthenticated, imageUpload.array('images', 100), async (req, res) => {
     try {
       const files = req.files as Express.Multer.File[] | undefined;
