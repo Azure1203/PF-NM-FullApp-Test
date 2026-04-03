@@ -299,7 +299,10 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
           }
           const itemBatch: InsertOrderItem[] = [];
           for (const item of itemObjects) {
-            const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
+            const sku: string = (
+              item.MANU_CODE || item['Manuf code'] || item['Manuf Code'] || item['manuf code'] ||
+              item['MANUF CODE'] || item.SKU || item.sku || item['MANU CODE'] || ''
+            ).toString().trim();
             if (!sku) continue;
 
             const product = matchProductToSku(sku, activeProducts);
@@ -330,11 +333,11 @@ async function processAsanaImportTasks(): Promise<{ processed: number; imported:
 
             const pricingItem = {
               ...item,
-              width:    Number(item.Width    || item.width    || 0),
-              height:   Number(item.Height   || item.height   || 0),
-              length:   Number(item.Length   || item.length   || 0),
-              depth:    Number(item.Length   || item.length   || 0),
-              quantity: Number(item.Qty      || item.quantity || item.QUANTITY || 1),
+              width:    Number(item['Width(R)']  || item.Width    || item.width    || item['WIDTH']  || 0),
+              height:   Number(item.Height       || item.height   || item['HEIGHT'] || 0),
+              length:   Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || 0),
+              depth:    Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || item.Thickness || item.thickness || 0),
+              quantity: Number(item.Quantity     || item.Qty      || item.quantity || item.QUANTITY  || 1),
             };
 
             let unitPrice = 0;

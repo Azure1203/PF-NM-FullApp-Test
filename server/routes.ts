@@ -1194,7 +1194,7 @@ export async function registerRoutes(
           }
           const key = `${product.id}:${grid.id}:${alias}`;
           if (existingBindingSet.has(key)) continue;
-          const lookupColumn = colorAliases.has(alias) ? 'Material' : 'MANU_CODE';
+          const lookupColumn = colorAliases.has(alias) ? 'Color' : 'MANU_CODE';
           toCreate.push({ productId: product.id, productName: product.name, gridId: grid.id, gridName: grid.name, alias, lookupColumn });
           existingBindingSet.add(key);
         }
@@ -1422,6 +1422,29 @@ export async function registerRoutes(
       })));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
+    }
+  });
+
+  // Diagnostic endpoint — quick order health check
+  app.get('/api/test/order-check/:id', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const files = await storage.getProjectFiles(projectId);
+      res.json({
+        projectId,
+        fileCount: files.length,
+        filenames: files.map(f => f.originalFilename),
+        itemCount: items.length,
+        sampleItems: items.slice(0, 3).map(i => ({
+          sku: i.sku, unitPrice: i.unitPrice, totalPrice: i.totalPrice,
+          pricingError: i.pricingError, exportType: i.exportType,
+        })),
+        totalPrice: items.reduce((s, i) => s + (i.totalPrice ?? 0), 0),
+        pricingErrors: items.filter(i => i.pricingError).length,
+      });
+    } catch (e: any) {
+      res.json({ error: (e as Error).message });
     }
   });
 
@@ -2414,7 +2437,10 @@ export async function registerRoutes(
         let rpPricingErrors = 0;
 
         for (const item of itemObjects) {
-          const sku: string = (item.MANU_CODE || item.SKU || item['Manuf Code'] || '').toString().trim();
+          const sku: string = (
+            item.MANU_CODE || item['Manuf code'] || item['Manuf Code'] || item['manuf code'] ||
+            item['MANUF CODE'] || item.SKU || item.sku || item['MANU CODE'] || ''
+          ).toString().trim();
           if (!sku) continue;
 
           const product = matchProductToSku(sku, activeProducts);
@@ -2453,11 +2479,11 @@ export async function registerRoutes(
 
           const pricingItem = {
             ...item,
-            width:    Number(item.Width    || item.width    || 0),
-            height:   Number(item.Height   || item.height   || 0),
-            length:   Number(item.Length   || item.length   || 0),
-            depth:    Number(item.Length   || item.length   || 0),
-            quantity: Number(item.Qty      || item.quantity || item.QUANTITY || 1),
+            width:    Number(item['Width(R)']  || item.Width    || item.width    || item['WIDTH']  || 0),
+            height:   Number(item.Height       || item.height   || item['HEIGHT'] || 0),
+            length:   Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || 0),
+            depth:    Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || item.Thickness || item.thickness || 0),
+            quantity: Number(item.Quantity     || item.Qty      || item.quantity || item.QUANTITY  || 1),
           };
 
           let unitPrice = 0;
@@ -2499,7 +2525,7 @@ export async function registerRoutes(
             fileId: file.id,
             productId: product?.id ?? null,
             sku,
-            description: item.NAME || item['Part Name'] || item.Description || '',
+            description: item.NAME || item['Part Name'] || item.Description || item['Manuf code'] || item.MANU_CODE || '',
             width:    pricingItem.width    || null,
             height:   pricingItem.height   || null,
             depth:    pricingItem.length   || null,
@@ -3058,7 +3084,8 @@ export async function registerRoutes(
         console.log(`[Upload Pipeline] Parsed ${itemObjects.length} data rows from ${pf.filename}`);
         if (itemObjects.length > 0) {
           console.log(`[Upload Pipeline] First item columns: ${JSON.stringify(Object.keys(itemObjects[0]))}`);
-          console.log(`[Upload Pipeline] First item MANU_CODE: "${itemObjects[0].MANU_CODE || itemObjects[0].SKU || '(not found)'}"`);
+          const firstSku = itemObjects[0].MANU_CODE || itemObjects[0]['Manuf code'] || itemObjects[0].SKU || '(not found)';
+          console.log(`[Upload Pipeline] First item SKU: "${firstSku}"`);
           console.log(`[Upload Pipeline] First item Material/Color: "${itemObjects[0].Material || itemObjects[0].Color || itemObjects[0].Colour || '(not found)'}"`);
         } else {
           console.error(`[Upload Pipeline] ⚠ ZERO data rows parsed — no order items will be created`);
@@ -3074,7 +3101,8 @@ export async function registerRoutes(
         for (const item of itemObjects) {
           // Resolve SKU from common column name variants
           const sku: string = (
-            item.MANU_CODE || item.SKU || item['Manuf Code'] || ''
+            item.MANU_CODE || item['Manuf code'] || item['Manuf Code'] || item['manuf code'] ||
+            item['MANUF CODE'] || item.SKU || item.sku || item['MANU CODE'] || ''
           ).toString().trim();
 
           if (!sku) continue; // skip blank rows
@@ -3119,11 +3147,11 @@ export async function registerRoutes(
           // for backward-compatibility with formulas written before the rename.
           const pricingItem = {
             ...item,
-            width:    Number(item.Width    || item.width    || 0),
-            height:   Number(item.Height   || item.height   || 0),
-            length:   Number(item.Length   || item.length   || 0),
-            depth:    Number(item.Length   || item.length   || 0),
-            quantity: Number(item.Qty      || item.quantity || item.QUANTITY || 1),
+            width:    Number(item['Width(R)']  || item.Width    || item.width    || item['WIDTH']  || 0),
+            height:   Number(item.Height       || item.height   || item['HEIGHT'] || 0),
+            length:   Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || 0),
+            depth:    Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || item.Thickness || item.thickness || 0),
+            quantity: Number(item.Quantity     || item.Qty      || item.quantity || item.QUANTITY  || 1),
           };
 
           // Calculate unit price
@@ -3170,7 +3198,7 @@ export async function registerRoutes(
             fileId: orderFile.id,
             productId: product?.id ?? null,
             sku,
-            description: item.NAME || item['Part Name'] || item.Description || '',
+            description: item.NAME || item['Part Name'] || item.Description || item['Manuf code'] || item.MANU_CODE || '',
             width:    pricingItem.width    || null,
             height:   pricingItem.height   || null,
             depth:    pricingItem.length   || null,
