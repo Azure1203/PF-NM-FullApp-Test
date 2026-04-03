@@ -34,6 +34,16 @@ import { Link } from "wouter";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { api, type ProjectWithFiles, type SyncPreview } from "@shared/routes";
+import { AllItemsTab } from "@/pages/order-tabs/AllItemsTab";
+import { InvoiceTab } from "@/pages/order-tabs/InvoiceTab";
+import { PackingSlipTab } from "@/pages/order-tabs/PackingSlipTab";
+import { OrdTab } from "@/pages/order-tabs/OrdTab";
+import { EliasTab } from "@/pages/order-tabs/EliasTab";
+import { MJTab } from "@/pages/order-tabs/MJTab";
+import { ErpTab } from "@/pages/order-tabs/ErpTab";
+import { CtsTab } from "@/pages/order-tabs/CtsTab";
+import { HardwareTab } from "@/pages/order-tabs/HardwareTab";
+import { GlassTab } from "@/pages/order-tabs/GlassTab";
 import { Badge } from "@/components/ui/badge";
 import { PackingSlipChecklist } from "@/components/PackingSlipChecklist";
 
@@ -92,10 +102,7 @@ export default function OrderDetails() {
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [materialSummaryOpen, setMaterialSummaryOpen] = useState(false);
   const [editingProjectNotes, setEditingProjectNotes] = useState<string | null>(null);
-  const [pricingOpen, setPricingOpen] = useState(true);
-  const [outputDocsOpen, setOutputDocsOpen] = useState(false);
-  const [activeOutputTab, setActiveOutputTab] = useState("invoice");
-  const [fileFilter, setFileFilter] = useState<'all' | number>('all');
+  const [activeTab, setActiveTab] = useState("overview");
 
   const [editingCienappsJobNumber, setEditingCienappsJobNumber] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<{ [fileId: number]: string }>({});
@@ -759,30 +766,6 @@ export default function OrderDetails() {
   const hasHardware = (exportTypeCounts['HARDWARE'] || 0) > 0;
   const hasORD = !!(orderItems?.some(i => i.exportText));
 
-  const filteredItems = fileFilter === 'all'
-    ? (orderItems ?? [])
-    : (orderItems ?? []).filter(i => i.fileId === fileFilter);
-
-  const { data: eliasExportText } = useQuery<string>({
-    queryKey: ['/api/orders', id, 'export', 'elias'],
-    queryFn: () => fetch(`/api/orders/${id}/export/elias`, { credentials: 'include' }).then(r => r.ok ? r.text() : Promise.reject(new Error('No Elias items'))),
-    enabled: !!id && hasElias && activeOutputTab === 'elias' && outputDocsOpen,
-    staleTime: 60_000,
-  });
-
-  const { data: mjExportText } = useQuery<string>({
-    queryKey: ['/api/orders', id, 'export', 'mj'],
-    queryFn: () => fetch(`/api/orders/${id}/export/mj`, { credentials: 'include' }).then(r => r.ok ? r.text() : Promise.reject(new Error('No M&J items'))),
-    enabled: !!id && hasMJ && activeOutputTab === 'mj' && outputDocsOpen,
-    staleTime: 60_000,
-  });
-
-  const { data: erpExportText } = useQuery<string>({
-    queryKey: ['/api/orders', id, 'export', 'erp'],
-    queryFn: () => fetch(`/api/orders/${id}/export/erp`, { credentials: 'include' }).then(r => r.ok ? r.text() : Promise.reject(new Error('No ERP items'))),
-    enabled: !!id && activeOutputTab === 'erp' && outputDocsOpen,
-    staleTime: 60_000,
-  });
 
   // Auto-select first file when preview loads
   useEffect(() => {
@@ -1268,564 +1251,154 @@ export default function OrderDetails() {
           }
         />
 
-        {/* Pricing & Export - Collapsible */}
-        <Collapsible open={pricingOpen} onOpenChange={setPricingOpen}>
-          <Card className="mb-6 border-none shadow-md" data-testid="pricing-export-card">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-lg">
-                <CardTitle className="flex items-center justify-between gap-2 text-lg">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-primary" />
-                    Pricing &amp; Export
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {orderItems && orderItems.length > 0 && (
-                      <span className="text-base font-bold text-primary">
-                        ${orderItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
-                      </span>
-                    )}
-                    {pricingOpen ? (
-                      <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                    )}
-                  </div>
-                </CardTitle>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0">
-                {/* Action buttons */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <Button
-                    data-testid="button-reprice"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => repriceMutation.mutate()}
-                    disabled={repriceMutation.isPending}
-                  >
-                    {repriceMutation.isPending
-                      ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                      : <RefreshCw className="w-4 h-4 mr-1.5" />
-                    }
-                    Re-run Pricing
-                  </Button>
-                  <Button
-                    data-testid="button-regenerate-checklists"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => regenerateChecklistsMutation.mutate()}
-                    disabled={regenerateChecklistsMutation.isPending}
-                  >
-                    {regenerateChecklistsMutation.isPending
-                      ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                      : <ClipboardList className="w-4 h-4 mr-1.5" />
-                    }
-                    Regenerate Checklists
-                  </Button>
-                  <Button
-                    data-testid="button-download-ord"
-                    variant="outline"
-                    size="sm"
-                    onClick={downloadOrd}
-                  >
-                    <Download className="w-4 h-4 mr-1.5" />
-                    Download .ORD
-                  </Button>
-                  {hasElias && (
-                    <Button
-                      data-testid="button-download-elias"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/orders/${id}/export/elias`, '_blank')}
-                    >
-                      <Download className="w-4 h-4 mr-1.5" />
-                      Elias CSV ({exportTypeCounts['ELIAS']})
-                    </Button>
-                  )}
-                  {hasElias && (
-                    <Button
-                      data-testid="button-elias-pdf"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/orders/${id}/pdf/elias`, '_blank')}
-                    >
-                      <FileText className="w-4 h-4 mr-1.5" />
-                      Elias PDF ({exportTypeCounts['ELIAS']})
-                    </Button>
-                  )}
-                  {hasMJ && (
-                    <Button
-                      data-testid="button-download-mj"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/orders/${id}/export/mj`, '_blank')}
-                    >
-                      <Download className="w-4 h-4 mr-1.5" />
-                      M&amp;J CSV ({exportTypeCounts['MJ']})
-                    </Button>
-                  )}
-                  {(hasMJ || hasGlass) && (
-                    <Button
-                      data-testid="button-mj-shaker-pdf"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/orders/${id}/pdf/mj`, '_blank')}
-                    >
-                      <FileText className="w-4 h-4 mr-1.5" />
-                      M&amp;J Shaker PDF ({(exportTypeCounts['MJ'] || 0) + (exportTypeCounts['GLASS'] || 0)})
-                    </Button>
-                  )}
-                  {hasCTS && (
-                    <Button
-                      data-testid="button-download-cts"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/orders/${id}/export/cts`, '_blank')}
-                    >
-                      <Download className="w-4 h-4 mr-1.5" />
-                      Cut-to-Size ({exportTypeCounts['CTS']})
-                    </Button>
-                  )}
-                  {hasCTS && (
-                    <Button
-                      data-testid="button-cts-pdf"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`/api/orders/${id}/pdf/cut-to-size`, '_blank')}
-                    >
-                      <FileText className="w-4 h-4 mr-1.5" />
-                      Cut-to-Size PDF ({exportTypeCounts['CTS']})
-                    </Button>
-                  )}
-                  <Button
-                    data-testid="button-download-erp"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(`/api/orders/${id}/export/erp`, '_blank')}
-                  >
-                    <Download className="w-4 h-4 mr-1.5" />
-                    ERP Import
-                  </Button>
-                  <Button
-                    data-testid="button-invoice-pdf"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(`/api/orders/${id}/pdf/invoice`, '_blank')}
-                  >
-                    <FileText className="w-4 h-4 mr-1.5" />
-                    Invoice PDF
-                  </Button>
-                  <Button
-                    data-testid="button-customer-packing-slip"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(`/api/orders/${id}/pdf/customer-packing-slip`, '_blank')}
-                  >
-                    <FileText className="w-4 h-4 mr-1.5" />
-                    Customer Packing Slip
-                  </Button>
-                  <Button
-                    data-testid="button-internal-packing-slip"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(`/api/orders/${id}/pdf/internal-packing-slip`, '_blank')}
-                  >
-                    <FileText className="w-4 h-4 mr-1.5" />
-                    Internal Packing Slip
-                  </Button>
-                </div>
+        {/* ==================== MAIN TABS ==================== */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 mb-6">
+            <TabsList className="inline-flex h-auto p-1 gap-0.5 ml-4 sm:ml-0 flex-wrap">
+              <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+              <TabsTrigger value="items" data-testid="tab-items">All Items</TabsTrigger>
+              <TabsTrigger value="invoice" data-testid="tab-invoice">Invoice</TabsTrigger>
+              <TabsTrigger value="customer-slip" data-testid="tab-customer-slip">Customer Slip</TabsTrigger>
+              <TabsTrigger value="internal-slip" data-testid="tab-internal-slip">Internal Slip</TabsTrigger>
+              {hasORD && <TabsTrigger value="ord" data-testid="tab-ord">Cabinet Vision</TabsTrigger>}
+              {hasElias && <TabsTrigger value="elias" data-testid="tab-elias">Elias</TabsTrigger>}
+              {hasMJ && <TabsTrigger value="mj" data-testid="tab-mj">M&amp;J Doors</TabsTrigger>}
+              <TabsTrigger value="erp" data-testid="tab-erp">ERP Import</TabsTrigger>
+              {hasCTS && <TabsTrigger value="cts" data-testid="tab-cts">Cut-to-Size</TabsTrigger>}
+              {hasHardware && <TabsTrigger value="hardware" data-testid="tab-hardware">Hardware</TabsTrigger>}
+              {hasGlass && <TabsTrigger value="glass" data-testid="tab-glass">Glass</TabsTrigger>}
+            </TabsList>
+          </div>
 
-                {/* Loading skeleton */}
-                {itemsLoading && (
-                  <div className="space-y-2">
-                    {[0,1,2].map(i => (
-                      <div key={i} className="flex gap-3">
-                        <Skeleton className="h-8 w-24" />
-                        <Skeleton className="h-8 w-40" />
-                        <Skeleton className="h-8 flex-1" />
-                        <Skeleton className="h-8 w-16" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Empty state */}
-                {!itemsLoading && (!orderItems || orderItems.length === 0) && (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No pricing data available. Re-upload the order CSV to generate pricing breakdown.
-                  </div>
-                )}
-
-                {/* Items table */}
-                {!itemsLoading && orderItems && orderItems.length > 0 && (
-                  <>
-                    {/* Per-file filter */}
-                    {project?.files && project.files.length > 1 && (
-                      <div className="flex gap-1.5 flex-wrap mb-3">
-                        <button
-                          onClick={() => setFileFilter('all')}
-                          className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${fileFilter === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted border-border text-muted-foreground'}`}
-                        >
-                          All Files ({orderItems.length})
-                        </button>
-                        {project.files.map((f: any) => {
-                          const fileItemCount = orderItems.filter(i => i.fileId === f.id).length;
-                          return (
-                            <button
-                              key={f.id}
-                              onClick={() => setFileFilter(f.id)}
-                              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${fileFilter === f.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-muted border-border text-muted-foreground'}`}
-                            >
-                              {(f.originalFilename || f.filename || `File ${f.id}`).replace(/\.[^/.]+$/, '')} ({fileItemCount})
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <ScrollArea className="max-h-[500px] rounded-md border">
-                      <Table>
-                        <TableHeader className="sticky top-0 bg-background z-10">
-                          <TableRow>
-                            <TableHead className="font-bold">SKU</TableHead>
-                            <TableHead className="font-bold">Product</TableHead>
-                            <TableHead className="font-bold">Description</TableHead>
-                            <TableHead className="font-bold text-center">W × H × L</TableHead>
-                            <TableHead className="font-bold text-center">Qty</TableHead>
-                            <TableHead className="font-bold text-right">Unit Price</TableHead>
-                            <TableHead className="font-bold text-right">Total</TableHead>
-                            <TableHead className="font-bold text-center">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredItems.map((item) => {
-                            const hasError = !!item.pricingError;
-                            const matched = item.productId !== null;
-                            const zeroPriced = matched && !hasError && (item.unitPrice ?? 0) === 0;
-                            const priced = matched && !hasError && (item.unitPrice ?? 0) > 0;
-                            const rowClass = hasError
-                              ? 'bg-red-50 dark:bg-red-950/20'
-                              : zeroPriced
-                              ? 'bg-yellow-50 dark:bg-yellow-950/20'
-                              : priced
-                              ? 'bg-emerald-50 dark:bg-emerald-950/20'
-                              : '';
-                            return (
-                              <TableRow
-                                key={item.id}
-                                data-testid={`row-order-item-${item.id}`}
-                                className={rowClass}
-                              >
-                                <TableCell className="font-mono text-xs">
-                                  <div>{item.sku}</div>
-                                  {hasError && (
-                                    <div className="mt-1 text-[10px] text-red-600 dark:text-red-400 font-sans">
-                                      {item.pricingError}
-                                    </div>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {item.productName ? (
-                                    <span className="text-sm">{item.productName}</span>
-                                  ) : (
-                                    <Badge variant="destructive" className="text-[10px]">No Match</Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">{item.description || '—'}</TableCell>
-                                <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap">
-                                  {item.width ?? '?'} × {item.height ?? '?'} × {item.depth ?? '?'}
-                                </TableCell>
-                                <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                                <TableCell className="text-right font-mono text-sm">
-                                  ${(item.unitPrice ?? 0).toFixed(2)}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-sm font-semibold">
-                                  ${(item.totalPrice ?? 0).toFixed(2)}
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  {hasError ? (
-                                    <Badge variant="destructive" data-testid={`badge-error-${item.id}`} className="gap-1 text-[10px]">
-                                      <X className="h-3 w-3" /> Error
-                                    </Badge>
-                                  ) : zeroPriced ? (
-                                    <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 gap-1 text-[10px]" data-testid={`badge-warn-${item.id}`}>
-                                      <AlertTriangle className="h-3 w-3" /> $0
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 gap-1 text-[10px]" data-testid={`badge-ok-${item.id}`}>
-                                      <Check className="h-3 w-3" /> OK
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-
-                    {/* Summary row */}
-                    <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t text-sm text-muted-foreground">
-                      <span><strong>{filteredItems.length}</strong> items{fileFilter !== 'all' && <span className="text-xs ml-1">(filtered)</span>}</span>
-                      {filteredItems.filter(i => !!i.pricingError).length > 0 && (
-                        <span className="text-red-500">
-                          <strong>{filteredItems.filter(i => !!i.pricingError).length}</strong> errors
-                        </span>
-                      )}
-                      {filteredItems.filter(i => !i.productId).length > 0 && (
-                        <span className="text-amber-500">
-                          <strong>{filteredItems.filter(i => !i.productId).length}</strong> unmatched SKUs
-                        </span>
-                      )}
-                      <span className="ml-auto font-bold text-foreground">
-                        {fileFilter !== 'all' ? 'File Subtotal' : 'Grand Total'}: ${filteredItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        {fileFilter !== 'all' && orderItems && (
-                          <span className="ml-2 font-normal text-muted-foreground text-xs">
-                            (Order: ${orderItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
+          {/* ---- Items Tab ---- */}
+          <TabsContent value="items">
+            <Card className="mb-6 border-none shadow-md">
+              <CardContent className="pt-4">
+                <AllItemsTab
+                  orderId={id}
+                  orderItems={orderItems ?? []}
+                  isLoading={itemsLoading}
+                  files={project?.files}
+                  exportTypeCounts={exportTypeCounts}
+                  hasElias={hasElias}
+                  hasMJ={hasMJ}
+                  hasGlass={hasGlass}
+                  hasCTS={hasCTS}
+                  repricePending={repriceMutation.isPending}
+                  regeneratePending={regenerateChecklistsMutation.isPending}
+                  onReprice={() => repriceMutation.mutate()}
+                  onRegenerate={() => regenerateChecklistsMutation.mutate()}
+                  onDownloadOrd={downloadOrd}
+                />
               </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
+            </Card>
+          </TabsContent>
 
-        {/* Output Documents - Collapsible */}
-        <Collapsible open={outputDocsOpen} onOpenChange={setOutputDocsOpen}>
-          <Card className="mb-6 border-none shadow-md" data-testid="output-docs-card">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="pb-2 cursor-pointer hover-elevate rounded-t-lg">
-                <CardTitle className="flex items-center justify-between gap-2 text-lg">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-primary" />
-                    Output Documents
-                  </div>
-                  {outputDocsOpen ? (
-                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0">
-                <Tabs value={activeOutputTab} onValueChange={setActiveOutputTab}>
-                  <ScrollArea className="w-full">
-                    <TabsList className="flex w-max gap-1 h-auto flex-wrap p-1 mb-4">
-                      <TabsTrigger value="invoice" className="text-xs">Invoice</TabsTrigger>
-                      <TabsTrigger value="customer-packing-slip" className="text-xs">Customer Packing Slip</TabsTrigger>
-                      <TabsTrigger value="internal-packing-slip" className="text-xs">Internal Packing Slip</TabsTrigger>
-                      {hasORD && <TabsTrigger value="ord" className="text-xs">Cabinet Vision (.ORD)</TabsTrigger>}
-                      {hasElias && <TabsTrigger value="elias" className="text-xs">Elias Export ({exportTypeCounts['ELIAS']})</TabsTrigger>}
-                      {hasElias && <TabsTrigger value="elias-pdf" className="text-xs">Elias PDF</TabsTrigger>}
-                      {(hasMJ || hasGlass) && <TabsTrigger value="mj" className="text-xs">M&amp;J Export ({(exportTypeCounts['MJ'] || 0) + (exportTypeCounts['GLASS'] || 0)})</TabsTrigger>}
-                      {(hasMJ || hasGlass) && <TabsTrigger value="mj-pdf" className="text-xs">M&amp;J Shaker PDF</TabsTrigger>}
-                      <TabsTrigger value="erp" className="text-xs">ERP Import</TabsTrigger>
-                      {hasCTS && <TabsTrigger value="cts" className="text-xs">Cut-to-Size ({exportTypeCounts['CTS']})</TabsTrigger>}
-                      {hasHardware && <TabsTrigger value="hardware" className="text-xs">Hardware ({exportTypeCounts['HARDWARE']})</TabsTrigger>}
-                      {hasGlass && <TabsTrigger value="glass" className="text-xs">Glass ({exportTypeCounts['GLASS']})</TabsTrigger>}
-                    </TabsList>
-                  </ScrollArea>
-
-                  {/* PDF tabs — inline iframe viewer */}
-                  {(['invoice', 'customer-packing-slip', 'internal-packing-slip', 'cts', 'elias-pdf', 'mj-pdf'] as const).map(tab => {
-                    const urlMap: Record<string, string> = {
-                      'invoice': `/api/orders/${id}/pdf/invoice`,
-                      'customer-packing-slip': `/api/orders/${id}/pdf/customer-packing-slip`,
-                      'internal-packing-slip': `/api/orders/${id}/pdf/internal-packing-slip`,
-                      'cts': `/api/orders/${id}/pdf/cut-to-size`,
-                      'elias-pdf': `/api/orders/${id}/pdf/elias`,
-                      'mj-pdf': `/api/orders/${id}/pdf/mj`,
-                    };
-                    const labelMap: Record<string, string> = {
-                      'invoice': 'Invoice.pdf',
-                      'customer-packing-slip': 'Customer_Packing_Slip.pdf',
-                      'internal-packing-slip': 'Internal_Packing_Slip.pdf',
-                      'cts': 'Cut_to_Size.pdf',
-                      'elias-pdf': 'Elias_Export.pdf',
-                      'mj-pdf': 'MJ_Shaker.pdf',
-                    };
-                    const url = urlMap[tab];
-                    const label = labelMap[tab];
-                    return (
-                      <TabsContent key={tab} value={tab}>
-                        <div className="flex justify-end mb-2">
-                          <a href={url} target="_blank" rel="noopener noreferrer">
-                            <Button variant="outline" size="sm">
-                              <Download className="w-3.5 h-3.5 mr-1.5" />
-                              Download {label}
-                            </Button>
-                          </a>
-                        </div>
-                        <iframe
-                          src={url}
-                          className="w-full rounded border"
-                          style={{ height: '800px' }}
-                          title={label}
-                        />
-                      </TabsContent>
-                    );
-                  })}
-
-                  {/* ORD tab — code block assembled from items */}
-                  {hasORD && (
-                    <TabsContent value="ord">
-                      {(() => {
-                        const ordItems = orderItems?.filter(i => i.exportText) ?? [];
-                        const fileMap = new Map((project?.files || []).map((f: any) => [f.id, f]));
-                        const headerTemplate = headerTemplateSetting?.value || '';
-                        const grouped = new Map<number, string[]>();
-                        for (const item of ordItems) {
-                          if (!grouped.has(item.fileId)) grouped.set(item.fileId, []);
-                          grouped.get(item.fileId)!.push(item.exportText!);
-                        }
-                        let ordText = '';
-                        for (const [fileId, lines] of grouped) {
-                          const file = fileMap.get(fileId);
-                          if (headerTemplate) {
-                            const designName = file?.poNumber || file?.originalFilename?.replace(/\.[^.]+$/, '') || '';
-                            const poNumber = file?.poNumber || '';
-                            ordText += headerTemplate
-                              .replace(/\{\{design_name\}\}/g, designName)
-                              .replace(/\{\{po_number\}\}/g, poNumber) + '\n';
-                          }
-                          ordText += lines.join('\n') + '\n';
-                        }
-                        return (
-                          <>
-                            <div className="flex justify-end mb-2">
-                              <Button variant="outline" size="sm" onClick={downloadOrd}>
-                                <Download className="w-3.5 h-3.5 mr-1.5" />
-                                Download .ORD
-                              </Button>
-                            </div>
-                            <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px] whitespace-pre-wrap">
-                              {ordText || 'No ORD export text found in this order.'}
-                            </pre>
-                            <p className="text-xs text-muted-foreground mt-1">{ordItems.length} items with export text</p>
-                          </>
-                        );
-                      })()}
-                    </TabsContent>
-                  )}
-
-                  {/* Elias CSV tab */}
-                  {hasElias && (
-                    <TabsContent value="elias">
-                      <div className="flex justify-end mb-2">
-                        <a href={`/api/orders/${id}/export/elias`} download="Elias_Export.csv">
-                          <Button variant="outline" size="sm">
-                            <Download className="w-3.5 h-3.5 mr-1.5" />
-                            Download Elias_Export.csv
-                          </Button>
-                        </a>
-                      </div>
-                      <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px]">
-                        {eliasExportText ?? 'Loading…'}
-                      </pre>
-                    </TabsContent>
-                  )}
-
-                  {/* M&J CSV tab */}
-                  {(hasMJ || hasGlass) && (
-                    <TabsContent value="mj">
-                      <div className="flex justify-end mb-2">
-                        <a href={`/api/orders/${id}/export/mj`} download="MJ_Export.csv">
-                          <Button variant="outline" size="sm">
-                            <Download className="w-3.5 h-3.5 mr-1.5" />
-                            Download MJ_Export.csv
-                          </Button>
-                        </a>
-                      </div>
-                      <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px]">
-                        {mjExportText ?? 'Loading…'}
-                      </pre>
-                    </TabsContent>
-                  )}
-
-                  {/* ERP tab */}
-                  <TabsContent value="erp">
-                    <div className="flex justify-end mb-2">
-                      <a href={`/api/orders/${id}/export/erp`} download="ERP_Import.csv">
-                        <Button variant="outline" size="sm">
-                          <Download className="w-3.5 h-3.5 mr-1.5" />
-                          Download ERP_Import.csv
-                        </Button>
-                      </a>
-                    </div>
-                    <pre className="bg-muted/50 p-4 rounded border text-xs font-mono overflow-auto max-h-[600px]">
-                      {erpExportText ?? 'Loading…'}
-                    </pre>
-                  </TabsContent>
-
-                  {/* Hardware tab — filtered from items */}
-                  {hasHardware && (
-                    <TabsContent value="hardware">
-                      <ScrollArea className="max-h-[500px] rounded-md border">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                              <TableHead>SKU</TableHead>
-                              <TableHead>Product</TableHead>
-                              <TableHead className="text-center">Qty</TableHead>
-                              <TableHead className="text-right">Unit Price</TableHead>
-                              <TableHead className="text-right">Total</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(orderItems ?? []).filter(i => i.exportType === 'HARDWARE').map(item => (
-                              <TableRow key={item.id}>
-                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                                <TableCell className="text-sm">{item.productName || item.description || '—'}</TableCell>
-                                <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                                <TableCell className="text-right font-mono text-sm">${(item.unitPrice ?? 0).toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-mono text-sm font-semibold">${(item.totalPrice ?? 0).toFixed(2)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </ScrollArea>
-                    </TabsContent>
-                  )}
-
-                  {/* Glass tab — filtered from items */}
-                  {hasGlass && (
-                    <TabsContent value="glass">
-                      <ScrollArea className="max-h-[500px] rounded-md border">
-                        <Table>
-                          <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                              <TableHead>SKU</TableHead>
-                              <TableHead>Product</TableHead>
-                              <TableHead className="text-center">Qty</TableHead>
-                              <TableHead className="text-right">Unit Price</TableHead>
-                              <TableHead className="text-right">Total</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(orderItems ?? []).filter(i => i.exportType === 'GLASS').map(item => (
-                              <TableRow key={item.id}>
-                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
-                                <TableCell className="text-sm">{item.productName || item.description || '—'}</TableCell>
-                                <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                                <TableCell className="text-right font-mono text-sm">${(item.unitPrice ?? 0).toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-mono text-sm font-semibold">${(item.totalPrice ?? 0).toFixed(2)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </ScrollArea>
-                    </TabsContent>
-                  )}
-                </Tabs>
+          {/* ---- Invoice Tab ---- */}
+          <TabsContent value="invoice">
+            <Card className="mb-6 border-none shadow-md">
+              <CardContent className="pt-4">
+                <InvoiceTab orderId={id} />
               </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
+            </Card>
+          </TabsContent>
+
+          {/* ---- Customer Packing Slip Tab ---- */}
+          <TabsContent value="customer-slip">
+            <Card className="mb-6 border-none shadow-md">
+              <CardContent className="pt-4">
+                <PackingSlipTab orderId={id} slipType="customer" />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ---- Internal Packing Slip Tab ---- */}
+          <TabsContent value="internal-slip">
+            <Card className="mb-6 border-none shadow-md">
+              <CardContent className="pt-4">
+                <PackingSlipTab orderId={id} slipType="internal" />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ---- Cabinet Vision ORD Tab ---- */}
+          {hasORD && (
+            <TabsContent value="ord">
+              <Card className="mb-6 border-none shadow-md">
+                <CardContent className="pt-4">
+                  <OrdTab orderId={id} projectName={project?.name ?? ''} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* ---- Elias Tab ---- */}
+          {hasElias && (
+            <TabsContent value="elias">
+              <Card className="mb-6 border-none shadow-md">
+                <CardContent className="pt-4">
+                  <EliasTab orderId={id} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* ---- M&J Doors Tab ---- */}
+          {hasMJ && (
+            <TabsContent value="mj">
+              <Card className="mb-6 border-none shadow-md">
+                <CardContent className="pt-4">
+                  <MJTab orderId={id} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* ---- ERP Import Tab ---- */}
+          <TabsContent value="erp">
+            <Card className="mb-6 border-none shadow-md">
+              <CardContent className="pt-4">
+                <ErpTab orderId={id} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ---- Cut-to-Size Tab ---- */}
+          {hasCTS && (
+            <TabsContent value="cts">
+              <Card className="mb-6 border-none shadow-md">
+                <CardContent className="pt-4">
+                  <CtsTab orderId={id} files={project?.files} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* ---- Hardware Tab ---- */}
+          {hasHardware && (
+            <TabsContent value="hardware">
+              <Card className="mb-6 border-none shadow-md">
+                <CardContent className="pt-4">
+                  <HardwareTab orderItems={orderItems ?? []} files={project?.files} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* ---- Glass Tab ---- */}
+          {hasGlass && (
+            <TabsContent value="glass">
+              <Card className="mb-6 border-none shadow-md">
+                <CardContent className="pt-4">
+                  <GlassTab orderItems={orderItems ?? []} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* ==================== OVERVIEW TAB ==================== */}
+          <TabsContent value="overview">
+
 
         {/* Project Notes - Collapsible */}
         <Collapsible open={projectNotesOpen} onOpenChange={setProjectNotesOpen}>
@@ -3428,6 +3001,9 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
         </div>
+
+          </TabsContent>
+        </Tabs>
       </div>
       
       {/* ==================== ADD/EDIT PALLET DIALOG ==================== */}

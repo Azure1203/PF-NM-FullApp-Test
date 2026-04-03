@@ -1425,6 +1425,159 @@ export async function registerRoutes(
     }
   });
 
+  // GET Invoice data as JSON (for inline HTML rendering)
+  app.get('/api/orders/:id/data/invoice', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+      const items = await storage.getOrderItemsByProject(projectId);
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+      const groupedMap = new Map<string, typeof items>();
+      const groupOrder: string[] = [];
+      for (const item of items) {
+        const key = item.productId != null ? `p:${item.productId}` : `s:${item.sku ?? item.description ?? 'unknown'}`;
+        if (!groupedMap.has(key)) { groupedMap.set(key, []); groupOrder.push(key); }
+        groupedMap.get(key)!.push(item);
+      }
+      let sectionIndex = 0;
+      const sections = groupOrder.map(key => {
+        const groupItems = groupedMap.get(key)!;
+        const firstItem = groupItems[0];
+        const product = firstItem.productId != null ? productMap.get(firstItem.productId) : null;
+        const exportType = firstItem.exportType ?? null;
+        const raw0 = (firstItem.rawRowData ?? {}) as Record<string, any>;
+        const color: string | null = raw0['Material'] ?? raw0['Color'] ?? raw0['Colour'] ?? raw0['color'] ?? null;
+        const invoiceItems = groupItems.map((item, idx) => {
+          const raw = (item.rawRowData ?? {}) as Record<string, any>;
+          return {
+            id: `${sectionIndex + 1} ${String(idx + 1).padStart(2, '0')}`,
+            qty: item.quantity ?? 1,
+            height: item.height, width: item.width,
+            length: item.depth, thickness: item.depth,
+            edgeLeft:   (raw['Left']   === '1' || raw['Left']   === 1) ? 'E' : 'N',
+            edgeRight:  (raw['Right']  === '1' || raw['Right']  === 1) ? 'E' : 'N',
+            edgeTop:    (raw['Top']    === '1' || raw['Top']    === 1) ? 'E' : 'N',
+            edgeBottom: (raw['Bottom'] === '1' || raw['Bottom'] === 1) ? 'E' : 'N',
+            type: product?.name ?? item.description ?? '',
+            supplyType: item.supplyType ?? 'STOCK',
+            unitPrice: item.unitPrice ?? 0,
+            totalPrice: item.totalPrice ?? 0,
+            pricingError: item.pricingError ?? null,
+          };
+        });
+        sectionIndex++;
+        return {
+          sku: firstItem.sku ?? product?.skuPrefix ?? `Item ${sectionIndex}`,
+          color, exportType,
+          categoryLabel: product?.description ?? exportType ?? '',
+          productDescription: product?.name ?? firstItem.description ?? '',
+          items: invoiceItems,
+          totalItems: groupItems.reduce((s, i) => s + (i.quantity ?? 1), 0),
+          subtotal: Math.round(groupItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+        };
+      });
+      const grandTotal = Math.round(sections.reduce((s, sec) => s + sec.subtotal, 0) * 100) / 100;
+      res.json({
+        orderName: project.name, dealer: project.dealer ?? null,
+        orderId: projectId, sections, grandTotal,
+        itemCount: items.length,
+        errorCount: items.filter(i => i.pricingError).length,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET Elias items as JSON
+  app.get('/api/orders/:id/data/elias', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const eliasItems = items.filter(i => i.exportType === 'ELIAS');
+      res.json({
+        items: eliasItems.map(i => ({
+          sku: i.sku, qty: i.quantity, height: i.height, width: i.width, depth: i.depth,
+          unitPrice: i.unitPrice, totalPrice: i.totalPrice,
+          exportText: i.exportText, pricingError: i.pricingError, supplyType: i.supplyType,
+        })),
+        total: Math.round(eliasItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET M&J items as JSON
+  app.get('/api/orders/:id/data/mj', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const mjItems = items.filter(i => i.exportType === 'MJ');
+      res.json({
+        items: mjItems.map(i => ({
+          sku: i.sku, qty: i.quantity, height: i.height, width: i.width, depth: i.depth,
+          unitPrice: i.unitPrice, totalPrice: i.totalPrice,
+          exportText: i.exportText, pricingError: i.pricingError, supplyType: i.supplyType,
+        })),
+        total: Math.round(mjItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET Hardware items as JSON
+  app.get('/api/orders/:id/data/hardware', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+      const hwItems = items.filter(i => i.exportType === 'HARDWARE');
+      res.json({
+        items: hwItems.map(i => ({
+          sku: i.sku, qty: i.quantity,
+          productName: i.productId ? (productMap.get(i.productId)?.name ?? null) : null,
+          unitPrice: i.unitPrice, totalPrice: i.totalPrice,
+          supplyType: i.supplyType, pricingError: i.pricingError,
+        })),
+        total: Math.round(hwItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET Glass items as JSON
+  app.get('/api/orders/:id/data/glass', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const glassItems = items.filter(i => i.exportType === 'GLASS');
+      res.json({
+        items: glassItems.map(i => ({
+          sku: i.sku, qty: i.quantity, height: i.height, width: i.width, depth: i.depth,
+          unitPrice: i.unitPrice, totalPrice: i.totalPrice,
+          pricingError: i.pricingError, supplyType: i.supplyType,
+        })),
+        total: Math.round(glassItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET ORD items + assembled text as JSON
+  app.get('/api/orders/:id/data/ord', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const items = await storage.getOrderItemsByProject(projectId);
+      const ordItems = items.filter(i => i.exportText);
+      const assembledOrdText = ordItems.filter(i => i.exportText).map(i => i.exportText).join('\n');
+      res.json({
+        items: ordItems.map(i => ({
+          sku: i.sku, qty: i.quantity, height: i.height, width: i.width, depth: i.depth,
+          unitPrice: i.unitPrice, totalPrice: i.totalPrice,
+          exportText: i.exportText, pricingError: i.pricingError,
+        })),
+        assembledOrdText,
+        total: Math.round(ordItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
   // GET Elias CSV export
   app.get('/api/orders/:id/export/elias', isAuthenticated, async (req, res) => {
     try {
