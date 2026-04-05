@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-05 (r19) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-05 (r21) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -209,7 +209,7 @@ CHANGELOG.md                        Per-release fix log
   - **All Items** — line-item table with per-file filter pills, pricing badges, re-price / regenerate actions
   - **Invoice** — PDF iframe + JSON section breakdown
   - **Customer Slip / Internal Slip** — PDF iframes
-  - **Cabinet Vision** — items shown grouped by room; "Multi-Room" badge when 2+ files; "Download .ORD" button now calls backend `/api/orders/:id/download/ord` directly (r19); multi-room extended 18-field format with `[Walls]` section, global entry numbers, room number in field 14, `Note=` banding (r16)
+  - **Cabinet Vision** — items shown grouped by room; "Multi-Room" badge when 2+ files; download button shows "Download .ORD" (single file) or "Download ORD Files (.ZIP)" (multiple files); one `.ord` per CSV file (r21); standard 8-field format, entry number always `1`, no `[Walls]`, `\r\n` line endings, ZIP via `archiver` (r21)
   - **Elias / M&J Doors / ERP Import / Cut-to-Size / Hardware / Glass** — conditional tabs per `exportType`
 - [x] Page scrolling fixed — all pages with long content scroll correctly (r19: removed `overflow-hidden` from outer wrapper and `<main>`; r15: `h-full` → `min-h-full` on AppLayout inner wrapper)
 - [x] Re-run Pricing button on Order Details — reprices all items, shows ✅/⚠/$0 badges per item
@@ -267,8 +267,11 @@ CHANGELOG.md                        Per-release fix log
 ### r17 — 2026-04-05
 **Fix (critical):** `findGridForAlias` — replaced single-pass `includes()` with a 3-pass priority system: (1) exact match, (2) starts-with (date suffix tolerance), (3) contains fallback. Previously `shelves` matched "Corner Shelves" before "Shelves", putting all shelves-dependent products on the wrong grid and generating zero correct bindings. After deploying: run "Reset & Recreate Bindings" on the Diagnostic page, then "Re-run Pricing" on the affected order.
 
+### r21 — 2026-04-05
+**Feature:** ORD format overhaul — `GET /api/orders/:id/download/ord` rewritten. One `.ord` file per CSV file; single file → single `.ord` download, multiple files → ZIP (via `archiver`). Each `.ord` has its own `[Header]` populated from the stored template using that file's PO number. Standard 8-field cabinet lines (`1,"SKU",W,H,D,"hinge","type",QTY`), entry number always `1`, no `[Walls]` section, `\r\n` line endings. OrdTab button updates to "Download ORD Files (.ZIP)" or "Download .ORD" based on `downloadFormat` field from `/data/ord` endpoint.
+
 ### r16 — 2026-04-05
-**Feature:** Multi-room Cabinet Vision ORD — `GET /api/orders/:id/download/ord` completely rewritten. One `[Header]` + `[Walls]` section for the entire project; each item gets `[Catalog]`/`[Parameters]`/`[Cabinets]` blocks; cabinet entries use extended 18-field format with room number in field 14 and global sequential entry numbers; `[Parameters]` uses `Note=` for banding. Room = CSV file order (file 1 → room 1).
+**Feature:** Cabinet Vision ORD — initial multi-room implementation (later superseded by r21). One combined `.ord` file with `[Header]`, `[Walls]`, 18-field extended cabinet lines (room number in field 14), global sequential entry numbers, `Note=` banding.
 **Feature:** `/data/ord` now returns room-grouped structure `{ projectName, rooms[], totalItems, total }` instead of flat `items[]` + `assembledOrdText`.
 **Feature:** OrdTab redesigned — room-labelled sections, "Multi-Room" badge, download via server-side endpoint, removed raw text preview.
 **Feature:** Missing-alias diagnostic logging in upload handler — logs unresolved formula aliases with binding list for the first 3 matched items per upload.

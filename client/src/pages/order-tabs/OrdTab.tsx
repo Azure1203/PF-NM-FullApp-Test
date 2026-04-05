@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, AlertCircle } from "lucide-react";
+import { Download, AlertCircle, FileArchive } from "lucide-react";
 
 interface OrdItem {
   sku: string | null;
@@ -31,6 +31,7 @@ interface OrdData {
   rooms: OrdRoom[];
   totalItems: number;
   total: number;
+  downloadFormat: 'ord' | 'zip';
 }
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -68,8 +69,9 @@ export function OrdTab({ orderId, projectName }: OrdTabProps) {
           )}
         </div>
         <Button variant="outline" size="sm" onClick={handleDownload} data-testid="button-download-ord-file">
-          <Download className="w-4 h-4 mr-1.5" />
-          Download .ORD
+          {data.downloadFormat === 'zip'
+            ? <><FileArchive className="w-4 h-4 mr-1.5" />Download ORD Files (.ZIP)</>
+            : <><Download className="w-4 h-4 mr-1.5" />Download .ORD</>}
         </Button>
       </div>
 

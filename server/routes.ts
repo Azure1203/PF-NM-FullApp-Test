@@ -1681,6 +1681,7 @@ export async function registerRoutes(
         };
       }).filter(r => r.itemCount > 0);
 
+      const roomCount = rooms.length;
       res.json({
         projectName: project.name,
         rooms,
@@ -1688,54 +1689,43 @@ export async function registerRoutes(
         total: Math.round(
           rooms.flatMap(r => r.items).reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100
         ) / 100,
+        // Tells the UI whether download will be a single .ord or a .zip
+        downloadFormat: roomCount > 1 ? 'zip' : 'ord',
       });
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  // Multi-room ORD file download — one [Header]+[Walls] then per-item [Catalog]/[Parameters]/[Cabinets]
-  // Room number = file index (file 1 → room 1, file 2 → room 2, ...)
+  // ORD file download — one .ord per CSV file; single .ord for 1 file, ZIP for multiple
   app.get('/api/orders/:id/download/ord', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
+      const headerSetting = await storage.getSetting('ord_header_template');
+      const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
+
       const files = await storage.getProjectFiles(projectId);
       const allItems = await storage.getOrderItemsByProject(projectId);
+      const ordItems = allItems.filter(i => i.exportType === 'ORD' && i.exportText);
 
-      const projectName = project.name || `Order ${projectId}`;
-      const poNumber = (project as any).orderId || '';
+      // Build one .ord content buffer per CSV file
+      const fileOrds: { name: string; content: Buffer }[] = [];
 
-      // Single [Header] + [Walls] for the entire multi-room file
-      let ord = '';
-      ord += `[Header]\n`;
-      ord += `Version=4\n`;
-      ord += `Unit=1\n`;
-      ord += `Name="${projectName}"\n`;
-      ord += `Description="${projectName}"\n`;
-      ord += `PurchaseOrder="${poNumber}"\n`;
-      ord += `Comment=""\n`;
-      ord += `Customer="Perfect Fit Closets"\n`;
-      ord += `Address1="100-111 5 Avenue Southwest"\n`;
-      ord += `\n`;
-      ord += `[Walls]\n`;
-      ord += `\n`;
+      for (const file of files) {
+        const items = ordItems.filter(i => i.fileId === file.id);
+        if (items.length === 0) continue;
 
-      // Global sequential entry number across all rooms
-      let orderEntryNum = 1;
+        const designName = file.poNumber || file.originalFilename.replace(/\.[^.]+$/, '') || project.name || '';
+        const poNumber   = file.poNumber || '';
 
-      for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
-        const file = files[fileIdx];
-        const roomNum = fileIdx + 1;
+        const header = generateOrdHeader(headerTemplate, { designName, poNumber });
+        const lines: string[] = [header.trim(), ''];
 
-        const fileItems = allItems.filter(i =>
-          i.fileId === file.id && i.exportType === 'ORD' && i.exportText
-        );
-
-        for (const item of fileItems) {
+        for (const item of items) {
           const exportBlock = item.exportText || '';
 
-          // Extract [Catalog] section content
+          // Extract [Catalog] section content (everything between [Catalog] and [Parameters])
           const catalogMatch = exportBlock.match(/\[Catalog\]([\s\S]*?)(?=\[Parameters\]|\[Cabinets\])/);
           const catalogSection = catalogMatch ? catalogMatch[1].trim() : '';
 
@@ -1744,12 +1734,11 @@ export async function registerRoutes(
           const bandingValue = bandingMatch ? bandingMatch[1] : 'NNNN';
 
           // Extract cabinet line from [Cabinets]
-          const cabinetMatch = exportBlock.match(/\[Cabinets\]\s*\n\s*(\d+,"[^"]+".+)/);
-          const cabinetLine = cabinetMatch ? cabinetMatch[1].trim() : null;
-
+          const cabinetMatch = exportBlock.match(/\[Cabinets\]\s*\r?\n\s*(\d+,"[^"]+".+)/);
+          const cabinetLine  = cabinetMatch ? cabinetMatch[1].trim() : null;
           if (!cabinetLine) continue;
 
-          // Parse the standard 8-field cabinet line: N,"SKU",W,H,D,"*","N",QTY
+          // Parse standard 8-field cabinet line: N,"SKU",W,H,D,"hinge","type",QTY
           const parts = cabinetLine.match(/\d+,"([^"]+)",([^,]+),([^,]+),([^,]+),"([^"]+)","([^"]+)",(\d+)/);
           if (!parts) continue;
 
@@ -1761,35 +1750,68 @@ export async function registerRoutes(
           const endTyp = parts[6];
           const qty    = parts[7];
 
-          // Write [Catalog] block for this item
-          ord += `[Catalog]\n`;
-          if (catalogSection) ord += catalogSection + '\n';
-          ord += `\n`;
+          // [Catalog] block
+          lines.push('[Catalog]');
+          if (catalogSection) lines.push(catalogSection);
+          lines.push('');
 
-          // Write [Parameters] with Note= for banding (extended multi-room format)
-          ord += `[Parameters]\n`;
-          ord += `Note="Banding","xPFC_BAND","text","${bandingValue}"\n`;
-          ord += `\n`;
+          // [Parameters] block
+          lines.push('[Parameters]');
+          lines.push(`Note="Banding","xPFC_BAND","text","${bandingValue}"`);
+          lines.push('');
 
-          // Write [Cabinets] with 18-field extended format (room number in field 14)
-          ord += `[Cabinets]\n`;
-          ord += `${orderEntryNum},"${sku}",${width},${height},${depth},"${hinge}","${endTyp}",${qty},"",,0.0,0.0,0.0,${roomNum},0,"","","S"\n`;
-          ord += `\n`;
-
-          orderEntryNum++;
+          // [Cabinets] block — standard 8-field format, entry number always 1
+          lines.push('[Cabinets]');
+          lines.push(`1,"${sku}",${width},${height},${depth},"${hinge}","${endTyp}",${qty}`);
+          lines.push('');
         }
+
+        const safeName = file.originalFilename
+          .replace(/\.csv$/i, '')
+          .replace(/[^a-zA-Z0-9_\-\s]/g, '_')
+          .trim() || `Room_${file.id}`;
+
+        fileOrds.push({ name: safeName, content: Buffer.from(lines.join('\r\n'), 'utf8') });
       }
 
-      if (orderEntryNum === 1) {
+      if (fileOrds.length === 0) {
         return res.status(404).json({ message: 'No ORD items in this order' });
       }
 
-      const filename = projectName.replace(/[^a-zA-Z0-9_() -]/g, '_');
-      res.setHeader('Content-Type', 'text/plain');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}.ord"`);
-      res.send(ord);
+      // Single file → return a single .ord directly (no ZIP)
+      if (fileOrds.length === 1) {
+        const { name, content } = fileOrds[0];
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Content-Disposition', `attachment; filename="${name}.ord"`);
+        return res.send(content);
+      }
+
+      // Multiple files → ZIP containing one .ord per CSV file
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const archiver = require('archiver');
+      const archive  = archiver('zip', { zlib: { level: 9 } });
+
+      const safeProjName = (project.name || `Order_${projectId}`)
+        .replace(/[^a-zA-Z0-9_\-\s]/g, '_')
+        .trim();
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeProjName}_ORD_Files.zip"`);
+
+      archive.on('error', (err: Error) => {
+        console.error('[ORD ZIP] Archive error:', err.message);
+      });
+
+      archive.pipe(res);
+
+      for (const { name, content } of fileOrds) {
+        archive.append(content, { name: `${name}.ord` });
+      }
+
+      await archive.finalize();
     } catch (e: any) {
-      res.status(500).json({ message: e.message });
+      console.error('[ORD Download] Error:', e.message);
+      if (!res.headersSent) res.status(500).json({ message: e.message });
     }
   });
 

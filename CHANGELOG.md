@@ -1,6 +1,38 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-05 (r19)
+> Last updated: 2026-04-05 (r21)
+
+---
+
+## r21 — 2026-04-05 — ORD Format Overhaul: Separate File Per Room + Standard 8-Field Format
+
+### Problem
+The r16/r19 ORD generator produced a single combined `.ord` file using the 18-field Extended Format with a `[Walls]` section and room numbers in field 14. This was architecturally wrong: Cabinet Vision's ORD format has no concept of multiple rooms in one file; `[Walls]` is for physical wall geometry (X/Y coordinates), not logical room grouping; and the 8 reference Allmoxy templates all use the 8-field Standard Format.
+
+### Fix 1 — Separate .ORD per CSV file (`server/routes.ts` — `GET /api/orders/:id/download/ord`)
+
+Rewrote the download endpoint from scratch:
+
+- **One `.ord` file per CSV file** (one per room/closet). Each file has its own `[Header]` block populated from the header template using that file's `poNumber` / filename as `{{design_name}}`.
+- **Single file → single `.ord`** returned directly (no ZIP).
+- **Multiple files → ZIP** (`${projectName}_ORD_Files.zip`) containing one `.ord` per CSV, built with the `archiver` npm package.
+- **NO `[Walls]` section** — removed entirely.
+- **Standard 8-field cabinet line**: `1,"SKU",W,H,D,"hinge","type",QTY` — no trailing positional fields.
+- **Entry number always `1`** for every cabinet line (matches Allmoxy reference behavior).
+- **Consistent `\r\n` line endings** throughout via `lines.join('\r\n')`.
+
+Installed: `archiver`, `@types/archiver`.
+
+### Fix 2 — `/data/ord` response (`server/routes.ts`)
+
+Added `downloadFormat: 'zip' | 'ord'` field to the JSON response. Value is `'zip'` when the project has more than one ORD-bearing CSV file, `'ord'` when only one.
+
+### Fix 3 — Cabinet Vision Tab UI (`client/src/pages/order-tabs/OrdTab.tsx`)
+
+- Added `downloadFormat` field to `OrdData` interface.
+- Download button dynamically shows:
+  - `FileArchive` icon + **"Download ORD Files (.ZIP)"** when `downloadFormat === 'zip'`
+  - `Download` icon + **"Download .ORD"** when `downloadFormat === 'ord'`
 
 ---
 
