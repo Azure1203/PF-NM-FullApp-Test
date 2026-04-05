@@ -1,6 +1,60 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-03 (r14)
+> Last updated: 2026-04-05 (r15)
+
+---
+
+## r15 — 2026-04-05 — Page Scrolling Fix, ORD Header Fix, MANU_CODE Grid Binding Fix, /download/ord Endpoint
+
+### Fix 1 — Page Scrolling (`client/src/components/AppLayout.tsx`)
+
+The content wrapper inside the scrollable area had `h-full`, which capped the inner div to exactly the viewport height. This meant the `overflow-y-auto` scroll container had nothing to scroll through — the child was always the same size as the parent. Changed to `min-h-full` and moved `p-8` into the inner div so padding is part of the scrollable content rather than a fixed frame offset. All pages with long content (Order Details with many items, Admin pages, etc.) now scroll correctly.
+
+```tsx
+// Before
+<div className="flex-1 overflow-y-auto p-8 relative">
+  <div className="max-w-7xl mx-auto h-full">{children}</div>
+</div>
+
+// After
+<div className="flex-1 overflow-y-auto relative">
+  <div className="max-w-7xl mx-auto min-h-full p-8">{children}</div>
+</div>
+```
+
+### Fix 2 — ORD Header Template Default (`server/routes.ts`)
+
+Updated `DEFAULT_ORD_HEADER_TEMPLATE` to include quoted values and filled-in `Customer` and `Address1` fields matching the Cabinet Vision `.ORD` spec (Perfect Fit Closets):
+
+```
+[Header]
+Version=4
+Unit=1
+Name="{{design_name}}"
+Description="{{design_name}}"
+PurchaseOrder="{{po_number}}"
+Comment=""
+Customer="Perfect Fit Closets"
+Address1="100-111 5 Avenue Southwest"
+```
+
+### Fix 3 — `/data/ord` Endpoint Now Includes Header and Filters Correctly (`server/routes.ts`)
+
+`GET /api/orders/:id/data/ord` previously returned all items with any `exportText` regardless of `exportType`. It now:
+- Filters to `exportType === 'ORD'` items only
+- Prepends the generated ORD header (from `app_settings` or default) to `assembledOrdText`
+
+The download button in the Cabinet Vision tab now produces a fully-formed `.ord` file with the correct `[Header]` block at the top.
+
+### Fix 4 — New `/download/ord` Endpoint (`server/routes.ts`)
+
+Added `GET /api/orders/:id/download/ord` — returns the assembled `.ord` file as a direct file download (`Content-Disposition: attachment; filename="<name>.ord"`). Useful for server-to-server integrations and as a stable URL for future automation.
+
+### Fix 5 — MANU_CODE Grid Binding Lookup (both pipeline locations)
+
+When a grid binding's `lookupColumn` contains `"manu"` (e.g. `MANU_CODE`), the pipeline was looking for `item['MANU_CODE']` in the CSV row — a key that doesn't exist (actual CSV column is `Manuf code`, already consumed to extract the SKU). The pipeline now correctly uses the already-extracted `sku` string for those bindings. Applied to both the upload handler and the reprice route in `server/routes.ts`.
+
+Also added `item['COLOR']` (uppercase) as an additional fallback in the color column resolution chain.
 
 ---
 

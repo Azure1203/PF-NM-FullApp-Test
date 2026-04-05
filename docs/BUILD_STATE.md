@@ -192,7 +192,7 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r14)
+## What's Working End-to-End (as of r15)
 
 - [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
 - [x] Allmoxy order CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
@@ -202,13 +202,15 @@ CHANGELOG.md                        Per-release fix log
 - [x] Proxy variables pre-computed into formula scope (r5)
 - [x] Grid row cache in all three pipeline locations — O(1) in-memory lookups (r5)
 - [x] Fast pipeline — no sequential DB queries (fixed r4)
+- [x] MANU_CODE grid bindings correctly use extracted SKU (not missing CSV key) in both upload + reprice pipelines (r15)
 - [x] Order Details — tabbed layout with 12 tabs (r13):
   - **Overview** — project notes, details, order status, material summary, pallets, CSV files, sync status
   - **All Items** — line-item table with per-file filter pills, pricing badges, re-price / regenerate actions
   - **Invoice** — PDF iframe + JSON section breakdown
   - **Customer Slip / Internal Slip** — PDF iframes
-  - **Cabinet Vision** — assembled `.ORD` in `<pre>` + download (conditional: items with `exportText`)
+  - **Cabinet Vision** — assembled `.ORD` in `<pre>` + download; header (`[Header]` block) prepended from `app_settings` or default (r15); filtered to `exportType === 'ORD'` items only (r15)
   - **Elias / M&J Doors / ERP Import / Cut-to-Size / Hardware / Glass** — conditional tabs per `exportType`
+- [x] Page scrolling fixed — all pages with long content scroll correctly (r15: `h-full` → `min-h-full` on AppLayout wrapper)
 - [x] Re-run Pricing button on Order Details — reprices all items, shows ✅/⚠/$0 badges per item
 - [x] Allmoxy Product Manager — full CRUD, image upload/clear, category, formula assignment
 - [x] Attribute Grid Manager — CSV import, row editing, product binding management (Rows + Bindings tabs)
@@ -238,16 +240,22 @@ CHANGELOG.md                        Per-release fix log
 | Gap | Impact |
 |---|---|
 | `allmoxy_products` missing: `isCustomCut`, `isHardware`, `supplierName`, `active` columns | Custom-cut and hardware routing relies on manual `exportType` config instead |
-| `order_items` missing: `formulaSnapshot`, `variableSnapshot`, `ordExportBlock`, `erpExportRow`, `colorCode` | No pricing audit trail; Cabinet Vision .ORD assembler blocked on `ordExportBlock` |
+| `order_items` missing: `formulaSnapshot`, `variableSnapshot`, `colorCode` | No pricing audit trail |
 | `proxy_variables` missing: `description` column | Admins can't annotate what a formula does in the UI |
 | `attribute_grids` missing: `displayName`, `updatedAt` columns | Grid list shows raw name only |
 | `attribute_grid_rows` missing: `sortOrder` column | Grid rows appear in DB insert order only |
-| Cabinet Vision .ORD final assembler | The per-line `ordExportBlock` column doesn't exist yet; final .ORD download is blocked |
 | Pricing audit trail | Formula + variable snapshots not stored at calculation time |
 
 ---
 
 ## Release History
+
+### r15 — 2026-04-05
+**Fix:** Page scrolling — `h-full` on the `max-w-7xl` content wrapper in `AppLayout.tsx` was capping the scrollable area to exactly the viewport height, preventing `overflow-y-auto` from ever activating. Changed to `min-h-full`; moved `p-8` inside the wrapper.
+**Fix:** `DEFAULT_ORD_HEADER_TEMPLATE` updated with quoted values and `Customer`/`Address1` fields for Cabinet Vision compatibility.
+**Fix:** `/api/orders/:id/data/ord` now filters to `exportType === 'ORD'` items only and prepends the generated `[Header]` block to `assembledOrdText`. Cabinet Vision tab download now produces a fully-formed `.ord` file.
+**Added:** `GET /api/orders/:id/download/ord` — server-side file download endpoint returning the assembled `.ord` file as an attachment.
+**Fix:** MANU_CODE grid bindings — when `lookupColumn` contains `"manu"`, the pipeline now uses the already-extracted SKU string instead of attempting to look up a non-existent `item['MANU_CODE']` CSV column. Applied to both upload and reprice pipelines. Also added `item['COLOR']` uppercase fallback in color resolution chain.
 
 ### r14 — 2026-04-03
 **Fix (critical):** CSV column name mismatch — `Manuf code` (lowercase 'c') was not matched by any SKU extraction variant, causing `if (!sku) continue` to skip every row and produce zero order items on every upload. Also fixed `Width(R)`, `Length(L)`, `Quantity` column names for dimensions. Applied across all 3 pipeline locations (upload handler, reprice route, Asana scheduler).
