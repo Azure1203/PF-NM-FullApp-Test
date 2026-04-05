@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-05 (r15) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-05 (r16) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -192,7 +192,7 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r15)
+## What's Working End-to-End (as of r16)
 
 - [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
 - [x] Allmoxy order CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
@@ -208,7 +208,7 @@ CHANGELOG.md                        Per-release fix log
   - **All Items** — line-item table with per-file filter pills, pricing badges, re-price / regenerate actions
   - **Invoice** — PDF iframe + JSON section breakdown
   - **Customer Slip / Internal Slip** — PDF iframes
-  - **Cabinet Vision** — assembled `.ORD` in `<pre>` + download; header (`[Header]` block) prepended from `app_settings` or default (r15); filtered to `exportType === 'ORD'` items only (r15)
+  - **Cabinet Vision** — items shown grouped by room; "Multi-Room" badge when 2+ files; download via server-side `/download/ord`; multi-room extended 18-field format with `[Walls]` section, global entry numbers, room number in field 14, `Note=` banding (r16)
   - **Elias / M&J Doors / ERP Import / Cut-to-Size / Hardware / Glass** — conditional tabs per `exportType`
 - [x] Page scrolling fixed — all pages with long content scroll correctly (r15: `h-full` → `min-h-full` on AppLayout wrapper)
 - [x] Re-run Pricing button on Order Details — reprices all items, shows ✅/⚠/$0 badges per item
@@ -232,6 +232,7 @@ CHANGELOG.md                        Per-release fix log
 - [x] Upload page readiness banner — green/amber pre-flight status before uploading, shows actionable issues
 - [x] Upload page results summary — after successful upload shows matched/unmatched/priced/error counts + "Go to Dashboard" button (no auto-redirect)
 - [x] Comprehensive pipeline logging — `[Upload Pipeline]` and `[Reprice Pipeline]` logs at every critical step: product count, header detection, rows parsed, SKU match/no-match, pricing success/error, batch insert size
+- [x] Missing-alias diagnostic logging — `[Upload Pipeline] MISSING aliases for "SKU": alias1, alias2` logged for first 3 matched items, showing which grid aliases are referenced in the formula but unresolved (r16)
 
 ---
 
@@ -249,6 +250,13 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r16 — 2026-04-05
+**Feature:** Multi-room Cabinet Vision ORD — `GET /api/orders/:id/download/ord` completely rewritten. One `[Header]` + `[Walls]` section for the entire project; each item gets `[Catalog]`/`[Parameters]`/`[Cabinets]` blocks; cabinet entries use extended 18-field format with room number in field 14 and global sequential entry numbers; `[Parameters]` uses `Note=` for banding. Room = CSV file order (file 1 → room 1).
+**Feature:** `/data/ord` now returns room-grouped structure `{ projectName, rooms[], totalItems, total }` instead of flat `items[]` + `assembledOrdText`.
+**Feature:** OrdTab redesigned — room-labelled sections, "Multi-Room" badge, download via server-side endpoint, removed raw text preview.
+**Feature:** Missing-alias diagnostic logging in upload handler — logs unresolved formula aliases with binding list for the first 3 matched items per upload.
+**Fix:** Scrolling hardened — added `min-height: 100vh; overflow-y: auto` to `html, body, #root` in `index.css`.
 
 ### r15 — 2026-04-05
 **Fix:** Page scrolling — `h-full` on the `max-w-7xl` content wrapper in `AppLayout.tsx` was capping the scrollable area to exactly the viewport height, preventing `overflow-y-auto` from ever activating. Changed to `min-h-full`; moved `p-8` inside the wrapper.

@@ -81,3 +81,8 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-[#807161]/45;
 }
+
+html, body, #root {
+  min-height: 100vh;
+  overflow-y: auto;
+}

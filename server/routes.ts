@@ -1582,64 +1582,147 @@ export async function registerRoutes(
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  // GET ORD items + assembled text as JSON
+  // GET ORD items grouped by room (one room per CSV file)
   app.get('/api/orders/:id/data/ord', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const items = await storage.getOrderItemsByProject(projectId);
-      const ordItems = items.filter(i => i.exportType === 'ORD' && i.exportText);
-
-      const headerSetting = await storage.getSetting('ord_header_template');
-      const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
       const files = await storage.getProjectFiles(projectId);
-      const designName = (files[0] as any)?.poNumber || project.name || `Order ${projectId}`;
-      const poNumber = (files[0] as any)?.poNumber || (project as any).orderId || '';
-      const header = generateOrdHeader(headerTemplate, { designName, poNumber });
+      const allItems = await storage.getOrderItemsByProject(projectId);
 
-      const assembledOrdText = header + '\n' + ordItems.map(i => i.exportText).join('\n');
+      const rooms = files.map((file, idx) => {
+        const fileItems = allItems.filter(i =>
+          i.fileId === file.id && i.exportType === 'ORD' && i.exportText
+        );
+        return {
+          roomNumber: idx + 1,
+          fileId: file.id,
+          fileName: file.originalFilename,
+          roomName: file.poNumber || file.originalFilename.replace(/\.[^.]+$/, ''),
+          itemCount: fileItems.length,
+          items: fileItems.map(i => ({
+            sku: i.sku,
+            qty: i.quantity,
+            height: i.height,
+            width: i.width,
+            depth: i.depth,
+            unitPrice: i.unitPrice,
+            totalPrice: i.totalPrice,
+            pricingError: i.pricingError,
+            exportText: i.exportText,
+          })),
+        };
+      }).filter(r => r.itemCount > 0);
 
       res.json({
-        items: ordItems.map(i => ({
-          sku: i.sku, qty: i.quantity, height: i.height, width: i.width, depth: i.depth,
-          unitPrice: i.unitPrice, totalPrice: i.totalPrice,
-          exportText: i.exportText, pricingError: i.pricingError,
-        })),
-        assembledOrdText,
-        total: Math.round(ordItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+        projectName: project.name,
+        rooms,
+        totalItems: rooms.reduce((s, r) => s + r.itemCount, 0),
+        total: Math.round(
+          rooms.flatMap(r => r.items).reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100
+        ) / 100,
       });
     } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
-  // Dedicated ORD file download (returns the assembled .ord file as a download)
+  // Multi-room ORD file download — one [Header]+[Walls] then per-item [Catalog]/[Parameters]/[Cabinets]
+  // Room number = file index (file 1 → room 1, file 2 → room 2, ...)
   app.get('/api/orders/:id/download/ord', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const items = await storage.getOrderItemsByProject(projectId);
-      const ordItems = items.filter(i => i.exportType === 'ORD' && i.exportText);
+      const files = await storage.getProjectFiles(projectId);
+      const allItems = await storage.getOrderItemsByProject(projectId);
 
-      if (ordItems.length === 0) {
+      const projectName = project.name || `Order ${projectId}`;
+      const poNumber = (project as any).orderId || '';
+
+      // Single [Header] + [Walls] for the entire multi-room file
+      let ord = '';
+      ord += `[Header]\n`;
+      ord += `Version=4\n`;
+      ord += `Unit=1\n`;
+      ord += `Name="${projectName}"\n`;
+      ord += `Description="${projectName}"\n`;
+      ord += `PurchaseOrder="${poNumber}"\n`;
+      ord += `Comment=""\n`;
+      ord += `Customer="Perfect Fit Closets"\n`;
+      ord += `Address1="100-111 5 Avenue Southwest"\n`;
+      ord += `\n`;
+      ord += `[Walls]\n`;
+      ord += `\n`;
+
+      // Global sequential entry number across all rooms
+      let orderEntryNum = 1;
+
+      for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
+        const file = files[fileIdx];
+        const roomNum = fileIdx + 1;
+
+        const fileItems = allItems.filter(i =>
+          i.fileId === file.id && i.exportType === 'ORD' && i.exportText
+        );
+
+        for (const item of fileItems) {
+          const exportBlock = item.exportText || '';
+
+          // Extract [Catalog] section content
+          const catalogMatch = exportBlock.match(/\[Catalog\]([\s\S]*?)(?=\[Parameters\]|\[Cabinets\])/);
+          const catalogSection = catalogMatch ? catalogMatch[1].trim() : '';
+
+          // Extract banding value from [Parameters]
+          const bandingMatch = exportBlock.match(/(?:Attribute|Note)="Banding","xPFC_BAND","text","([^"]+)"/);
+          const bandingValue = bandingMatch ? bandingMatch[1] : 'NNNN';
+
+          // Extract cabinet line from [Cabinets]
+          const cabinetMatch = exportBlock.match(/\[Cabinets\]\s*\n\s*(\d+,"[^"]+".+)/);
+          const cabinetLine = cabinetMatch ? cabinetMatch[1].trim() : null;
+
+          if (!cabinetLine) continue;
+
+          // Parse the standard 8-field cabinet line: N,"SKU",W,H,D,"*","N",QTY
+          const parts = cabinetLine.match(/\d+,"([^"]+)",([^,]+),([^,]+),([^,]+),"([^"]+)","([^"]+)",(\d+)/);
+          if (!parts) continue;
+
+          const sku    = parts[1];
+          const width  = parts[2];
+          const height = parts[3];
+          const depth  = parts[4];
+          const hinge  = parts[5];
+          const endTyp = parts[6];
+          const qty    = parts[7];
+
+          // Write [Catalog] block for this item
+          ord += `[Catalog]\n`;
+          if (catalogSection) ord += catalogSection + '\n';
+          ord += `\n`;
+
+          // Write [Parameters] with Note= for banding (extended multi-room format)
+          ord += `[Parameters]\n`;
+          ord += `Note="Banding","xPFC_BAND","text","${bandingValue}"\n`;
+          ord += `\n`;
+
+          // Write [Cabinets] with 18-field extended format (room number in field 14)
+          ord += `[Cabinets]\n`;
+          ord += `${orderEntryNum},"${sku}",${width},${height},${depth},"${hinge}","${endTyp}",${qty},"",,0.0,0.0,0.0,${roomNum},0,"","","S"\n`;
+          ord += `\n`;
+
+          orderEntryNum++;
+        }
+      }
+
+      if (orderEntryNum === 1) {
         return res.status(404).json({ message: 'No ORD items in this order' });
       }
 
-      const headerSetting = await storage.getSetting('ord_header_template');
-      const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
-      const files = await storage.getProjectFiles(projectId);
-      const designName = (files[0] as any)?.poNumber || project.name || `Order ${projectId}`;
-      const poNumber = (files[0] as any)?.poNumber || (project as any).orderId || '';
-      const header = generateOrdHeader(headerTemplate, { designName, poNumber });
-
-      const ordText = header + '\n' + ordItems.map(i => i.exportText).join('\n');
-      const filename = (project.name || `Order_${projectId}`).replace(/[^a-zA-Z0-9_-]/g, '_');
-
+      const filename = projectName.replace(/[^a-zA-Z0-9_() -]/g, '_');
       res.setHeader('Content-Type', 'text/plain');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.ord"`);
-      res.send(ordText);
+      res.send(ord);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -3202,6 +3285,22 @@ export async function registerRoutes(
               const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
               if (row) {
                 contextScope[binding.alias.toLowerCase()] = gridRowToScope(row.rowData as Record<string, any>);
+              }
+            }
+          }
+
+          // Diagnostic: log missing formula aliases for the first 3 matched items
+          if (product && product.pricingProxyId != null && (matchCount + noMatchCount) <= 3) {
+            const proxy = proxyVarMap.get(product.pricingProxyId);
+            if (proxy) {
+              const refs = [...new Set(
+                [...proxy.formula.toLowerCase().matchAll(/([a-z_][a-z0-9_]*)\./g)].map(m => m[1])
+              )];
+              const reservedWords = ['math', 'number', 'string', 'object', 'array', 'json', 'console'];
+              const missing = refs.filter(a => !contextScope[a] && !reservedWords.includes(a));
+              if (missing.length > 0) {
+                const bindings = productBindingsMap.get(product.id) ?? [];
+                console.log(`[Upload Pipeline] MISSING aliases for "${sku}": ${missing.join(', ')}. Has ${bindings.length} bindings: ${bindings.map(b => `${b.alias}(grid=${b.gridId})`).join(', ')}`);
               }
             }
           }

@@ -1,6 +1,63 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-05 (r15)
+> Last updated: 2026-04-05 (r16)
+
+---
+
+## r16 — 2026-04-05 — Multi-Room ORD Format, Shelves Diagnostic Logging, Scrolling Hardening
+
+### Fix 1 — Multi-Room Cabinet Vision ORD File (`server/routes.ts` — `/download/ord`)
+
+Complete rewrite of `GET /api/orders/:id/download/ord` to produce the extended multi-room `.ord` format that Cabinet Vision requires when a project has multiple rooms.
+
+**Structure of the new format:**
+- One `[Header]` block for the entire file (project name + PO) — **not** one per item
+- An empty `[Walls]` section immediately after — required by Cabinet Vision to enable the 18-field extended cabinet format
+- Each item gets its own `[Catalog]` / `[Parameters]` / `[Cabinets]` block
+- Cabinet entries use the **18-field extended format** (vs. old 8-field):
+  ```
+  ENTRY_NUM,"SKU",WIDTH,HEIGHT,DEPTH,"HINGE","ENDTYPE",QTY,"",,0.0,0.0,0.0,ROOM_NUM,0,"","","S"
+  ```
+  where field 14 (`ROOM_NUM`) maps each item to its room in Cabinet Vision
+- `[Parameters]` now uses `Note=` (not `Attribute=`) for the banding line — required in the extended format
+- Entry numbers are sequential across all rooms (global counter, not per-room)
+
+**Room assignment:** Each CSV file uploaded = one room. File 1 → Room 1, File 2 → Room 2, etc. The project name (e.g. "H Holtermann") is used as the `.ord` `Name`, not the individual CSV filenames.
+
+### Fix 2 — `/data/ord` Endpoint Returns Room-Grouped Structure (`server/routes.ts`)
+
+`GET /api/orders/:id/data/ord` now returns:
+```json
+{
+  "projectName": "H Holtermann",
+  "rooms": [
+    { "roomNumber": 1, "fileName": "Her Closet V2.csv", "roomName": "Her Closet V2", "itemCount": 45, "items": [...] }
+  ],
+  "totalItems": 87,
+  "total": 4821.50
+}
+```
+instead of the flat `items[]` + `assembledOrdText` format.
+
+### Fix 3 — OrdTab UI Updated for Room Grouping (`client/src/pages/order-tabs/OrdTab.tsx`)
+
+- Now renders one labelled section per room ("Room 1", "Room 2", …) each with a separate items table
+- Download button calls `GET /api/orders/:id/download/ord` directly (server-side file download) instead of building a client-side blob from assembled text
+- Shows "Multi-Room" badge when project has 2+ CSV files
+- Summary line shows room count, total items, and total price
+- Removed the assembled `.ORD` raw text preview block (superseded by the server-side download)
+
+### Fix 4 — Missing-Alias Diagnostic Logging (upload handler, `server/routes.ts`)
+
+Added diagnostic logging for the first 3 matched items per upload. After contextScope is built, checks which formula aliases are referenced in the pricing formula but missing from the resolved scope, and logs:
+```
+[Upload Pipeline] MISSING aliases for "34SHFF": shelves. Has 2 bindings: color(grid=5), manu_code(grid=3)
+```
+This surfaces shelves/grid binding misses immediately in the server logs without waiting for pricing errors.
+
+### Fix 5 — Scrolling Hardening (`client/src/index.css`)
+
+Added `min-height: 100vh; overflow-y: auto` to `html, body, #root` as a baseline layer on top of the r15 AppLayout fix.
 
 ---
 
