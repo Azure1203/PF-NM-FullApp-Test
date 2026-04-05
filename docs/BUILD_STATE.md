@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-05 (r17) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-05 (r18) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -192,7 +192,7 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r17)
+## What's Working End-to-End (as of r18)
 
 - [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
 - [x] Allmoxy order CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
@@ -250,6 +250,10 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r18 — 2026-04-05
+**Fix (critical):** `gridNameMap` construction — added sort so grids with date suffixes (the current active ones) are always written last into the map, guaranteeing they overwrite any old/empty grid that produces the same normalized key. Old `Shelves` (0 rows) can no longer shadow `Shelves 02202026` (47 rows).
+**Added:** `GET /api/admin/duplicate-grids` — diagnostic endpoint listing all grids that share a base name after stripping the date suffix, with row counts, so stale/empty duplicates can be identified and deleted via the Grid Manager.
 
 ### r17 — 2026-04-05
 **Fix (critical):** `findGridForAlias` — replaced single-pass `includes()` with a 3-pass priority system: (1) exact match, (2) starts-with (date suffix tolerance), (3) contains fallback. Previously `shelves` matched "Corner Shelves" before "Shelves", putting all shelves-dependent products on the wrong grid and generating zero correct bindings. After deploying: run "Reset & Recreate Bindings" on the Diagnostic page, then "Re-run Pricing" on the affected order.

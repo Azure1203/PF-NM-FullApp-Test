@@ -1,6 +1,57 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-05 (r17)
+> Last updated: 2026-04-05 (r18)
+
+---
+
+## r18 — 2026-04-05 — Fix Grid Name Map: Old Grids Shadowing Current Grids
+
+### Root Cause
+
+If an old grid named `Shelves` (no date suffix) exists alongside the current `Shelves 02202026`, both produce the normalized key `'shelves'` when added to the `gridNameMap`. Since `Map.set()` overwrites, whichever grid was iterated **last** won. If the old, empty grid happened to be last, `findGridForAlias('shelves')` returned that empty grid — so all shelves bindings were created against a grid with zero rows, and pricing always failed.
+
+### Fix 1 — Sort grids before building gridNameMap (`server/routes.ts` ~line 1096)
+
+Grids are now sorted before population so that **grids with date suffixes are always written last**, overwriting any older grid that produces the same normalized key:
+
+```ts
+const sortedGrids = [...allGrids].sort((a, b) => {
+  const aHasDate = /[\s_]\d{8}$/.test(a.name);
+  const bHasDate = /[\s_]\d{8}$/.test(b.name);
+  if (aHasDate && !bHasDate) return 1;   // dated grids written last → they win
+  if (!aHasDate && bHasDate) return -1;
+  return a.name.localeCompare(b.name);
+});
+```
+
+For example, if both `Shelves` and `Shelves 02202026` are in the database, `Shelves 02202026` (dated) is now guaranteed to overwrite `Shelves` (undated) for the key `'shelves'` — regardless of DB insertion order.
+
+### Fix 2 — New diagnostic endpoint: `GET /api/admin/duplicate-grids` (`server/routes.ts`)
+
+Added a new endpoint that groups all attribute grids by their base name (stripping the date suffix) and returns any groups with more than one member — along with the row count of each, so you can identify which are empty/stale and should be deleted.
+
+Example response:
+```json
+{
+  "totalGrids": 12,
+  "duplicates": [
+    {
+      "baseName": "shelves",
+      "grids": [
+        { "id": 3, "name": "Shelves", "rowCount": 0 },
+        { "id": 9, "name": "Shelves 02202026", "rowCount": 47 }
+      ]
+    }
+  ]
+}
+```
+
+### How to Activate
+
+1. Visit `/api/admin/duplicate-grids` in your browser to see which grids are duplicated and which have 0 rows (the stale ones)
+2. Delete the old empty grids via **Admin → Attribute Grids**
+3. Go to **Admin → Pricing Diagnostic** → **"Reset & Recreate Bindings"**
+4. Go to the order → **"Re-run Pricing"**
 
 ---
 

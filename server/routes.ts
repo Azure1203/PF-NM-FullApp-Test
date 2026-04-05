@@ -941,6 +941,44 @@ export async function registerRoutes(
     }
   });
 
+  // ── Duplicate Grid Diagnostic ─────────────────────────────────────────────
+  // Lists grids that share the same base name (ignoring date suffix) — helps
+  // find old/empty grids that shadow the current dated grids in the name map.
+  app.get('/api/admin/duplicate-grids', isAuthenticated, async (req, res) => {
+    try {
+      const allGrids = await storage.getAttributeGrids();
+      const byBaseName = new Map<string, typeof allGrids>();
+
+      for (const g of allGrids) {
+        const baseName = g.name.replace(/[\s_]?\d{8}$/, '').trim().toLowerCase();
+        const list = byBaseName.get(baseName) ?? [];
+        list.push(g);
+        byBaseName.set(baseName, list);
+      }
+
+      const duplicates: Array<{
+        baseName: string;
+        grids: Array<{ id: number; name: string; rowCount: number }>;
+      }> = [];
+
+      for (const [baseName, grids] of byBaseName) {
+        if (grids.length > 1) {
+          const withCounts = await Promise.all(
+            grids.map(async g => {
+              const rows = await storage.getAttributeGridRows(g.id);
+              return { id: g.id, name: g.name, rowCount: rows.length };
+            })
+          );
+          duplicates.push({ baseName, grids: withCounts });
+        }
+      }
+
+      res.json({ duplicates, totalGrids: allGrids.length });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ── Pricing Diagnostic ────────────────────────────────────────────────────
   app.get('/api/admin/pricing-diagnostic', isAuthenticated, async (req, res) => {
     try {
@@ -1093,8 +1131,17 @@ export async function registerRoutes(
       // Build gridNameMap with multiple normalized keys per grid so that
       // space-separated names ("Main Color Attribute 02202026") and
       // underscore-separated patterns ("main_color_attribute") both match.
+      // Sort so grids WITH date suffixes come last — they overwrite older/empty grids
+      // that produce the same normalized key (e.g. bare "Shelves" overwritten by "Shelves 02202026").
       const gridNameMap = new Map<string, typeof allGrids[0]>();
-      for (const g of allGrids) {
+      const sortedGrids = [...allGrids].sort((a, b) => {
+        const aHasDate = /[\s_]\d{8}$/.test(a.name);
+        const bHasDate = /[\s_]\d{8}$/.test(b.name);
+        if (aHasDate && !bHasDate) return 1;  // dated grids written last → they win
+        if (!aHasDate && bHasDate) return -1;
+        return a.name.localeCompare(b.name);
+      });
+      for (const g of sortedGrids) {
         const lower = g.name.toLowerCase();
         // Strip trailing date suffix (space or underscore separator before 8 digits)
         const noDate = g.name.replace(/[\s_]?\d{8}$/, '').trim();
