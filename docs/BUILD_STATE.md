@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-05 (r16) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-05 (r17) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -192,7 +192,7 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r16)
+## What's Working End-to-End (as of r17)
 
 - [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
 - [x] Allmoxy order CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
@@ -250,6 +250,9 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r17 — 2026-04-05
+**Fix (critical):** `findGridForAlias` — replaced single-pass `includes()` with a 3-pass priority system: (1) exact match, (2) starts-with (date suffix tolerance), (3) contains fallback. Previously `shelves` matched "Corner Shelves" before "Shelves", putting all shelves-dependent products on the wrong grid and generating zero correct bindings. After deploying: run "Reset & Recreate Bindings" on the Diagnostic page, then "Re-run Pricing" on the affected order.
 
 ### r16 — 2026-04-05
 **Feature:** Multi-room Cabinet Vision ORD — `GET /api/orders/:id/download/ord` completely rewritten. One `[Header]` + `[Walls]` section for the entire project; each item gets `[Catalog]`/`[Parameters]`/`[Cabinets]` blocks; cabinet entries use extended 18-field format with room number in field 14 and global sequential entry numbers; `[Parameters]` uses `Note=` for banding. Room = CSV file order (file 1 → room 1).

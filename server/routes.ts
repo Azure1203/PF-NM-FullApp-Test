@@ -1148,16 +1148,34 @@ export async function registerRoutes(
 
       function findGridForAlias(alias: string): typeof allGrids[0] | undefined {
         const patterns = aliasToGridPatterns[alias] ?? [alias];
+
+        // Pass 1: Exact match — avoids "shelves" matching "corner_shelves"
         for (const pattern of patterns) {
-          // Normalize pattern: replace spaces with underscores for comparison
           const normPattern = pattern.replace(/\s+/g, '_').toLowerCase();
           for (const [key, grid] of gridNameMap) {
-            // Normalize key too — the map already has underscore variants stored,
-            // but extra normalization here is a safety net
+            const normKey = key.replace(/\s+/g, '_').toLowerCase();
+            if (normKey === normPattern) return grid;
+          }
+        }
+
+        // Pass 2: Starts-with — handles date suffixes like "shelves_02202026"
+        for (const pattern of patterns) {
+          const normPattern = pattern.replace(/\s+/g, '_').toLowerCase();
+          for (const [key, grid] of gridNameMap) {
+            const normKey = key.replace(/\s+/g, '_').toLowerCase();
+            if (normKey.startsWith(normPattern + '_') || normKey.startsWith(normPattern + ' ')) return grid;
+          }
+        }
+
+        // Pass 3: Contains — broad fallback
+        for (const pattern of patterns) {
+          const normPattern = pattern.replace(/\s+/g, '_').toLowerCase();
+          for (const [key, grid] of gridNameMap) {
             const normKey = key.replace(/\s+/g, '_').toLowerCase();
             if (normKey.includes(normPattern)) return grid;
           }
         }
+
         return undefined;
       }
 

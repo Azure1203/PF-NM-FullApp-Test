@@ -1,6 +1,41 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-05 (r16)
+> Last updated: 2026-04-05 (r17)
+
+---
+
+## r17 — 2026-04-05 — Fix findGridForAlias: Exact Match Priority
+
+### Root Cause
+
+`findGridForAlias('shelves')` was using `normKey.includes(normPattern)` as the only matching strategy. This caused `shelves` to match **Corner Shelves** or **Outside Corner Shelves** (whichever appeared first in the map) instead of the plain **Shelves** grid, because all three contain the substring "shelves". Result: the `shelves` alias ended up pointing to the wrong grid, so no correct shelves bindings were created, and all shelves-dependent products failed pricing.
+
+### Fix (`server/routes.ts` — `findGridForAlias`, line ~1152)
+
+Replaced the single-pass `includes()` lookup with a three-pass priority system:
+
+**Pass 1 — Exact match** (e.g. `shelves` matches `Shelves` exactly after normalization):
+```ts
+if (normKey === normPattern) return grid;
+```
+
+**Pass 2 — Starts-with** (handles date suffixes like `Shelves_02202026`):
+```ts
+if (normKey.startsWith(normPattern + '_') || normKey.startsWith(normPattern + ' ')) return grid;
+```
+
+**Pass 3 — Contains** (broad fallback for partial matches, same as before):
+```ts
+if (normKey.includes(normPattern)) return grid;
+```
+
+All three passes still normalize both sides with `.replace(/\s+/g, '_').toLowerCase()`.
+
+### How to Activate
+
+1. Go to `/admin/diagnostic` → **"Reset & Recreate Bindings"** — this deletes and recreates all auto-created bindings using the fixed `findGridForAlias` logic. The `shelves` alias will now resolve to the correct grid.
+2. Verify in `/admin/attribute-grids` → Shelves grid → Bindings tab — products with `shelves` in their formula should now appear.
+3. Go to the order → **"Re-run Pricing"** — shelves pricing errors should be resolved.
 
 ---
 
