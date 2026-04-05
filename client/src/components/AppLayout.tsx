@@ -12,6 +12,7 @@ import {
   Settings,
   ImagePlus,
   Zap,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ const navItems = [
       { name: "Proxy Variables", href: "/admin/proxy-variables", icon: Code },
       { name: "Formula Tester", href: "/admin/formula-tester", icon: FlaskConical },
       { name: "Pricing Diagnostic", href: "/admin/diagnostic", icon: Zap },
+      { name: "Output Settings", href: "/admin/output-settings", icon: SlidersHorizontal },
       { name: "Settings", href: "/admin/settings", icon: Settings },
       { name: "Users", href: "/admin/users", icon: Users },
     ]
@@ -64,7 +66,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <aside className="w-64 hidden md:flex flex-col bg-[#2E2E2E] border-r border-[#807161]/20">
         <div className="px-6 py-5 border-b border-[#CDAB4A]/20">
@@ -130,7 +132,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 bg-background">
         {/* Header */}
         <header className="h-14 border-b border-border bg-background flex items-center justify-between px-8 sticky top-0 z-10">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">{getPageTitle()}</h2>

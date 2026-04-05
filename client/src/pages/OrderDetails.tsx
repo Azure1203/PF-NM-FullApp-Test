@@ -696,57 +696,6 @@ export default function OrderDetails() {
     },
   });
 
-  const { data: headerTemplateSetting } = useQuery<{ value: string }>({
-    queryKey: ['/api/admin/settings', 'ord_header_template'],
-    queryFn: async () => {
-      const res = await fetch('/api/admin/settings/ord_header_template', { credentials: 'include' });
-      if (!res.ok) return { value: '' };
-      return res.json();
-    },
-  });
-
-  const downloadOrd = () => {
-    const items = (orderItems ?? []).filter(i => i.exportText);
-    if (items.length === 0) {
-      toast({ title: 'No export text available', description: 'Run pricing first or check product export formulas', variant: 'destructive' });
-      return;
-    }
-
-    const headerTemplate = headerTemplateSetting?.value || '';
-    const files = project?.files || [];
-    const fileMap = new Map(files.map((f: any) => [f.id, f]));
-
-    const groupedByFile = new Map<number, string[]>();
-    for (const item of items) {
-      const fileId = item.fileId;
-      if (!groupedByFile.has(fileId)) {
-        groupedByFile.set(fileId, []);
-      }
-      groupedByFile.get(fileId)!.push(item.exportText!);
-    }
-
-    let combinedOrdText = '';
-    for (const [fileId, exportLines] of groupedByFile) {
-      const file = fileMap.get(fileId);
-      if (headerTemplate) {
-        const designName = file?.poNumber || file?.originalFilename?.replace(/\.[^.]+$/, '') || '';
-        const poNumber = file?.poNumber || '';
-        const header = headerTemplate
-          .replace(/\{\{design_name\}\}/g, designName)
-          .replace(/\{\{po_number\}\}/g, poNumber);
-        combinedOrdText += header + '\n';
-      }
-      combinedOrdText += exportLines.join('\n') + '\n';
-    }
-
-    const blob = new Blob([combinedOrdText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${project?.name ?? 'order'}.ord`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const exportTypeCounts = useMemo(() => {
     if (!orderItems) return {} as Record<string, number>;
@@ -1288,7 +1237,7 @@ export default function OrderDetails() {
                   regeneratePending={regenerateChecklistsMutation.isPending}
                   onReprice={() => repriceMutation.mutate()}
                   onRegenerate={() => regenerateChecklistsMutation.mutate()}
-                  onDownloadOrd={downloadOrd}
+                  onDownloadOrd={() => { window.location.href = `/api/orders/${id}/download/ord`; }}
                 />
               </CardContent>
             </Card>

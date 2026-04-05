@@ -1,6 +1,72 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-05 (r18)
+> Last updated: 2026-04-05 (r19)
+
+---
+
+## r19 — 2026-04-05 — Scrolling Fix + ORD Download Endpoint + Output Settings Page + PDF Page Breaks
+
+### Fix 1 — Page Scrolling (`client/src/components/AppLayout.tsx`)
+
+Removed `overflow-hidden` from both the outer layout wrapper and the `<main>` element. Both were blocking the inner `overflow-y-auto` scroll container from functioning correctly. The Order Details page now scrolls through all items (was showing "57 items" but unable to scroll to see them).
+
+- Line 67: `flex h-screen bg-background overflow-hidden` → `flex h-screen bg-background`
+- Line 133: `flex-1 flex flex-col min-w-0 bg-background overflow-hidden` → `flex-1 flex flex-col min-w-0 bg-background`
+
+### Fix 2 — ORD Download Button (`client/src/pages/OrderDetails.tsx`, `client/src/pages/order-tabs/AllItemsTab.tsx`)
+
+The "Download .ORD" button was using a client-side assembly routine: it fetched the header template setting, re-grouped items by file, concatenated their `exportText` strings, and built an old-format single-room file. This bypassed the multi-room backend endpoint entirely.
+
+**Removed** from `OrderDetails.tsx`:
+- `headerTemplateSetting` useQuery hook
+- `downloadOrd()` function (template fetch, groupByFile loop, Blob assembly, anchor click)
+
+**Replaced** with a direct route call — `onDownloadOrd` prop now does:
+```ts
+() => { window.location.href = `/api/orders/${id}/download/ord`; }
+```
+
+The backend endpoint at `GET /api/orders/:id/download/ord` (r16) handles the full multi-room format: `[Header]` with quoted values, `[Walls]`, 18-field cabinet lines with room numbers, HARDWARE items excluded.
+
+### Fix 3 — Output Page Settings (`/admin/output-settings`)
+
+New admin page for controlling per-document-type display toggles.
+
+**Backend** (`server/routes.ts`):
+- `GET /api/admin/output-settings` — returns a merged settings object with defaults for 10 document types (invoice, customerSlip, internalSlip, elias, mj, hardware, glass, ord, cts, erp). Each page has relevant keys: `showProductImages` and/or `showPricing`.
+- `PUT /api/admin/output-settings` — updates a single setting by `output.<page>.<key>` key; validates key prefix; uses existing `storage.setSetting()`.
+
+**Frontend** (`client/src/pages/admin/OutputSettings.tsx` — new file):
+- Cards per document type, switch toggles per setting, TanStack Query for data + mutation, toast on save.
+- Skips settings that don't apply to a given page (e.g. `showPricing` only shown for invoice and customerSlip).
+
+**Routing** (`client/src/App.tsx`, `client/src/components/AppLayout.tsx`):
+- Route `/admin/output-settings` added to router.
+- Sidebar link "Output Settings" added to SYSTEM ADMINISTRATION group (uses `SlidersHorizontal` icon).
+
+### Fix 4 — PDF Page Break Formatting (all Python scripts)
+
+Applied `KeepTogether` wrapping for small sections (≤ 6 items) across all 5 PDF generators. When a section has few items, it is now guaranteed to stay on a single page rather than breaking awkwardly across a page boundary.
+
+**Scripts updated:**
+- `server/scripts/generate_invoice.py`
+- `server/scripts/generate_customer_packing_slip.py`
+- `server/scripts/generate_internal_packing_slip.py`
+- `server/scripts/generate_elias_pdf.py`
+- `server/scripts/generate_mj_pdf.py`
+
+**Added `KeepTogether` import** to elias, mj, and cut_to_size scripts (invoice, customer slip, internal slip already had it).
+
+**Pattern applied** to all section loops:
+```python
+flowables = build_section_flowables(section, styles)
+if len(section.get('items', [])) <= 6:
+    story.append(KeepTogether(flowables))
+else:
+    story.extend(flowables)
+```
+
+All data tables already had `repeatRows=1` from prior work.
 
 ---
 

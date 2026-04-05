@@ -7687,6 +7687,58 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Output Page Settings =====
+
+  app.get('/api/admin/output-settings', isAuthenticated, async (_req, res) => {
+    try {
+      const allSettings = await storage.getAllSettings();
+      const stored = Object.fromEntries(
+        allSettings.filter(s => s.key.startsWith('output.')).map(s => [s.key, s.value])
+      );
+
+      const defaults: Record<string, Record<string, string>> = {
+        invoice:       { showProductImages: 'false', showPricing: 'true' },
+        customerSlip:  { showProductImages: 'false', showPricing: 'false' },
+        internalSlip:  { showProductImages: 'true',  showPricing: 'false' },
+        elias:         { showProductImages: 'false' },
+        mj:            { showProductImages: 'false' },
+        hardware:      { showProductImages: 'true' },
+        glass:         { showProductImages: 'false' },
+        ord:           { showProductImages: 'false' },
+        cts:           { showProductImages: 'false' },
+        erp:           { showProductImages: 'false' },
+      };
+
+      const result: Record<string, Record<string, string>> = {};
+      for (const [page, pageDefaults] of Object.entries(defaults)) {
+        result[page] = { ...pageDefaults };
+        for (const key of Object.keys(pageDefaults)) {
+          const storedKey = `output.${page}.${key}`;
+          if (stored[storedKey] !== undefined) {
+            result[page][key] = stored[storedKey];
+          }
+        }
+      }
+
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  app.put('/api/admin/output-settings', isAuthenticated, async (req, res) => {
+    try {
+      const { key, value } = req.body;
+      if (!key || !key.startsWith('output.')) {
+        return res.status(400).json({ message: 'Key must start with output.' });
+      }
+      await storage.setSetting(key, String(value));
+      res.json({ key, value: String(value) });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // ===== Settings Endpoints =====
 
   app.get('/api/admin/settings', isAuthenticated, async (_req, res) => {

@@ -5,7 +5,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer,
-    Table, TableStyle, HRFlowable
+    Table, TableStyle, HRFlowable, KeepTogether
 )
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
@@ -209,7 +209,11 @@ def generate(data):
     story = []
     story.extend(build_header(data, styles))
     for section in data.get('sections', []):
-        story.extend(build_section(section, styles))
+        flowables = build_section(section, styles)
+        if len(section.get('items', [])) <= 6:
+            story.append(KeepTogether(flowables))
+        else:
+            story.extend(flowables)
 
     def make_canvas_factory(oid):
         def factory(*args, **kwargs):

@@ -304,7 +304,11 @@ def generate(data):
     story = []
     story.extend(build_header_table(data, styles))
     for section in data.get('sections', []):
-        story.extend(build_section_flowables(section, styles))
+        flowables = build_section_flowables(section, styles)
+        if len(section.get('items', [])) <= 6:
+            story.append(KeepTogether(flowables))
+        else:
+            story.extend(flowables)
     story.extend(build_totals_flowable(data, styles))
 
     def make_canvas_factory(order_id):

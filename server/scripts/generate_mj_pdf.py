@@ -5,7 +5,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer,
-    Table, TableStyle, HRFlowable
+    Table, TableStyle, HRFlowable, KeepTogether
 )
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
@@ -308,11 +308,15 @@ def generate(data):
     for section in data.get('sections', []):
         section_type = section.get('sectionType', 'drawer_front')
         if section_type == 'glass':
-            story.extend(build_glass_section(section, styles))
+            flowables = build_glass_section(section, styles)
         elif section_type == 'door':
-            story.extend(build_door_section(section, styles))
+            flowables = build_door_section(section, styles)
         else:
-            story.extend(build_drawer_front_section(section, styles))
+            flowables = build_drawer_front_section(section, styles)
+        if len(section.get('items', [])) <= 6:
+            story.append(KeepTogether(flowables))
+        else:
+            story.extend(flowables)
 
     def make_canvas_factory(oid):
         def factory(*args, **kwargs):

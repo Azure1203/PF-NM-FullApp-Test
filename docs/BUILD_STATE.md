@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-05 (r18) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-05 (r19) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -25,7 +25,7 @@ and produces all downstream documents needed for production, shipping, and suppl
 
 ---
 
-## All 16 Pages (Routes)
+## All 17 Pages (Routes)
 
 | URL | Page | Purpose |
 |---|---|---|
@@ -45,6 +45,7 @@ and produces all downstream documents needed for production, shipping, and suppl
 | `/admin/formula-tester` | Formula Tester | Test any formula with a custom scope, live result — binding status panel, better error messages |
 | `/admin/product-images` | Bulk Image Uploader | Match + upload images to products by filename (batched, progress bar) |
 | `/admin/diagnostic` | Pricing Diagnostic | Health check: stats, issue list, auto-create missing grid bindings |
+| `/admin/output-settings` | Output Settings | Per-document-type display toggles (images, pricing) |
 | `/admin/settings` | ORD Settings | Cabinet Vision header template configuration |
 | `/admin/users` | Admin Users | Allowed-users whitelist management |
 | `/how-it-works` | How It Works | Internal documentation page |
@@ -192,7 +193,7 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r18)
+## What's Working End-to-End (as of r19)
 
 - [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
 - [x] Allmoxy order CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
@@ -208,9 +209,9 @@ CHANGELOG.md                        Per-release fix log
   - **All Items** — line-item table with per-file filter pills, pricing badges, re-price / regenerate actions
   - **Invoice** — PDF iframe + JSON section breakdown
   - **Customer Slip / Internal Slip** — PDF iframes
-  - **Cabinet Vision** — items shown grouped by room; "Multi-Room" badge when 2+ files; download via server-side `/download/ord`; multi-room extended 18-field format with `[Walls]` section, global entry numbers, room number in field 14, `Note=` banding (r16)
+  - **Cabinet Vision** — items shown grouped by room; "Multi-Room" badge when 2+ files; "Download .ORD" button now calls backend `/api/orders/:id/download/ord` directly (r19); multi-room extended 18-field format with `[Walls]` section, global entry numbers, room number in field 14, `Note=` banding (r16)
   - **Elias / M&J Doors / ERP Import / Cut-to-Size / Hardware / Glass** — conditional tabs per `exportType`
-- [x] Page scrolling fixed — all pages with long content scroll correctly (r15: `h-full` → `min-h-full` on AppLayout wrapper)
+- [x] Page scrolling fixed — all pages with long content scroll correctly (r19: removed `overflow-hidden` from outer wrapper and `<main>`; r15: `h-full` → `min-h-full` on AppLayout inner wrapper)
 - [x] Re-run Pricing button on Order Details — reprices all items, shows ✅/⚠/$0 badges per item
 - [x] Allmoxy Product Manager — full CRUD, image upload/clear, category, formula assignment
 - [x] Attribute Grid Manager — CSV import, row editing, product binding management (Rows + Bindings tabs)
@@ -227,6 +228,8 @@ CHANGELOG.md                        Per-release fix log
 - [x] CTS parts page
 - [x] Pallet management
 - [x] Dark mode, responsive layout, sidebar navigation
+- [x] Output Settings page (`/admin/output-settings`) — toggle `showProductImages` and `showPricing` per document type; stored as `output.<page>.<key>` in `app_settings` (r19)
+- [x] PDF page breaks — `KeepTogether` applied for sections with ≤ 6 items in invoice, packing slips, Elias, M&J (r19)
 - [x] Pricing Diagnostic page — health check stats, issue list, auto-create bindings (dry-run → confirm), Reset & Recreate (fixes wrong-grid bindings)
 - [x] Import Readiness endpoint — fast health check (`GET /api/admin/import-readiness`) covering products, grids, bindings, proxy vars
 - [x] Upload page readiness banner — green/amber pre-flight status before uploading, shows actionable issues
@@ -250,6 +253,12 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r19 — 2026-04-05
+**Fix (critical):** Removed `overflow-hidden` from outer `<div>` wrapper and `<main>` in `AppLayout.tsx` — was silently clipping the `overflow-y-auto` scroll container, preventing scroll on the Order Details page.
+**Fix:** "Download .ORD" button replaced with `window.location.href` to backend endpoint — old client-side assembly code (header template fetch + groupByFile + Blob) deleted; button now uses `GET /api/orders/:id/download/ord` (multi-room format, r16).
+**Added:** Output Settings page (`/admin/output-settings`) — GET/PUT endpoints + new frontend page with per-document toggle switches (showProductImages, showPricing). Settings stored as `output.<page>.<key>` in `app_settings`.
+**Fixed:** PDF page break formatting — `KeepTogether` now applied for small sections (≤ 6 items) across 5 Python PDF generators. `KeepTogether` import added to elias, mj, and cts scripts.
 
 ### r18 — 2026-04-05
 **Fix (critical):** `gridNameMap` construction — added sort so grids with date suffixes (the current active ones) are always written last into the map, guaranteeing they overwrite any old/empty grid that produces the same normalized key. Old `Shelves` (0 rows) can no longer shadow `Shelves 02202026` (47 rows).
