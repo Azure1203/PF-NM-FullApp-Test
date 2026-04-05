@@ -1,6 +1,65 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-03 (r13)
+> Last updated: 2026-04-03 (r14)
+
+---
+
+## r14 — 2026-04-03 — CRITICAL FIX: CSV Column Name Mismatch (Zero Order Items)
+
+### Root Cause
+
+The Allmoxy order CSV uses column names that never matched what the pipeline code expected. The `if (!sku) continue` guard was silently skipping every single row, producing zero order items on every upload.
+
+| CSV Column (actual) | Code expected | Outcome |
+|---|---|---|
+| `Manuf code` | `MANU_CODE`, `Manuf Code` | ❌ case mismatch — all rows skipped |
+| `Width(R)` | `Width` | ❌ suffix — always 0 |
+| `Length(L)` | `Length` | ❌ suffix — always 0 |
+| `Quantity` | `Qty` | ❌ different word — always 1 |
+
+### Fix 1 — SKU Extraction (all 3 pipeline locations)
+
+`server/routes.ts` (reprice + upload handler), `server/asanaImportScheduler.ts`:
+
+```ts
+// Before
+item.MANU_CODE || item.SKU || item['Manuf Code'] || ''
+
+// After
+item.MANU_CODE || item['Manuf code'] || item['Manuf Code'] || item['manuf code'] ||
+item['MANUF CODE'] || item.SKU || item.sku || item['MANU CODE'] || ''
+```
+
+### Fix 2 — Dimension Extraction (all 3 pipeline locations)
+
+```ts
+// Before
+width:    Number(item.Width    || item.width    || 0),
+length:   Number(item.Length   || item.length   || 0),
+quantity: Number(item.Qty      || item.quantity || item.QUANTITY || 1),
+
+// After
+width:    Number(item['Width(R)']  || item.Width    || item.width    || item['WIDTH']  || 0),
+length:   Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || 0),
+depth:    Number(item['Length(L)'] || item.Length   || item.length   || item['LENGTH'] || item.Thickness || item.thickness || 0),
+quantity: Number(item.Quantity     || item.Qty      || item.quantity || item.QUANTITY  || 1),
+```
+
+### Fix 3 — Color Binding `lookupColumn` (`server/routes.ts` auto-create-bindings)
+
+Changed `lookupColumn` for color aliases from `'Material'` → `'Color'` to match the actual CSV column name. The per-pipeline fallback (`Material || Color || Colour`) was already correct; this ensures newly auto-created bindings use the right primary column.
+
+### Fix 4 — Description Field (2 locations in `server/routes.ts`)
+
+Added `item['Manuf code'] || item.MANU_CODE` as final fallback when no NAME / Part Name / Description column is present.
+
+### Fix 5 — Upload Pipeline Debug Log
+
+Updated the "First item SKU" log to also check `item['Manuf code']` so it surfaces the actual value rather than `(not found)`.
+
+### Added: Diagnostic endpoint
+
+`GET /api/test/order-check/:id` — returns `{ projectId, fileCount, filenames, itemCount, sampleItems, totalPrice, pricingErrors }` for quick post-upload verification without opening the UI.
 
 ---
 

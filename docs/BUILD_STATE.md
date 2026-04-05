@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-03 (r13) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-03 (r14) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -192,9 +192,10 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r13)
+## What's Working End-to-End (as of r14)
 
-- [x] CSV upload → order items created (fixed r4 — header-aware parsing)
+- [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
+- [x] Allmoxy order CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
 - [x] Multi-file CSV upload → single project with all files merged
 - [x] SKU prefix matching → product resolved per line item
 - [x] mathjs pricing engine → unit price computed per line item
@@ -247,6 +248,12 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r14 — 2026-04-03
+**Fix (critical):** CSV column name mismatch — `Manuf code` (lowercase 'c') was not matched by any SKU extraction variant, causing `if (!sku) continue` to skip every row and produce zero order items on every upload. Also fixed `Width(R)`, `Length(L)`, `Quantity` column names for dimensions. Applied across all 3 pipeline locations (upload handler, reprice route, Asana scheduler).
+**Fix:** Color binding `lookupColumn` changed from `'Material'` → `'Color'` in auto-create-bindings to match actual CSV column name. Per-pipeline fallback was already handling this correctly.
+**Fix:** Description field now falls back to `item['Manuf code']` when NAME/Part Name/Description absent.
+**Added:** `GET /api/test/order-check/:id` — diagnostic endpoint returning item count, sample items with prices, total price, and error count for quick post-upload verification.
 
 ### r13 — 2026-04-03
 **Feature:** 6 new JSON data endpoints — `/api/orders/:id/data/{invoice,elias,mj,hardware,glass,ord}` — serve structured JSON for order output data consumed by tab components.
