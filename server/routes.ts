@@ -77,12 +77,12 @@ const ASANA_READY_TO_IMPORT_SECTION_GID = '1213318854211307';
 const DEFAULT_ORD_HEADER_TEMPLATE = `[Header]
 Version=4
 Unit=1
-Name={{design_name}}
-Description=
-PurchaseOrder={{po_number}}
-Comment=
-Customer=
-Address1=`;
+Name="{{design_name}}"
+Description="{{design_name}}"
+PurchaseOrder="{{po_number}}"
+Comment=""
+Customer="Perfect Fit Closets"
+Address1="100-111 5 Avenue Southwest"`;
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1586,9 +1586,21 @@ export async function registerRoutes(
   app.get('/api/orders/:id/data/ord', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
       const items = await storage.getOrderItemsByProject(projectId);
-      const ordItems = items.filter(i => i.exportText);
-      const assembledOrdText = ordItems.filter(i => i.exportText).map(i => i.exportText).join('\n');
+      const ordItems = items.filter(i => i.exportType === 'ORD' && i.exportText);
+
+      const headerSetting = await storage.getSetting('ord_header_template');
+      const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
+      const files = await storage.getProjectFiles(projectId);
+      const designName = (files[0] as any)?.poNumber || project.name || `Order ${projectId}`;
+      const poNumber = (files[0] as any)?.poNumber || (project as any).orderId || '';
+      const header = generateOrdHeader(headerTemplate, { designName, poNumber });
+
+      const assembledOrdText = header + '\n' + ordItems.map(i => i.exportText).join('\n');
+
       res.json({
         items: ordItems.map(i => ({
           sku: i.sku, qty: i.quantity, height: i.height, width: i.width, depth: i.depth,
@@ -1599,6 +1611,38 @@ export async function registerRoutes(
         total: Math.round(ordItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
       });
     } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Dedicated ORD file download (returns the assembled .ord file as a download)
+  app.get('/api/orders/:id/download/ord', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+
+      const items = await storage.getOrderItemsByProject(projectId);
+      const ordItems = items.filter(i => i.exportType === 'ORD' && i.exportText);
+
+      if (ordItems.length === 0) {
+        return res.status(404).json({ message: 'No ORD items in this order' });
+      }
+
+      const headerSetting = await storage.getSetting('ord_header_template');
+      const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
+      const files = await storage.getProjectFiles(projectId);
+      const designName = (files[0] as any)?.poNumber || project.name || `Order ${projectId}`;
+      const poNumber = (files[0] as any)?.poNumber || (project as any).orderId || '';
+      const header = generateOrdHeader(headerTemplate, { designName, poNumber });
+
+      const ordText = header + '\n' + ordItems.map(i => i.exportText).join('\n');
+      const filename = (project.name || `Order_${projectId}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}.ord"`);
+      res.send(ordText);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // GET Elias CSV export
@@ -2461,14 +2505,24 @@ export async function registerRoutes(
               const grid = gridMap.get(binding.gridId);
               if (!grid) continue;
               const col = binding.lookupColumn;
-              const lookupValue = (
-                item[col] ||
-                item[col.toLowerCase()] ||
-                item[col.toUpperCase()] ||
-                ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
-                  ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || '')
-                  : '')
-              ).toString().trim();
+              const isManuCol = col.toLowerCase().includes('manu');
+
+              let lookupValue: string;
+              if (isManuCol) {
+                // For MANU_CODE bindings, use the already-extracted SKU
+                // (CSV column is "Manuf code", not "MANU_CODE")
+                lookupValue = sku;
+              } else {
+                lookupValue = (
+                  item[col] ||
+                  item[col.toLowerCase()] ||
+                  item[col.toUpperCase()] ||
+                  ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
+                    ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || item['COLOR'] || '')
+                    : '')
+                ).toString().trim();
+              }
+
               if (!lookupValue) continue;
               const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
               if (row) {
@@ -3126,14 +3180,24 @@ export async function registerRoutes(
               const grid = gridMap.get(binding.gridId);
               if (!grid) continue;
               const col = binding.lookupColumn;
-              const lookupValue = (
-                item[col] ||
-                item[col.toLowerCase()] ||
-                item[col.toUpperCase()] ||
-                ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
-                  ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || '')
-                  : '')
-              ).toString().trim();
+              const isManuCol = col.toLowerCase().includes('manu');
+
+              let lookupValue: string;
+              if (isManuCol) {
+                // For MANU_CODE bindings, use the already-extracted SKU
+                // (CSV column is "Manuf code", not "MANU_CODE")
+                lookupValue = sku;
+              } else {
+                lookupValue = (
+                  item[col] ||
+                  item[col.toLowerCase()] ||
+                  item[col.toUpperCase()] ||
+                  ((col.toLowerCase() === 'color' || col.toLowerCase() === 'material' || col.toLowerCase() === 'colour')
+                    ? (item['Material'] || item['Color'] || item['Colour'] || item['material'] || item['color'] || item['COLOR'] || '')
+                    : '')
+                ).toString().trim();
+              }
+
               if (!lookupValue) continue;
               const row = findGridRowInCache(binding.gridId, lookupValue, grid.keyColumn);
               if (row) {

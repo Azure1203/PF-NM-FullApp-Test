@@ -148,8 +148,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 relative">
-          <div className="max-w-7xl mx-auto h-full">
+        <div className="flex-1 overflow-y-auto relative">
+          <div className="max-w-7xl mx-auto min-h-full p-8">
             {children}
           </div>
         </div>
