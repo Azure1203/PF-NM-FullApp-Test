@@ -149,7 +149,7 @@ export default function OrderDetails() {
   const multiFile = fileSummary.length > 1;
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* ─── Project Header Bar ─── */}
       <div className="sticky top-0 z-20 bg-background border-b shadow-sm">
         <div className="flex items-center gap-2 px-4 py-2.5 flex-wrap">

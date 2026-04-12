@@ -27,6 +27,7 @@ import AdminSettings from "@/pages/admin/AdminSettings";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import AppLayout from "@/components/AppLayout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function AccessDenied({ onLogout }: { onLogout: () => void }) {
   return (
@@ -72,6 +73,7 @@ function AppRouter() {
 
   return (
     <AppLayout>
+      <ErrorBoundary>
       <Switch>
         <Route path="/"><Redirect to="/orders" /></Route>
         <Route path="/orders" component={Dashboard} />
@@ -92,6 +94,7 @@ function AppRouter() {
         <Route path="/files/:fileId/hardware-checklist" component={HardwareChecklist} />
         <Route component={NotFound} />
       </Switch>
+      </ErrorBoundary>
     </AppLayout>
   );
 }
