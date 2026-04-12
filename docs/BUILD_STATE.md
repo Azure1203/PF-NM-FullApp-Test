@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-12 (r21 + merged tasks #1–#26) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-12 (r22) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -26,14 +26,14 @@ and produces all downstream documents needed for production, shipping, and suppl
 
 ---
 
-## All 20 Pages (Routes)
+## All 17 Pages (Routes)
 
 | URL | Page | Purpose |
 |---|---|---|
-| `/` | Order Processing Dashboard | Daily workflow hub — drag-and-drop CSV upload, Asana sync, status overview |
+| `/` | — | Redirects to `/orders` |
 | `/orders` | All Orders | Full order list with filters, email sync, Asana import |
-| `/orders/:id` | Order Details | Line-item table, pricing, all export downloads (12 tabs) |
-| `/upload` | Upload Order | CSV drag-and-drop upload |
+| `/orders/:id` | Order Details | Sticky header, FileSidebar, Documents / Packing & Shipping sections; full-height layout, no AppLayout top bar |
+| `/upload` | Upload Order | CSV drag-and-drop upload with readiness banner and post-upload results summary |
 | `/products` | Hardware Products | Internal hardware catalog |
 | `/products/import` | Hardware Import | Import hardware CSV |
 | `/products/import-components` | Component Import | Import component CSV |
@@ -46,10 +46,7 @@ and produces all downstream documents needed for production, shipping, and suppl
 | `/admin/formula-tester` | Formula Tester | Test any formula with a custom scope, live result — binding status panel, better error messages |
 | `/admin/product-images` | Bulk Image Uploader | Match + upload images by filename (exact match, both tables, auto-save, progress bar) |
 | `/admin/diagnostic` | Pricing Diagnostic | Health check: stats, issue list, auto-create/reset bindings |
-| `/admin/output-settings` | Output Settings | Per-document-type display toggles (images, pricing) |
-| `/admin/settings` | ORD Settings | Cabinet Vision header template configuration (`{{design_name}}`, `{{po_number}}`) |
-| `/admin/users` | Admin Users | Allowed-users whitelist management |
-| `/how-it-works` | How It Works | Internal documentation page |
+| `/admin/settings` | Admin Settings | 3-tab consolidated settings page: **ORD Export** (header template) · **Output Settings** (per-doc image/pricing toggles) · **Users** (allowed-users whitelist) |
 
 ---
 
@@ -178,23 +175,27 @@ All generated from `order_items`. Routed by `exportType` field on each product.
 ## Key Files
 
 ```
-shared/schema.ts                    Single source of truth — all DB types, Drizzle tables, Zod schemas, DTO types
-server/routes.ts                    All API route handlers (156+ routes, 6,934 lines)
-server/storage.ts                   DB query layer — IStorage interface + DatabaseStorage implementation (1,041 lines)
-server/services/pricingEngine.ts    mathjs formula evaluator + grid resolver
-server/csvHelpers.ts                CSV parsing helpers — countPartsFromCSV, extractCTSParts, etc.
-server/replit_integrations/         Asana, Outlook, Google Sheets, Auth connectors
-client/src/App.tsx                  Route definitions (16 pages)
-client/src/pages/                   All page components
-client/src/pages/admin/             Admin-only pages
-docs/MASTER_ARCHITECTURE_SPEC_v4.md Full system specification (authoritative)
-docs/BUILD_STATE.md                 This file — current build state, updated alongside CHANGELOG.md
-CHANGELOG.md                        Per-release fix log
+shared/schema.ts                          Single source of truth — all DB types, Drizzle tables, Zod schemas, DTO types
+server/routes.ts                          All API route handlers (180+ routes, ~8,200 lines)
+server/storage.ts                         DB query layer — IStorage interface + DatabaseStorage implementation
+server/services/pricingEngine.ts          mathjs formula evaluator + grid resolver
+server/csvHelpers.ts                      CSV parsing helpers — countPartsFromCSV, extractCTSParts, etc.
+server/replit_integrations/               Asana, Outlook, Google Sheets, Auth connectors
+client/src/App.tsx                        Route definitions (17 pages)
+client/src/pages/OrderDetails.tsx         Order detail page — ~340 lines, sticky header + two-section layout
+client/src/pages/order-detail/            9 sub-components: FileSidebar, DocumentsView, ShippingView,
+                                            FileItemsTable, PdfViewer, PackingChecklistInline,
+                                            HardwareChecklistInline, CtsPartsInline, PalletManager
+client/src/pages/admin/AdminSettings.tsx  Consolidated 3-tab settings page (ORD Export · Output · Users)
+client/src/pages/admin/                   All other admin pages
+docs/MASTER_ARCHITECTURE_SPEC_v4.md       Full system specification (authoritative)
+docs/BUILD_STATE.md                       This file — current build state, updated alongside CHANGELOG.md
+CHANGELOG.md                              Per-release fix log
 ```
 
 ---
 
-## What's Working End-to-End (as of r21 + merged tasks)
+## What's Working End-to-End (as of r22)
 
 ### Upload & Pricing Pipeline
 - [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
@@ -212,18 +213,18 @@ CHANGELOG.md                        Per-release fix log
 - [x] Comprehensive pipeline logging — `[Upload Pipeline]` / `[Reprice Pipeline]` at every step (r11)
 - [x] Missing-alias diagnostic logging — logs unresolved grid aliases for first 3 matched items per upload (r16)
 
-### Order Details (12-Tab Layout)
-- [x] Order Details — tabbed layout with 12 tabs (r13):
-  - **Overview** — project notes, details, order status, material summary, pallets, CSV files, sync status
-  - **All Items** — line-item table with per-file filter pills, pricing badges, re-price / regenerate actions
-  - **Invoice** — PDF iframe + JSON section breakdown
-  - **Customer Slip** — PDF iframe (customer-facing)
-  - **Internal Slip** — PDF iframe; internal-only production document with rack locations (task #11)
-  - **M&J Shaker PDF** — "NETLEY 5 PIECE SHAKER JOB LIST" PDF; drawer fronts + doors + glass sections; sent to M&J Woodcraft (task #13)
-  - **Cut-to-Size PDF** — Part list PDF with length summary, item detail table, and rod totals; "DO NOT SEND WITH JOB" warning (task #12)
-  - **Cabinet Vision** — items grouped by room; "Multi-Room" badge when 2+ files; download button shows "Download .ORD" (single file) or "Download ORD Files (.ZIP)" (multi-file); one `.ord` per CSV with its own `[Header]`, 8-field standard lines, entry `1`, no `[Walls]`, `\r\n` endings (r21)
-  - **Elias / M&J Doors / ERP Import / Hardware / Glass** — conditional tabs per `exportType`
-- [x] Page scrolling fixed — all pages scroll correctly (r19, r15)
+### Order Details (r22 Redesign)
+- [x] Full-height layout — hides AppLayout top bar; own sticky `ProjectHeaderBar` with project name, status, dealer, file count, total price, actions dropdown (r22)
+- [x] Two-section toggle: **Documents** and **Packing & Shipping** (r22)
+- [x] `FileSidebar` — file list left panel, shown only for multi-file projects; badges show pricing status and packing progress; switches between Documents/Shipping modes (r22)
+- [x] **Documents section** tabs (per selected file): Items · Invoice · Customer Slip · Internal Slip · Cabinet Vision · Elias · M&J · Hardware · Glass (r22)
+- [x] **Packing & Shipping section** tabs (per selected file): Packing Checklist · Hardware Checklist · CTS Parts · Pallets (r22)
+- [x] `?fileId=N` filtering supported on all 12+ data/PDF/ORD endpoints — components render per-file content (r22)
+- [x] `GET /api/orders/:id/file-summary` — per-file summary (pricing/export type, item counts, total) (r22)
+- [x] `GET /api/orders/:id/shipping-summary` — per-file packing/hardware/CTS progress summary (r22)
+- [x] `PalletManager` — full pallet CRUD + 12-tile packaging metrics display, extracted to standalone component (r22)
+- [x] `ProjectDetailsDialog` + `ProductionStatusDialog` accessible from the actions dropdown (r22)
+- [x] Old `order-tabs/` directory deleted; `OrderDetails.tsx` reduced 3165 → ~340 lines (r22)
 - [x] Re-run Pricing button — reprices all items, shows ✅/⚠/$0 badges per item
 - [x] Regenerate Checklists button — re-runs hardware + packing checklist generation for all files (task #2)
 
@@ -251,6 +252,10 @@ CHANGELOG.md                        Per-release fix log
 ### Sidebar & Navigation
 - [x] "All Orders" (`/orders`) and "Users" (`/admin/users`) surfaced in sidebar (task #3)
 - [x] Email Sync card removed from Order Processing Dashboard — controls live on All Orders page (task #3)
+- [x] Sidebar simplified to 7 items — removed redundant "Order Processing" entry (r22)
+- [x] `/` redirects to `/orders` (r22)
+- [x] `/admin/settings` consolidated to 3-tab page: ORD Export · Output Settings · Users (r22)
+- [x] `/admin/output-settings` and `/admin/users` removed as standalone routes (merged into `/admin/settings`) (r22)
 - [x] Dark mode, responsive layout, sidebar navigation
 
 ### Integrations & Automation
@@ -281,6 +286,28 @@ CHANGELOG.md                        Per-release fix log
 ---
 
 ## Release History
+
+### r22 — 2026-04-12
+**Feature:** Full Order Details page redesign. `OrderDetails.tsx` reduced from 3,165 lines to ~340 lines.
+- **Sticky `ProjectHeaderBar`** — project name, status, dealer, file count, total price, Actions dropdown (Project Details · Production Status · Asana sync · Delete).
+- **Two-section toggle** — **Documents** and **Packing & Shipping**, each with their own per-file tab sets.
+- **`FileSidebar`** (left panel, multi-file projects only) — file list with pricing/packing progress badges; clicking a file scopes all content to that file. Hidden for single-file projects.
+- **`DocumentsView`** tabs: Items · Invoice · Customer Slip · Internal Slip · Cabinet Vision · Elias · M&J · Hardware · Glass.
+- **`ShippingView`** tabs: Packing Checklist · Hardware Checklist · CTS Parts · Pallets.
+- **9 new components** in `client/src/pages/order-detail/`: `FileSidebar`, `DocumentsView`, `ShippingView`, `FileItemsTable`, `PdfViewer`, `PackingChecklistInline`, `HardwareChecklistInline`, `CtsPartsInline`, `PalletManager`.
+- Old `client/src/pages/order-tabs/` directory deleted (10 components removed).
+- `?fileId=N` query parameter added to all 12 data/PDF/ORD endpoints.
+- `GET /api/orders/:id/file-summary` — per-file pricing/export-type summary.
+- `GET /api/orders/:id/shipping-summary` — per-file packing/hardware/CTS progress.
+
+**Feature:** App navigation overhaul.
+- `/` now redirects to `/orders`.
+- AppLayout sidebar simplified from 8 items to 7 (removed "Order Processing").
+- `OrderDetails` pages bypass the AppLayout top bar and use a full-height overflow-hidden flex layout.
+- `/admin/settings` consolidated into a 3-tab page: **ORD Export** · **Output Settings** · **Users**. Standalone routes `/admin/output-settings`, `/admin/users`, and `/how-it-works` removed.
+- `AdminSettings.tsx` created (`client/src/pages/admin/AdminSettings.tsx`).
+
+---
 
 ### r19 — 2026-04-05
 **Fix (critical):** Removed `overflow-hidden` from outer `<div>` wrapper and `<main>` in `AppLayout.tsx` — was silently clipping the `overflow-y-auto` scroll container, preventing scroll on the Order Details page.

@@ -1,6 +1,46 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-12 (r21 + merged tasks #1–#26)
+> Last updated: 2026-04-12 (r22)
+
+---
+
+## r22 — 2026-04-12 — Full Order Page Redesign + App Navigation Overhaul
+
+### T001 — Backend: fileId filtering + new summary endpoints
+
+- `?fileId=N` query parameter added to all 12 data/PDF/ORD endpoints: `data/invoice`, `data/elias`, `data/mj`, `data/hardware`, `data/glass`, `data/ord`, `pdf/invoice`, `pdf/customer-packing-slip`, `pdf/internal-packing-slip`, `pdf/elias`, `pdf/mj`, `pdf/cut-to-size`, `download/ord`.
+- `GET /api/orders/:id/file-summary` — returns per-file array: `fileId`, `fileName`, `itemCount`, `totalPrice`, `pricingErrors`, `exportTypes[]`, `hasCTS`, `hasMJ`, `hasElias`, `hasHardware`, `hasGlass`, `hasORD`.
+- `GET /api/orders/:id/shipping-summary` — returns per-file array: `fileId`, `fileName`, packing checklist counts, hardware checklist counts, CTS counts, pallet count.
+
+### T002 — Frontend: New `order-detail/` component directory (9 components)
+
+- **`FileSidebar.tsx`** — file list left panel; `mode` prop switches Documents/Shipping view; each file card shows pricing total, error count, and packing progress badge. Hidden for single-file projects.
+- **`DocumentsView.tsx`** — per-file tab bar: Items · Invoice · Customer Slip · Internal Slip · Cabinet Vision · Elias · M&J · Hardware · Glass. Tabs hidden when not applicable for the file's export types.
+- **`ShippingView.tsx`** — per-file tab bar: Packing Checklist · Hardware Checklist · CTS Parts · Pallets.
+- **`FileItemsTable.tsx`** — fetches `GET /api/orders/:id/items?fileId=N`; no scroll cap; pricing/error badges per row.
+- **`PdfViewer.tsx`** — reusable PDF `<iframe>` + Download button; accepts `url` and `filename` props.
+- **`PackingChecklistInline.tsx`** — inline packing checklist for a single `fileId`.
+- **`HardwareChecklistInline.tsx`** — inline hardware checklist for a single `fileId`.
+- **`CtsPartsInline.tsx`** — inline CTS parts list for a single `fileId`.
+- **`PalletManager.tsx`** — pallet CRUD + 12-tile packaging metrics (assembled, fivePiece, glassInserts, glassShelves, mjDoors, richelieuDoors, doubleThick, cts, wallRail, weight, maxLength, maxWidth, recommendedPallet); extracted from old `OrderDetails.tsx`. Uses custom `queryFn` to avoid broken default URL construction.
+
+### T003 — Frontend: OrderDetails.tsx rewrite (3165 → ~340 lines)
+
+- **`ProjectHeaderBar`** — sticky top bar: project name, status badge, dealer, file count, total price, Actions dropdown (Project Details dialog · Production Status dialog · Asana sync · Delete project).
+- **Two-section toggle** — Documents / Packing & Shipping; state drives `FileSidebar` mode and which view component renders.
+- **Two-panel layout** — `FileSidebar` (left, 240 px, multi-file only) + content area (right, fills remaining width).
+- Single-file projects: FileSidebar hidden; content renders at full width with the only file pre-selected.
+- `ProjectDetailsDialog` and `ProductionStatusDialog` extracted into the Actions dropdown menu.
+- Old `client/src/pages/order-tabs/` directory deleted — 10 components removed.
+
+### T004 — Sidebar + Navigation
+
+- `AppLayout.tsx` sidebar reduced to 7 items; "Order Processing" entry removed.
+- `/` route now uses `<Redirect to="/orders" />` via wouter.
+- `OrderDetails` (`/orders/:id`) bypasses AppLayout top header; content wrapper uses `overflow-hidden h-full` flex layout to enable internal scrolling.
+- `AdminSettings.tsx` created at `client/src/pages/admin/AdminSettings.tsx` — 3-tab page: **ORD Export** (header template textarea + `{{design_name}}` / `{{po_number}}` hints) · **Output Settings** (per-document image/pricing toggles) · **Users** (allowed-users whitelist).
+- Routes `/admin/output-settings`, `/admin/users`, and `/how-it-works` removed from `App.tsx`.
+- `/admin/settings` route now renders `AdminSettings`.
 
 ---
 
