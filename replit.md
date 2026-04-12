@@ -12,7 +12,9 @@ It defines every data model, formula pattern, output document, admin UI, and bui
 A full snapshot of what is built, working, and not yet built lives at:
 **`docs/BUILD_STATE.md`**
 
-This file is updated alongside `CHANGELOG.md` after every release. It covers all pages, all 26 DB tables, the CSV pipeline, the pricing engine, exports, integrations, known gaps, and the release history.
+This file is updated alongside `CHANGELOG.md` after every release. It covers all pages, all 27 DB tables, the CSV pipeline, the pricing engine, exports, integrations, known gaps, and the release history.
+
+**Current release:** r22-hotfix (2026-04-12) — fixes production blank page on `/orders/:id` (ErrorBoundary + flex layout hardening).
 
 ## Overview
 

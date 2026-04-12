@@ -1,6 +1,38 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-12 (r22)
+> Last updated: 2026-04-12 (r22-hotfix)
+
+---
+
+## r22-hotfix — 2026-04-12 — Production Blank Page Fix on /orders/:id
+
+### Problem
+After deploying r22, navigating to any `/orders/:id` URL in production showed a completely blank page. Dev mode worked correctly. The API returned 200 OK for all order endpoints. No browser-visible error — React was silently crashing with no error boundary to catch or display it.
+
+### Fix 1 — ErrorBoundary (`client/src/components/ErrorBoundary.tsx`, `client/src/App.tsx`)
+
+Created `ErrorBoundary.tsx` as a React class component using `getDerivedStateFromError` + `componentDidCatch`. When a render crash occurs it now shows:
+- A readable error message with the exception text
+- A "Reload page" button
+- Prevents the completely blank white screen
+
+Wrapped the entire `<Switch>` block in `App.tsx` with `<ErrorBoundary>`. The closing `</ErrorBoundary>` tag was accidentally omitted in the r22 commit — this fix restores it.
+
+### Fix 2 — Flex layout hardening (`client/src/components/AppLayout.tsx`, `client/src/pages/OrderDetails.tsx`)
+
+The order-detail content wrapper in `AppLayout` was `flex-1 min-h-0 overflow-hidden` — a flex item but **not** a flex container. `OrderDetails` used `h-full` on its root div to fill the wrapper. In production builds, `height: 100%` on a block element inside a flex item (without an explicit `height` on the flex item itself) can silently compute to 0, collapsing the entire page.
+
+**`AppLayout.tsx`** — added `flex flex-col` to the order-detail content wrapper:
+```
+flex-1 min-h-0 overflow-hidden  →  flex-1 min-h-0 overflow-hidden flex flex-col
+```
+
+**`OrderDetails.tsx`** — replaced `h-full` with `flex-1` on the root div, since the parent is now a proper flex container:
+```
+flex flex-col h-full min-h-0  →  flex flex-col flex-1 min-h-0 overflow-hidden
+```
+
+This ensures the full-height layout works correctly in both dev and production builds across all browsers.
 
 ---
 

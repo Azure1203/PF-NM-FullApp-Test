@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-12 (r22) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-12 (r22-hotfix) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -286,6 +286,13 @@ CHANGELOG.md                              Per-release fix log
 ---
 
 ## Release History
+
+### r22-hotfix — 2026-04-12
+**Fix (critical):** Production blank page on `/orders/:id`. Dev worked; production showed nothing. Root causes:
+1. **Missing `</ErrorBoundary>` closing tag** — the tag was accidentally omitted in the r22 commit. React render crashes were completely silent (no visible error). Created `client/src/components/ErrorBoundary.tsx` (class component, `getDerivedStateFromError` + `componentDidCatch`) and properly wrapped the entire `<Switch>` in `App.tsx` with it. Render errors now show an error message + "Reload page" button instead of a blank screen.
+2. **`h-full` collapsing to 0 in production builds** — `OrderDetails` root used `h-full` inside a flex item that was not itself a flex container. In production (minified) builds, `height: 100%` on a block element inside a non-container flex item can resolve to 0. Fixed by: (a) adding `flex flex-col` to the AppLayout order-detail content wrapper, (b) replacing `h-full` with `flex-1` on the `OrderDetails` root div.
+
+---
 
 ### r22 — 2026-04-12
 **Feature:** Full Order Details page redesign. `OrderDetails.tsx` reduced from 3,165 lines to ~340 lines.
