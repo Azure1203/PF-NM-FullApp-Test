@@ -1464,7 +1464,10 @@ export async function registerRoutes(
   app.get('/api/orders/:id/items', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const items = await storage.getOrderItemsByProject(projectId);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const allProducts = await storage.getAllmoxyProducts();
       const productNameMap = new Map(allProducts.map(p => [p.id, p.name]));
       res.json(items.map(item => ({
@@ -1517,9 +1520,12 @@ export async function registerRoutes(
   app.get('/api/orders/:id/data/invoice', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
-      const items = await storage.getOrderItemsByProject(projectId);
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const allProducts = await storage.getAllmoxyProducts();
       const productMap = new Map(allProducts.map(p => [p.id, p]));
       const groupedMap = new Map<string, typeof items>();
@@ -1580,7 +1586,10 @@ export async function registerRoutes(
   app.get('/api/orders/:id/data/elias', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const items = await storage.getOrderItemsByProject(projectId);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const eliasItems = items.filter(i => i.exportType === 'ELIAS');
       res.json({
         items: eliasItems.map(i => ({
@@ -1597,7 +1606,10 @@ export async function registerRoutes(
   app.get('/api/orders/:id/data/mj', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const items = await storage.getOrderItemsByProject(projectId);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const mjItems = items.filter(i => i.exportType === 'MJ');
       res.json({
         items: mjItems.map(i => ({
@@ -1614,7 +1626,10 @@ export async function registerRoutes(
   app.get('/api/orders/:id/data/hardware', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const items = await storage.getOrderItemsByProject(projectId);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const allProducts = await storage.getAllmoxyProducts();
       const productMap = new Map(allProducts.map(p => [p.id, p]));
       const hwItems = items.filter(i => i.exportType === 'HARDWARE');
@@ -1634,7 +1649,10 @@ export async function registerRoutes(
   app.get('/api/orders/:id/data/glass', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const items = await storage.getOrderItemsByProject(projectId);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const glassItems = items.filter(i => i.exportType === 'GLASS');
       res.json({
         items: glassItems.map(i => ({
@@ -1651,11 +1669,15 @@ export async function registerRoutes(
   app.get('/api/orders/:id/data/ord', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileIdParam = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const files = await storage.getProjectFiles(projectId);
-      const allItems = await storage.getOrderItemsByProject(projectId);
+      const allFiles = await storage.getProjectFiles(projectId);
+      const files = fileIdParam ? allFiles.filter(f => f.id === fileIdParam) : allFiles;
+      const allItems = fileIdParam
+        ? await storage.getOrderItemsByFile(fileIdParam)
+        : await storage.getOrderItemsByProject(projectId);
 
       const rooms = files.map((file, idx) => {
         const fileItems = allItems.filter(i =>
@@ -1696,17 +1718,22 @@ export async function registerRoutes(
   });
 
   // ORD file download — one .ord per CSV file; single .ord for 1 file, ZIP for multiple
+  // ?fileId=N → return single .ord for that file only
   app.get('/api/orders/:id/download/ord', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileIdParam = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
       const headerSetting = await storage.getSetting('ord_header_template');
       const headerTemplate = headerSetting?.value ?? DEFAULT_ORD_HEADER_TEMPLATE;
 
-      const files = await storage.getProjectFiles(projectId);
-      const allItems = await storage.getOrderItemsByProject(projectId);
+      const allFiles = await storage.getProjectFiles(projectId);
+      const files = fileIdParam ? allFiles.filter(f => f.id === fileIdParam) : allFiles;
+      const allItems = fileIdParam
+        ? await storage.getOrderItemsByFile(fileIdParam)
+        : await storage.getOrderItemsByProject(projectId);
       const ordItems = allItems.filter(i => i.exportType === 'ORD' && i.exportText);
 
       // Build one .ord content buffer per CSV file
@@ -1919,10 +1946,13 @@ export async function registerRoutes(
   app.get('/api/orders/:id/pdf/cut-to-size', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const items = await storage.getOrderItemsByProject(projectId);
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const ctsItems = items.filter(i => i.exportType === 'CTS');
       if (ctsItems.length === 0) {
         return res.status(404).json({ message: 'No CTS items in this order' });
@@ -2000,10 +2030,13 @@ export async function registerRoutes(
   app.get('/api/orders/:id/pdf/invoice', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const items = await storage.getOrderItemsByProject(projectId);
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const allProducts = await storage.getAllmoxyProducts();
       const productMap = new Map(allProducts.map(p => [p.id, p]));
 
@@ -2112,10 +2145,13 @@ export async function registerRoutes(
   app.get('/api/orders/:id/pdf/customer-packing-slip', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const items = await storage.getOrderItemsByProject(projectId);
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const allProducts = await storage.getAllmoxyProducts();
       const productMap = new Map(allProducts.map(p => [p.id, p]));
 
@@ -2221,10 +2257,13 @@ export async function registerRoutes(
   app.get('/api/orders/:id/pdf/elias', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const allItems = await storage.getOrderItemsByProject(projectId);
+      const allItems = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const eliasItems = allItems.filter(i => i.exportType === 'ELIAS');
 
       if (eliasItems.length === 0) {
@@ -2299,10 +2338,13 @@ export async function registerRoutes(
   app.get('/api/orders/:id/pdf/internal-packing-slip', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const items = await storage.getOrderItemsByProject(projectId);
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const allProducts = await storage.getAllmoxyProducts();
       const productMap = new Map(allProducts.map(p => [p.id, p]));
 
@@ -2439,10 +2481,13 @@ export async function registerRoutes(
   app.get('/api/orders/:id/pdf/mj', isAuthenticated, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: 'Project not found' });
 
-      const allItems = await storage.getOrderItemsByProject(projectId);
+      const allItems = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
       const mjGlassItems = allItems.filter(i => i.exportType === 'MJ' || i.exportType === 'GLASS');
 
       if (mjGlassItems.length === 0) {
@@ -2540,6 +2585,118 @@ export async function registerRoutes(
       console.error('[M&J PDF]', e.message);
       res.status(500).json({ message: e.message });
     }
+  });
+
+  // GET per-file metadata summary for file sidebar
+  app.get('/api/orders/:id/file-summary', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+      const orderFilesList = await storage.getProjectFiles(projectId);
+      const allItems = await storage.getOrderItemsByProject(projectId);
+
+      const files = orderFilesList.map(file => {
+        const fileItems = allItems.filter(i => i.fileId === file.id);
+        const exportTypes = [...new Set(fileItems.map(i => i.exportType).filter(Boolean))] as string[];
+        const subtotal = Math.round(fileItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100;
+
+        let displayName = '';
+        if (file.poNumber) {
+          const match = file.poNumber.match(/\(([^)]+)\)/);
+          displayName = match ? match[1] : file.poNumber;
+        }
+        if (!displayName) {
+          displayName = (file.originalFilename || `File ${file.id}`).replace(/\.csv$/i, '');
+        }
+
+        return {
+          fileId: file.id,
+          displayName,
+          filename: file.originalFilename,
+          poNumber: file.poNumber,
+          itemCount: fileItems.length,
+          subtotal,
+          pricingErrors: fileItems.filter(i => i.pricingError).length,
+          exportTypes,
+          hasElias: exportTypes.includes('ELIAS'),
+          hasMJ: exportTypes.includes('MJ'),
+          hasHardware: exportTypes.includes('HARDWARE'),
+          hasGlass: exportTypes.includes('GLASS'),
+          hasCTS: exportTypes.includes('CTS'),
+          hasORD: exportTypes.includes('ORD'),
+        };
+      });
+
+      res.json({
+        files,
+        projectTotal: Math.round(allItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+        totalItems: allItems.length,
+        totalFiles: files.length,
+      });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // GET per-file packing/hardware/CTS progress for shipping sidebar
+  app.get('/api/orders/:id/shipping-summary', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: 'Project not found' });
+      const orderFilesList = await storage.getProjectFiles(projectId);
+      const allItems = await storage.getOrderItemsByProject(projectId);
+
+      const files = await Promise.all(orderFilesList.map(async file => {
+        const fileItems = allItems.filter(i => i.fileId === file.id);
+
+        let displayName = '';
+        if (file.poNumber) {
+          const match = file.poNumber.match(/\(([^)]+)\)/);
+          displayName = match ? match[1] : file.poNumber;
+        }
+        if (!displayName) {
+          displayName = (file.originalFilename || `File ${file.id}`).replace(/\.csv$/i, '');
+        }
+
+        const [packingProgress, hardwareProgress, ctsStatus] = await Promise.all([
+          storage.getPackingSlipProgress(file.id),
+          storage.getHardwareChecklistProgress(file.id),
+          storage.getCtsPartsCutStatus(file.id),
+        ]);
+
+        const hasCTS = fileItems.some(i => i.exportType === 'CTS');
+        const hasHardware = fileItems.some(i => i.exportType === 'HARDWARE');
+
+        return {
+          fileId: file.id,
+          displayName,
+          packingProgress: {
+            total: packingProgress.total,
+            checked: packingProgress.checked,
+            percentage: packingProgress.percentage,
+          },
+          hardwareProgress: hasHardware ? {
+            total: hardwareProgress.total,
+            packed: hardwareProgress.packed,
+            percentage: hardwareProgress.total > 0
+              ? Math.round((hardwareProgress.packed / hardwareProgress.total) * 100)
+              : 0,
+            buyoutItems: hardwareProgress.buyoutItems,
+            buyoutArrived: hardwareProgress.buyoutArrived,
+          } : null,
+          ctsProgress: hasCTS ? {
+            total: ctsStatus.total,
+            cut: ctsStatus.cut,
+            allCut: ctsStatus.allCut,
+            percentage: ctsStatus.total > 0
+              ? Math.round((ctsStatus.cut / ctsStatus.total) * 100)
+              : 0,
+          } : null,
+        };
+      }));
+
+      res.json({ files });
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
 
   // POST re-run pricing pipeline for an already-saved project

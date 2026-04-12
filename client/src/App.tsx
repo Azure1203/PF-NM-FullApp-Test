@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import Dashboard from "@/pages/Dashboard";
-import OrderProcessingDashboard from "@/pages/daily/OrderProcessingDashboard";
 import UploadOrder from "@/pages/UploadOrder";
 import OrderDetails from "@/pages/OrderDetails";
 import CutToSize from "@/pages/CutToSize";
@@ -18,16 +17,13 @@ import HardwareChecklist from "@/pages/HardwareChecklist";
 import Products from "@/pages/Products";
 import HardwareImport from "@/pages/HardwareImport";
 import ComponentImport from "@/pages/ComponentImport";
-import AdminUsers from "@/pages/AdminUsers";
-import OrdSettings from "@/pages/admin/OrdSettings";
-import HowItWorks from "@/pages/HowItWorks";
 import DynamicGridManager from "@/pages/admin/DynamicGridManager";
 import ProxyVariableManager from "@/pages/admin/ProxyVariableManager";
 import AllmoxyProductManager from "@/pages/admin/AllmoxyProductManager";
 import FormulaTester from "@/pages/admin/FormulaTester";
 import ProductImageUploader from "@/pages/admin/ProductImageUploader";
 import PricingDiagnostic from "@/pages/admin/PricingDiagnostic";
-import OutputSettings from "@/pages/admin/OutputSettings";
+import AdminSettings from "@/pages/admin/AdminSettings";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import AppLayout from "@/components/AppLayout";
@@ -77,23 +73,20 @@ function AppRouter() {
   return (
     <AppLayout>
       <Switch>
-        <Route path="/" component={OrderProcessingDashboard} />
+        <Route path="/"><Redirect to="/orders" /></Route>
         <Route path="/orders" component={Dashboard} />
+        <Route path="/orders/:id" component={OrderDetails} />
         <Route path="/upload" component={UploadOrder} />
         <Route path="/products" component={Products} />
         <Route path="/products/import" component={HardwareImport} />
         <Route path="/products/import-components" component={ComponentImport} />
-        <Route path="/admin/users" component={AdminUsers} />
-        <Route path="/admin/settings" component={OrdSettings} />
+        <Route path="/admin/settings" component={AdminSettings} />
         <Route path="/admin/attribute-grids" component={DynamicGridManager} />
         <Route path="/admin/proxy-variables" component={ProxyVariableManager} />
         <Route path="/admin/allmoxy-products" component={AllmoxyProductManager} />
         <Route path="/admin/formula-tester" component={FormulaTester} />
         <Route path="/admin/product-images" component={ProductImageUploader} />
         <Route path="/admin/diagnostic" component={PricingDiagnostic} />
-        <Route path="/admin/output-settings" component={OutputSettings} />
-        <Route path="/how-it-works" component={HowItWorks} />
-        <Route path="/orders/:id" component={OrderDetails} />
         <Route path="/files/:fileId/cts" component={CutToSize} />
         <Route path="/files/:fileId/checklist" component={PackingChecklist} />
         <Route path="/files/:fileId/hardware-checklist" component={HardwareChecklist} />
