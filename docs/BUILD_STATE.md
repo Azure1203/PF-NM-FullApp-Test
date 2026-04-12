@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-05 (r21) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-12 (r21 + merged tasks #1–#26) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -18,20 +18,21 @@ and produces all downstream documents needed for production, shipping, and suppl
 | Layer | Technology |
 |---|---|
 | Frontend | React 18 + TypeScript, Vite, Wouter, TanStack Query v5, shadcn/ui, Tailwind CSS |
-| Backend | Express.js + TypeScript (tsx), 156+ REST API routes (6,934 lines) |
-| Database | PostgreSQL + Drizzle ORM — 26 tables, schema in `shared/schema.ts` |
+| Backend | Express.js + TypeScript (tsx), 180+ REST API routes (8,153 lines) |
+| Database | PostgreSQL + Drizzle ORM — 27 tables, schema in `shared/schema.ts` |
 | Pricing Engine | mathjs formula evaluator (`server/services/pricingEngine.ts`) |
+| PDF Generation | Python/ReportLab scripts — 6 scripts: invoice, customer slip, internal slip, Elias, M&J, CTS |
 | Auth | Replit OIDC — single user, gated by `allowed_users` table + `is_admin` flag |
 
 ---
 
-## All 17 Pages (Routes)
+## All 20 Pages (Routes)
 
 | URL | Page | Purpose |
 |---|---|---|
-| `/` | Order Processing Dashboard | Daily workflow hub — drag-and-drop, Asana sync, status overview |
-| `/orders` | Dashboard | Full order list with filters |
-| `/orders/:id` | Order Details | Line-item table, pricing, all export downloads |
+| `/` | Order Processing Dashboard | Daily workflow hub — drag-and-drop CSV upload, Asana sync, status overview |
+| `/orders` | All Orders | Full order list with filters, email sync, Asana import |
+| `/orders/:id` | Order Details | Line-item table, pricing, all export downloads (12 tabs) |
 | `/upload` | Upload Order | CSV drag-and-drop upload |
 | `/products` | Hardware Products | Internal hardware catalog |
 | `/products/import` | Hardware Import | Import hardware CSV |
@@ -39,20 +40,20 @@ and produces all downstream documents needed for production, shipping, and suppl
 | `/files/:fileId/cts` | Cut to Size | CTS part list for a file |
 | `/files/:fileId/checklist` | Packing Checklist | Packing slip check-off UI |
 | `/files/:fileId/hardware-checklist` | Hardware Checklist | Hardware packing check-off UI |
-| `/admin/allmoxy-products` | Allmoxy Product Manager | Full CRUD for products, images, category, formula assignments |
-| `/admin/attribute-grids` | Attribute Grid Manager | Import grids from CSV, edit rows, manage product-grid bindings |
+| `/admin/allmoxy-products` | Allmoxy Product Manager | Full CRUD for products, images, category, formula assignments, export type |
+| `/admin/attribute-grids` | Attribute Grid Manager | Multi-file CSV import, row editing, multi-select delete, product-grid bindings |
 | `/admin/proxy-variables` | Proxy Variable Manager | Create/edit/delete formula variables, live preview |
 | `/admin/formula-tester` | Formula Tester | Test any formula with a custom scope, live result — binding status panel, better error messages |
-| `/admin/product-images` | Bulk Image Uploader | Match + upload images to products by filename (batched, progress bar) |
-| `/admin/diagnostic` | Pricing Diagnostic | Health check: stats, issue list, auto-create missing grid bindings |
+| `/admin/product-images` | Bulk Image Uploader | Match + upload images by filename (exact match, both tables, auto-save, progress bar) |
+| `/admin/diagnostic` | Pricing Diagnostic | Health check: stats, issue list, auto-create/reset bindings |
 | `/admin/output-settings` | Output Settings | Per-document-type display toggles (images, pricing) |
-| `/admin/settings` | ORD Settings | Cabinet Vision header template configuration |
+| `/admin/settings` | ORD Settings | Cabinet Vision header template configuration (`{{design_name}}`, `{{po_number}}`) |
 | `/admin/users` | Admin Users | Allowed-users whitelist management |
 | `/how-it-works` | How It Works | Internal documentation page |
 
 ---
 
-## Database — 26 Tables
+## Database — 27 Tables
 
 | Table | Purpose |
 |---|---|
@@ -193,49 +194,76 @@ CHANGELOG.md                        Per-release fix log
 
 ---
 
-## What's Working End-to-End (as of r19)
+## What's Working End-to-End (as of r21 + merged tasks)
 
+### Upload & Pricing Pipeline
 - [x] CSV upload → order items created (r4 header-aware parsing + r14 column name fix)
-- [x] Allmoxy order CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
+- [x] Allmoxy CSV column names handled: `Manuf code`, `Width(R)`, `Length(L)`, `Quantity` (r14)
 - [x] Multi-file CSV upload → single project with all files merged
 - [x] SKU prefix matching → product resolved per line item
 - [x] mathjs pricing engine → unit price computed per line item
 - [x] Proxy variables pre-computed into formula scope (r5)
 - [x] Grid row cache in all three pipeline locations — O(1) in-memory lookups (r5)
-- [x] Fast pipeline — no sequential DB queries (fixed r4)
-- [x] MANU_CODE grid bindings correctly use extracted SKU (not missing CSV key) in both upload + reprice pipelines (r15)
+- [x] Fast pipeline — no sequential DB queries (r4)
+- [x] MANU_CODE grid bindings correctly use extracted SKU in both upload + reprice pipelines (r15)
+- [x] `exportType` copied from matched product to `order_items` at upload time (task #8)
+- [x] Duplicate product names in import CSV are deduplicated before upsert — no more constraint crash (task #24)
+- [x] Checklist regeneration wired into reprice endpoint — checklists auto-update after re-price (task #2)
+- [x] Comprehensive pipeline logging — `[Upload Pipeline]` / `[Reprice Pipeline]` at every step (r11)
+- [x] Missing-alias diagnostic logging — logs unresolved grid aliases for first 3 matched items per upload (r16)
+
+### Order Details (12-Tab Layout)
 - [x] Order Details — tabbed layout with 12 tabs (r13):
   - **Overview** — project notes, details, order status, material summary, pallets, CSV files, sync status
   - **All Items** — line-item table with per-file filter pills, pricing badges, re-price / regenerate actions
   - **Invoice** — PDF iframe + JSON section breakdown
-  - **Customer Slip / Internal Slip** — PDF iframes
-  - **Cabinet Vision** — items shown grouped by room; "Multi-Room" badge when 2+ files; download button shows "Download .ORD" (single file) or "Download ORD Files (.ZIP)" (multiple files); one `.ord` per CSV file (r21); standard 8-field format, entry number always `1`, no `[Walls]`, `\r\n` line endings, ZIP via `archiver` (r21)
-  - **Elias / M&J Doors / ERP Import / Cut-to-Size / Hardware / Glass** — conditional tabs per `exportType`
-- [x] Page scrolling fixed — all pages with long content scroll correctly (r19: removed `overflow-hidden` from outer wrapper and `<main>`; r15: `h-full` → `min-h-full` on AppLayout inner wrapper)
-- [x] Re-run Pricing button on Order Details — reprices all items, shows ✅/⚠/$0 badges per item
-- [x] Allmoxy Product Manager — full CRUD, image upload/clear, category, formula assignment
-- [x] Attribute Grid Manager — CSV import, row editing, product binding management (Rows + Bindings tabs)
+  - **Customer Slip** — PDF iframe (customer-facing)
+  - **Internal Slip** — PDF iframe; internal-only production document with rack locations (task #11)
+  - **M&J Shaker PDF** — "NETLEY 5 PIECE SHAKER JOB LIST" PDF; drawer fronts + doors + glass sections; sent to M&J Woodcraft (task #13)
+  - **Cut-to-Size PDF** — Part list PDF with length summary, item detail table, and rod totals; "DO NOT SEND WITH JOB" warning (task #12)
+  - **Cabinet Vision** — items grouped by room; "Multi-Room" badge when 2+ files; download button shows "Download .ORD" (single file) or "Download ORD Files (.ZIP)" (multi-file); one `.ord` per CSV with its own `[Header]`, 8-field standard lines, entry `1`, no `[Walls]`, `\r\n` endings (r21)
+  - **Elias / M&J Doors / ERP Import / Hardware / Glass** — conditional tabs per `exportType`
+- [x] Page scrolling fixed — all pages scroll correctly (r19, r15)
+- [x] Re-run Pricing button — reprices all items, shows ✅/⚠/$0 badges per item
+- [x] Regenerate Checklists button — re-runs hardware + packing checklist generation for all files (task #2)
+
+### Admin — Products
+- [x] Allmoxy Product Manager — full CRUD, per-product image upload/clear, category, formula assignment, `exportType` dropdown with auto-classify (tasks #8, #17)
+- [x] `exportType` auto-classify — `POST /api/admin/products/auto-classify-export-types` classifies all active products by SKU prefix rules (task #8)
+- [x] Per-product image upload in editor — click thumbnail to replace, × to clear; saves to DB immediately (task #17)
+- [x] Bulk image uploader (`/admin/product-images`) — exact-match by filename-without-extension against both tables; auto-saves on upload (no separate confirm step); shows saved/unmatched results (tasks #10, #16, #23)
+- [x] Product images stored as base64 `image_data` in PostgreSQL — no object storage dependency (task #23)
+- [x] Product list endpoints exclude `imageData` column — no timeout with 2,363+ products (task #26)
+- [x] Image serve routes: `GET /api/product-images/by-id/:id` (Allmoxy), `GET /api/product-images/hardware/by-id/:id` (hardware) (task #23)
+
+### Admin — Grids, Formulas, Setup
+- [x] Attribute Grid Manager — **multi-file CSV upload** (derives name from filename, no manual entry); **multi-select delete** with checkbox mode + "Delete X grids" confirmation (task #6)
 - [x] Proxy Variable Manager — formula CRUD, live preview
 - [x] Formula Tester — live sandbox with: binding status panel, searchable color/grid dropdowns (auto-select first value), better error messages, diagnostic banner
 - [x] Ad-hoc grid lookups in Formula Tester — test any grid without a configured binding
-- [x] Bulk image uploader — matches 2,363 products by filename, batched with progress
-- [x] Product list endpoints — no `imageData` in list queries (fixed r4 — no more timeout)
-- [x] Asana sync — background scheduler, task creation/update, dedup
-- [x] Outlook sync — background scheduler, attachment fetch, dedup
+- [x] Bulk formula seed — `POST /api/admin/seed-formulas` creates/updates all ~55 pricing + export proxy variables from hardcoded spec (task #9)
+- [x] Auto-assign formulas & bindings — `POST /api/admin/products/auto-assign-formulas` matches every product's SKU prefix to the correct pricing/export proxy and creates grid bindings via fuzzy grid name matching (task #9)
+- [x] Pricing Diagnostic page — health check stats, issue list, auto-create bindings (dry-run → confirm), Reset & Recreate
+- [x] `GET /api/admin/import-readiness` — fast pre-flight check covering products, grids, bindings, proxy vars (r11)
+- [x] ORD Settings page — `app_settings`-backed header template editor with `{{design_name}}` / `{{po_number}}` placeholders (tasks #1, r15)
+- [x] Output Settings page — toggle `showProductImages` and `showPricing` per document type (r19)
+
+### Sidebar & Navigation
+- [x] "All Orders" (`/orders`) and "Users" (`/admin/users`) surfaced in sidebar (task #3)
+- [x] Email Sync card removed from Order Processing Dashboard — controls live on All Orders page (task #3)
+- [x] Dark mode, responsive layout, sidebar navigation
+
+### Integrations & Automation
+- [x] Asana sync — background scheduler every 5 min, task creation/update, dedup
+- [x] Outlook sync — background scheduler every 30 min, attachment fetch, dedup
 - [x] Google Sheets backup — daily at 3 AM + manual trigger
 - [x] Hardware packing checklist — check-off, timestamps, buyout tracking
 - [x] Packing slip checklist
 - [x] CTS parts page
 - [x] Pallet management
-- [x] Dark mode, responsive layout, sidebar navigation
-- [x] Output Settings page (`/admin/output-settings`) — toggle `showProductImages` and `showPricing` per document type; stored as `output.<page>.<key>` in `app_settings` (r19)
-- [x] PDF page breaks — `KeepTogether` applied for sections with ≤ 6 items in invoice, packing slips, Elias, M&J (r19)
-- [x] Pricing Diagnostic page — health check stats, issue list, auto-create bindings (dry-run → confirm), Reset & Recreate (fixes wrong-grid bindings)
-- [x] Import Readiness endpoint — fast health check (`GET /api/admin/import-readiness`) covering products, grids, bindings, proxy vars
-- [x] Upload page readiness banner — green/amber pre-flight status before uploading, shows actionable issues
-- [x] Upload page results summary — after successful upload shows matched/unmatched/priced/error counts + "Go to Dashboard" button (no auto-redirect)
-- [x] Comprehensive pipeline logging — `[Upload Pipeline]` and `[Reprice Pipeline]` logs at every critical step: product count, header detection, rows parsed, SKU match/no-match, pricing success/error, batch insert size
-- [x] Missing-alias diagnostic logging — `[Upload Pipeline] MISSING aliases for "SKU": alias1, alias2` logged for first 3 matched items, showing which grid aliases are referenced in the formula but unresolved (r16)
+- [x] Upload page readiness banner — green/amber pre-flight status before uploading (r11)
+- [x] Upload page results summary — matched/unmatched/priced/error counts + "Go to Dashboard" (r11)
+- [x] PDF page breaks — `KeepTogether` for sections ≤ 6 items across all 5 Python generators (r19)
 
 ---
 
@@ -266,6 +294,58 @@ CHANGELOG.md                        Per-release fix log
 
 ### r17 — 2026-04-05
 **Fix (critical):** `findGridForAlias` — replaced single-pass `includes()` with a 3-pass priority system: (1) exact match, (2) starts-with (date suffix tolerance), (3) contains fallback. Previously `shelves` matched "Corner Shelves" before "Shelves", putting all shelves-dependent products on the wrong grid and generating zero correct bindings. After deploying: run "Reset & Recreate Bindings" on the Diagnostic page, then "Re-run Pricing" on the affected order.
+
+### Merged Tasks (task agents, 2026-04-12)
+
+**Task #1 — ORD Header Template & Settings Infrastructure**
+Added `app_settings` table (27th DB table) with `getSetting` / `setSetting` / `getAllSettings` storage methods. Seeded default ORD `[Header]` template at startup. Added `GET/PUT /api/admin/settings/:key` endpoints. Added `generateOrdHeader()` to `ordExporter.ts`. ORD Settings page (`/admin/settings`) shows a textarea editor for the header template with `{{design_name}}` / `{{po_number}}` placeholder hints.
+
+**Task #2 — Port Production Workflow Features**
+`productsMap` is now passed to `countPartsFromCSV` in the upload handler so M&J/Richelieu door detection works correctly. Reprice endpoint now calls both checklist generators for every file after pricing. Added `GET /api/orders/:id/files` endpoint. Added `POST /api/orders/:id/regenerate-checklists` endpoint + "Regenerate Checklists" button on Order Details.
+
+**Task #3 — Surface Features via Sidebar Navigation**
+"All Orders" (`/orders`) and "Users" (`/admin/users`) added to sidebar. Page title resolver updated for both. Email Sync card removed from Order Processing Dashboard (controls live on `/orders` page).
+
+**Task #6 — Bulk Grid Upload + Multi-Select Delete**
+`POST /api/admin/upload-dynamic-grids-bulk` — accepts multiple CSV files; derives grid name from filename automatically. `DELETE /api/admin/attribute-grids/bulk` — accepts `{ ids: number[] }` and deletes all. Grid Manager left panel redesigned: multi-file dropzone (no name input), "Upload All" button with per-file results, checkbox-based selection mode with "Delete X grids" confirmation.
+
+**Task #8 — Export Type Field**
+`export_type` column added to `allmoxy_products` and `order_items`. Product Manager edit form has an "Export Type" dropdown. Product list shows colored export-type badges (ORD=blue, HARDWARE=gray, ELIAS=green, MJ=purple, CTS=orange, GLASS=cyan). `POST /api/admin/products/auto-classify-export-types` applies SKU-prefix classification rules to all active products. `export_type` is propagated from product to `order_items` at upload time.
+
+**Task #9 — Bulk Formula Seed & Setup Wizard**
+`POST /api/admin/seed-formulas` — creates or updates all ~55 pricing and export proxy variables from the hardcoded spec list; returns `{ created, updated, total }`. `POST /api/admin/products/auto-assign-formulas` — for each active product, matches its SKU prefix to the correct proxy variables and creates grid bindings via fuzzy name matching; accepts `overwrite` boolean; returns `{ formulasAssigned, bindingsCreated, skipped, errors }`.
+
+**Task #10 — Bulk Product Image Uploader**
+Initial bulk image uploader at `/admin/product-images`. Drag-and-drop multiple image files; uploads to object storage; matches by filename prefix/partial against both Allmoxy and hardware product tables; preview table with confidence badges; "Save X Image Assignments" confirm step.
+
+**Task #11 — Internal Packing Slip PDF**
+`server/scripts/generate_internal_packing_slip.py` — internal production document with rack location column (resolved from product grid bindings). `GET /api/orders/:id/pdf/internal-packing-slip` endpoint. "Internal Packing Slip" PDF iframe tab on Order Details.
+
+**Task #12 — Cut-to-Size PDF**
+`server/scripts/generate_cut_to_size.py` — PDF with "DO NOT SEND WITH JOB" header, length summary table (unique lengths × qty), item detail table (ID/Qty/Length/Buyout or Stock?/Rack Location), item totals (total mm/in/rods). `GET /api/orders/:id/pdf/cut-to-size` endpoint. "Cut-to-Size PDF" tab on Order Details, visible only when CTS items exist.
+
+**Task #13 — M&J Shaker Door PDF**
+`server/scripts/generate_mj_pdf.py` — "NETLEY 5 PIECE SHAKER JOB LIST"; Letter-size pages; sections for drawer fronts, doors, and glass (each with Supplier/Premoule label, X checkmarks, item table); no pricing. `GET /api/orders/:id/pdf/mj` endpoint. "M&J Shaker PDF" tab on Order Details visible when MJ or GLASS items exist.
+
+**Task #16 — Bulk Image Uploader Redesign (Parallel Upload + Auto-Save)**
+Rewrote bulk upload backend to: build in-memory product map first, match by exact filename-without-extension (case-insensitive) only, upload matched files to GCS in parallel batches of 10, write `image_path` to the product row in the same step. No separate confirm step. Frontend redesigned: single "Upload & Save" button, loading spinner, two-section results (Saved ✓ / Unmatched ✗).
+
+**Task #17 — Per-Product Image Upload in Product Editor**
+Image thumbnail in Allmoxy product editor is now clickable. Selecting a file uploads immediately and updates the thumbnail. A "×" button clears the image. List thumbnails update after upload via TanStack Query cache invalidation.
+
+**Tasks #19–#22 — GCS Upload Fix Iterations**
+Multiple attempts to fix GCS object storage uploads (signed URL approach, sidecar token passing, GCS client library). All failed due to broken GCS environment.
+
+**Task #23 — Store Product Images in Database (Final Solution)**
+GCS abandoned. `image_data` text column added to `allmoxy_products` (base64-encoded bytes). Both single and bulk upload routes now write base64 to `image_data` column (no GCS calls). New image serve routes: `GET /api/product-images/by-id/:id` and `GET /api/product-images/hardware/by-id/:id`. Frontend updated to use ID-based URLs. `image_path` retained as filename reference only.
+
+**Task #24 — Fix CSV Import Crash on Duplicate Product Names**
+After building `productsToInsert` from the CSV rows, a `Map<name, ...>` deduplication step now runs before the upsert — last occurrence of any duplicate name wins. Eliminates the "ON CONFLICT DO UPDATE command cannot affect a row a second time" PostgreSQL crash.
+
+**Task #26 — Fix Product List — Stop Sending Image Data**
+`getAllmoxyProducts()` and `getProducts()` in `server/storage.ts` now explicitly select all columns except `imageData` using Drizzle's column selection syntax. Eliminates the multi-hundred-MB response that caused page timeouts after all 2,363 product images were stored in DB.
+
+---
 
 ### r21 — 2026-04-05
 **Feature:** ORD format overhaul — `GET /api/orders/:id/download/ord` rewritten. One `.ord` file per CSV file; single file → single `.ord` download, multiple files → ZIP (via `archiver`). Each `.ord` has its own `[Header]` populated from the stored template using that file's PO number. Standard 8-field cabinet lines (`1,"SKU",W,H,D,"hinge","type",QTY`), entry number always `1`, no `[Walls]` section, `\r\n` line endings. OrdTab button updates to "Download ORD Files (.ZIP)" or "Download .ORD" based on `downloadFormat` field from `/data/ord` endpoint.

@@ -1,6 +1,108 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-05 (r21)
+> Last updated: 2026-04-12 (r21 + merged tasks #1–#26)
+
+---
+
+## Merged Tasks — 2026-04-12 — Task-Agent Batch (#1, #2, #3, #6, #8, #9, #10–#13, #16–#17, #23–#24, #26)
+
+The following features were implemented by isolated task agents and merged into main:
+
+### Task #1 — ORD Header Template & Settings Infrastructure
+
+- Added `app_settings` table to `shared/schema.ts` (key, value, description, updatedAt). 27th DB table.
+- Added `getSetting`, `setSetting`, `getAllSettings` to `IStorage` / `DatabaseStorage` in `server/storage.ts`. `setSetting` upserts on key conflict.
+- Startup code in `registerRoutes` seeds a default `[Header]` template on first boot (`ord_header_template` key).
+- `GET /api/admin/settings`, `GET /api/admin/settings/:key`, `PUT /api/admin/settings/:key` endpoints.
+- `generateOrdHeader(template, { designName, poNumber })` exported from `server/services/ordExporter.ts`.
+- ORD Settings page (`/admin/settings`) — textarea pre-filled from DB, Save button, placeholder badge hints (`{{design_name}}`, `{{po_number}}`).
+
+### Task #2 — Port Production Workflow Features
+
+- Upload handler passes `productsMap` to `countPartsFromCSV` so M&J/Richelieu door detection works correctly.
+- Reprice endpoint (`POST /api/orders/:id/reprice`) now calls `generateHardwareChecklistForFile` + `generatePackingSlipChecklistForFile` for each file after pricing completes.
+- New `GET /api/orders/:id/files` endpoint.
+- New `POST /api/orders/:id/regenerate-checklists` endpoint — iterates all files, calls both generators, returns `{ success, totalHardwareItems, totalPackingItems, errors }`.
+- "Regenerate Checklists" button added to Order Details header with spinner + toast.
+
+### Task #3 — Surface Backend Features via Sidebar Navigation
+
+- "All Orders" (`/orders`) and "Users" (`/admin/users`) added to sidebar under DAILY OPERATIONS and SYSTEM ADMINISTRATION respectively.
+- `getPageTitle()` in `AppLayout.tsx` updated for both new routes.
+- Email Sync card (AgentMail + Outlook fetch buttons) removed from `OrderProcessingDashboard` — those controls remain on the `/orders` page.
+
+### Task #6 — Bulk Grid Upload + Multi-Select Delete
+
+- `POST /api/admin/upload-dynamic-grids-bulk` — accepts `upload.array()` of CSV files; derives grid name from filename (strips `.csv`); upserts each grid + replaces rows; returns per-file `{ name, rowCount }` array.
+- `DELETE /api/admin/attribute-grids/bulk` — accepts `{ ids: number[] }`; deletes each grid and its rows.
+- Grid Manager left panel redesigned: multi-file dropzone (name input removed), file queue list with derived names, "Upload All" button with per-file result badges, checkbox-based selection mode, "Delete X grids" confirmation dialog.
+
+### Task #8 — Export Type Field for Products & Order Items
+
+- `export_type` text column added to `allmoxy_products` and `order_items` (schema + `db:push`).
+- Product Manager edit form — "Export Type" dropdown after Export Proxy Variable selector.
+- Product list shows colored export-type badge per row (ORD=blue, HARDWARE=gray, ELIAS=green, MJ=purple, CTS=orange, GLASS=cyan).
+- `POST /api/admin/products/auto-classify-export-types` — applies 7-rule priority classification (CTS→ELIAS→MJ→GLASS→HARDWARE→ORD→NONE) to all active products; returns `{ total, classified }`.
+- Upload handler propagates matched product's `exportType` to each `order_item`.
+
+### Task #9 — Bulk Formula Seed & Auto-Assign
+
+- `POST /api/admin/seed-formulas` — upserts all ~55 pricing and export proxy variables from the hardcoded spec; returns `{ created, updated, total }`.
+- `POST /api/admin/products/auto-assign-formulas` — matches every active product's SKU prefix to the correct `pricingProxyId` + `exportProxyId`, deletes stale bindings, and creates correct grid bindings via fuzzy/case-insensitive partial name matching. Accepts `overwrite: boolean`; returns `{ formulasAssigned, bindingsCreated, skipped, errors }`.
+
+### Task #10 — Bulk Product Image Uploader (initial)
+
+Initial `/admin/product-images` page — drag-and-drop image files, upload to object storage, match by filename against both product tables (prefix/partial), preview table with confidence badges, manual selector for unmatched rows, "Save X Assignments" confirm step.
+
+### Task #11 — Internal Packing Slip PDF
+
+- `server/scripts/generate_internal_packing_slip.py` — internal production document; columns include Rack Location (resolved from CTS/HARDWARE product grid bindings); "INTERNAL — DO NOT SEND" header; no pricing.
+- `GET /api/orders/:id/pdf/internal-packing-slip` endpoint (behind `isAuthenticated`).
+- "Internal Packing Slip" PDF iframe tab on Order Details.
+
+### Task #12 — Cut-to-Size PDF
+
+- `server/scripts/generate_cut_to_size.py` — "DO NOT SEND WITH JOB" header; Length Summary table (unique cut lengths × qty); Item Detail table (ID, Qty, Length mm, Buyout or Stock?, Rack Location); Item Totals (total mm, total in, total rods at 2438.4 mm/rod); page footer.
+- `GET /api/orders/:id/pdf/cut-to-size` endpoint; returns 404 when no CTS items.
+- "Cut-to-Size PDF" button on Order Details visible only when `hasCTS` is true.
+
+### Task #13 — M&J Shaker Door PDF
+
+- `server/scripts/generate_mj_pdf.py` — "NETLEY 5 PIECE SHAKER JOB LIST" PDF; Letter-size pages with 0.5" margins; per-section drawer front / door / glass layouts; Supplier/Premoule label; X checkmarks; glass section adds "Buyout or Stock?" column and Notes block; no pricing; page N of total footer.
+- `GET /api/orders/:id/pdf/mj` endpoint; returns 404 when no MJ/GLASS items.
+- "M&J Shaker PDF (N)" button on Order Details visible when `hasMJ || hasGlass`.
+
+### Task #16 — Bulk Image Uploader Redesign (Parallel Upload + Auto-Save)
+
+Rewrote bulk upload backend and frontend:
+- Backend: builds in-memory product name/skuPrefix/code map first; matches by exact filename-without-extension (case-insensitive); uploads matched files to GCS in parallel batches of 10; writes `image_path` to product row in same step. No separate confirm endpoint used.
+- Frontend: single "Upload & Save" button; loading spinner; results screen with "Saved (N)" green rows and "Unmatched (N)" red rows. Removed checkbox table, confirm button, manual selector, fuzzy matching.
+
+### Task #17 — Per-Product Image Upload in Product Editor
+
+- Image thumbnail in Allmoxy product editor right panel is clickable — opens file picker (jpg/jpeg/png/webp).
+- Selecting a file calls `POST /api/admin/allmoxy-products/:id/image` immediately; new image renders in place with spinner during upload.
+- "×" button clears image (`DELETE /api/admin/allmoxy-products/:id/image`).
+- TanStack Query cache invalidated after both operations — list thumbnail updates live.
+
+### Tasks #19–#22 — GCS Upload Fix Iterations (Superseded)
+
+Multiple failed attempts to fix GCS object storage: signed URL approach (task #19), sidecar credential token (task #20), client-side batching (task #21), GCS client library direct write (task #22). All failed — GCS environment is broken in this Repl. Solution was task #23.
+
+### Task #23 — Store Product Images in Database (Final Solution)
+
+- `image_data` text column added to `allmoxy_products` — stores base64-encoded image bytes.
+- Both single-product upload route and bulk upload route now write base64 to `image_data`; GCS calls removed entirely.
+- `GET /api/product-images/by-id/:id` (Allmoxy) and `GET /api/product-images/hardware/by-id/:id` (hardware) — read `image_data` from DB, detect content-type from `image_path` extension, send bytes with `Cache-Control: public, max-age=86400`.
+- Frontend updated to use ID-based URLs throughout. `image_path` retained as filename reference.
+
+### Task #24 — Fix CSV Import Crash on Duplicate Product Names
+
+After building `productsToInsert` from CSV rows, a `Map<string, product>` keyed on `name` deduplicates the array before the DB upsert (last occurrence wins). Fixes "ON CONFLICT DO UPDATE command cannot affect a row a second time" crash when an import CSV has repeated product names.
+
+### Task #26 — Fix Product List — Stop Sending Image Data in List Queries
+
+`getAllmoxyProducts()` and `getProducts()` in `server/storage.ts` now use explicit Drizzle column selection to exclude `imageData`. Fixes multi-hundred-MB API responses that caused page timeouts after all 2,363 product images were stored in the DB. Single-product detail routes still return the full record.
 
 ---
 
