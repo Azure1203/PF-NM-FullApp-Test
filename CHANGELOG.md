@@ -1,6 +1,53 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-12 (r22-hotfix)
+> Last updated: 2026-04-12 (r22-hotfix-2)
+
+---
+
+## r22-hotfix-2 — 2026-04-12 — Fix "T.find is not a function" Crash on Order Details
+
+### Root Cause
+
+`/api/orders/:id/file-summary` and `/api/orders/:id/shipping-summary` both return `{ files: [...], ... }` — an object with a `files` property — but `OrderDetails.tsx` used `useQuery<FileSummaryItem[]>` with the default queryFn (which passes the raw response through), then called `.find()` / `.reduce()` / `.length` directly on the response. In production minified code, `object.find` is `undefined`, so calling it gives `T.find is not a function`.
+
+The same problem affected `shippingSummary`.
+
+### Fix 1 — Custom `queryFn` in OrderDetails.tsx (`useQuery` for fileSummary + shippingSummary)
+
+Both queries now have explicit `queryFn` implementations that fetch the endpoint and extract `.files` from the response, with an `Array.isArray` guard as a fallback:
+
+```ts
+queryFn: async () => {
+  const res = await fetch(`/api/orders/${id}/file-summary`, { credentials: "include" });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data?.files ?? []);
+},
+```
+
+### Fix 2 — `safeFileSummary` constant + remaining array operation guards
+
+A `const safeFileSummary = Array.isArray(fileSummary) ? fileSummary : []` is computed immediately after the query. All subsequent array operations (`.find()`, `.reduce()`, `.length`, `[0]?.fileId`) use `safeFileSummary` instead of the raw `fileSummary`. The `useEffect` and `FileSidebar files=` prop are also updated. `shippingSummary` has a matching `Array.isArray` guard before being passed to `FileSidebar`.
+
+### Fix 3 — `pallet.fileIds ?? []` guard in PalletManager.tsx
+
+`pallet.fileIds` can be `null` when a pallet has no file assignments (the DB `array_agg` returns null for empty sets). Two call sites fixed:
+
+```ts
+// openEdit: was setting state to null
+setPalletFileIds(pallet.fileIds ?? []);
+
+// render: was calling null.includes()
+const assignedFiles = projectFiles.filter(f => (pallet.fileIds ?? []).includes(f.id));
+```
+
+### Fix 4 — Remove `overflow-hidden` from layout wrappers
+
+`overflow-hidden` was re-added to two wrappers in r22-hotfix, matching the root cause of the old scroll-truncation bugs (r15/r16/r19). Removed from:
+- `AppLayout.tsx` order-detail content wrapper: `flex-1 min-h-0 overflow-hidden flex flex-col` → `flex-1 flex flex-col min-h-0`
+- `OrderDetails.tsx` root div: `flex flex-col flex-1 min-h-0 overflow-hidden` → `flex flex-col flex-1 min-h-0`
+
+The body `<div className="flex flex-1 min-h-0 overflow-hidden">` is intentionally kept — it scopes the two-column layout (file sidebar + content) so each column can scroll independently.
 
 ---
 

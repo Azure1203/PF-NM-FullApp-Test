@@ -146,7 +146,7 @@ export function PalletManager({ orderId }: Props) {
     setPalletSize(pallet.size as PalletSize);
     setPalletCustomSize(pallet.customSize || "");
     setPalletNotes(pallet.notes || "");
-    setPalletFileIds(pallet.fileIds);
+    setPalletFileIds(pallet.fileIds ?? []);
     setPalletDialogOpen(true);
   };
 
@@ -219,7 +219,7 @@ export function PalletManager({ orderId }: Props) {
         <div className="space-y-3">
           {pallets.map((pallet) => {
             const isExpanded = expandedPallets.has(pallet.id);
-            const assignedFiles = projectFiles.filter(f => pallet.fileIds.includes(f.id));
+            const assignedFiles = projectFiles.filter(f => (pallet.fileIds ?? []).includes(f.id));
             const previewFiles = assignedFiles.map(f => getPreviewForFile(f.id)).filter(Boolean);
             const palletWeight = previewFiles.reduce((s, f: any) => s + (f.weightLbs || 0), 0);
             const palletParts = previewFiles.reduce((s, f: any) => s + (f.coreParts || 0), 0);

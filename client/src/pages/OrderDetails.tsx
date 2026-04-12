@@ -48,12 +48,24 @@ export default function OrderDetails() {
 
   const { data: fileSummary = [] } = useQuery<FileSummaryItem[]>({
     queryKey: ["/api/orders", id, "file-summary"],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${id}/file-summary`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data?.files ?? []);
+    },
     enabled: id > 0,
     refetchInterval: 60000,
   });
 
   const { data: shippingSummary = [] } = useQuery<ShippingFileSummaryItem[]>({
     queryKey: ["/api/orders", id, "shipping-summary"],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${id}/shipping-summary`, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data?.files ?? []);
+    },
     enabled: id > 0 && section === "shipping",
     refetchInterval: 30000,
   });
@@ -108,15 +120,17 @@ export default function OrderDetails() {
   });
 
   useEffect(() => {
-    if (fileSummary.length > 0 && selectedFileId === null) {
-      setSelectedFileId(fileSummary[0].fileId);
+    const safe = Array.isArray(fileSummary) ? fileSummary : [];
+    if (safe.length > 0 && selectedFileId === null) {
+      setSelectedFileId(safe[0].fileId);
     }
   }, [fileSummary, selectedFileId]);
 
-  const selectedFileSummary = fileSummary.find(f => f.fileId === selectedFileId) ?? null;
-  const effectiveFileId = selectedFileId ?? fileSummary[0]?.fileId ?? 0;
+  const safeFileSummary = Array.isArray(fileSummary) ? fileSummary : [];
+  const selectedFileSummary = safeFileSummary.find(f => f.fileId === selectedFileId) ?? null;
+  const effectiveFileId = selectedFileId ?? safeFileSummary[0]?.fileId ?? 0;
 
-  const totalPrice = fileSummary.reduce((s, f) => s + f.subtotal, 0);
+  const totalPrice = safeFileSummary.reduce((s, f) => s + f.subtotal, 0);
 
   const PRODUCTION_STATUS_OPTIONS = [
     "SENT TO SHOP",
@@ -146,10 +160,10 @@ export default function OrderDetails() {
     );
   }
 
-  const multiFile = fileSummary.length > 1;
+  const multiFile = safeFileSummary.length > 1;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* ─── Project Header Bar ─── */}
       <div className="sticky top-0 z-20 bg-background border-b shadow-sm">
         <div className="flex items-center gap-2 px-4 py-2.5 flex-wrap">
@@ -172,7 +186,7 @@ export default function OrderDetails() {
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
               {project.dealer && <span data-testid="text-dealer">{project.dealer}</span>}
-              <span>{fileSummary.length} file{fileSummary.length !== 1 ? "s" : ""}</span>
+              <span>{safeFileSummary.length} file{safeFileSummary.length !== 1 ? "s" : ""}</span>
               {totalPrice > 0 && (
                 <span className="font-medium text-foreground" data-testid="text-total-price">
                   {fmtCurrency(totalPrice)}
@@ -278,8 +292,8 @@ export default function OrderDetails() {
           <div className="w-56 shrink-0 border-r overflow-y-auto px-2 bg-muted/20">
             <FileSidebar
               mode={section}
-              files={fileSummary}
-              shippingFiles={section === "shipping" ? shippingSummary : undefined}
+              files={safeFileSummary}
+              shippingFiles={section === "shipping" ? (Array.isArray(shippingSummary) ? shippingSummary : []) : undefined}
               selectedFileId={selectedFileId}
               onSelectFile={setSelectedFileId}
             />

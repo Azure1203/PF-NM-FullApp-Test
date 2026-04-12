@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-12 (r22-hotfix) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-12 (r22-hotfix-2) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -286,6 +286,14 @@ CHANGELOG.md                              Per-release fix log
 ---
 
 ## Release History
+
+### r22-hotfix-2 — 2026-04-12
+**Fix (critical):** `T.find is not a function` crash on `/orders/:id` in production.
+- **Root cause**: `/api/orders/:id/file-summary` and `/api/orders/:id/shipping-summary` both return `{ files: [...] }` (object), not a bare array. The default TanStack Query queryFn passed this through as-is, so `fileSummary.find(...)` was calling `.find()` on an object (undefined in minified code → crash).
+- **Fix 1**: Added explicit `queryFn` to both queries in `OrderDetails.tsx` that fetches the endpoint and extracts `data?.files ?? []`, with `Array.isArray` fallback.
+- **Fix 2**: Added `const safeFileSummary = Array.isArray(fileSummary) ? fileSummary : []` as a defensive guard; all `.find()`, `.reduce()`, `.length` calls in the component use `safeFileSummary`.
+- **Fix 3**: Guarded `pallet.fileIds ?? []` in `PalletManager.tsx` (two sites) — DB `array_agg` returns null for pallets with no file assignments.
+- **Fix 4**: Removed `overflow-hidden` from `AppLayout.tsx` order-detail wrapper and `OrderDetails.tsx` root div — re-added in r22-hotfix, causing same scroll-truncation bug as r15/r16/r19.
 
 ### r22-hotfix — 2026-04-12
 **Fix (critical):** Production blank page on `/orders/:id`. Dev worked; production showed nothing. Root causes:
