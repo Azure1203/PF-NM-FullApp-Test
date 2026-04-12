@@ -1,67 +1,50 @@
-import { useState } from "react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { PackingChecklistInline } from "./PackingChecklistInline";
-import { HardwareChecklistInline } from "./HardwareChecklistInline";
-import { CtsPartsInline } from "./CtsPartsInline";
+import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
 import { PalletManager } from "./PalletManager";
 import type { FileSummaryItem } from "./FileSidebar";
 
 interface Props {
   orderId: number;
-  fileId: number;
-  fileSummary: FileSummaryItem | null;
+  allFiles: FileSummaryItem[];
 }
 
-export function ShippingView({ orderId, fileId, fileSummary }: Props) {
-  const [activeTab, setActiveTab] = useState("packing");
-
-  const hasHardware = fileSummary?.hasHardware ?? false;
-  const hasCTS = fileSummary?.hasCTS ?? false;
-
+export function ShippingView({ orderId, allFiles }: Props) {
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <div className="overflow-x-auto">
-        <TabsList className="flex h-9 w-max gap-0.5">
-          <TabsTrigger value="packing" className="text-xs px-2.5 py-1 h-8 whitespace-nowrap" data-testid="tab-packing">
-            Packing Checklist
-          </TabsTrigger>
-          {hasHardware && (
-            <TabsTrigger value="hardware" className="text-xs px-2.5 py-1 h-8 whitespace-nowrap" data-testid="tab-hardware">
-              Hardware Checklist
-            </TabsTrigger>
-          )}
-          {hasCTS && (
-            <TabsTrigger value="cts" className="text-xs px-2.5 py-1 h-8 whitespace-nowrap" data-testid="tab-cts">
-              Cut-to-Size
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="pallets" className="text-xs px-2.5 py-1 h-8 whitespace-nowrap" data-testid="tab-pallets">
-            Pallets
-          </TabsTrigger>
-        </TabsList>
+    <div className="space-y-4 p-4">
+      {allFiles.map((file) => (
+        <div key={file.fileId} className="border rounded-lg p-4 space-y-3 bg-card">
+          <h4 className="font-medium text-sm">{file.displayName}</h4>
+
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/files/${file.fileId}/checklist`}>
+              <Button variant="outline" size="sm" data-testid={`link-packing-${file.fileId}`}>
+                Packing Checklist
+              </Button>
+            </Link>
+
+            {file.hasHardware && (
+              <Link href={`/files/${file.fileId}/hardware-checklist`}>
+                <Button variant="outline" size="sm" data-testid={`link-hardware-checklist-${file.fileId}`}>
+                  Hardware Checklist
+                </Button>
+              </Link>
+            )}
+
+            {file.hasCTS && (
+              <Link href={`/files/${file.fileId}/cts`}>
+                <Button variant="outline" size="sm" data-testid={`link-cts-${file.fileId}`}>
+                  Cut-to-Size
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <div className="border rounded-lg p-4 bg-card">
+        <h4 className="font-medium text-sm mb-3">Pallets</h4>
+        <PalletManager orderId={orderId} />
       </div>
-
-      <div className="mt-4">
-        <TabsContent value="packing" className="mt-0">
-          <PackingChecklistInline fileId={fileId} />
-        </TabsContent>
-
-        {hasHardware && (
-          <TabsContent value="hardware" className="mt-0">
-            <HardwareChecklistInline fileId={fileId} projectId={orderId} />
-          </TabsContent>
-        )}
-
-        {hasCTS && (
-          <TabsContent value="cts" className="mt-0">
-            <CtsPartsInline fileId={fileId} />
-          </TabsContent>
-        )}
-
-        <TabsContent value="pallets" className="mt-0">
-          <PalletManager orderId={orderId} />
-        </TabsContent>
-      </div>
-    </Tabs>
+    </div>
   );
 }

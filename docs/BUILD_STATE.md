@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-12 (r22-hotfix-2 · **deployed to production**) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-12 (r23) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -286,6 +286,11 @@ CHANGELOG.md                              Per-release fix log
 ---
 
 ## Release History
+
+### r23 — 2026-04-12
+- **Part 1 (Door Pricing)**: `LDRTFL90SHA`/`RDRTFL90SHA` products absent from `allmoxy_products` (Cause D). `matchProductToSku()` already does longest-prefix-wins so no code fix needed. Admin must create the products and assign pricing proxy + grid bindings.
+- **Part 2 (Packing UI)**: `ShippingView.tsx` rewritten to show link buttons to standalone pages (`/files/:fileId/checklist`, `/files/:fileId/hardware-checklist`, `/files/:fileId/cts`) instead of inline components. `PackingChecklistInline.tsx`, `HardwareChecklistInline.tsx`, `CtsPartsInline.tsx` deleted. `OrderDetails.tsx` passes `allFiles={safeFileSummary}` to ShippingView.
+- **Part 3 (Hardware Downloads)**: `GET /api/orders/:id/download/hardware-csv` and `GET /api/orders/:id/download/hardware-xlsx` added. Both support `?fileId=N`. `exceljs` installed. `DocumentsView.tsx` `HardwareDataTable` now shows "Download CSV" and "Download Excel" buttons once items load.
 
 ### r22-hotfix-2 — 2026-04-12 · **DEPLOYED** (commit `79622719`)
 **Fix (critical):** `T.find is not a function` crash on `/orders/:id` in production.

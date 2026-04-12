@@ -312,8 +312,7 @@ export default function OrderDetails() {
             ) : (
               <ShippingView
                 orderId={id}
-                fileId={effectiveFileId}
-                fileSummary={selectedFileSummary}
+                allFiles={safeFileSummary}
               />
             )
           ) : (

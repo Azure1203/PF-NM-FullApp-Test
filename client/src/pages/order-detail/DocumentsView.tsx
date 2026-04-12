@@ -193,7 +193,23 @@ function HardwareDataTable({ orderId, fileId }: { orderId: number; fileId: numbe
 
   if (!data?.items?.length) return <p className="text-sm text-muted-foreground">No hardware items.</p>;
 
+  const csvUrl = `/api/orders/${orderId}/download/hardware-csv?fileId=${fileId}`;
+  const xlsxUrl = `/api/orders/${orderId}/download/hardware-xlsx?fileId=${fileId}`;
+
   return (
+    <div className="space-y-3">
+      <div className="flex justify-end gap-2">
+        <a href={csvUrl} download data-testid="button-download-hardware-csv">
+          <button className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted/50 transition-colors">
+            Download CSV
+          </button>
+        </a>
+        <a href={xlsxUrl} download data-testid="button-download-hardware-xlsx">
+          <button className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+            Download Excel
+          </button>
+        </a>
+      </div>
     <div className="rounded-md border overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="border-b bg-muted/30">
@@ -221,6 +237,7 @@ function HardwareDataTable({ orderId, fileId }: { orderId: number; fileId: numbe
           </tr>
         </tfoot>
       </table>
+    </div>
     </div>
   );
 }

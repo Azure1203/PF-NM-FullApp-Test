@@ -1842,6 +1842,96 @@ export async function registerRoutes(
     }
   });
 
+  // Hardware CSV download
+  app.get('/api/orders/:id/download/hardware-csv', isAuthenticated, async (req, res) => {
+    try {
+      const projectId = Number(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+      const hwItems = items.filter(i => i.exportType === 'HARDWARE');
+
+      const header = 'SKU,Product Name,Quantity,Unit Price,Total Price,Supply Type';
+      const rows = hwItems.map(i => {
+        const productName = i.productId ? (productMap.get(i.productId)?.name ?? '') : '';
+        const safeName = productName.includes(',') ? `"${productName}"` : productName;
+        return `${i.sku ?? ''},${safeName},${i.quantity ?? 1},${(i.unitPrice ?? 0).toFixed(2)},${(i.totalPrice ?? 0).toFixed(2)},${i.supplyType ?? 'STOCK'}`;
+      });
+      const csv = [header, ...rows].join('\r\n');
+      const filename = fileId ? `Hardware_File${fileId}.csv` : `Hardware_Order${projectId}.csv`;
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+    } catch (e: any) { res.status(500).json({ message: e.message }); }
+  });
+
+  // Hardware XLSX download
+  app.get('/api/orders/:id/download/hardware-xlsx', isAuthenticated, async (req, res) => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const ExcelJS = require('exceljs');
+      const projectId = Number(req.params.id);
+      const fileId = req.query.fileId ? parseInt(req.query.fileId as string) : null;
+      const items = fileId
+        ? await storage.getOrderItemsByFile(fileId)
+        : await storage.getOrderItemsByProject(projectId);
+      const allProducts = await storage.getAllmoxyProducts();
+      const productMap = new Map(allProducts.map(p => [p.id, p]));
+      const hwItems = items.filter(i => i.exportType === 'HARDWARE');
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Hardware');
+      sheet.columns = [
+        { header: 'SKU', key: 'sku', width: 25 },
+        { header: 'Product Name', key: 'productName', width: 40 },
+        { header: 'Qty', key: 'qty', width: 8 },
+        { header: 'Unit Price', key: 'unitPrice', width: 12 },
+        { header: 'Total Price', key: 'totalPrice', width: 12 },
+        { header: 'Supply Type', key: 'supplyType', width: 15 },
+      ];
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
+      headerRow.border = { bottom: { style: 'thin' } };
+
+      for (const item of hwItems) {
+        const productName = item.productId ? (productMap.get(item.productId)?.name ?? '') : '';
+        sheet.addRow({
+          sku: item.sku ?? '',
+          productName,
+          qty: item.quantity ?? 1,
+          unitPrice: item.unitPrice ?? 0,
+          totalPrice: item.totalPrice ?? 0,
+          supplyType: item.supplyType ?? 'STOCK',
+        });
+      }
+      sheet.getColumn('unitPrice').numFmt = '$#,##0.00';
+      sheet.getColumn('totalPrice').numFmt = '$#,##0.00';
+
+      const totalRow = sheet.addRow({
+        sku: '',
+        productName: 'TOTAL',
+        qty: hwItems.reduce((s, i) => s + (i.quantity ?? 1), 0),
+        unitPrice: '',
+        totalPrice: Math.round(hwItems.reduce((s, i) => s + (i.totalPrice ?? 0), 0) * 100) / 100,
+        supplyType: '',
+      });
+      totalRow.font = { bold: true };
+
+      const filename = fileId ? `Hardware_File${fileId}.xlsx` : `Hardware_Order${projectId}.xlsx`;
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (e: any) {
+      console.error('[Hardware XLSX]', e.message);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   // GET Elias CSV export
   app.get('/api/orders/:id/export/elias', isAuthenticated, async (req, res) => {
     try {

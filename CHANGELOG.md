@@ -1,6 +1,45 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-12 (r22-hotfix-2 · deployed to production)
+> Last updated: 2026-04-12 (r23)
+
+---
+
+## r23 — 2026-04-12 — Door Pricing Diagnosis + Packing UI Revert + Hardware Downloads
+
+### Part 1 — Door Pricing (LDRTFL90SHA / RDRTFL90SHA): Diagnosis Only
+
+**Finding**: `LDRTFL90SHA` and `RDRTFL90SHA` products do not exist in `allmoxy_products` at all — Cause D from the prompt. No code fix is possible without the product records. The `matchProductToSku()` function already uses longest-prefix-wins matching, so Cause C (prefix collision) is NOT the issue and no code change is needed there.
+
+**Action required (admin)**: In the Allmoxy Product Manager, create products with `skuPrefix = LDRTFL90SHA` and `skuPrefix = RDRTFL90SHA`, assign the same pricing proxy and grid bindings as the equivalent GD door variants (`LDRTFL90SHAGD` / `RDRTFL90SHAGD`), then re-run pricing on the affected order.
+
+### Part 2 — Packing & Shipping UI Reverted to Standalone Page Links
+
+**Problem**: The r22 ShippingView rendered `PackingChecklistInline`, `HardwareChecklistInline`, and `CtsPartsInline` directly inside the order page — a worse UX than the original standalone checklist pages.
+
+**Fix**: Rewrote `ShippingView.tsx` to render one card per file with link buttons that navigate to the battle-tested standalone pages:
+- "Packing Checklist" → `/files/:fileId/checklist`
+- "Hardware Checklist" → `/files/:fileId/hardware-checklist` (shown only when `hasHardware`)
+- "Cut-to-Size" → `/files/:fileId/cts` (shown only when `hasCTS`)
+- Pallets section remains inline (project-level, no standalone page)
+
+**Deleted unused files** (no longer imported anywhere):
+- `client/src/pages/order-detail/PackingChecklistInline.tsx`
+- `client/src/pages/order-detail/HardwareChecklistInline.tsx`
+- `client/src/pages/order-detail/CtsPartsInline.tsx`
+
+`OrderDetails.tsx` updated to pass `allFiles={safeFileSummary}` to `ShippingView` (old `fileId`/`fileSummary` props removed).
+
+### Part 3 — Hardware CSV + XLSX Download
+
+**Backend** — two new endpoints added to `server/routes.ts`:
+- `GET /api/orders/:id/download/hardware-csv?fileId=N` — builds CSV with columns: SKU, Product Name, Quantity, Unit Price, Total Price, Supply Type. Uses `storage.getOrderItemsByFile(fileId)` when `fileId` is given, otherwise all project items.
+- `GET /api/orders/:id/download/hardware-xlsx?fileId=N` — same data in Excel format via `exceljs`. Bold header row, grey fill, currency number format on price columns, totals row. Responds with binary xlsx buffer.
+
+**Package**: `exceljs` installed (67 new packages).
+
+**Frontend** (`DocumentsView.tsx` / `HardwareDataTable`): After the hardware items load, two download buttons appear above the table:
+- "Download CSV" — `<a href=... download>` link to the CSV endpoint
+- "Download Excel" — same for xlsx, styled with primary button colors
 
 ---
 
