@@ -1,10 +1,10 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-12 (r22-hotfix-2)
+> Last updated: 2026-04-12 (r22-hotfix-2 · deployed to production)
 
 ---
 
-## r22-hotfix-2 — 2026-04-12 — Fix "T.find is not a function" Crash on Order Details
+## r22-hotfix-2 — 2026-04-12 — Fix "T.find is not a function" Crash on Order Details · **DEPLOYED**
 
 ### Root Cause
 

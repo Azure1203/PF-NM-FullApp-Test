@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-12 (r22-hotfix-2) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-12 (r22-hotfix-2 · **deployed to production**) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -287,7 +287,7 @@ CHANGELOG.md                              Per-release fix log
 
 ## Release History
 
-### r22-hotfix-2 — 2026-04-12
+### r22-hotfix-2 — 2026-04-12 · **DEPLOYED** (commit `79622719`)
 **Fix (critical):** `T.find is not a function` crash on `/orders/:id` in production.
 - **Root cause**: `/api/orders/:id/file-summary` and `/api/orders/:id/shipping-summary` both return `{ files: [...] }` (object), not a bare array. The default TanStack Query queryFn passed this through as-is, so `fileSummary.find(...)` was calling `.find()` on an object (undefined in minified code → crash).
 - **Fix 1**: Added explicit `queryFn` to both queries in `OrderDetails.tsx` that fetches the endpoint and extracts `data?.files ?? []`, with `Array.isArray` fallback.

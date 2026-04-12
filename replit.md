@@ -14,7 +14,7 @@ A full snapshot of what is built, working, and not yet built lives at:
 
 This file is updated alongside `CHANGELOG.md` after every release. It covers all pages, all 27 DB tables, the CSV pipeline, the pricing engine, exports, integrations, known gaps, and the release history.
 
-**Current release:** r22-hotfix-2 (2026-04-12) — fixes `T.find is not a function` crash on `/orders/:id` (file-summary/shipping-summary queryFn extraction + pallet.fileIds guard + overflow-hidden removed).
+**Current release:** r22-hotfix-2 (2026-04-12) · **DEPLOYED** — fixes `T.find is not a function` crash on `/orders/:id` (file-summary/shipping-summary queryFn extraction + pallet.fileIds guard + overflow-hidden removed).
 
 ## Overview
 
