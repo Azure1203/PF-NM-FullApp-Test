@@ -14,7 +14,7 @@ A full snapshot of what is built, working, and not yet built lives at:
 
 This file is updated alongside `CHANGELOG.md` after every release. It covers all pages, all 27 DB tables, the CSV pipeline, the pricing engine, exports, integrations, known gaps, and the release history.
 
-**Current release:** r23 (2026-04-12) — packing UI reverted to standalone page links, hardware CSV/XLSX download endpoints added, door pricing diagnosis (products missing from DB — admin action required).
+**Current release:** r24 (2026-04-14) — door pricing fix: new "Fix Missing Proxy Assignments" tool in Pricing Diagnostic, `updateAllmoxyProduct` storage method, M&J door classifier upgraded to regex pattern.
 
 ## Overview
 

@@ -312,7 +312,13 @@ export default function OrderDetails() {
             ) : (
               <ShippingView
                 orderId={id}
-                allFiles={safeFileSummary}
+                fileId={effectiveFileId}
+                fileSummary={selectedFileSummary}
+                shippingProgress={
+                  Array.isArray(shippingSummary)
+                    ? (shippingSummary.find(f => f.fileId === effectiveFileId) ?? null)
+                    : null
+                }
               />
             )
           ) : (

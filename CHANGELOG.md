@@ -1,6 +1,44 @@
 # CHANGELOG — Perfect Fit Closets / Netley Millwork Order Management System
 > Replit full-stack app · React + Express + PostgreSQL
-> Last updated: 2026-04-12 (r23)
+> Last updated: 2026-04-14 (r24)
+
+---
+
+## r24 — 2026-04-14 — Fix Door Pricing (LDRTFL90SHA / RDRTFL90SHA)
+
+### Root Cause
+`LDRTFL90SHA` and `RDRTFL90SHA` products exist in `allmoxy_products` but have `pricingProxyId = null`. The auto-create-bindings endpoint (line 1238: `if (!product.pricingProxyId) continue`) skips products with no pricing proxy, so they never got grid bindings either. Result: $0.00 / Error badge on every item with those SKUs.
+
+### Fix 1 — New `POST /api/admin/products/fix-missing-proxies` endpoint
+
+Scans all active products with `skuPrefix` but null `pricingProxyId`. For each, finds the active product with the most SKU characters in common (stem-match: either one's prefix starts with the other's). Copies `pricingProxyId`, `exportProxyId`, and `exportType` from the best match.
+
+Examples matched automatically:
+- `LDRTFL90SHA` → `LDRTFL90SHAGD` (11 chars overlap)
+- `RDRTFL90SHA` → `RDRTFL90SHAGD` (11 chars overlap)
+- Any other unassigned door variant → nearest GD or Hamper variant
+
+Supports `dryRun: true` (scan only) and `dryRun: false` (apply). Products with no stem match are reported separately.
+
+**Admin workflow:**
+1. `/admin/diagnostic` → Run Diagnostic
+2. "Fix Missing Proxy Assignments" panel → Scan → Fix N Products
+3. "Auto-Create Missing Bindings" panel → Reset & Recreate Bindings
+4. Go to affected order → Re-run Pricing
+
+### Fix 2 — `updateAllmoxyProduct` partial-update method added to `server/storage.ts`
+
+New method: `updateAllmoxyProduct(id, { pricingProxyId, exportProxyId, exportType })` — targeted update without requiring a full product upsert.
+
+### Fix 3 — M&J PDF door classifier switched from exact-set to regex
+
+`DOOR_SKUS` was a hardcoded `Set<string>` containing only `LDRTFL90SHAGD`, `RDRTFL90SHAGD`, `HDRTFL90SHA`. The classifier used `DOOR_SKUS.has(sku)` — an exact match — so `LDRTFL90SHA` items were wrongly classified as `drawer_front` in the M&J PDF.
+
+Replaced with `DOOR_SKU_PATTERN = /^(?:[GHKM]?[LR]DRTFL|HDRTFL)/i` which matches all door variants regardless of GD/non-GD/knee/garage suffix.
+
+### Fix 4 — "Fix Missing Proxy Assignments" panel in Pricing Diagnostic UI
+
+New collapsible panel appears when `activeProducts > withPricingProxy`. Shows a Scan button (dry-run) with table of what would be fixed (SKU → copied from), then a "Fix N Products" apply button. After applying, toast guides admin to run Reset & Recreate Bindings.
 
 ---
 

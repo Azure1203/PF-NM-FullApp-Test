@@ -155,6 +155,7 @@ export interface IStorage {
 
   getAllmoxyProducts(): Promise<AllmoxyProductListItem[]>;
   upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct>;
+  updateAllmoxyProduct(id: number, updates: { pricingProxyId?: number | null; exportProxyId?: number | null; exportType?: string | null }): Promise<AllmoxyProduct>;
   deleteAllmoxyProduct(id: number): Promise<boolean>;
   replaceAllmoxyProducts(products: InsertAllmoxyProduct[]): Promise<AllmoxyProduct[]>;
 
@@ -792,6 +793,19 @@ export class DatabaseStorage implements IStorage {
           categoryId: product.categoryId,
         },
       })
+      .returning();
+    return result;
+  }
+
+  async updateAllmoxyProduct(id: number, updates: { pricingProxyId?: number | null; exportProxyId?: number | null; exportType?: string | null }): Promise<AllmoxyProduct> {
+    const [result] = await db
+      .update(allmoxyProducts)
+      .set({
+        ...(updates.pricingProxyId !== undefined ? { pricingProxyId: updates.pricingProxyId } : {}),
+        ...(updates.exportProxyId !== undefined ? { exportProxyId: updates.exportProxyId } : {}),
+        ...(updates.exportType !== undefined ? { exportType: updates.exportType } : {}),
+      })
+      .where(eq(allmoxyProducts.id, id))
       .returning();
     return result;
   }

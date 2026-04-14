@@ -1284,6 +1284,88 @@ export async function registerRoutes(
     }
   });
 
+  // Fix products that have null pricingProxyId by copying from the closest SKU-stem match.
+  // E.g. LDRTFL90SHA → finds LDRTFL90SHAGD (which has the proxy) and copies its proxy+exportType.
+  app.post('/api/admin/products/fix-missing-proxies', isAuthenticated, async (req, res) => {
+    try {
+      const { dryRun = true } = req.body;
+      const allProducts = await storage.getAllmoxyProducts();
+
+      // Sources: active products that HAVE a pricingProxyId
+      const sources = allProducts.filter(p => p.status === 'active' && p.pricingProxyId && p.skuPrefix);
+      // Targets: active products with a skuPrefix but missing pricingProxyId
+      const targets = allProducts.filter(p => p.status === 'active' && p.skuPrefix && !p.pricingProxyId);
+
+      type Fix = {
+        productId: number;
+        productName: string;
+        skuPrefix: string;
+        matchedFrom: string;
+        pricingProxyId: number;
+        exportProxyId: number | null;
+        exportType: string | null;
+      };
+
+      const fixes: Fix[] = [];
+      const noMatch: string[] = [];
+
+      for (const target of targets) {
+        const targetPrefix = (target.skuPrefix ?? '').toUpperCase();
+        let bestSource: typeof sources[0] | null = null;
+        let bestOverlap = 0;
+
+        for (const source of sources) {
+          const sourcePrefix = (source.skuPrefix ?? '').toUpperCase();
+          // Match if either prefix starts with the other (stem match)
+          if (sourcePrefix.startsWith(targetPrefix) || targetPrefix.startsWith(sourcePrefix)) {
+            // Prefer the longest common prefix (most specific match)
+            const overlap = Math.min(targetPrefix.length, sourcePrefix.length);
+            if (overlap > bestOverlap) {
+              bestSource = source;
+              bestOverlap = overlap;
+            }
+          }
+        }
+
+        if (!bestSource) {
+          noMatch.push(`${target.skuPrefix} (${target.name}) — no similar product found`);
+          continue;
+        }
+
+        fixes.push({
+          productId: target.id,
+          productName: target.name,
+          skuPrefix: target.skuPrefix!,
+          matchedFrom: bestSource.skuPrefix!,
+          pricingProxyId: bestSource.pricingProxyId!,
+          exportProxyId: bestSource.exportProxyId ?? null,
+          exportType: bestSource.exportType ?? null,
+        });
+      }
+
+      if (!dryRun) {
+        let applied = 0;
+        for (const fix of fixes) {
+          try {
+            await storage.updateAllmoxyProduct(fix.productId, {
+              pricingProxyId: fix.pricingProxyId,
+              exportProxyId: fix.exportProxyId,
+              exportType: fix.exportType ?? 'ORD',
+            });
+            applied++;
+          } catch (e: any) {
+            noMatch.push(`${fix.skuPrefix}: update failed — ${e.message}`);
+          }
+        }
+        res.json({ dryRun: false, applied, fixes, noMatch });
+      } else {
+        res.json({ dryRun: true, wouldFix: fixes.length, fixes, noMatch });
+      }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.post('/api/admin/upload-allmoxy-products', isAuthenticated, upload.single('file'), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -2588,13 +2670,15 @@ export async function registerRoutes(
       const productMap = new Map(allProducts.map(p => [p.id, p]));
 
       const DRAWER_FRONT_SKUS = new Set(['DRWTFL90SHA', 'IDRWTFL90SHA', 'BDRWTFL90SHA', 'JDRWTFL90SHA']);
-      const DOOR_SKUS = new Set(['LDRTFL90SHAGD', 'RDRTFL90SHAGD', 'HDRTFL90SHA']);
+      // Doors: match any left/right/hamper/knee/garage door variant regardless of GD suffix
+      // Pattern covers: LDRTFL*, RDRTFL*, HDRTFL*, KLDRTFL*, KRDRTFL*, GLDRTFL*, GRDRTFL*
+      const DOOR_SKU_PATTERN = /^(?:[GHKM]?[LR]DRTFL|HDRTFL)/i;
 
       function classifyItem(item: typeof mjGlassItems[0]): 'drawer_front' | 'door' | 'glass' {
         if (item.exportType === 'GLASS') return 'glass';
-        const sku = item.sku ?? '';
-        if (DRAWER_FRONT_SKUS.has(sku)) return 'drawer_front';
-        if (DOOR_SKUS.has(sku)) return 'door';
+        const sku = (item.sku ?? '').trim();
+        if (DRAWER_FRONT_SKUS.has(sku.toUpperCase())) return 'drawer_front';
+        if (DOOR_SKU_PATTERN.test(sku)) return 'door';
         return 'drawer_front';
       }
 

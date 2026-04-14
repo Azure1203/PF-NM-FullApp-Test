@@ -1,6 +1,6 @@
 # Perfect Fit Closets / Netley Millwork — Order Management System
 ## Build State Reference
-> Last updated: 2026-04-12 (r23) · React + Express + PostgreSQL on Replit
+> Last updated: 2026-04-14 (r24) · React + Express + PostgreSQL on Replit
 
 ---
 
@@ -286,6 +286,13 @@ CHANGELOG.md                              Per-release fix log
 ---
 
 ## Release History
+
+### r24 — 2026-04-14
+- **Fix Missing Proxies endpoint**: `POST /api/admin/products/fix-missing-proxies` — stem-matches products with null `pricingProxyId` to those with the longest matching SKU prefix and copies their proxy/export assignments. Supports `dryRun`.
+- **`updateAllmoxyProduct` storage method**: partial update by ID without requiring full product upsert.
+- **M&J door classifier**: replaced `DOOR_SKUS` exact-match set with `DOOR_SKU_PATTERN = /^(?:[GHKM]?[LR]DRTFL|HDRTFL)/i` regex — catches all door variants regardless of GD/SHA suffix.
+- **Pricing Diagnostic UI**: new "Fix Missing Proxy Assignments" panel with Scan + Apply buttons; only shows when there are active products without pricing formulas.
+- **Admin workflow** for `LDRTFL90SHA`/`RDRTFL90SHA`: Diagnostic → Scan → Fix N → Reset & Recreate Bindings → Re-run Pricing.
 
 ### r23 — 2026-04-12
 - **Part 1 (Door Pricing)**: `LDRTFL90SHA`/`RDRTFL90SHA` products absent from `allmoxy_products` (Cause D). `matchProductToSku()` already does longest-prefix-wins so no code fix needed. Admin must create the products and assign pricing proxy + grid bindings.

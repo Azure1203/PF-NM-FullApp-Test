@@ -28,6 +28,7 @@ import {
   RefreshCw,
   RotateCcw,
   Wand2,
+  Wrench,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -78,6 +79,24 @@ type BindingResult = {
   }>;
 };
 
+type ProxyFix = {
+  productId: number;
+  productName: string;
+  skuPrefix: string;
+  matchedFrom: string;
+  pricingProxyId: number;
+  exportProxyId: number | null;
+  exportType: string | null;
+};
+
+type ProxyFixResult = {
+  dryRun: boolean;
+  wouldFix?: number;
+  applied?: number;
+  fixes: ProxyFix[];
+  noMatch: string[];
+};
+
 function StatCard({ label, value, sub, color }: { label: string; value: number | string; sub?: string; color?: string }) {
   return (
     <div className="rounded-lg border bg-card p-4 flex flex-col gap-1">
@@ -92,6 +111,8 @@ export default function PricingDiagnostic() {
   const { toast } = useToast();
   const [diagResult, setDiagResult] = useState<DiagResult | null>(null);
   const [bindingResult, setBindingResult] = useState<BindingResult | null>(null);
+  const [proxyFixResult, setProxyFixResult] = useState<ProxyFixResult | null>(null);
+  const [proxyFixOpen, setProxyFixOpen] = useState(true);
   const [issuesOpen, setIssuesOpen] = useState(true);
   const [sampleOpen, setSampleOpen] = useState(true);
   const [skippedOpen, setSkippedOpen] = useState(false);
@@ -146,6 +167,30 @@ export default function PricingDiagnostic() {
       toast({ title: "Reset & Recreate complete", description: `Deleted ${d} old bindings, created ${data.created} new bindings` });
     },
     onError: (e: Error) => toast({ title: "Reset failed", description: e.message, variant: "destructive" }),
+  });
+
+  const fixProxiesDryRunMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/products/fix-missing-proxies", { dryRun: true });
+      return res.json() as Promise<ProxyFixResult>;
+    },
+    onSuccess: (data) => {
+      setProxyFixResult(data);
+      toast({ title: "Proxy scan complete", description: `Found ${data.wouldFix ?? 0} products that can be auto-fixed` });
+    },
+    onError: (e: Error) => toast({ title: "Scan failed", description: e.message, variant: "destructive" }),
+  });
+
+  const fixProxiesApplyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/products/fix-missing-proxies", { dryRun: false });
+      return res.json() as Promise<ProxyFixResult>;
+    },
+    onSuccess: (data) => {
+      setProxyFixResult(data);
+      toast({ title: "Proxies assigned", description: `Fixed ${data.applied ?? 0} products — now run Reset & Recreate Bindings` });
+    },
+    onError: (e: Error) => toast({ title: "Fix failed", description: e.message, variant: "destructive" }),
   });
 
   const filteredIssues = diagResult?.issues.filter(i =>
@@ -337,6 +382,102 @@ export default function PricingDiagnostic() {
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Fix Missing Proxies panel */}
+        {diagResult && diagResult.stats.withPricingProxy < diagResult.stats.activeProducts && (
+          <div className="rounded-lg border p-5 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-primary" />
+                  Fix Missing Proxy Assignments
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Finds active products with no pricing formula and copies proxy assignments from the
+                  closest SKU-stem match. E.g. <code className="text-xs bg-muted px-1 py-0.5 rounded">LDRTFL90SHA</code> inherits
+                  from <code className="text-xs bg-muted px-1 py-0.5 rounded">LDRTFL90SHAGD</code>. After applying, run Reset &amp; Recreate Bindings above.
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  data-testid="button-proxy-fix-scan"
+                  variant="outline"
+                  onClick={() => fixProxiesDryRunMutation.mutate()}
+                  disabled={fixProxiesDryRunMutation.isPending || fixProxiesApplyMutation.isPending}
+                >
+                  {fixProxiesDryRunMutation.isPending
+                    ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    : <RefreshCw className="h-4 w-4 mr-2" />}
+                  Scan
+                </Button>
+                {proxyFixResult?.dryRun && (proxyFixResult.wouldFix ?? 0) > 0 && (
+                  <Button
+                    data-testid="button-proxy-fix-apply"
+                    onClick={() => fixProxiesApplyMutation.mutate()}
+                    disabled={fixProxiesApplyMutation.isPending}
+                  >
+                    {fixProxiesApplyMutation.isPending
+                      ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                    Fix {proxyFixResult.wouldFix} Products
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {proxyFixResult && (
+              <div className="space-y-3">
+                <div className={`rounded-md p-3 text-sm flex items-center gap-2 ${proxyFixResult.dryRun ? "bg-blue-50 dark:bg-blue-950/20 border border-blue-200" : "bg-green-50 dark:bg-green-950/20 border border-green-200"}`}>
+                  {proxyFixResult.dryRun
+                    ? <><RefreshCw className="h-4 w-4 text-blue-500 shrink-0" /><span><strong>Scan result:</strong> {proxyFixResult.wouldFix} products can be auto-fixed. {proxyFixResult.noMatch.length > 0 ? `${proxyFixResult.noMatch.length} have no match.` : ''} Click "Fix {proxyFixResult.wouldFix} Products" to apply.</span></>
+                    : <><CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" /><span><strong>Done:</strong> Applied proxy assignments to {proxyFixResult.applied} products. Now run Reset &amp; Recreate Bindings above.</span></>}
+                </div>
+
+                {proxyFixResult.fixes.length > 0 && (
+                  <Collapsible open={proxyFixOpen} onOpenChange={setProxyFixOpen}>
+                    <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium w-full text-left">
+                      {proxyFixResult.dryRun ? "Would fix" : "Fixed"} ({proxyFixResult.fixes.length} products)
+                      {proxyFixOpen ? <ChevronDown className="h-4 w-4 ml-auto text-muted-foreground" /> : <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />}
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="rounded-md border overflow-hidden mt-2">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-xs">Product</TableHead>
+                              <TableHead className="text-xs">SKU Prefix</TableHead>
+                              <TableHead className="text-xs">Copied From</TableHead>
+                              <TableHead className="text-xs">Export Type</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {proxyFixResult.fixes.map((f, i) => (
+                              <TableRow key={i} data-testid={`row-proxy-fix-${i}`}>
+                                <TableCell className="text-xs font-medium">{f.productName}</TableCell>
+                                <TableCell className="text-xs font-mono">{f.skuPrefix}</TableCell>
+                                <TableCell className="text-xs font-mono text-muted-foreground">{f.matchedFrom}</TableCell>
+                                <TableCell className="text-xs">{f.exportType ?? "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {proxyFixResult.noMatch.length > 0 && (
+                  <div className="max-h-28 overflow-y-auto rounded-md border bg-amber-50 dark:bg-amber-950/20 p-3 space-y-0.5">
+                    <p className="text-xs font-medium text-amber-700 mb-1">{proxyFixResult.noMatch.length} products with no stem match — assign manually:</p>
+                    {proxyFixResult.noMatch.map((s, i) => (
+                      <p key={i} className="text-xs text-amber-700 dark:text-amber-400 font-mono">{s}</p>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
