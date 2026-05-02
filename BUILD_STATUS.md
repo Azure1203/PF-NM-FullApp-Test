@@ -1025,7 +1025,7 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 
 2. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
 
-3. **[LOW] `image_data` columns not yet dropped from DB** — The `imageData` field has been removed from `shared/schema.ts` and all routes/storage code no longer read or write it. The backfill script runs on startup and migrates any remaining base64 bytes to object storage. Once confirmed zero rows remain (`SELECT count(*) FROM products WHERE image_data IS NOT NULL` and same for `allmoxy_products`), apply `migrations/0008_drop_image_data.sql` to drop the columns. This requires running `npx drizzle-kit migrate` or the equivalent for this project.
+3. **[RESOLVED] `image_data` columns dropped from DB (Task #32)** — Verified zero non-null rows in both `products` and `allmoxy_products`, then applied `migrations/0008_drop_image_data.sql` directly via SQL (`ALTER TABLE products DROP COLUMN IF EXISTS image_data; ALTER TABLE allmoxy_products DROP COLUMN IF EXISTS image_data;`). Confirmed via `information_schema.columns` that neither column exists anymore. No application code changes were required (Drizzle schema had already removed `imageData` in Task #30).
 
 ---
 
