@@ -1072,8 +1072,36 @@ across the range. Restart clean.
 remaining advisories report "no fix available" except the exceljs one
 which would require a downgrade. We're at the practical floor.
 
-**Files affected:** `package.json`, `package-lock.json`, `BUILD_STATUS.md`,
-plus a one-time SQL `DROP TABLE outlook_sync_status` against the dev DB.
+**Post-rejection hardening also bundled into r29** (validator caught two
+prior-task carry-over issues that needed re-fixing):
+
+- **`server/scripts/migrateProductImagesToObjectStorage.ts`** — wrapped the
+  standalone-entry guard in try/catch. The original
+  `fileURLToPath(import.meta.url)` at module top level crashed the bundled
+  CommonJS production server with `ERR_INVALID_ARG_TYPE` because esbuild
+  emits `import.meta.url` as `undefined` in CJS output. Fix: try/catch
+  around the call; if it throws (CJS bundle), the module was imported
+  rather than executed directly, so `__isStandaloneEntry` stays false and
+  the auto-run is skipped. The exported `migrateProductImagesToObjectStorage`
+  function called by `backfillMigration.ts` is unaffected — only the CLI
+  entry guard is bundle-safe now.
+
+- **`scripts/post-merge.sh`** — replaced `yes "" | npm run db:push` with
+  `npm run db:push </dev/null`. Previously, piping empty newlines auto-
+  accepted whatever option drizzle-kit highlighted as default; even though
+  drizzle-kit's convention is "destructive prompts default to No", encoding
+  that assumption in an automated hook is exactly what r28/r29 reviews
+  flagged as unsafe. New behavior: stdin is closed, so any prompt causes
+  drizzle-kit to fail fast. The script traps the failure and emits a
+  loud, actionable warning (manual `npm run db:push` from a TTY required,
+  with pointer to `migrations/0008_drop_image_data.sql` as the targeted-SQL
+  pattern) but does not fail the merge itself. Routine non-prompt schema
+  diffs still apply automatically.
+
+**Files affected:** `package.json`, `package-lock.json`,
+`server/scripts/migrateProductImagesToObjectStorage.ts`,
+`scripts/post-merge.sh`, `BUILD_STATUS.md`, plus a one-time SQL
+`DROP TABLE outlook_sync_status` against the dev DB.
 
 ---
 
