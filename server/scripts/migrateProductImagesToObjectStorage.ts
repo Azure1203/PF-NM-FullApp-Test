@@ -6,8 +6,11 @@
  *   SELECT count(*) FROM products WHERE image_data IS NOT NULL;        -- must be 0
  *   SELECT count(*) FROM allmoxy_products WHERE image_data IS NOT NULL; -- must be 0
  *
- * Idempotent: rows whose object already exists in storage are skipped (image_data
- * is still NULLed so re-runs are safe).
+ * Behaviour:
+ *  - Exits immediately if image_data columns no longer exist (safe after DROP COLUMN).
+ *  - Processes rows in chunks of 50 to avoid loading all base64 into memory at once.
+ *  - Idempotent: rows whose object already exists in storage are skipped but
+ *    image_data is still NULLed so re-runs converge to zero remaining rows.
  *
  * Standalone: npx tsx server/scripts/migrateProductImagesToObjectStorage.ts
  * Also called automatically on startup from server/backfillMigration.ts.
@@ -18,6 +21,8 @@ import { fileURLToPath } from "url";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { ObjectStorageService } from "../replit_integrations/object_storage/objectStorage";
+
+const CHUNK_SIZE = 50;
 
 function detectExtension(buffer: Buffer): string {
   if (buffer.length >= 12) {
@@ -59,108 +64,135 @@ function mimeFromExt(ext: string): string {
   return map[ext] || "image/jpeg";
 }
 
+/** Returns false if image_data has already been dropped from the DB. */
+async function imageDataColumnsExist(): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT count(*) AS cnt
+    FROM information_schema.columns
+    WHERE table_name IN ('products', 'allmoxy_products')
+      AND column_name = 'image_data'
+  `);
+  return Number((result.rows[0] as any).cnt) > 0;
+}
+
+/**
+ * Processes one table's rows in CHUNK_SIZE batches.
+ * Because successfully migrated rows get image_data = NULL, each iteration
+ * of the outer loop naturally works through the shrinking set without offset math.
+ */
+async function migrateTable(
+  tableName: "allmoxy_products" | "products",
+  labelPrefix: string,
+  svc: ObjectStorageService,
+  counters: { migrated: number; alreadyPresent: number; failed: number }
+): Promise<void> {
+  while (true) {
+    // Always query the first CHUNK_SIZE rows with image_data still set
+    const result =
+      tableName === "allmoxy_products"
+        ? await db.execute(sql`
+            SELECT id, image_path, image_data
+            FROM allmoxy_products
+            WHERE image_data IS NOT NULL
+            ORDER BY id
+            LIMIT ${CHUNK_SIZE}
+          `)
+        : await db.execute(sql`
+            SELECT id, image_path, image_data
+            FROM products
+            WHERE image_data IS NOT NULL
+            ORDER BY id
+            LIMIT ${CHUNK_SIZE}
+          `);
+
+    if (result.rows.length === 0) break;
+
+    for (const row of result.rows as any[]) {
+      const { id, image_path, image_data } = row;
+      try {
+        const buffer = Buffer.from(image_data as string, "base64");
+        const ext = image_path
+          ? path.extname(image_path as string).toLowerCase() ||
+            detectExtension(buffer)
+          : detectExtension(buffer);
+        const objectPath =
+          (image_path as string | null) ||
+          `product-images/migrated/${labelPrefix}-${id}${ext}`;
+
+        const existing = await svc.downloadBuffer(objectPath);
+        if (existing) {
+          console.log(
+            `[ImageMigrate] ${labelPrefix}-${id}: already present at ${objectPath}`
+          );
+          await db.execute(
+            tableName === "allmoxy_products"
+              ? sql`UPDATE allmoxy_products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
+              : sql`UPDATE products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
+          );
+          counters.alreadyPresent++;
+          continue;
+        }
+
+        await svc.uploadBuffer(buffer, objectPath, mimeFromExt(ext));
+        await db.execute(
+          tableName === "allmoxy_products"
+            ? sql`UPDATE allmoxy_products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
+            : sql`UPDATE products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
+        );
+        console.log(
+          `[ImageMigrate] ${labelPrefix}-${id}: migrated → ${objectPath}`
+        );
+        counters.migrated++;
+      } catch (e: any) {
+        console.error(
+          `[ImageMigrate] ${labelPrefix}-${id}: FAILED — ${e.message}`
+        );
+        counters.failed++;
+      }
+    }
+
+    // If all rows in this chunk failed (none NULLed), they'll appear again forever.
+    // Break to avoid infinite loop — the final summary will show non-zero failures.
+    if (result.rows.length > 0 && counters.failed > 0) {
+      const remaining = await db.execute(
+        tableName === "allmoxy_products"
+          ? sql`SELECT count(*) AS cnt FROM allmoxy_products WHERE image_data IS NOT NULL`
+          : sql`SELECT count(*) AS cnt FROM products WHERE image_data IS NOT NULL`
+      );
+      const stillRemaining = Number((remaining.rows[0] as any).cnt);
+      if (stillRemaining >= result.rows.length) {
+        // No progress — all remaining rows are failing; stop to avoid infinite loop
+        console.warn(
+          `[ImageMigrate] ${labelPrefix}: stopping chunk loop — ${stillRemaining} rows still have image_data but every row in this chunk failed`
+        );
+        break;
+      }
+    }
+  }
+}
+
 export async function migrateProductImagesToObjectStorage(): Promise<void> {
+  // Guard: exit cleanly if image_data columns were already dropped
+  const columnsExist = await imageDataColumnsExist();
+  if (!columnsExist) {
+    console.log(
+      "[ImageMigrate] image_data columns already dropped — nothing to migrate"
+    );
+    return;
+  }
+
   const svc = new ObjectStorageService();
-  let migrated = 0;
-  let alreadyPresent = 0;
-  let failed = 0;
+  const counters = { migrated: 0, alreadyPresent: 0, failed: 0 };
 
-  // --- allmoxy_products ---
-  const allmoxyResult = await db.execute(sql`
-    SELECT id, image_path, image_data
-    FROM allmoxy_products
-    WHERE image_data IS NOT NULL
-  `);
-
-  for (const row of allmoxyResult.rows as any[]) {
-    const { id, image_path, image_data } = row;
-    try {
-      const buffer = Buffer.from(image_data as string, "base64");
-      const ext = image_path
-        ? path.extname(image_path as string).toLowerCase() ||
-          detectExtension(buffer)
-        : detectExtension(buffer);
-      const objectPath =
-        (image_path as string | null) ||
-        `product-images/migrated/allmoxy-${id}${ext}`;
-
-      const existing = await svc.downloadBuffer(objectPath);
-      if (existing) {
-        console.log(
-          `[ImageMigrate] allmoxy-${id}: already present at ${objectPath}`
-        );
-        // Still NULL out image_data and ensure image_path is set
-        await db.execute(
-          sql`UPDATE allmoxy_products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
-        );
-        alreadyPresent++;
-        continue;
-      }
-
-      await svc.uploadBuffer(buffer, objectPath, mimeFromExt(ext));
-      // Update image_path and clear image_data in one statement
-      await db.execute(
-        sql`UPDATE allmoxy_products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
-      );
-      console.log(`[ImageMigrate] allmoxy-${id}: migrated → ${objectPath}`);
-      migrated++;
-    } catch (e: any) {
-      console.error(`[ImageMigrate] allmoxy-${id}: FAILED — ${e.message}`);
-      failed++;
-    }
-  }
-
-  // --- products (hardware catalog) ---
-  const hwResult = await db.execute(sql`
-    SELECT id, image_path, image_data
-    FROM products
-    WHERE image_data IS NOT NULL
-  `);
-
-  for (const row of hwResult.rows as any[]) {
-    const { id, image_path, image_data } = row;
-    try {
-      const buffer = Buffer.from(image_data as string, "base64");
-      const ext = image_path
-        ? path.extname(image_path as string).toLowerCase() ||
-          detectExtension(buffer)
-        : detectExtension(buffer);
-      const objectPath =
-        (image_path as string | null) ||
-        `product-images/migrated/hardware-${id}${ext}`;
-
-      const existing = await svc.downloadBuffer(objectPath);
-      if (existing) {
-        console.log(
-          `[ImageMigrate] hardware-${id}: already present at ${objectPath}`
-        );
-        // Still NULL out image_data and ensure image_path is set
-        await db.execute(
-          sql`UPDATE products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
-        );
-        alreadyPresent++;
-        continue;
-      }
-
-      await svc.uploadBuffer(buffer, objectPath, mimeFromExt(ext));
-      // Update image_path and clear image_data in one statement
-      await db.execute(
-        sql`UPDATE products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
-      );
-      console.log(`[ImageMigrate] hardware-${id}: migrated → ${objectPath}`);
-      migrated++;
-    } catch (e: any) {
-      console.error(`[ImageMigrate] hardware-${id}: FAILED — ${e.message}`);
-      failed++;
-    }
-  }
+  await migrateTable("allmoxy_products", "allmoxy", svc, counters);
+  await migrateTable("products", "hardware", svc, counters);
 
   console.log(
-    `[ImageMigrate] Done. migrated=${migrated}, already-present=${alreadyPresent}, failed=${failed}`
+    `[ImageMigrate] Done. migrated=${counters.migrated}, already-present=${counters.alreadyPresent}, failed=${counters.failed}`
   );
-  if (failed > 0) {
+  if (counters.failed > 0) {
     console.warn(
-      `[ImageMigrate] WARNING: ${failed} rows failed. Re-run before applying migrations/0008_drop_image_data.sql.`
+      `[ImageMigrate] WARNING: ${counters.failed} rows failed. Re-run before applying migrations/0008_drop_image_data.sql.`
     );
   }
 }
