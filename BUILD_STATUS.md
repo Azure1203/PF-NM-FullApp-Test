@@ -1028,17 +1028,21 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 
 1. **[LOW] `outlook_sync_status` orphaned table** — Exists in DB only, not in schema. Safe to `DROP TABLE outlook_sync_status;` directly in the production DB.
 
-2. **[LOW] Asana 403 on task 1213347389204508** — One Asana task consistently returns "You do not have access to this task" every import cycle. The scheduler handles it gracefully but logs a verbose stack trace every 10 minutes. Fix: filter this task GID in `asanaImportScheduler.ts`, or remove it from the Asana "READY TO IMPORT" section.
+2. **[LOW] `@microsoft/microsoft-graph-client` still in package.json** — The Outlook integration was removed in r25 but the npm package remains installed. Not imported anywhere. Can be uninstalled with `npm uninstall @microsoft/microsoft-graph-client`.
 
-3. **[LOW] `@microsoft/microsoft-graph-client` still in package.json** — The Outlook integration was removed in r25 but the npm package remains installed. Not imported anywhere. Can be uninstalled with `npm uninstall @microsoft/microsoft-graph-client`.
+3. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
 
-4. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
-
-5. **[MEDIUM] Product image storage is base64 in DB** — Images stored as base64 text in `allmoxy_products.image_data` and `products.image_data`. For the current scale this works, but list queries must never include `image_data`. The `getAllmoxyProducts()` and `getProducts()` storage methods explicitly exclude it. All image reads go through `/api/product-images/by-id/:id/:table`. Do not add `imageData` to any list query.
+4. **[MEDIUM] Product image storage is base64 in DB** — Images stored as base64 text in `allmoxy_products.image_data` and `products.image_data`. For the current scale this works, but list queries must never include `image_data`. The `getAllmoxyProducts()` and `getProducts()` storage methods explicitly exclude it. All image reads go through `/api/product-images/by-id/:id/:table`. Do not add `imageData` to any list query.
 
 ---
 
 ## 10. Changelog (reverse-chronological, recent releases)
+
+### r26-a — 2026-05-02 — Clean stale Asana-403 test data
+
+Removed two duplicate test projects (id 8 and 9, both named "TEST PERFECT FIT JOB") from the dev database. Both pointed to Asana task `1213347389204508`, which had become inaccessible (returns 403). The Asana sync-all job was hitting that task every 10 minutes and dumping a verbose stack trace into the logs. Cascade-deleted 8 order files, 16 CTS parts, 182 hardware checklist items, 528 packing-slip items, plus the orphaned `processed_asana_tasks` row referencing the same GID. No code changes — the scheduler now finds zero stale references and the 403 spam is gone.
+
+---
 
 ### r26 — 2026-05-02 — BUILD_STATUS.md comprehensive rewrite
 
