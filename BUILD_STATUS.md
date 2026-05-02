@@ -35,7 +35,7 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 |---|---|
 | react ^18.3.1 | Frontend UI |
 | express ^4.21.2 | Backend HTTP server |
-| drizzle-orm ^0.39.3 | ORM + query builder |
+| drizzle-orm ^0.45.2 | ORM + query builder |
 | drizzle-kit ^0.31.8 | Schema migrations |
 | drizzle-zod ^0.7.0 | Zod schema generation from Drizzle tables |
 | @tanstack/react-query ^5.60.5 | Server state / data fetching |
@@ -47,7 +47,7 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 | tailwindcss ^3.4.17 | Utility CSS |
 | shadcn/ui (Radix UI) | Component library |
 | asana ^3.1.5 | Asana API client |
-| googleapis ^148.0.0 | Google Sheets / Drive backup |
+| googleapis ^171.4.0 | Google Sheets / Drive backup |
 | archiver ^7.0.1 | ZIP generation for multi-file ORD downloads |
 | exceljs ^4.4.0 | Hardware XLSX export |
 | pdf-lib / pdfjs-dist | PDF generation and parsing |
@@ -1021,7 +1021,7 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 
 ## 9. Known Issues & Bugs
 
-1. **[LOW] `outlook_sync_status` orphaned in production DB only** — Dropped from the development database in r25-c, but still exists in the production database. `outlookSyncStatus` was removed from `shared/schema.ts` in r25-b, so Replit's Publish flow will detect the orphan during its dev↔prod schema diff on the next publish and offer to drop it. No manual action required — agents must NOT write migration scripts, deploy-build hooks, or startup-time DDL to drop it; the supported path is Publish.
+1. **[PARTIALLY RESOLVED] `outlook_sync_status` orphan table** — Verified in r29 that the table actually still existed in BOTH dev and prod (the r25-c BUILD_STATUS claim that dev was already cleaned was inaccurate). Dropped from dev via direct SQL (`DROP TABLE IF EXISTS outlook_sync_status`) in r29 so it now matches the schema (1 row of stale sync metrics discarded — column was removed from the codebase in r25-b, no reader/writer remained). Production still has the table; will be cleaned on next Publish, when Replit's dev↔prod schema diff offers the drop. No manual action required for prod — the supported path is Publish.
 
 2. **[RESOLVED] Grid column digit-prefix UI warning** — Resolved in r28. Grid Manager now displays an amber banner at the top of the selected grid when any column name starts with a digit, listing the offending columns and showing an example formula reference (`alias._{column}` form) so admins know to add the leading underscore.
 
@@ -1030,6 +1030,52 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 ---
 
 ## 10. Changelog (reverse-chronological, recent releases)
+
+### r29 — 2026-05-02 — Major-version dependency upgrades + outlook_sync_status orphan cleanup (Tasks #33–#36)
+
+**Four small-scope tasks bundled together (user said "do all of those").**
+
+**#33 — `outlook_sync_status` orphan drop (dev side).** Audit revealed the
+table actually still existed in both dev and prod (BUILD_STATUS r25-c claim
+of dev cleanup was inaccurate). One row of stale sync metrics; six columns
+(`id`, `last_sync_at`, `last_success_at`, `last_error`, `emails_processed`,
+`emails_matched`); zero codebase references (`outlookSyncStatus` was removed
+from `shared/schema.ts` in r25-b). Dropped from dev via
+`DROP TABLE IF EXISTS outlook_sync_status` so dev now matches schema.
+Production still has it — Replit's Publish flow will offer the drop on the
+next deploy. §9 item 1 marked PARTIALLY RESOLVED.
+
+**#34 — `drizzle-orm` 0.39.3 → 0.45.2.** Six minor versions. Surface area is
+heavy (`server/storage.ts`, `server/routes.ts`, `server/backfillMigration.ts`,
+`server/asanaImportScheduler.ts`, `server/agentmailScheduler.ts`,
+`server/replit_integrations/auth/storage.ts`, `server/db.ts`,
+`server/scripts/migrateProductImagesToObjectStorage.ts`,
+`shared/schema.ts`, `shared/models/auth.ts`) but only stable named exports
+used (`eq`, `desc`, `and`, `or`, `inArray`, `sql`, `ilike`, `isNull`, `like`)
+plus `drizzle-orm/node-postgres` driver and `drizzle-orm/pg-core` table
+helpers — all retained backward-compatible signatures across 0.40–0.45.
+Restart clean, zero TS errors from drizzle-orm types, app serving normally.
+
+**#35 — `exceljs` upgrade investigation.** Already pinned at `^4.4.0` and
+4.4.0 is the current latest stable (only newer line is alpha/4.5+); the
+remaining moderate advisory's "fix" path requires DOWNGRADING to 3.4.0,
+which is the wrong direction. No-op upgrade, kept at 4.4.0. Single
+consumer (`server/routes.ts` ~line 1967, `new ExcelJS.Workbook()` for
+hardware XLSX export) unchanged.
+
+**#36 — `googleapis` 148.0.0 → 171.4.0.** 23 minor versions. Only consumer
+is `server/googleSheets.ts` and only uses `google.auth.OAuth2` constructor
+plus `google.sheets({ version: 'v4', auth })` factory — both APIs stable
+across the range. Restart clean.
+
+**Audit numbers:** 22 → 19 vulns (high: 7 → 6, moderate: 13 → 11). All 19
+remaining advisories report "no fix available" except the exceljs one
+which would require a downgrade. We're at the practical floor.
+
+**Files affected:** `package.json`, `package-lock.json`, `BUILD_STATUS.md`,
+plus a one-time SQL `DROP TABLE outlook_sync_status` against the dev DB.
+
+---
 
 ### r28 — 2026-05-02 — Post-merge hardening, Grid Manager digit-prefix warning, security patches
 
