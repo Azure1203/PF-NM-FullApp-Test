@@ -21,7 +21,7 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 | Field | Value |
 |---|---|
 | **Last updated** | 2026-05-02 |
-| **Current release** | r27 |
+| **Current release** | r28 |
 | **Active branch** | main (Replit managed) |
 | **How to run (dev)** | `npm run dev` → starts Express + Vite on port 5000 |
 | **Entry point (backend)** | `server/index.ts` |
@@ -40,9 +40,9 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 | drizzle-zod ^0.7.0 | Zod schema generation from Drizzle tables |
 | @tanstack/react-query ^5.60.5 | Server state / data fetching |
 | wouter ^3.3.5 | Client-side routing |
-| mathjs ^15.1.1 | Pricing formula evaluation |
+| mathjs ^15.2.0 | Pricing formula evaluation |
 | zod ^3.24.2 | Runtime validation |
-| vite ^7.3.0 | Frontend build tool |
+| vite ^7.3.2 | Frontend build tool |
 | tsx ^4.21.0 | Backend TypeScript runner |
 | tailwindcss ^3.4.17 | Utility CSS |
 | shadcn/ui (Radix UI) | Component library |
@@ -1023,13 +1023,59 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 
 1. **[LOW] `outlook_sync_status` orphaned in production DB only** — Dropped from the development database in r25-c, but still exists in the production database. `outlookSyncStatus` was removed from `shared/schema.ts` in r25-b, so Replit's Publish flow will detect the orphan during its dev↔prod schema diff on the next publish and offer to drop it. No manual action required — agents must NOT write migration scripts, deploy-build hooks, or startup-time DDL to drop it; the supported path is Publish.
 
-2. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
+2. **[RESOLVED] Grid column digit-prefix UI warning** — Resolved in r28. Grid Manager now displays an amber banner at the top of the selected grid when any column name starts with a digit, listing the offending columns and showing an example formula reference (`alias._{column}` form) so admins know to add the leading underscore.
 
 3. **[RESOLVED] `image_data` columns dropped from DB (Task #32)** — Verified zero non-null rows in both `products` and `allmoxy_products`, then applied `migrations/0008_drop_image_data.sql` directly via SQL (`ALTER TABLE products DROP COLUMN IF EXISTS image_data; ALTER TABLE allmoxy_products DROP COLUMN IF EXISTS image_data;`). Confirmed via `information_schema.columns` that neither column exists anymore. No application code changes were required (Drizzle schema had already removed `imageData` in Task #30).
 
 ---
 
 ## 10. Changelog (reverse-chronological, recent releases)
+
+### r28 — 2026-05-02 — Post-merge hardening, Grid Manager digit-prefix warning, security patches
+
+**Three small improvements bundled together:**
+
+**A. Non-interactive `db:push` in `scripts/post-merge.sh`** — Post-merge hook
+previously hung when `drizzle-kit push` prompted about adding a unique
+constraint to a populated table (observed during Task #32 merge). Wrapped the
+command with `yes "" |` so any drizzle-kit interactive prompt receives
+repeated newlines and auto-accepts the highlighted (default = non-destructive)
+option. Prevents future post-merge hangs.
+
+**B. Digit-prefix column warning in Grid Manager**
+(`client/src/pages/admin/DynamicGridManager.tsx`) — When the selected
+attribute grid has any column whose name begins with a digit (e.g.
+`45_AND_90_PRICING_ID`), an amber banner now appears between the toolbar and
+the tab bar listing the offending columns and showing an example
+(`alias._45_and_90_pricing_id`) so admins know pricing formulas must use a
+leading underscore. The pricing engine already sanitizes these automatically;
+the banner only addresses the discoverability gap (BUILD_STATUS §9 item 2).
+Implementation: `digitPrefixColumns` `useMemo` (line ~116) filters
+`selectedGrid.columns` with `/^\d/`; banner renders only when non-empty;
+example uses the first binding's alias from `gridBindings` (falls back to
+`'alias'`).
+
+**C. Security patches — non-breaking dependency updates**
+- `mathjs` 15.1.1 → 15.2.0 (fixes "Improperly Controlled Modification of
+  Dynamically-Determined Object Attributes" + "Unsafe object property setter")
+- `multer` 2.0.2 → 2.1.1 (fixes two DoS advisories)
+- `vite` 7.3.0 → 7.3.2 (fixes path-traversal in optimized-deps `.map`
+  handling and `server.fs.deny` query bypass)
+- `postcss` 8.4.47 → 8.5.13 (fixes XSS via unescaped `</style>` in CSS
+  stringify output)
+- Audit total dropped 26 → 22 (high: 10 → 7, moderate: 14 → 13).
+
+**Major-bump advisories deliberately deferred** (require explicit user
+approval — high regression risk to ORM, exports, Google integrations):
+`drizzle-orm` 0.39 → 0.45, `exceljs` 4.4 → 4-latest, `googleapis` 148 → 171.
+Other transitives (`@google-cloud/storage`, `@replit/object-storage`, `uuid`)
+have no upstream fix yet.
+
+**Files affected:** `scripts/post-merge.sh`,
+`client/src/pages/admin/DynamicGridManager.tsx`, `package.json`,
+`package-lock.json`, `BUILD_STATUS.md`.
+
+---
 
 ### r27 — 2026-05-02 — Migrate product images from DB to Object Storage (Task #30)
 

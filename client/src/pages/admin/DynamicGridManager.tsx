@@ -107,6 +107,14 @@ export default function DynamicGridManager() {
     );
   }, [rows, searchQuery]);
 
+  // Detect columns whose names start with a digit. JavaScript identifiers
+  // cannot begin with a number, so the pricing engine sanitizes these by
+  // prepending an underscore — but admins writing formulas must do the same.
+  const digitPrefixColumns = useMemo(
+    () => (selectedGrid?.columns ?? []).filter(c => /^\d/.test(c)),
+    [selectedGrid?.columns]
+  );
+
   const updateRowMutation = useMutation({
     mutationFn: async ({ rowId, rowData }: { rowId: number; rowData: Record<string, any> }) => {
       const res = await fetch(`/api/admin/attribute-grids/rows/${rowId}`, {
@@ -674,6 +682,32 @@ export default function DynamicGridManager() {
                   </Button>
                 )}
               </div>
+
+              {/* Digit-prefix column warning */}
+              {digitPrefixColumns.length > 0 && (
+                <div
+                  className="mx-4 mt-2 mb-1 px-3 py-2 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 text-xs flex items-start gap-2 shrink-0"
+                  data-testid="warning-digit-prefix-columns"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 mt-0.5 shrink-0" />
+                  <div className="text-amber-900 dark:text-amber-200 leading-snug">
+                    <strong>Heads up:</strong> {digitPrefixColumns.length === 1 ? 'Column' : 'Columns'}{' '}
+                    {digitPrefixColumns.map((c, i) => (
+                      <span key={c}>
+                        <code className="font-mono bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5 rounded">{c}</code>
+                        {i < digitPrefixColumns.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}{' '}
+                    {digitPrefixColumns.length === 1 ? 'starts' : 'start'} with a digit.
+                    JavaScript identifiers cannot begin with a number, so pricing formulas
+                    must reference {digitPrefixColumns.length === 1 ? 'it' : 'them'} with a leading underscore — e.g.{' '}
+                    <code className="font-mono bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5 rounded">
+                      {gridBindings[0]?.alias ?? 'alias'}._{digitPrefixColumns[0].toLowerCase()}
+                    </code>{' '}
+                    instead of <code className="font-mono">.{digitPrefixColumns[0].toLowerCase()}</code>.
+                  </div>
+                </div>
+              )}
 
               {/* Tab bar */}
               <div className="px-4 flex items-center gap-1 border-b shrink-0 bg-muted/10">
