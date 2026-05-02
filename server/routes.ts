@@ -677,7 +677,13 @@ export async function registerRoutes(
       const ext = path.extname(req.file.originalname).toLowerCase();
       const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
       if (!allowedExts.includes(ext)) return res.status(400).json({ message: 'Invalid file type. Use jpg, png, or webp.' });
-      const imagePath = `product-images/${req.file.originalname}`;
+      // Sanitize: strip any directory components and disallow path-traversal
+      // characters before composing the object-storage key.
+      const safeName = path.basename(req.file.originalname).replace(/[^A-Za-z0-9._-]/g, '_');
+      if (!safeName || safeName === '.' || safeName === '..') {
+        return res.status(400).json({ message: 'Invalid filename' });
+      }
+      const imagePath = `product-images/${safeName}`;
       await objectStorageService.uploadBuffer(req.file.buffer, imagePath, req.file.mimetype);
       await db.update(allmoxyProducts).set({ imagePath }).where(eq(allmoxyProducts.id, productId));
       res.json({ imagePath });
@@ -8153,7 +8159,14 @@ export async function registerRoutes(
         const ext = path.extname(file.originalname).toLowerCase();
         if (!allowedExts.includes(ext)) continue;
         const baseName = path.basename(file.originalname, ext).toLowerCase();
-        const storagePath = `product-images/${file.originalname}`;
+        // Sanitize: strip directory components and disallow path-traversal
+        // characters before composing the object-storage key.
+        const safeName = path.basename(file.originalname).replace(/[^A-Za-z0-9._-]/g, '_');
+        if (!safeName || safeName === '.' || safeName === '..') {
+          unmatchedFiles.push({ filename: file.originalname });
+          continue;
+        }
+        const storagePath = `product-images/${safeName}`;
 
         const allmoxyMatch = allmoxyByName.get(baseName) || allmoxyBySku.get(baseName);
         if (allmoxyMatch) {

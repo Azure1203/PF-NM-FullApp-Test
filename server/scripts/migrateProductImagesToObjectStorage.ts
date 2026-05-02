@@ -107,6 +107,11 @@ async function migrateTable(
 
     if (result.rows.length === 0) break;
 
+    // Track per-chunk progress (NOT cumulative). The loop must only stop when
+    // a chunk makes zero progress — i.e. every row in this chunk failed.
+    // Mixing cumulative failure counts with per-chunk size led to premature
+    // termination when many rows still remained behind a single failed row.
+    let chunkProcessed = 0;
     for (const row of result.rows as any[]) {
       const { id, image_path, image_data } = row;
       try {
@@ -130,6 +135,7 @@ async function migrateTable(
               : sql`UPDATE products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
           );
           counters.alreadyPresent++;
+          chunkProcessed++;
           continue;
         }
 
@@ -143,6 +149,7 @@ async function migrateTable(
           `[ImageMigrate] ${labelPrefix}-${id}: migrated → ${objectPath}`
         );
         counters.migrated++;
+        chunkProcessed++;
       } catch (e: any) {
         console.error(
           `[ImageMigrate] ${labelPrefix}-${id}: FAILED — ${e.message}`
@@ -151,22 +158,15 @@ async function migrateTable(
       }
     }
 
-    // If all rows in this chunk failed (none NULLed), they'll appear again forever.
-    // Break to avoid infinite loop — the final summary will show non-zero failures.
-    if (result.rows.length > 0 && counters.failed > 0) {
-      const remaining = await db.execute(
-        tableName === "allmoxy_products"
-          ? sql`SELECT count(*) AS cnt FROM allmoxy_products WHERE image_data IS NOT NULL`
-          : sql`SELECT count(*) AS cnt FROM products WHERE image_data IS NOT NULL`
+    // Only break when this chunk made zero progress (every row failed).
+    // Otherwise the same failed rows will keep being re-fetched at the head
+    // of the ordered query forever. Successful rows always reduce the
+    // candidate set because image_data is NULLed inside the same statement.
+    if (chunkProcessed === 0) {
+      console.warn(
+        `[ImageMigrate] ${labelPrefix}: stopping chunk loop — every row in the last chunk of ${result.rows.length} failed`
       );
-      const stillRemaining = Number((remaining.rows[0] as any).cnt);
-      if (stillRemaining >= result.rows.length) {
-        // No progress — all remaining rows are failing; stop to avoid infinite loop
-        console.warn(
-          `[ImageMigrate] ${labelPrefix}: stopping chunk loop — ${stillRemaining} rows still have image_data but every row in this chunk failed`
-        );
-        break;
-      }
+      break;
     }
   }
 }

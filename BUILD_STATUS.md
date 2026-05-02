@@ -1039,8 +1039,12 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 previously hung when `drizzle-kit push` prompted about adding a unique
 constraint to a populated table (observed during Task #32 merge). Wrapped the
 command with `yes "" |` so any drizzle-kit interactive prompt receives
-repeated newlines and auto-accepts the highlighted (default = non-destructive)
-option. Prevents future post-merge hangs.
+repeated newlines and auto-accepts the highlighted (default) option.
+drizzle-kit's convention is that destructive prompts (DROP COLUMN, TRUNCATE)
+default to "No" and non-destructive prompts default to the data-preserving
+option, so `yes ""` is safe. Comment in the script documents the safety
+contract and points to `migrations/0008_drop_image_data.sql` as the established
+manual-SQL pattern for genuinely destructive changes.
 
 **B. Digit-prefix column warning in Grid Manager**
 (`client/src/pages/admin/DynamicGridManager.tsx`) — When the selected
@@ -1071,9 +1075,28 @@ approval — high regression risk to ORM, exports, Google integrations):
 Other transitives (`@google-cloud/storage`, `@replit/object-storage`, `uuid`)
 have no upstream fix yet.
 
+**Follow-up cleanups also bundled into r28** (post-review fixes from r27 carry-over):
+- **`server/scripts/migrateProductImagesToObjectStorage.ts`** — fixed
+  premature-break bug in chunked loop. Old logic compared cumulative
+  `counters.failed` against per-chunk size, which incorrectly broke after a
+  single failed row when many rows still remained. New logic tracks
+  `chunkProcessed` per iteration and only breaks when an entire chunk made
+  zero progress (every row in that chunk failed).
+- **`server/routes.ts`** — sanitized `req.file.originalname` at both upload
+  sinks (single `POST /api/admin/allmoxy-products/:id/image` and bulk
+  `POST /api/admin/products/bulk-upload-images`). Now strips directory
+  components via `path.basename` and replaces unsafe characters with `_`,
+  closing path-traversal risk on the local filesystem fallback in
+  `objectStorageService.uploadBuffer`.
+- **`shared/schema.ts`** + **`server/storage.ts`** — removed leftover
+  `ProductListItem = Product` alias and updated all references to plain
+  `Product` / `Product[]`.
+
 **Files affected:** `scripts/post-merge.sh`,
-`client/src/pages/admin/DynamicGridManager.tsx`, `package.json`,
-`package-lock.json`, `BUILD_STATUS.md`.
+`client/src/pages/admin/DynamicGridManager.tsx`,
+`server/scripts/migrateProductImagesToObjectStorage.ts`, `server/routes.ts`,
+`shared/schema.ts`, `server/storage.ts`, `package.json`, `package-lock.json`,
+`BUILD_STATUS.md`.
 
 ---
 

@@ -322,7 +322,6 @@ export const insertProductSchema = createInsertSchema(products).omit({
 });
 
 export type Product = typeof products.$inferSelect;
-export type ProductListItem = Product;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 
 // Hardware checklist items - items from hardware CSV attached to order files

@@ -27,7 +27,6 @@ import {
   type PackingSlipItem,
   type InsertPackingSlipItem,
   type Product,
-  type ProductListItem,
   type InsertProduct,
   type HardwareChecklistItem,
   type InsertHardwareChecklistItem,
@@ -111,7 +110,7 @@ export interface IStorage {
   replacePackingSlipItems(fileId: number, items: InsertPackingSlipItem[]): Promise<PackingSlipItem[]>;
   
   // Product catalog methods
-  getProducts(search?: string, category?: string): Promise<ProductListItem[]>;
+  getProducts(search?: string, category?: string): Promise<Product[]>;
   getProduct(id: number): Promise<Product | undefined>;
   getProductByCode(code: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
@@ -491,7 +490,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Product catalog methods
-  async getProducts(search?: string, category?: string): Promise<ProductListItem[]> {
+  async getProducts(search?: string, category?: string): Promise<Product[]> {
     const conditions = [];
     if (search) {
       conditions.push(
