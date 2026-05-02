@@ -1,13 +1,16 @@
 # BUILD_STATUS.md — Perfect Fit Closets / Netley Millwork Order Management System
 
 > **Living document.** Updated automatically with every meaningful change.
-> For an outside developer or AI: read this file first. It is the single source of truth for the current state of the application.
+> For an outside developer or AI: read this file first. It is the single source of truth.
+> Extracted from: `shared/schema.ts`, `server/routes.ts` (8 377 lines), `server/storage.ts`, `server/services/pricingEngine.ts`.
 
 ---
 
 ## 1. App Overview
 
-This is a production-ready internal order management dashboard built for **Netley Millwork / Perfect Fit Closets**, replacing their legacy Allmoxy system. Shop staff upload CSV order exports, the app prices every line item using SKU-matched formulas evaluated against attribute lookup grids, and then generates all downstream outputs: Cabinet Vision `.ORD` files, ELIAS dovetail PDFs, M&J Shaker door job lists, hardware/glass manifests, cut-to-size sheets, packing checklists, and invoices. Orders sync bidirectionally with Asana for production tracking, and inbound packing-slip PDFs are ingested automatically via AgentMail. The tech stack is **React 18 + TypeScript (Vite)** on the frontend, **Express.js + TypeScript** on the backend, and **PostgreSQL with Drizzle ORM** for persistence, all running on Replit.
+Production-ready internal order management dashboard for **Netley Millwork / Perfect Fit Closets**, replacing their legacy Allmoxy system. Shop staff upload CSV order exports; the app prices every line item using SKU-matched mathjs formulas evaluated against JSONB attribute lookup grids, then generates all downstream outputs: Cabinet Vision `.ORD` files, ELIAS dovetail PDFs, M&J Shaker door job lists, hardware/glass manifests, cut-to-size sheets, packing checklists, and invoices. Orders sync bidirectionally with Asana for production tracking. Inbound packing-slip PDFs are ingested automatically via AgentMail.
+
+**Stack:** React 18 + TypeScript (Vite) · Express.js + TypeScript · PostgreSQL + Drizzle ORM · Replit deployment.
 
 **Current stage:** Production-ready / actively deployed.
 
@@ -17,8 +20,8 @@ This is a production-ready internal order management dashboard built for **Netle
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-05-02 19:00 UTC |
-| **Current release** | r25 |
+| **Last updated** | 2026-05-02 |
+| **Current release** | r26 |
 | **Active branch** | main (Replit managed) |
 | **How to run (dev)** | `npm run dev` → starts Express + Vite on port 5000 |
 | **Entry point (backend)** | `server/index.ts` |
@@ -28,30 +31,30 @@ This is a production-ready internal order management dashboard built for **Netle
 
 ### Key Dependencies
 
-| Package | Version | Purpose |
-|---|---|---|
-| react | ^18.3.1 | Frontend UI |
-| express | ^4.21.2 | Backend HTTP server |
-| drizzle-orm | ^0.39.3 | ORM + query builder |
-| drizzle-kit | ^0.31.8 | Schema migrations |
-| drizzle-zod | ^0.7.0 | Zod schema generation from Drizzle tables |
-| @tanstack/react-query | ^5.60.5 | Server state / data fetching |
-| wouter | ^3.3.5 | Client-side routing |
-| mathjs | ^15.1.1 | Pricing formula evaluation |
-| zod | ^3.24.2 | Runtime validation |
-| vite | ^7.3.0 | Frontend build tool |
-| tsx | ^4.21.0 | Backend TypeScript runner |
-| tailwindcss | ^3.4.17 | Utility CSS |
-| shadcn/ui (Radix UI) | various | Component library |
-| asana | ^3.1.5 | Asana API client |
-| @microsoft/microsoft-graph-client | ^3.0.7 | Retained as dependency; Outlook integration removed |
-| googleapis | ^148.0.0 | Google Sheets / Drive backup |
-| archiver | ^7.0.1 | ZIP generation for multi-file ORD downloads |
-| exceljs | ^4.4.0 | Hardware XLSX export |
-| pdf-lib / pdfjs-dist | ^1.17.1 / ^5.4.530 | PDF generation and parsing |
-| multer | ^2.0.2 | File upload handling |
-| csv-parse | ^6.1.0 | CSV parsing |
-| papaparse | ^5.5.3 | Client-side CSV parsing |
+| Package | Purpose |
+|---|---|
+| react ^18.3.1 | Frontend UI |
+| express ^4.21.2 | Backend HTTP server |
+| drizzle-orm ^0.39.3 | ORM + query builder |
+| drizzle-kit ^0.31.8 | Schema migrations |
+| drizzle-zod ^0.7.0 | Zod schema generation from Drizzle tables |
+| @tanstack/react-query ^5.60.5 | Server state / data fetching |
+| wouter ^3.3.5 | Client-side routing |
+| mathjs ^15.1.1 | Pricing formula evaluation |
+| zod ^3.24.2 | Runtime validation |
+| vite ^7.3.0 | Frontend build tool |
+| tsx ^4.21.0 | Backend TypeScript runner |
+| tailwindcss ^3.4.17 | Utility CSS |
+| shadcn/ui (Radix UI) | Component library |
+| asana ^3.1.5 | Asana API client |
+| googleapis ^148.0.0 | Google Sheets / Drive backup |
+| archiver ^7.0.1 | ZIP generation for multi-file ORD downloads |
+| exceljs ^4.4.0 | Hardware XLSX export |
+| pdf-lib / pdfjs-dist | PDF generation and parsing |
+| multer ^2.0.2 | File upload handling |
+| csv-parse ^6.1.0 | CSV parsing |
+| papaparse ^5.5.3 | Client-side CSV parsing |
+| @microsoft/microsoft-graph-client | Retained but unused (Outlook removed r25) |
 
 ---
 
@@ -60,40 +63,38 @@ This is a production-ready internal order management dashboard built for **Netle
 ```
 project root
 ├── BUILD_STATUS.md              ← This file (living build state)
-├── CHANGELOG.md                 ← Full reverse-chronological change log (r1–r25)
+├── CHANGELOG.md                 ← Full reverse-chronological change log (r1–r26)
 ├── ORDER_PROCESS_GUIDE.md       ← End-to-end guide for shop staff
 ├── replit.md                    ← Replit-specific notes + architecture pointer
-├── package.json                 ← Scripts and all dependencies
-├── tsconfig.json                ← TypeScript config (shared paths)
-├── vite.config.ts               ← Vite config (aliases, plugins)
-├── tailwind.config.ts           ← Tailwind theme + dark mode config
-├── drizzle.config.ts            ← Drizzle Kit migration config
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── tailwind.config.ts
+├── drizzle.config.ts
 ├── components.json              ← shadcn/ui component registry
 │
 ├── shared/
 │   ├── schema.ts                ← All 23 Drizzle table definitions + Zod insert schemas + TS types
 │   ├── routes.ts                ← Shared route path constants
-│   └── models/
-│       └── auth.ts              ← Replit Auth user/session model
+│   └── models/auth.ts           ← Replit Auth user/session model
 │
 ├── server/
 │   ├── index.ts                 ← Express app entry point; starts schedulers after server boot
-│   ├── routes.ts                ← All ~130 API route handlers (8,376 lines)
+│   ├── routes.ts                ← All ~135 API route handlers (8 377 lines)
 │   ├── storage.ts               ← IStorage interface + DatabaseStorage class (all DB CRUD)
 │   ├── db.ts                    ← Drizzle/pg connection pool
 │   ├── static.ts                ← Production static file serving
 │   ├── vite.ts                  ← Vite dev-server middleware (dev only)
-│   ├── csvHelpers.ts            ← CSV parsing utilities (normalise columns, extract metadata)
+│   ├── csvHelpers.ts            ← CSV parsing utilities
 │   ├── backfillMigration.ts     ← One-time startup migration for legacy order files
 │   ├── googleSheets.ts          ← Google Sheets / Drive OAuth client factory
 │   ├── backupScheduler.ts       ← Daily 3 AM Google Sheets backup scheduler
 │   ├── agentmail.ts             ← AgentMail API client (inbound email ingestion)
-│   ├── agentmailScheduler.ts    ← AgentMail polling scheduler (every 30 min); uses processed_outlook_emails table for dedup
+│   ├── agentmailScheduler.ts    ← AgentMail polling scheduler (every 30 min)
 │   ├── asanaNotes.ts            ← Asana task note sync helpers
-│   ├── asanaNotesScheduler.ts   ← Asana notes scheduler (first run 5 min, then 24 h)
+│   ├── asanaNotesScheduler.ts   ← Asana notes scheduler (5 min delay, then 24 h)
 │   ├── asanaImportScheduler.ts  ← Asana "READY TO IMPORT" polling (every 10 min)
-│   ├── lib/
-│   │   └── asana.ts             ← Asana OAuth token helper
+│   ├── lib/asana.ts             ← Asana OAuth token helper
 │   ├── services/
 │   │   ├── pricingEngine.ts     ← mathjs formula evaluator; gridRowToScope + sanitizeDigitAccessors
 │   │   ├── ordExporter.ts       ← Cabinet Vision .ORD file builder + header template engine
@@ -103,112 +104,895 @@ project root
 │       └── object_storage/      ← Replit Object Storage client + ACL routes
 │
 ├── client/src/
-│   ├── main.tsx                 ← React entry point
+│   ├── main.tsx
 │   ├── App.tsx                  ← Router (16 routes) + auth guard + ErrorBoundary
 │   ├── index.css                ← Tailwind base + CSS custom properties (light/dark theme vars)
 │   ├── components/
 │   │   ├── AppLayout.tsx        ← Sidebar + top header shell; 7-item nav
-│   │   ├── ErrorBoundary.tsx    ← React class error boundary (catches render crashes)
-│   │   ├── FileUpload.tsx       ← Drag-and-drop CSV upload component
-│   │   ├── HardwareCsvUploadSection.tsx  ← Hardware CSV upload with auto-checklist generation
-│   │   ├── HardwarePackingChecklist.tsx  ← Interactive hardware checklist component
-│   │   ├── ObjectUploader.tsx   ← Generic object storage upload wrapper
-│   │   ├── PackingSlipChecklist.tsx  ← Interactive packing checklist component
-│   │   ├── PageHeader.tsx       ← Reusable page title + subtitle header
-│   │   ├── PrinterSettings.tsx  ← QZ Tray printer configuration
-│   │   └── StatusBadge.tsx      ← Order status pill badge
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── FileUpload.tsx
+│   │   ├── HardwareCsvUploadSection.tsx
+│   │   ├── HardwarePackingChecklist.tsx
+│   │   ├── ObjectUploader.tsx
+│   │   ├── PackingSlipChecklist.tsx
+│   │   ├── PageHeader.tsx
+│   │   ├── PrinterSettings.tsx
+│   │   └── StatusBadge.tsx
 │   ├── hooks/
-│   │   ├── use-admin.ts         ← Admin role check hook
-│   │   ├── use-auth.ts          ← Auth state hook (Replit OIDC)
-│   │   ├── use-mobile.tsx       ← Mobile breakpoint hook
-│   │   ├── use-orders.ts        ← Orders data hook
-│   │   ├── use-toast.ts         ← Toast notification hook
-│   │   └── use-upload.ts        ← File upload state hook
+│   │   ├── use-admin.ts
+│   │   ├── use-auth.ts
+│   │   ├── use-mobile.tsx
+│   │   ├── use-orders.ts
+│   │   ├── use-toast.ts
+│   │   └── use-upload.ts
 │   ├── lib/
-│   │   ├── auth-utils.ts        ← Auth helper utilities
+│   │   ├── auth-utils.ts
 │   │   ├── queryClient.ts       ← TanStack Query client + apiRequest helper
 │   │   ├── qzTray.ts            ← QZ Tray label printer integration
-│   │   └── utils.ts             ← cn() and other utilities
+│   │   └── utils.ts
 │   └── pages/
 │       ├── Dashboard.tsx        ← /orders — order list + AgentMail/Asana sync controls
-│       ├── OrderDetails.tsx     ← /orders/:id — two-panel order view (FileSidebar + Documents/Shipping)
+│       ├── OrderDetails.tsx     ← /orders/:id — two-panel order view
 │       ├── UploadOrder.tsx      ← /upload — CSV order upload flow
 │       ├── Products.tsx         ← /products — hardware/component product catalog
 │       ├── HardwareImport.tsx   ← /products/import — bulk hardware CSV import
 │       ├── ComponentImport.tsx  ← /products/import-components — component CSV import
 │       ├── CutToSize.tsx        ← /files/:fileId/cts — CTS parts cutting checklist
 │       ├── PackingChecklist.tsx ← /files/:fileId/checklist — packing slip checklist
-│       ├── HardwareChecklist.tsx← /files/:fileId/hardware-checklist — hardware packing checklist
+│       ├── HardwareChecklist.tsx← /files/:fileId/hardware-checklist
 │       ├── HowItWorks.tsx       ← /how-it-works — system documentation page
 │       ├── Landing.tsx          ← Unauthenticated landing/login page
 │       ├── not-found.tsx        ← 404 page
-│       ├── order-detail/        ← Components used exclusively within OrderDetails
-│       │   ├── FileSidebar.tsx       ← Left panel file list (Documents / Shipping mode)
-│       │   ├── DocumentsView.tsx     ← Per-file tab bar: Items, Invoice, PDFs, exports
-│       │   ├── ShippingView.tsx      ← Per-file shipping card with checklist/CTS/pallet links
-│       │   ├── FileItemsTable.tsx    ← Per-file order items table with pricing badges
-│       │   ├── PdfViewer.tsx         ← Reusable PDF iframe + download button
-│       │   └── PalletManager.tsx     ← Pallet CRUD + 16-metric packaging dashboard
+│       ├── order-detail/
+│       │   ├── FileSidebar.tsx
+│       │   ├── DocumentsView.tsx
+│       │   ├── ShippingView.tsx
+│       │   ├── FileItemsTable.tsx
+│       │   ├── PdfViewer.tsx
+│       │   └── PalletManager.tsx
 │       └── admin/
-│           ├── AdminSettings.tsx     ← /admin/settings — 3-tab: ORD Export, Output Settings, Users
-│           ├── AllmoxyProductManager.tsx ← /admin/allmoxy-products — product catalog editor
-│           ├── DynamicGridManager.tsx    ← /admin/attribute-grids — attribute grid CRUD + bulk upload
-│           ├── ProxyVariableManager.tsx  ← /admin/proxy-variables — formula/proxy variable editor
-│           ├── FormulaTester.tsx         ← /admin/formula-tester — live pricing formula debugger
-│           ├── ProductImageUploader.tsx  ← /admin/product-images — bulk image upload + auto-match
-│           ├── PricingDiagnostic.tsx     ← /admin/diagnostic — pricing health + fix missing proxies
-│           ├── OrdSettings.tsx           ← ORD header template settings (tab within AdminSettings)
-│           └── OutputSettings.tsx        ← Output document toggles (tab within AdminSettings)
+│           ├── AdminSettings.tsx         ← /admin/settings — 3-tab: ORD Export, Output Settings, Users
+│           ├── AllmoxyProductManager.tsx ← /admin/allmoxy-products
+│           ├── DynamicGridManager.tsx    ← /admin/attribute-grids
+│           ├── ProxyVariableManager.tsx  ← /admin/proxy-variables
+│           ├── FormulaTester.tsx         ← /admin/formula-tester
+│           ├── ProductImageUploader.tsx  ← /admin/product-images
+│           ├── PricingDiagnostic.tsx     ← /admin/diagnostic
+│           ├── OrdSettings.tsx
+│           └── OutputSettings.tsx
 │
 ├── migrations/                  ← Drizzle migration SQL files (0000–0007)
 ├── docs/
-│   ├── MASTER_ARCHITECTURE_SPEC_v4.md  ← Authoritative system specification
-│   └── BUILD_STATE.md                  ← Previous build state snapshot (superseded by this file)
-├── attached_assets/             ← Historical prompt files (r8–r24 build notes)
-└── script/
-    └── build.ts                 ← Production build script (esbuild backend + Vite frontend)
+│   ├── MASTER_ARCHITECTURE_SPEC_v4.md
+│   └── BUILD_STATE.md           ← Superseded by this file
+├── attached_assets/             ← Historical prompt files (r8–r26 build notes)
+└── script/build.ts              ← Production build script
 ```
 
 ---
 
-## 4. Feature Status
+## 4. Database Tables (from `shared/schema.ts`)
+
+All 23 tables. PostgreSQL via Drizzle ORM.
+
+### 4.1 `projects`
+Top-level order record; one per customer job; maps to one Asana task.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| name | text NOT NULL | e.g. "Anderson PO25-391065" |
+| date | text | YYYY-MM-DD |
+| dealer | text | |
+| shippingAddress | text | |
+| phone | text | |
+| taxId | text | |
+| orderId | text | Allmoxy order ID |
+| status | text | `'pending'` \| `'synced'` |
+| asanaTaskId | text | GID of the Asana task after sync |
+| asanaSection | text | Section name pulled from Asana |
+| pfOrderStatus | text | `PF ORDER STATUS` custom field from Asana |
+| pfProductionStatus | text[] | `PF PRODUCTION STATUS` multi-enum from Asana (also set locally) |
+| cienappsJobNumber | text | Pulled from Asana `CIENAPPS JOB NUMBER` field |
+| lastAsanaSyncAt | timestamp | |
+| powerTailgate | boolean | |
+| phoneAppointment | boolean | |
+| notes | text | |
+| createdAt | timestamp | |
+
+### 4.2 `order_files`
+Individual CSV files within a project (one per room/design).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| projectId | integer FK→projects | |
+| originalFilename | text | |
+| poNumber | text | Extracted from CSV |
+| rawContent | text | Full CSV string stored for reprice/re-parse |
+| coreParts | integer | |
+| dovetails | integer | |
+| assembledDrawers | integer | |
+| fivePieceDoors | integer | |
+| weightLbs | integer | |
+| maxLength | integer | |
+| maxWidth | integer | |
+| largestPartWidth | integer | |
+| widestPartLength | integer | |
+| hasGlassParts | boolean | |
+| glassInserts | integer | |
+| glassShelves | integer | |
+| hasMJDoors | boolean | |
+| hasRichelieuDoors | boolean | |
+| hasDoubleThick | boolean | |
+| hasShakerDoors | boolean | |
+| mjDoorsCount | integer | |
+| richelieuDoorsCount | integer | |
+| doubleThickCount | integer | |
+| wallRailPieces | integer | |
+| hardwareBoStatus | text | `'NO BO HARDWARE'` \| `'WAITING FOR BO HARDWARE'` \| `'BO HARDWARE ARRIVED'` |
+| allmoxyJobNumber | text | Manually entered by staff |
+| packagingLink | text | |
+| notes | text | |
+| cutToFilePdfPath | text | Object storage path for uploaded Cut-To-File PDF |
+| eliasDovetailPdfPath | text | Object storage path |
+| netley5PiecePdfPath | text | Object storage path |
+| netleyPackingSlipPdfPath | text | Object storage path |
+| createdAt | timestamp | |
+
+### 4.3 `order_items`
+Parsed line items from a CSV file; holds pricing results and generated ORD export text.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| projectId | integer FK→projects | |
+| fileId | integer FK→order_files | |
+| productId | integer FK→allmoxy_products nullable | |
+| sku | text | Raw SKU from CSV |
+| description | text | |
+| width | numeric | |
+| height | numeric | |
+| depth | numeric | (CSV `Length` column) |
+| quantity | integer | |
+| unitPrice | numeric | Result of pricing formula evaluation |
+| totalPrice | numeric | unitPrice × quantity |
+| exportText | text | Generated ORD block or other export text |
+| pricingError | text | Error message if formula evaluation failed |
+| rawRowData | jsonb | Full CSV row as key→value map |
+| exportType | text | `'ORD'` \| `'ELIAS'` \| `'MJ'` \| `'GLASS'` \| `'HARDWARE'` \| `'CTS'` \| `'NONE'` |
+| supplyType | text | |
+| createdAt | timestamp | |
+
+### 4.4 `cts_parts`
+Cut-to-size rod parts extracted per file.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| fileId | integer FK→order_files | |
+| partNumber | text | e.g. `CRC.CTS` |
+| description | text | |
+| cutLength | numeric | |
+| quantity | integer | |
+| isCut | boolean | Staff marks this after cutting |
+| createdAt | timestamp | |
+
+### 4.5 `cts_part_configs`
+Shared image URL + rack location per distinct CTS part number.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| partNumber | text UNIQUE | |
+| imageUrl | text | |
+| rackLocation | text | |
+| createdAt | timestamp | |
+| updatedAt | timestamp | |
+
+### 4.6 `pallets`
+Packaging pallets assigned to a project.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| projectId | integer FK→projects | |
+| palletNumber | integer | Sequential per project |
+| size | text | e.g. `'40x48'`, `'custom'` |
+| customSize | text | |
+| finalSize | text | Measured final size; syncs to Asana `PALLET SIZE` field |
+| notes | text | |
+| packagingStatus | jsonb | Key-value packaging step statuses |
+| hardwarePackaged | boolean | When true (all pallets) → Asana `HARDWARE PACKED` |
+| createdAt | timestamp | |
+
+### 4.7 `pallet_file_assignments`
+Many-to-many: which CSV files are on which pallet.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| palletId | integer FK→pallets | |
+| fileId | integer FK→order_files | |
+| hardwarePackaged | boolean | Per-assignment hardware packed flag |
+| hardwarePackedBy | text | Name of packer |
+| buyoutHardwareStatuses | text[] | `'NO BUYOUT HARDWARE'` \| `'WAITING FOR BO HARDWARE'` \| `'BO HARDWARE ARRIVED'` |
+| createdAt | timestamp | |
+
+### 4.8 `packing_slip_items`
+Checklist items auto-generated from order CSV data (all parts, not just hardware).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| fileId | integer FK→order_files | |
+| partCode | text | SKU/Manuf code |
+| color | text | |
+| quantity | integer | |
+| height | numeric | |
+| width | numeric | |
+| length | numeric | |
+| thickness | numeric | |
+| description | text | |
+| isChecked | boolean | |
+| checkedBy | text | |
+| checkedAt | timestamp | |
+| sortOrder | integer | |
+| createdAt | timestamp | |
+
+### 4.9 `hardware_checklist_items`
+Checklist items from hardware cross-reference; buyout/packed tracking.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| fileId | integer FK→order_files | |
+| productId | integer FK→products nullable | |
+| productCode | text | |
+| productName | text | |
+| quantity | integer | |
+| cutLength | numeric | Populated for `.CTS` parts only |
+| isBuyout | boolean | Derived from `products.stockStatus = 'BUYOUT'` |
+| buyoutArrived | boolean | |
+| isPacked | boolean | |
+| packedBy | text | |
+| packedAt | timestamp | |
+| notInDatabase | boolean | True if code has hardware prefix but no DB record |
+| sortOrder | integer | |
+| createdAt | timestamp | |
+
+### 4.10 `products`
+Internal hardware/component product catalog.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| code | text UNIQUE NOT NULL | e.g. `H.BLD-15` |
+| name | text | |
+| supplier | text | |
+| category | text | `'HARDWARE'` \| `'COMPONENT'` |
+| stockStatus | text | `'IN_STOCK'` \| `'BUYOUT'` |
+| length | numeric | |
+| width | numeric | |
+| height | numeric | |
+| weight | numeric | grams |
+| imagePath | text | Object storage path (legacy) |
+| imageData | text | Base64 image data (current primary) |
+| imageExt | text | `.jpg` \| `.png` \| `.webp` |
+| notes | text | |
+| importRowNumber | integer | Row number in import CSV (for image auto-linking) |
+| createdAt | timestamp | |
+| updatedAt | timestamp | |
+
+### 4.11 `product_categories`
+Product category tags.
+
+| Column | Type |
+|---|---|
+| id | serial PK |
+| name | text UNIQUE NOT NULL |
+| createdAt | timestamp |
+
+### 4.12 `allmoxy_products`
+Allmoxy product definitions: SKU prefix, pricing/export proxy IDs, export type, images.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| name | text NOT NULL | |
+| skuPrefix | text | Longest-prefix-wins matching |
+| status | text | `'active'` \| `'inactive'` |
+| pricingProxyId | integer FK→proxy_variables nullable | |
+| exportProxyId | integer FK→proxy_variables nullable | |
+| exportType | text | `'ORD'` \| `'ELIAS'` \| `'MJ'` \| `'GLASS'` \| `'HARDWARE'` \| `'CTS'` \| `'NONE'` |
+| supplyType | text | |
+| imagePath | text | Object storage path (legacy) |
+| imageData | text | Base64 image data (current primary) |
+| imageExt | text | |
+| createdAt | timestamp | |
+| updatedAt | timestamp | |
+
+### 4.13 `attribute_grids`
+Named lookup tables (e.g. "TFL Shaker Doors", "Colors").
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| name | text NOT NULL | |
+| keyColumn | text | Column used as the lookup key |
+| description | text | |
+| createdAt | timestamp | |
+| updatedAt | timestamp | |
+
+### 4.14 `attribute_grid_rows`
+Individual rows in a grid; `row_data` is JSONB.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| gridId | integer FK→attribute_grids | |
+| lookupKey | text | Value matched against CSV field |
+| rowData | jsonb | All column values for this row |
+| createdAt | timestamp | |
+
+### 4.15 `proxy_variables`
+Pricing and export formula definitions evaluated by mathjs.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| name | text NOT NULL | |
+| formula | text NOT NULL | mathjs expression; may reference other proxy vars |
+| type | text | `'PRICE'` \| `'EXPORT'` |
+| description | text | |
+| createdAt | timestamp | |
+| updatedAt | timestamp | |
+
+### 4.16 `product_grid_bindings`
+Links an `allmoxy_product` to a grid with an alias (scope name) and lookup column.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| productId | integer FK→allmoxy_products | |
+| gridId | integer FK→attribute_grids | |
+| alias | text | Variable name injected into formula scope (e.g. `"doors"`) |
+| lookupColumn | text | CSV column name to use as the grid lookup key |
+| createdAt | timestamp | |
+
+### 4.17 `allowed_users`
+Whitelist of Replit users (username or email) allowed to access the system.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| email | text | |
+| username | text | |
+| displayName | text | |
+| isAdmin | boolean | Admin can manage users, settings, formulas |
+| addedBy | text | |
+| createdAt | timestamp | |
+
+### 4.18 `color_grid`
+Color code → description lookup (used by color-breakdown endpoint).
+
+| Column | Type |
+|---|---|
+| id | serial PK |
+| code | text UNIQUE NOT NULL |
+| description | text |
+| createdAt | timestamp |
+
+### 4.19 `processed_outlook_emails`
+**Dedup table for AgentMail** (legacy name kept to avoid migration). Keys prefixed `agentmail:`.
+
+| Column | Type |
+|---|---|
+| id | serial PK |
+| emailId | text UNIQUE NOT NULL |
+| processedAt | timestamp |
+| matchedOrderId | integer nullable |
+| notes | text |
+
+### 4.20 `agentmail_sync_status`
+AgentMail last sync time, error, and counts.
+
+| Column | Type |
+|---|---|
+| id | serial PK (always row 1) |
+| lastSyncAt | timestamp |
+| lastError | text |
+| emailsProcessed | integer |
+| emailsMatched | integer |
+| updatedAt | timestamp |
+
+### 4.21 `processed_asana_tasks`
+Dedup table for Asana auto-import scheduler.
+
+| Column | Type |
+|---|---|
+| id | serial PK |
+| taskGid | text UNIQUE NOT NULL |
+| projectId | integer FK→projects nullable |
+| processedAt | timestamp |
+| taskName | text |
+
+### 4.22 `asana_import_sync_status`
+Asana import last sync time, error, and counts.
+
+| Column | Type |
+|---|---|
+| id | serial PK (always row 1) |
+| lastSyncAt | timestamp |
+| lastError | text |
+| tasksProcessed | integer |
+| tasksImported | integer |
+| updatedAt | timestamp |
+
+### 4.23 `app_settings`
+Key-value store for app configuration.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | serial PK | |
+| key | text UNIQUE NOT NULL | e.g. `ord_header_template`, `output.invoice.showPricing` |
+| value | text | |
+| description | text | |
+| updatedAt | timestamp | |
+
+> **Orphaned DB table** (exists in DB only, not in schema): `outlook_sync_status` — safe to `DROP TABLE` at any time.
+
+---
+
+## 5. Storage Interface (`server/storage.ts` — `IStorage`)
+
+All database access goes through this interface. `DatabaseStorage` implements it using Drizzle ORM.
+
+### Projects
+- `getProjects()` → `Project[]`
+- `getProject(id)` → `Project | undefined`
+- `createProject(data)` → `Project`
+- `updateProject(id, data)` → `Project | undefined`
+- `deleteProject(id)` → `boolean`
+
+### Order Files
+- `getProjectFiles(projectId)` → `OrderFile[]`
+- `getOrderFile(id)` → `OrderFile | undefined`
+- `getFileWithProject(fileId)` → `{ file, project } | undefined`
+- `createOrderFile(data)` → `OrderFile`
+- `updateOrderFile(id, data)` → `OrderFile | undefined`
+- `deleteOrderFile(id)` → `boolean`
+
+### Order Items
+- `getOrderItemsByProject(projectId)` → `OrderItem[]`
+- `getOrderItemsByFile(fileId)` → `OrderItem[]`
+- `createOrderItem(data)` → `OrderItem`
+- `createOrderItemsBatch(items[])` → `OrderItem[]`
+- `deleteOrderItemsByFile(fileId)` → `void`
+- `deleteOrderItemsByProject(projectId)` → `void`
+
+### CTS Parts
+- `getCtsPartsForFile(fileId)` → `CtsPart[]`
+- `getCtsPartsCountForFile(fileId)` → `number`
+- `createCtsPart(data)` → `CtsPart`
+- `updateCtsPartCutStatus(partId, isCut)` → `CtsPart | undefined`
+- `getCtsPartsCutStatus(fileId)` → `{ total, cut, remaining }`
+- `deleteCtsPartsForFile(fileId)` → `void`
+- `getCtsPartConfigs()` → `CtsPartConfig[]`
+- `getCtsPartConfigByPartNumber(partNumber)` → `CtsPartConfig | undefined`
+- `upsertCtsPartConfig(data)` → `CtsPartConfig`
+
+### Pallets
+- `getPalletsForProject(projectId)` → `Pallet[]`
+- `getPallet(id)` → `Pallet | undefined`
+- `getNextPalletNumber(projectId)` → `number`
+- `createPallet(data)` → `Pallet`
+- `updatePallet(id, data)` → `Pallet | undefined`
+- `deletePallet(id)` → `boolean`
+
+### Pallet File Assignments
+- `getAssignmentsForPallet(palletId)` → `PalletFileAssignment[]`
+- `getAssignmentsForFile(fileId)` → `PalletFileAssignment[]`
+- `getAssignment(id)` → `PalletFileAssignment | undefined`
+- `setAssignmentsForPallet(palletId, fileIds[])` → `PalletFileAssignment[]`
+- `updateAssignmentHardwareStatus(id, packed, packedBy)` → `PalletFileAssignment | undefined`
+- `updateAssignmentBuyoutStatuses(id, statuses[])` → `PalletFileAssignment | undefined`
+
+### Packing Slip Checklist
+- `getPackingSlipItems(fileId)` → `PackingSlipItem[]`
+- `getPackingSlipProgress(fileId)` → `{ total, checked, remaining }`
+- `createPackingSlipItems(items[])` → `PackingSlipItem[]`
+- `togglePackingSlipItem(id, isChecked, checkedBy)` → `PackingSlipItem | undefined`
+- `deletePackingSlipItemsForFile(fileId)` → `void`
+
+### Hardware Checklist
+- `getHardwareChecklistItems(fileId)` → `HardwareChecklistItem[]`
+- `getHardwareChecklistProgress(fileId)` → `{ total, packed, remaining, buyoutTotal, buyoutPacked }`
+- `createHardwareChecklistItems(items[])` → `HardwareChecklistItem[]`
+- `replaceHardwareChecklist(fileId, items[])` → `HardwareChecklistItem[]` — atomic delete+insert; guarded against 0-item insert
+- `toggleHardwareItemPacked(id, isPacked, packedBy)` → `HardwareChecklistItem | undefined`
+- `toggleHardwareItemBuyoutArrived(id, buyoutArrived)` → `HardwareChecklistItem | undefined`
+- `deleteHardwareChecklistItemsForFile(fileId)` → `void`
+
+### Products (hardware catalog)
+- `getProducts(search?, category?)` → `Product[]` — excludes `imageData`
+- `getProduct(id)` → `Product | undefined`
+- `getProductByCode(code)` → `Product | undefined`
+- `getProductsByCode(codes[])` → `Product[]`
+- `getProductsByImportRowNumbers(rowNumbers[])` → `Product[]`
+- `createProduct(data)` → `Product`
+- `updateProduct(id, data)` → `Product | undefined`
+- `deleteProduct(id)` → `boolean`
+
+### Allmoxy Products
+- `getAllmoxyProducts()` → `AllmoxyProduct[]` — excludes `imageData`
+- `getAllmoxyProduct(id)` → `AllmoxyProduct | undefined` — includes `imageData`
+- `createAllmoxyProduct(data)` → `AllmoxyProduct`
+- `updateAllmoxyProduct(id, data)` → `AllmoxyProduct | undefined`
+- `deleteAllmoxyProduct(id)` → `boolean`
+- `bulkInsertAllmoxyProducts(products[])` → `AllmoxyProduct[]` — COALESCE preserves existing pricingProxyId/exportProxyId
+
+### Attribute Grids
+- `getAttributeGrids()` → `AttributeGrid[]`
+- `getAttributeGrid(id)` → `AttributeGrid | undefined`
+- `createAttributeGrid(data)` → `AttributeGrid`
+- `updateAttributeGrid(id, data)` → `AttributeGrid | undefined`
+- `deleteAttributeGrid(id)` → `boolean`
+- `getAttributeGridRows(gridId)` → `AttributeGridRow[]`
+- `getAttributeGridRow(id)` → `AttributeGridRow | undefined`
+- `getAttributeGridRowByKey(gridId, lookupKey, rowDataColumn?)` — tries exact → case-insensitive → rowData column → any rowData value
+- `createAttributeGridRow(data)` → `AttributeGridRow`
+- `updateAttributeGridRow(id, data)` → `AttributeGridRow | undefined`
+- `deleteAttributeGridRow(id)` → `boolean`
+- `deleteAttributeGridRows(gridId)` → `void`
+- `bulkInsertAttributeGridRows(gridId, rows[])` → `AttributeGridRow[]`
+
+### Proxy Variables
+- `getProxyVariables()` → `ProxyVariable[]`
+- `getProxyVariable(id)` → `ProxyVariable | undefined`
+- `createProxyVariable(data)` → `ProxyVariable`
+- `updateProxyVariable(id, data)` → `ProxyVariable | undefined`
+- `deleteProxyVariable(id)` → `boolean`
+
+### Product Grid Bindings
+- `getProductGridBindings(productId)` → `ProductGridBinding[]`
+- `getAllProductGridBindings()` → `ProductGridBinding[]`
+- `createProductGridBinding(data)` → `ProductGridBinding`
+- `deleteProductGridBinding(id)` → `boolean`
+- `deleteProductGridBindingsForProduct(productId)` → `void`
+
+### Color Grid
+- `getColorGrid()` → `ColorGridEntry[]`
+
+### Allowed Users
+- `getAllowedUsers()` → `AllowedUser[]`
+- `getAllowedUser(id)` → `AllowedUser | undefined`
+- `getAllowedUserByEmail(email)` → `AllowedUser | undefined`
+- `getAllowedUserByUsername(username)` → `AllowedUser | undefined`
+- `isUserAllowed(username, email?)` → `boolean`
+- `isUserAdmin(username, email?)` → `boolean`
+- `createAllowedUser(data)` → `AllowedUser`
+- `deleteAllowedUser(id)` → `boolean`
+- `updateAllowedUserAdmin(id, isAdmin)` → `void`
+
+### AgentMail / Processed Emails
+- `getAgentMailSyncStatus()` → `AgentMailSyncStatus | undefined`
+- `upsertAgentMailSyncStatus(data)` → `AgentMailSyncStatus`
+- `getProcessedEmailById(emailId)` → `ProcessedEmail | undefined`
+- `createProcessedEmail(data)` → `ProcessedEmail`
+- `clearProcessedAgentMailEmails()` → `number` — deletes all rows with `agentmail:` prefix
+
+### Asana Import
+- `getAsanaImportSyncStatus()` → `AsanaImportSyncStatus | undefined`
+- `upsertAsanaImportSyncStatus(data)` → `AsanaImportSyncStatus`
+- `getProcessedAsanaTask(taskGid)` → `ProcessedAsanaTask | undefined`
+- `createProcessedAsanaTask(data)` → `ProcessedAsanaTask`
+
+### App Settings
+- `getSetting(key)` → `AppSetting | undefined`
+- `setSetting(key, value, description?)` → `AppSetting`
+- `getAllSettings()` → `AppSetting[]`
+
+---
+
+## 6. Pricing Engine (`server/services/pricingEngine.ts`)
+
+### `evaluatePrice(formula, item, contextScope, allProxyVars) → number`
+Main entry point. Steps:
+1. `stripComments(formula)` — removes `//` line comments.
+2. `sanitizeDigitAccessors(formula)` — rewrites `obj.45_prop` → `obj._45_prop` using regex `/([A-Za-z_]\w*)\.(\d[A-Za-z0-9_]*)/g`. Decimal literals (e.g. `1.5`) are not affected.
+3. Builds mathjs scope from `item` fields (`width`, `height`, `length`, `depth`, `quantity`) plus `contextScope` (grid row objects).
+4. Resolves proxy variable references: for each other proxy var referenced in the formula, evaluates it recursively and injects the result into scope.
+5. Evaluates final formula string via `mathjs.evaluate()`.
+6. Returns `number` result (clamped to 0 on error, errors propagated by caller).
+
+### `gridRowToScope(rowData: Record<string, any>) → Record<string, any>`
+Converts a grid row's JSONB `rowData` into a safe mathjs scope object:
+- All keys lowercased.
+- Numeric strings coerced to `number`.
+- For any key starting with a digit `d`, also writes a `_d` alias (e.g. `45_and_90_pricing_id` → also `_45_and_90_pricing_id`). This is the r25-a fix.
+
+### `sanitizeDigitAccessors(formula: string) → string`
+Regex: `/([A-Za-z_]\w*)\.(\d[A-Za-z0-9_]*)/g`
+Rewrites `identifier.digit-starting-prop` to `identifier._digit-starting-prop`.
+Safe for decimal literals because the regex requires `[A-Za-z_]` before the dot.
+
+### `generateOrdItemBlock(item, contextScope, exportFormula) → string`
+Evaluates an EXPORT-type proxy variable formula to produce a Cabinet Vision `.ORD` item block string.
+
+### `matchProductToSku(sku, activeProducts) → AllmoxyProduct | undefined`
+Longest-prefix-wins: iterates active products sorted by `skuPrefix.length DESC`, returns first match where `sku.toUpperCase().startsWith(prefix.toUpperCase())`.
+
+---
+
+## 7. API Route Summary (complete list from `server/routes.ts`)
+
+All routes require `isAuthenticated` middleware (Replit session) unless noted.
+
+### Orders (Projects)
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/orders` | List all projects |
+| POST | `/api/orders` (multipart) | Upload CSV files → create project + items + checklists |
+| GET | `/api/orders/:id` | Single project detail |
+| PUT | `/api/orders/:id` | Update project fields |
+| DELETE | `/api/orders/:id` | Delete project + all children |
+| POST | `/api/orders/:id/reprice` | Re-run pricing engine for all files |
+| POST | `/api/orders/:id/regenerate-checklists` | Rebuild packing + hardware checklists |
+| GET | `/api/orders/:id/items` | Order items (`?fileId=N` optional) |
+| GET | `/api/orders/:id/files` | List files in project |
+| GET | `/api/orders/:id/file-summary` | Per-file metadata array (counts + flags) |
+| GET | `/api/orders/:id/shipping-summary` | Per-file shipping/checklist/BO status |
+| GET | `/api/orders/:id/pallets` | Get pallets with file assignments |
+| POST | `/api/orders/:id/pallets` | Create pallet |
+| GET | `/api/orders/:id/file-pallet-info` | File→pallet mapping |
+
+### Export Data Endpoints (all support `?fileId=N`)
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/orders/:id/data/invoice` | Invoice line items JSON |
+| GET | `/api/orders/:id/data/elias` | ELIAS dovetail rows JSON |
+| GET | `/api/orders/:id/data/mj` | M&J door sections JSON |
+| GET | `/api/orders/:id/data/hardware` | Hardware items JSON |
+| GET | `/api/orders/:id/data/glass` | Glass items JSON |
+| GET | `/api/orders/:id/data/ord` | Raw ORD text |
+| GET | `/api/orders/:id/data/cts` | CTS parts JSON |
+
+### Export PDF / Download Endpoints
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/orders/:id/pdf/invoice` | Invoice PDF |
+| GET | `/api/orders/:id/pdf/customer-packing-slip` | Customer packing slip PDF |
+| GET | `/api/orders/:id/pdf/internal-packing-slip` | Internal packing slip PDF (no pricing) |
+| GET | `/api/orders/:id/pdf/elias` | ELIAS dovetail PDF |
+| GET | `/api/orders/:id/pdf/mj` | M&J Shaker door PDF |
+| GET | `/api/orders/:id/pdf/cut-to-size` | Cut-to-size summary PDF |
+| GET | `/api/orders/:id/download/ord` | `.ord` file or `.zip` (multi-file) |
+| GET | `/api/orders/:id/download/hardware-csv` | Hardware CSV export |
+| GET | `/api/orders/:id/download/hardware-xlsx` | Hardware XLSX export (exceljs) |
+
+### Asana Sync
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/orders/:id/sync` | Sync project to Asana (duplicate template or update existing task) |
+| POST | `/api/orders/:id/sync-asana-status` | Pull `PF ORDER STATUS`, `PF PRODUCTION STATUS`, section, `CIENAPPS JOB NUMBER` from Asana |
+| POST | `/api/sync-all-asana-status` | Batch pull status for all synced projects |
+| GET | `/api/asana-import/status` | Asana import scheduler status |
+| POST | `/api/asana-import/trigger` | Manually trigger Asana import |
+| POST | `/api/asana-import/reset/:projectId` | Admin: delete project + clear processed task (admin only) |
+| POST | `/api/asana-import/reset-orphan/:processedTaskId` | Admin: clear orphaned processed task entry |
+| GET | `/api/asana-import/projects` | List all projects with their Asana sync state |
+| POST | `/api/asana/sync-all-notes` | Admin: sync all task descriptions to Asana (admin only) |
+| POST | `/api/admin/trigger-asana-import` | Alias for `/api/asana-import/trigger` |
+| GET | `/api/admin/asana-import-status` | Alias for `/api/asana-import/status` |
+
+### File-Level Routes
+| Method | Path | Description |
+|---|---|---|
+| PATCH | `/api/files/:fileId/notes` | Update file notes |
+| PATCH | `/api/files/:fileId/allmoxy-job` | Update Allmoxy Job # (triggers Asana notes sync) |
+| PATCH | `/api/files/:fileId/allmoxy-job-number` | Alias for above |
+| PATCH | `/api/files/:fileId/packaging-link` | Update packaging link |
+| GET | `/api/files/:fileId/cts-status` | CTS cut progress `{total, cut, remaining}` |
+| POST | `/api/files/:fileId/reparse-packing-slip` | Regenerate packing slip checklist from stored CSV |
+| GET | `/api/files/:fileId/cut-to-file-pdf` | Download uploaded Cut-To-File PDF |
+| DELETE | `/api/files/:fileId/cut-to-file-pdf` | Delete Cut-To-File PDF |
+| GET | `/api/files/:fileId/elias-dovetail-pdf` | Download Elias dovetail PDF |
+| DELETE | `/api/files/:fileId/elias-dovetail-pdf` | Delete Elias dovetail PDF |
+| GET | `/api/files/:fileId/netley-5-piece-pdf` | Download Netley 5-piece shaker door PDF |
+| DELETE | `/api/files/:fileId/netley-5-piece-pdf` | Delete Netley 5-piece PDF |
+| GET | `/api/files/:fileId/netley-packing-slip-pdf` | Download Netley packing slip PDF |
+| DELETE | `/api/files/:fileId/netley-packing-slip-pdf` | Delete Netley packing slip PDF |
+| GET | `/api/files/:fileId/checklist` | Packing slip checklist items + progress (enriched with product info) |
+| GET | `/api/files/:fileId/checklist/progress` | Packing slip progress only |
+| GET | `/api/files/:fileId/hardware-checklist` | Hardware checklist items + progress (enriched with images + stock status) |
+| POST | `/api/files/:fileId/generate-hardware-checklist` | Generate hardware checklist from uploaded CSV body |
+| POST | `/api/files/:fileId/generate-hardware-from-order` | Generate hardware checklist from stored `rawContent` (cross-ref products DB) |
+| GET | `/api/packing-slip-images/:imagePath` | Serve packing slip image from object storage (path format: `file-{id}-item-{n}.png`) |
+
+### Pallets
+| Method | Path | Description |
+|---|---|---|
+| PATCH | `/api/pallets/:palletId` | Update pallet size/notes/file assignments |
+| DELETE | `/api/pallets/:palletId` | Delete pallet |
+| PATCH | `/api/pallets/:palletId/final-size` | Set final size → sync to Asana `PALLET SIZE` field |
+| PATCH | `/api/pallets/:palletId/packaging-status` | Update packaging step statuses JSONB |
+| PATCH | `/api/pallets/:palletId/hardware-packaged` | Toggle hardware packed; syncs `HARDWARE PACKED` + `PF PRODUCTION STATUS` to Asana |
+
+### Pallet Assignments
+| Method | Path | Description |
+|---|---|---|
+| PATCH | `/api/assignments/:assignmentId/hardware-packaged` | Toggle per-assignment hardware packed (requires `hardwarePackedBy` name) |
+| PATCH | `/api/assignments/:assignmentId/buyout-statuses` | Update buyout hardware statuses → recalculates project `pfProductionStatus` + syncs to Asana |
+
+### Checklists
+| Method | Path | Description |
+|---|---|---|
+| PATCH | `/api/checklist/:itemId/toggle` | Toggle packing slip item checked/unchecked |
+| POST | `/api/hardware-checklist/:itemId/toggle-packed` | Toggle hardware item packed status → recalculates BO status |
+| POST | `/api/hardware-checklist/:itemId/toggle-buyout-arrived` | Toggle hardware buyout-arrived → recalculates BO status + Asana sync |
+
+### CTS Parts
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/cts-parts/config` | List all CTS part configs |
+| POST | `/api/cts-parts/config` | Upsert CTS part config (image URL + rack location) |
+| PATCH | `/api/cts-parts/:partId/cut` | Mark CTS part as cut/uncut |
+
+### Product Catalog (hardware/component)
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/products` | List products (`?search=` `?category=`) — excludes imageData |
+| GET | `/api/products/:id` | Single product |
+| GET | `/api/products/by-code/:code` | Lookup by code |
+| POST | `/api/products` | Create product |
+| PATCH | `/api/products/:id` | Update product |
+| DELETE | `/api/products/:id` | Delete product |
+| POST | `/api/products/bulk-lookup` | Lookup multiple products by codes array → returns map |
+| POST | `/api/products/import/preview` | Parse hardware CSV → categorize as new/changed/unchanged |
+| POST | `/api/products/import` | Bulk-create new hardware products from parsed items |
+| POST | `/api/products/import/update` | Bulk-update changed hardware products |
+| POST | `/api/products/link-images` | Link image path to products by import row numbers |
+| POST | `/api/components/import/preview` | Parse component CSV → categorize as new/changed/unchanged |
+| POST | `/api/components/import` | Bulk-create new component products (category=COMPONENT) |
+| POST | `/api/components/import/update` | Bulk-update changed components |
+
+### Admin — Allmoxy Products
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/allmoxy-products` | List all Allmoxy products |
+| GET | `/api/admin/allmoxy-products/:id` | Single product (includes imageData) |
+| POST | `/api/admin/allmoxy-products` | Create Allmoxy product |
+| PUT | `/api/admin/allmoxy-products/:id` | Update Allmoxy product |
+| DELETE | `/api/admin/allmoxy-products/:id` | Delete |
+| POST | `/api/admin/allmoxy-products/bulk-import` | Bulk insert from array |
+| GET | `/api/admin/allmoxy-products/:id/image` | Serve product image (from imageData base64) |
+| POST | `/api/admin/allmoxy-products/:id/image` | Upload + save product image as base64 in DB |
+| DELETE | `/api/admin/allmoxy-products/:id/image` | Clear product image |
+
+### Admin — Attribute Grids
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/attribute-grids` | List grids |
+| POST | `/api/admin/attribute-grids` | Create grid |
+| PUT | `/api/admin/attribute-grids/:id` | Update grid metadata |
+| DELETE | `/api/admin/attribute-grids/:id` | Delete grid + rows |
+| GET | `/api/admin/attribute-grids/:id/rows` | List rows for grid |
+| POST | `/api/admin/attribute-grids/:id/rows` | Add row |
+| PUT | `/api/admin/attribute-grids/:gridId/rows/:rowId` | Update row |
+| DELETE | `/api/admin/attribute-grids/:gridId/rows/:rowId` | Delete row |
+| POST | `/api/admin/upload-dynamic-grids-bulk` | Bulk CSV upload (multiple grids) |
+
+### Admin — Proxy Variables
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/proxy-variables` | List all proxy vars |
+| POST | `/api/admin/proxy-variables` | Create |
+| PUT | `/api/admin/proxy-variables/:id` | Update |
+| DELETE | `/api/admin/proxy-variables/:id` | Delete |
+| POST | `/api/admin/proxy-variables/bulk-import` | Bulk create from array |
+
+### Admin — Product Grid Bindings
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/allmoxy-products/:id/bindings` | List bindings for product |
+| POST | `/api/admin/allmoxy-products/:id/bindings` | Create binding |
+| DELETE | `/api/admin/allmoxy-products/:id/bindings/:bindingId` | Delete binding |
+
+### Admin — Pricing Tools
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/admin/formula-test` | Evaluate formula with test inputs; returns result + scope |
+| POST | `/api/admin/pricing-diagnostic` | Coverage stats: matched/unmatched SKUs across all orders |
+| POST | `/api/admin/products/auto-assign-formulas` | Fuzzy-match products → assign pricingProxyId + exportProxyId + create bindings |
+| POST | `/api/admin/products/fix-missing-proxies` | Stem-match products with no proxy assignment |
+| POST | `/api/admin/auto-create-bindings` | Create all missing grid bindings for all products |
+
+### Admin — Images
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/admin/products/bulk-upload-images` | Batch upload images (up to 100); filename-match to allmoxy/hardware products; saves as base64 in DB |
+| GET | `/api/product-images/by-id/:id/:table` | Serve product image from DB by ID + table (`allmoxy`\|`hardware`) |
+| GET | `/api/product-images/*` | Serve product image from object storage by path |
+| GET | `/api/admin/products/search-all` | Search across allmoxy + hardware products (`?q=`) |
+
+### Admin — Users & Settings
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/admin/allowed-users` | List allowed users |
+| POST | `/api/admin/allowed-users` | Add allowed user (email or username) |
+| DELETE | `/api/admin/allowed-users/:id` | Remove user |
+| POST | `/api/admin/allowed-users/:id/toggle-admin` | Toggle admin role |
+| POST | `/api/admin/bootstrap-admin` | First-time admin setup (no auth required if no admin exists) |
+| GET | `/api/admin/is-admin` | Check if current user is admin |
+| GET | `/api/admin/check-allowed/:username` | Check if a username is allowed (no auth required) |
+| GET | `/api/admin/settings` | List all settings |
+| GET | `/api/admin/settings/:key` | Get single setting |
+| PUT | `/api/admin/settings/:key` | Upsert setting |
+| GET | `/api/admin/output-settings` | Get all `output.*` settings merged with defaults |
+| PUT | `/api/admin/output-settings` | Set a single `output.*` key |
+| POST | `/api/admin/backfill-file-metrics` | Re-parse all stored CSVs and update file metric columns |
+
+### AgentMail
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/agentmail/status` | Sync status (last run, counts, error) |
+| POST | `/api/agentmail/fetch` | Manually trigger AgentMail fetch + process cycle |
+| POST | `/api/agentmail/clear` | Clear all processed AgentMail records |
+| POST | `/api/agentmail/test` | Test AgentMail connection |
+| DELETE | `/api/agentmail/processed-emails` | Alias for clear processed emails |
+
+### Backup
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/backup/google-sheets` | Create timestamped Google Sheets backup in Drive folder "Perfect Fit Orders Replit Backup" |
+| GET | `/api/backup/status` | Backup scheduler status |
+
+### Miscellaneous
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/projects/:projectId/color-breakdown` | Per-file color/quantity breakdown from stored CSV (excludes hardware, dovetails, glass; requires `color_grid` match) |
+
+---
+
+## 8. Feature Status
 
 ### Core Order Flow
 
 | Feature | Status | Notes |
 |---|---|---|
 | CSV upload + parsing | ✅ Done | Multi-file projects; extracts metadata, CTS parts, dimensions |
-| SKU → product matching | ✅ Done | Longest-prefix-wins; `matchProductToSku()` in routes.ts |
+| SKU → product matching | ✅ Done | Longest-prefix-wins; `matchProductToSku()` |
 | Pricing formula evaluation | ✅ Done | mathjs + proxy variables + JSONB attribute grid lookups; digit-starting column names sanitized (r25) |
-| Re-price button | ✅ Done | `POST /api/orders/:id/reprice`; regenerates checklists after repricing |
+| Re-price button | ✅ Done | `POST /api/orders/:id/reprice` |
 | Asana task sync | ✅ Done | Bidirectional; creates + updates tasks; reads PF ORDER STATUS, PRODUCTION STATUS, section |
 | Asana auto-import | ✅ Done | Polls "READY TO IMPORT" section every 10 min; dedup via `processed_asana_tasks` |
-| AgentMail PDF ingestion | ✅ Done | Polls every 30 min; matches PDFs to order files by job number; dedup via `processed_outlook_emails` |
-| Outlook integration | ❌ Removed | Removed in r25; AgentMail is the sole email ingestion method |
+| AgentMail PDF ingestion | ✅ Done | Polls every 30 min; matches PDFs to order files by job number |
+| Outlook integration | ❌ Removed | Removed r25; AgentMail is sole email ingestion method |
 
 ### Export Documents
 
 | Feature | Status | Notes |
 |---|---|---|
-| Cabinet Vision .ORD download | ✅ Done | One `.ord` per CSV file; multi-file → ZIP; 8-field standard format |
+| Cabinet Vision .ORD download | ✅ Done | One `.ord` per CSV file; multi-file → ZIP |
 | Invoice PDF | ✅ Done | Per-file or full project |
 | Customer packing slip PDF | ✅ Done | |
 | Internal packing slip PDF | ✅ Done | No pricing; rack location column |
 | ELIAS dovetail PDF | ✅ Done | |
-| M&J Shaker door job list PDF | ✅ Done | Per-section: drawer front / door / glass layouts |
-| Cut-to-size PDF | ✅ Done | Length summary + item detail + totals |
-| Hardware CSV download | ✅ Done | Per-file or full project |
-| Hardware XLSX download | ✅ Done | Bold headers, currency format, totals row (exceljs) |
-| Glass items export | ✅ Done | Separate data endpoint; included in M&J PDF glass section |
+| M&J Shaker door job list PDF | ✅ Done | |
+| Cut-to-size PDF | ✅ Done | |
+| Hardware CSV download | ✅ Done | |
+| Hardware XLSX download | ✅ Done | Bold headers, currency format, totals row |
+| Glass items export | ✅ Done | |
 
 ### Checklists & Packing
 
 | Feature | Status | Notes |
 |---|---|---|
-| Packing slip checklist | ✅ Done | Generated from order CSV (not PDF); items checked off by staff |
-| Hardware checklist | ✅ Done | Generated from hardware CSV; buyout/BO status tracking |
+| Packing slip checklist | ✅ Done | Generated from order CSV; items checked off by staff |
+| Hardware checklist | ✅ Done | Generated from hardware cross-ref; buyout/BO status tracking |
 | Cut-to-size checklist | ✅ Done | Mark individual rod cuts as done |
-| Pallet manager | ✅ Done | Pallet CRUD; 16-metric packaging dashboard; file assignments; final size for Asana |
+| Pallet manager | ✅ Done | CRUD; 16-metric packaging dashboard; file assignments; final size → Asana |
 
 ### Admin & Configuration
 
@@ -218,15 +1002,13 @@ project root
 | Proxy variable (formula) manager | ✅ Done | CRUD; bulk import; type: PRICE / EXPORT |
 | Allmoxy product manager | ✅ Done | Full CRUD; SKU prefix; pricing/export proxy; grid bindings; per-product images |
 | Formula tester | ✅ Done | Live evaluation with scope inspector; auto-detect digit-prefix columns |
-| Pricing diagnostic | ✅ Done | Coverage stats; "Fix Missing Proxy Assignments" tool; "Auto-Create Missing Bindings" |
+| Pricing diagnostic | ✅ Done | Coverage stats; "Fix Missing Proxy Assignments"; "Auto-Create Missing Bindings" |
 | Bulk product image uploader | ✅ Done | Filename-exact matching; parallel upload; images stored as base64 in DB |
 | Per-product image upload | ✅ Done | Click thumbnail in editor to replace; DELETE to clear |
-| Export type auto-classifier | ✅ Done | 7-rule priority: CTS→ELIAS→MJ→GLASS→HARDWARE→ORD→NONE |
-| Auto-assign pricing formulas | ✅ Done | Fuzzy SKU-prefix matching; also creates grid bindings |
 | ORD header template | ✅ Done | `{{design_name}}` / `{{po_number}}` placeholders; stored in `app_settings` |
 | Output settings toggles | ✅ Done | Per-document image/pricing visibility flags |
 | Allowed users whitelist | ✅ Done | Admin role toggle; blocks non-whitelisted Replit users |
-| Google Sheets backup | ✅ Done | Daily 3 AM auto-backup + manual trigger; all 23 tables |
+| Google Sheets backup | ✅ Done | Daily 3 AM auto-backup + manual trigger; exports 6 sheets |
 
 ### Integrations
 
@@ -236,212 +1018,65 @@ project root
 | Asana | ✅ Done | OAuth via Replit Connectors; import + sync + notes |
 | AgentMail | ✅ Done | API key via `AGENTMAIL_API_KEY` env var |
 | Google Sheets / Drive | ✅ Done | OAuth via Replit Connectors |
-| Replit Object Storage | ✅ Done | Used for CTS part config images, packing slip PDFs |
+| Replit Object Storage | ✅ Done | Used for CTS part config images, uploaded PDFs |
 | QZ Tray label printing | ✅ Done | Certificate + signing endpoints; client-side printer settings |
-| Outlook | ❌ Removed | Removed r25; files deleted, scheduler gone, routes removed |
+| Outlook | ❌ Removed | r25; files deleted, scheduler gone, routes removed |
 
 ---
 
-## 5. Database Tables
+## 9. Known Issues & Bugs
 
-All 23 tables defined in `shared/schema.ts`. PostgreSQL via Drizzle ORM.
+1. **[LOW] `outlook_sync_status` orphaned table** — Exists in DB only, not in schema. Safe to `DROP TABLE outlook_sync_status;` directly in the production DB.
 
-| Table | Purpose |
-|---|---|
-| `projects` | Top-level order record (one per customer job); maps to Asana task |
-| `order_files` | Individual CSV files within a project (one per room/closet) |
-| `order_items` | Parsed line items from CSVs; holds pricing results and export text |
-| `cts_parts` | Cut-to-size rod parts extracted per file |
-| `cts_part_configs` | Shared image + rack location per CTS part type |
-| `pallets` | Packaging pallets assigned to a project |
-| `pallet_file_assignments` | Many-to-many: which CSV files are on which pallet |
-| `packing_slip_items` | Checklist items generated from order CSV data |
-| `hardware_checklist_items` | Checklist items from hardware CSV; buyout/packed tracking |
-| `products` | Internal hardware/component product catalog |
-| `product_categories` | Product category tags |
-| `allmoxy_products` | Allmoxy product definitions: SKU prefix, pricing/export proxy IDs, images |
-| `attribute_grids` | Named lookup tables (e.g. "Doors", "Color") |
-| `attribute_grid_rows` | Individual rows in a grid; `row_data` is JSONB |
-| `proxy_variables` | Pricing and export formula definitions evaluated by mathjs |
-| `product_grid_bindings` | Links a product to a grid with an alias and lookup column |
-| `allowed_users` | Whitelist of Replit users (username or email) allowed access |
-| `color_grid` | Color code → description lookup |
-| `processed_outlook_emails` | **AgentMail** dedup table (legacy name kept to avoid migration; prefix `agentmail:`) |
-| `agentmail_sync_status` | AgentMail last sync time, error, counts |
-| `processed_asana_tasks` | Dedup table for Asana auto-import |
-| `asana_import_sync_status` | Asana import last sync time, error, counts |
-| `app_settings` | Key-value store for app configuration (ORD header template, output flags) |
+2. **[LOW] Asana 403 on task 1213347389204508** — One Asana task consistently returns "You do not have access to this task" every import cycle. The scheduler handles it gracefully but logs a verbose stack trace every 10 minutes. Fix: filter this task GID in `asanaImportScheduler.ts`, or remove it from the Asana "READY TO IMPORT" section.
 
-> **Orphaned DB tables** (exist in DB but no longer in schema): `outlook_sync_status` — safe to `DROP TABLE` at any time.
+3. **[LOW] `@microsoft/microsoft-graph-client` still in package.json** — The Outlook integration was removed in r25 but the npm package remains installed. Not imported anywhere. Can be uninstalled with `npm uninstall @microsoft/microsoft-graph-client`.
+
+4. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
+
+5. **[MEDIUM] Product image storage is base64 in DB** — Images stored as base64 text in `allmoxy_products.image_data` and `products.image_data`. For the current scale this works, but list queries must never include `image_data`. The `getAllmoxyProducts()` and `getProducts()` storage methods explicitly exclude it. All image reads go through `/api/product-images/by-id/:id/:table`. Do not add `imageData` to any list query.
 
 ---
 
-## 6. API Route Summary
+## 10. Changelog (reverse-chronological, recent releases)
 
-All routes require `isAuthenticated` middleware (Replit session). Admin-only routes additionally check `isAdmin`.
+### r26 — 2026-05-02 — BUILD_STATUS.md comprehensive rewrite
 
-### Orders & Files
-- `GET /api/orders` — list all projects
-- `GET /api/orders/:id` — single project detail
-- `POST /api/orders/:id/reprice` — re-run pricing engine for all files
-- `POST /api/orders/:id/regenerate-checklists` — rebuild packing + hardware checklists
-- `GET /api/orders/:id/items` — order items (supports `?fileId=N`)
-- `GET /api/orders/:id/files` — list files in project
-- `GET /api/orders/:id/file-summary` — per-file metadata array (counts, flags)
-- `GET /api/orders/:id/shipping-summary` — per-file shipping/checklist status
-
-### Export Endpoints (all support `?fileId=N`)
-- `GET /api/orders/:id/data/{invoice,elias,mj,hardware,glass,ord}` — JSON data
-- `GET /api/orders/:id/pdf/{invoice,customer-packing-slip,internal-packing-slip,elias,mj,cut-to-size}` — PDF binary
-- `GET /api/orders/:id/download/ord` — `.ord` or `.zip` Cabinet Vision file
-- `GET /api/orders/:id/download/hardware-{csv,xlsx}` — hardware exports
-
-### Admin
-- `GET/PUT /api/admin/settings/:key` — app settings CRUD
-- `GET/POST/PUT/DELETE /api/admin/attribute-grids` — grid management
-- `GET/POST/PUT/DELETE /api/admin/proxy-variables` — formula management
-- `GET/POST/PUT/DELETE /api/admin/allmoxy-products` — product management
-- `POST /api/admin/products/auto-assign-formulas` — bulk formula assignment
-- `POST /api/admin/products/fix-missing-proxies` — stem-match unassigned products
-- `POST /api/admin/auto-create-bindings` — create all missing grid bindings
-- `POST /api/admin/formula-test` — evaluate formula with test inputs
-- `POST /api/admin/pricing-diagnostic` — pricing coverage report
-- `POST /api/admin/products/bulk-upload-images` — parallel image upload + save
-- `POST /api/admin/upload-dynamic-grids-bulk` — bulk CSV grid upload
-
-### Integrations
-- `GET/POST /api/agentmail/*` — AgentMail sync status + manual trigger
-- `GET/POST /api/asana-import/*` — Asana import status + manual trigger
-- `POST /api/sync-all-asana-status` — sync all project statuses from Asana
-- `POST /api/backup/google-sheets` — trigger Google Sheets backup
-
----
-
-## 7. Known Issues & Bugs
-
-1. **[LOW] `outlook_sync_status` orphaned table** — The DB table still exists but the schema no longer references it. No harm, but can be cleaned up with `DROP TABLE outlook_sync_status;` directly in the production DB.
-
-2. **[LOW] Asana 403 on task 1213347389204508** — One specific Asana task consistently returns "You do not have access to this task" on every import cycle. The scheduler handles the error gracefully (continues processing other tasks) but logs a verbose stack trace every 10 minutes. Workaround: none currently. Fix: filter this task GID out in `asanaImportScheduler.ts`, or remove it from the Asana "READY TO IMPORT" section.
-
-3. **[LOW] `@microsoft/microsoft-graph-client` still in package.json** — The Outlook integration was removed in r25 but the npm package remains installed. It is not imported anywhere. No functional impact; can be uninstalled with `npm uninstall @microsoft/microsoft-graph-client` if desired.
-
-4. **[LOW] Grid column digit-prefix warning** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must reference it with a leading underscore (e.g. `doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist. Follow-up task #28 will add this hint.
-
-5. **[MEDIUM] Product image storage is base64 in DB** — Images are stored as base64 text in `allmoxy_products.image_data`. For the current ~2,363 products this works, but list queries that accidentally include `image_data` would return hundreds of MB. The `getAllmoxyProducts()` and `getProducts()` storage methods explicitly exclude `image_data` from list queries; all read paths go through `GET /api/product-images/by-id/:id`. Do not add `image_data` to any list query.
-
----
-
-## 8. Changelog (reverse-chronological)
+Updated BUILD_STATUS.md to incorporate all information extracted directly from `schema.ts` (all 23 tables, all columns), `storage.ts` (full IStorage interface, all ~70 methods), `pricingEngine.ts` (all functions + logic), and `routes.ts` (all 8 377 lines, all ~135 routes fully documented).
 
 ---
 
 ### r25-b — 2026-05-02 — Remove Outlook Integration
 
 **Files affected:**
-- `server/outlook.ts` — **deleted**
-- `server/outlookScheduler.ts` — **deleted**
+- `server/outlook.ts` — deleted
+- `server/outlookScheduler.ts` — deleted
 - `server/index.ts` — removed Outlook scheduler startup block
 - `server/routes.ts` — removed 10 `/api/outlook/*` routes + imports
 - `server/storage.ts` — removed `clearProcessedOutlookEmails()` from interface + implementation
-- `shared/schema.ts` — removed `outlookSyncStatus` table; retained `processedOutlookEmails` (renamed concept to "processed emails dedup", used by AgentMail)
-- `client/src/pages/Dashboard.tsx` — removed Outlook sync query, two mutations, "Fetch Netley Emails" toolbar button, "Reset Processed Emails" diagnostic button
-- `client/src/pages/HowItWorks.tsx` — removed "Outlook Integration (Preserved)" callout; updated two stale references to mention AgentMail
+- `shared/schema.ts` — removed `outlookSyncStatus` table; retained `processedOutlookEmails` (AgentMail dedup)
+- `client/src/pages/Dashboard.tsx` — removed Outlook sync query, two mutations, "Fetch Netley Emails" and "Reset Processed Emails" buttons
+- `client/src/pages/HowItWorks.tsx` — removed Outlook callout; updated references to mention AgentMail
 
-**Why:** Outlook was replaced by AgentMail. The Outlook scheduler was throwing a startup warning every boot (`Cannot read properties of undefined (reading 'settings')`) and running a wasted 30-minute polling loop. The `processed_outlook_emails` table is retained unchanged because `agentmailScheduler.ts` uses it for its own deduplication (keys prefixed with `agentmail:`).
-
-**Side effects / follow-up:** `outlook_sync_status` DB table is now orphaned. Can be dropped manually. `@microsoft/microsoft-graph-client` npm package is still installed but unused.
+**Why:** Outlook was replaced by AgentMail. The Outlook scheduler was throwing a startup warning every boot and running a wasted 30-minute polling loop. The `processed_outlook_emails` table is retained because `agentmailScheduler.ts` uses it for deduplication (keys prefixed with `agentmail:`).
 
 ---
 
 ### r25-a — 2026-05-02 — Fix TFL Shaker Door Pricing (Digit-Starting Column Names)
 
-**Files affected:**
-- `server/services/pricingEngine.ts`
+**Files affected:** `server/services/pricingEngine.ts`
 
-**Root cause:** mathjs cannot dot-access object properties whose names start with a digit. The grid column `45_AND_90_PRICING_ID` (lowercased to `45_and_90_pricing_id`) caused `doors.45_and_90_pricing_id` to be tokenized as `doors × 0.45 × _and_90_pricing_id`, throwing `multiplyScalar (... actual: Object)` and yielding $0.00 on every TFL Shaker door line item.
+**Root cause:** mathjs tokenizes `doors.45_and_90_pricing_id` as `doors × 0.45 × _and_90_pricing_id`, throwing `multiplyScalar (... actual: Object)` and yielding $0.00 on every TFL Shaker door line item.
 
 **Fix:**
-1. `gridRowToScope()` now also writes a `_`-prefixed alias for any key starting with a digit (e.g. both `45_and_90_pricing_id` and `_45_and_90_pricing_id`).
-2. New `sanitizeDigitAccessors(formula)` helper rewrites `<identifier>.<digit-prefix-prop>` → `<identifier>._<digit-prefix-prop>` using regex `/([A-Za-z_]\w*)\.(\d[A-Za-z0-9_]*)/g`. Decimal literals (e.g. `1.5`, `92900) < 1.1`) are not affected because the regex requires a letter/underscore before the dot.
-3. `evaluatePrice()` applies `sanitizeDigitAccessors` to both proxy variable sub-formulas and the main formula, after `stripComments`.
+1. `gridRowToScope()` writes `_`-prefixed alias for any key starting with a digit.
+2. New `sanitizeDigitAccessors(formula)` rewrites `obj.digit-prop` → `obj._digit-prop`.
+3. `evaluatePrice()` applies `sanitizeDigitAccessors` before mathjs eval.
 
-**Verified:** `LDRTFL90SHA` · 489.1 mm × 2269 mm · color TFL1W → $187.50/door (was $0.00 + error). Expected: ceil(2269÷25.4)=90, ceil(489.1÷25.4)=20, 1800÷144=12.5 sqft × $15/sqft TFL90 cost = $187.50 ✓
-
-**Side effects:** None. The fix is globally backward-compatible. All four mathjs callers (upload pipeline, reprice route, formula tester, Asana import scheduler) flow through `evaluatePrice`.
+**Verified:** `LDRTFL90SHA` · 489.1mm × 2269mm · TFL1W → $187.50/door (was $0.00).
 
 ---
 
 ### r24 — 2026-04-14 — Fix Door Pricing (LDRTFL90SHA / RDRTFL90SHA)
 
-**Summary:** `LDRTFL90SHA` and `RDRTFL90SHA` existed in `allmoxy_products` but had `pricingProxyId = null`, causing $0.00 on all their order items. Added `POST /api/admin/products/fix-missing-proxies` endpoint (stem-match unassigned products to nearest known variant), `updateAllmoxyProduct()` partial-update method in storage, and a "Fix Missing Proxy Assignments" panel in the Pricing Diagnostic page. Also upgraded the M&J PDF door classifier from an exact `Set<string>` to a regex pattern `/^(?:[GHKM]?[LR]DRTFL|HDRTFL)/i`.
-
----
-
-### r23 — 2026-04-12 — Door Pricing Diagnosis + Packing UI Revert + Hardware Downloads
-
-**Summary:** Diagnosed root cause of LDRTFL90SHA pricing (missing product records — resolved in r24). Reverted ShippingView from inline checklists back to standalone page links. Added hardware CSV + XLSX download endpoints and frontend buttons. Deleted unused `PackingChecklistInline.tsx`, `HardwareChecklistInline.tsx`, `CtsPartsInline.tsx`.
-
----
-
-### r22-hotfix-2 — 2026-04-12 — Fix "T.find is not a function" Crash on Order Details
-
-**Summary:** Fixed `fileSummary` and `shippingSummary` queries in `OrderDetails.tsx` that were receiving `{ files: [...] }` objects but calling `.find()` directly on them. Added explicit `queryFn` implementations extracting `.files`, `safeFileSummary` guard, `pallet.fileIds ?? []` null guard in `PalletManager.tsx`, and removed erroneous `overflow-hidden` wrappers.
-
----
-
-### r22-hotfix — 2026-04-12 — Production Blank Page Fix on /orders/:id
-
-**Summary:** Blank page in production caused by `ErrorBoundary` closing tag accidentally omitted in r22 (silently crashed React render), plus `h-full` on `OrderDetails` root collapsing to 0 in production build. Added `ErrorBoundary` component, fixed flex layout on `AppLayout` + `OrderDetails`.
-
----
-
-### r22 — 2026-04-12 — Full Order Page Redesign + App Navigation Overhaul
-
-**Summary:** Complete rewrite of `OrderDetails.tsx` (3165 → ~340 lines). New two-panel layout: `FileSidebar` (left) + `DocumentsView` / `ShippingView` (right). Added `?fileId=N` to all 12 export endpoints. Two new summary endpoints: `file-summary` and `shipping-summary`. Sidebar reduced to 7 items. `/` redirects to `/orders`. `AdminSettings.tsx` consolidates ORD settings, output settings, and users into tabs.
-
----
-
-### Merged Tasks (batch) — 2026-04-12 — Tasks #1–#26
-
-**Summary of major features added:**
-- ORD header template stored in `app_settings` with `{{design_name}}` / `{{po_number}}` placeholders
-- Export type field on products + order items; 7-rule auto-classifier
-- Bulk grid upload (multi-file CSV dropzone); multi-select grid delete
-- Proxy variable bulk import; auto-assign formulas to products
-- Bulk product image uploader (parallel, auto-save, base64 in DB)
-- Per-product image upload in editor
-- Internal packing slip PDF, Cut-to-size PDF, M&J Shaker door PDF
-- Hardware CSV + XLSX download
-- Product images stored as base64 in DB (GCS was broken in this environment)
-- Product list queries exclude `image_data` to prevent timeout on large responses
-- CSV import dedup fix (duplicate product names in one CSV)
-
----
-
-### r21 — 2026-04-05 — ORD Format Overhaul
-
-**Summary:** Switched from single combined `.ord` (18-field Extended Format) to one `.ord` per CSV file (8-field Standard Format). Multiple files → ZIP. Removed `[Walls]` section entirely. Entry number always `1`. `\r\n` line endings.
-
----
-
-### r19 — 2026-04-05 — Scrolling Fix + ORD Download + Output Settings + PDF Page Breaks
-
-*(See CHANGELOG.md for full detail on r1–r19)*
-
----
-
-## 9. Next Steps
-
-Ordered by priority:
-
-1. **Deploy r25 to production** — The TFL Shaker pricing fix is in dev only. Once deployed, open any affected order and click "Re-run Pricing" to correct the $0.00 line items.
-
-2. **Follow-up #28 — Add digit-column warning in Grid Manager** — When a grid is imported with a column starting with a digit, show a yellow info badge explaining the leading-underscore rule in formulas. Affects `client/src/pages/admin/DynamicGridManager.tsx` and `client/src/pages/admin/FormulaTester.tsx`.
-
-3. **Drop orphaned `outlook_sync_status` DB table** — Run `DROP TABLE outlook_sync_status;` directly against the production database. Zero risk, purely cosmetic cleanup.
-
-4. **Suppress Asana 403 on task 1213347389204508** — Either remove the task from Asana's "READY TO IMPORT" section, or add a skip list in `server/asanaImportScheduler.ts` to stop the verbose stack trace from appearing every 10 minutes.
-
-5. **Uninstall `@microsoft/microsoft-graph-client`** — Now unused after Outlook removal. Run `npm uninstall @microsoft/microsoft-graph-client` and remove from `package.json` if desired.
-
-6. **AgentMail end-to-end validation** — Send a real test PDF to the AgentMail inbox address and confirm it lands as a matched attachment on the correct order file. Verify dedup prevents double-processing on the next poll.
+Earlier door pricing fix round. See `CHANGELOG.md` for full detail on r1–r24.
