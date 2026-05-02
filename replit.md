@@ -1,24 +1,20 @@
 # replit.md
 
+## Living Build Status
+
+The single source of truth for the current state of this application — all pages, all DB tables, the pricing engine, exports, integrations, known issues, and the full changelog — lives at:
+**`BUILD_STATUS.md`** (project root)
+
+This file is updated automatically with every meaningful change to the codebase.
+
 ## Master Architecture Reference
 
 The authoritative specification for this system lives at:
 **`docs/MASTER_ARCHITECTURE_SPEC_v4.md`**
 
-It defines every data model, formula pattern, output document, admin UI, and build prompt for the Perfect Fit Closets / Netley Millwork order management system. Read it first when planning any new feature. Section 14 of that file tracks the current implementation status and known gaps vs. the spec.
+It defines every data model, formula pattern, output document, admin UI, and build prompt for the Perfect Fit Closets / Netley Millwork order management system. Read it first when planning any new feature.
 
-## Current Build State
-
-A full snapshot of what is built, working, and not yet built lives at:
-**`docs/BUILD_STATE.md`**
-
-This file is updated alongside `CHANGELOG.md` after every release. It covers all pages, all 27 DB tables, the CSV pipeline, the pricing engine, exports, integrations, known gaps, and the release history.
-
-**Current release:** r24 (2026-04-14) — door pricing fix: new "Fix Missing Proxy Assignments" tool in Pricing Diagnostic, `updateAllmoxyProduct` storage method, M&J door classifier upgraded to regex pattern.
-
-## Overview
-
-This is an order management dashboard application designed for closet orders. It enables users to upload and parse CSV files containing order data, store this information in a PostgreSQL database, and then review and edit the extracted order details. A key feature is the synchronization of orders with Asana for project management, and automated integration with Outlook for fetching packing slips and hardware CSVs. The system also includes detailed inventory management for hardware and components, along with a comprehensive packing checklist system.
+**Current release:** r25 (2026-05-02) — TFL Shaker door pricing fix (digit-starting column name sanitizer); Outlook integration fully removed (replaced by AgentMail); BUILD_STATUS.md created.
 
 ## User Preferences
 
@@ -41,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database**: PostgreSQL with Drizzle ORM
-- **Schema**: Defined in `shared/schema.ts`
+- **Schema**: Defined in `shared/schema.ts` (23 tables)
 - **Migrations**: Drizzle Kit
 - **Connection**: `node-postgres` Pool
 
@@ -55,45 +51,17 @@ Preferred communication style: Simple, everyday language.
 - **Development**: `tsx` for backend, Vite for frontend
 - **Production**: Custom build script using esbuild for server, Vite for client
 
-### Core Features
-- **Pallet Size Recommendation**: Calculates optimal pallet size based on order dimensions.
-- **Color Breakdown**: Analyzes and displays part counts by material color, cross-referencing a stored color grid.
-- **Admin Roles**: Role-based access control for sensitive operations like order deletion.
-- **Order Status Tracking**: Displays production and shipping statuses derived from Asana.
-- **Product Management**: Comprehensive system for managing hardware and component products, including bulk import and image linking. Includes a bulk image uploader (`/admin/product-images`) that matches images to products by filename across both Allmoxy and Hardware tables.
-- **Product Image Serving**: Images uploaded via the bulk uploader are stored in object storage under `product-images/` and served via `/api/product-images/:path` with proper content-type and cache headers.
-- **Hardware Packing Checklist**: Generates and manages packing checklists based on uploaded hardware CSVs, cross-referencing a product database.
-- **Component Import**: Dedicated system for importing component products with specific CSV formats and validation.
-- **Supplier-Based Counting**: Accurately counts doors from specific suppliers (M&J Woodcraft, Richelieu) by cross-referencing the products database.
-- **Packing Slip Checklist**: Generates packing checklist items directly from order CSV data, including CTS cut lengths, eliminating PDF parsing.
-- **Mobile Optimization**: Full responsiveness across all application pages.
-- **Google Sheets Backup**: Daily automated and manual backup of all database data to Google Sheets, stored in a designated Google Drive folder.
-- **Allmoxy Migration**: Database tables mirroring Allmoxy product/attribute exports (`allmoxy_products`, `allmoxy_item_attributes`, `allmoxy_group_attributes`, `proxy_variables`), with a `PricingEngineService` (`server/services/pricingEngine.ts`) that evaluates proxy variable formulas using `mathjs`. The service strips comments from formulas, builds a scope from order item dimensions and attribute data, and evaluates pricing expressions.
+## External Integrations
 
-## External Dependencies
+- **Asana**: OAuth via Replit Connectors. Syncs orders as tasks; auto-imports from "READY TO IMPORT" section every 10 min; reads PF ORDER STATUS and PRODUCTION STATUS fields.
+- **AgentMail**: API key via `AGENTMAIL_API_KEY`. Polls inbound email every 30 min; matches PDF attachments to order files by Allmoxy Job #; dedup via `processed_outlook_emails` DB table (legacy name retained).
+- **Google Sheets / Drive**: OAuth via Replit Connectors. Daily 3 AM auto-backup + manual trigger from Dashboard.
+- **Replit Object Storage**: Used for CTS part config images and packing slip PDFs.
+- **Replit Auth (OIDC)**: Session-based auth; allowed-users whitelist in DB; admin role flag.
 
-- **Asana Integration**:
-    - **Library**: `asana` npm package.
-    - **Authentication**: OAuth via Replit Connectors.
-    - **Purpose**: Syncs orders as tasks, auto-imports orders from specific Asana projects, and updates existing tasks.
-    - **Projects**: "NEW JOBS" (import source), "PRODUCTION" (tracking).
-    - **Scheduling**: Auto-import scheduler polls every 10 minutes.
+## Environment Variables
 
-- **Outlook Integration**:
-    - **Library**: Microsoft Graph API via `@microsoft/microsoft-graph-client`.
-    - **Authentication**: OAuth via Replit Connectors.
-    - **Purpose**: Automatically fetches Netley packing slip PDFs and hardware CSV attachments from designated Outlook folders.
-    - **Scheduling**: Background polling runs every 10 minutes.
-
-- **Database**:
-    - **PostgreSQL**: Required for data storage.
-    - **Connection**: `DATABASE_URL` environment variable.
-
-- **Google Sheets / Google Drive Integration**:
-    - **Authentication**: OAuth via Replit Connectors.
-    - **Purpose**: Facilitates daily automated and manual backups of the entire database to Google Sheets, stored in a dedicated Google Drive folder.
-
-- **Environment Variables**:
-    - `DATABASE_URL`: PostgreSQL connection string.
-    - `REPLIT_CONNECTORS_HOSTNAME`: For Asana, Outlook, and Google OAuth token retrieval.
-    - `REPL_IDENTITY` or `WEB_REPL_RENEWAL`: For Replit authentication headers.
+- `DATABASE_URL` — PostgreSQL connection string
+- `AGENTMAIL_API_KEY` — AgentMail API key (AgentMail scheduler only starts if this is set)
+- `REPLIT_CONNECTORS_HOSTNAME` — For Asana and Google OAuth token retrieval
+- `REPL_IDENTITY` or `WEB_REPL_RENEWAL` — For Replit authentication headers
