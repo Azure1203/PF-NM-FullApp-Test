@@ -1,15 +1,20 @@
 /**
  * One-shot backfill: copies base64 image bytes from DB (image_data columns)
- * into Object Storage under the product-images/ prefix.
+ * into Object Storage under the product-images/ prefix, then NULLs image_data
+ * on success so the prerequisite check for migrations/0008_drop_image_data.sql
+ * is satisfied:
+ *   SELECT count(*) FROM products WHERE image_data IS NOT NULL;        -- must be 0
+ *   SELECT count(*) FROM allmoxy_products WHERE image_data IS NOT NULL; -- must be 0
  *
- * IMPORTANT: Run this successfully (zero failed rows) BEFORE applying
- * migrations/0008_drop_image_data.sql to drop the image_data columns.
+ * Idempotent: rows whose object already exists in storage are skipped (image_data
+ * is still NULLed so re-runs are safe).
  *
  * Standalone: npx tsx server/scripts/migrateProductImagesToObjectStorage.ts
  * Also called automatically on startup from server/backfillMigration.ts.
  */
 
 import path from "path";
+import { fileURLToPath } from "url";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { ObjectStorageService } from "../replit_integrations/object_storage/objectStorage";
@@ -75,25 +80,27 @@ export async function migrateProductImagesToObjectStorage(): Promise<void> {
         ? path.extname(image_path as string).toLowerCase() ||
           detectExtension(buffer)
         : detectExtension(buffer);
-      const objectPath = (image_path as string | null) || `product-images/migrated/allmoxy-${id}${ext}`;
+      const objectPath =
+        (image_path as string | null) ||
+        `product-images/migrated/allmoxy-${id}${ext}`;
 
       const existing = await svc.downloadBuffer(objectPath);
       if (existing) {
         console.log(
           `[ImageMigrate] allmoxy-${id}: already present at ${objectPath}`
         );
-        if (!image_path) {
-          await db.execute(
-            sql`UPDATE allmoxy_products SET image_path = ${objectPath} WHERE id = ${id}`
-          );
-        }
+        // Still NULL out image_data and ensure image_path is set
+        await db.execute(
+          sql`UPDATE allmoxy_products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
+        );
         alreadyPresent++;
         continue;
       }
 
       await svc.uploadBuffer(buffer, objectPath, mimeFromExt(ext));
+      // Update image_path and clear image_data in one statement
       await db.execute(
-        sql`UPDATE allmoxy_products SET image_path = ${objectPath} WHERE id = ${id}`
+        sql`UPDATE allmoxy_products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
       );
       console.log(`[ImageMigrate] allmoxy-${id}: migrated → ${objectPath}`);
       migrated++;
@@ -118,25 +125,27 @@ export async function migrateProductImagesToObjectStorage(): Promise<void> {
         ? path.extname(image_path as string).toLowerCase() ||
           detectExtension(buffer)
         : detectExtension(buffer);
-      const objectPath = (image_path as string | null) || `product-images/migrated/hardware-${id}${ext}`;
+      const objectPath =
+        (image_path as string | null) ||
+        `product-images/migrated/hardware-${id}${ext}`;
 
       const existing = await svc.downloadBuffer(objectPath);
       if (existing) {
         console.log(
           `[ImageMigrate] hardware-${id}: already present at ${objectPath}`
         );
-        if (!image_path) {
-          await db.execute(
-            sql`UPDATE products SET image_path = ${objectPath} WHERE id = ${id}`
-          );
-        }
+        // Still NULL out image_data and ensure image_path is set
+        await db.execute(
+          sql`UPDATE products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
+        );
         alreadyPresent++;
         continue;
       }
 
       await svc.uploadBuffer(buffer, objectPath, mimeFromExt(ext));
+      // Update image_path and clear image_data in one statement
       await db.execute(
-        sql`UPDATE products SET image_path = ${objectPath} WHERE id = ${id}`
+        sql`UPDATE products SET image_data = NULL, image_path = ${objectPath} WHERE id = ${id}`
       );
       console.log(`[ImageMigrate] hardware-${id}: migrated → ${objectPath}`);
       migrated++;
@@ -156,5 +165,13 @@ export async function migrateProductImagesToObjectStorage(): Promise<void> {
   }
 }
 
-// Standalone entry point: npx tsx server/scripts/migrateProductImagesToObjectStorage.ts
-// (tsx will execute the exported function when this file is the entry module)
+// Standalone entry point (ESM): npx tsx server/scripts/migrateProductImagesToObjectStorage.ts
+const __filename = fileURLToPath(import.meta.url);
+if (process.argv[1] === __filename) {
+  migrateProductImagesToObjectStorage()
+    .then(() => process.exit(0))
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    });
+}
