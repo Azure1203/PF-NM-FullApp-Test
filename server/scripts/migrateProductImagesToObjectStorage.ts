@@ -197,9 +197,23 @@ export async function migrateProductImagesToObjectStorage(): Promise<void> {
   }
 }
 
-// Standalone entry point (ESM): npx tsx server/scripts/migrateProductImagesToObjectStorage.ts
-const __filename = fileURLToPath(import.meta.url);
-if (process.argv[1] === __filename) {
+// Standalone entry point (ESM only): npx tsx server/scripts/migrateProductImagesToObjectStorage.ts
+//
+// In the bundled production build (CommonJS via esbuild), `import.meta.url`
+// is `undefined` and `fileURLToPath(undefined)` throws ERR_INVALID_ARG_TYPE
+// at module load — which would crash server startup since this module is
+// imported by `server/backfillMigration.ts`. Guard with try/catch: if we're
+// bundled, we're never the standalone CLI entry, so just skip the auto-run.
+let __isStandaloneEntry = false;
+try {
+  // @ts-ignore — import.meta.url is undefined in CJS bundle output
+  const __entryPath = fileURLToPath(import.meta.url);
+  __isStandaloneEntry = process.argv[1] === __entryPath;
+} catch {
+  // CJS bundle or import.meta unavailable — module was imported, not executed.
+  __isStandaloneEntry = false;
+}
+if (__isStandaloneEntry) {
   migrateProductImagesToObjectStorage()
     .then(() => process.exit(0))
     .catch((e) => {
