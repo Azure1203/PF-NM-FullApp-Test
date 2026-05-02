@@ -6,7 +6,7 @@ import {
   ctsPartConfigs,
   pallets,
   palletFileAssignments,
-  processedOutlookEmails,
+
   packingSlipItems,
   products,
   hardwareChecklistItems,
@@ -104,9 +104,6 @@ export interface IStorage {
   setAssignmentsForPallet(palletId: number, fileIds: number[]): Promise<PalletFileAssignment[]>;
   getAssignment(id: number): Promise<PalletFileAssignment | undefined>;
   updateAssignmentHardwareStatus(id: number, hardwarePackaged: boolean, hardwarePackedBy?: string | null): Promise<PalletFileAssignment | undefined>;
-  
-  // Outlook email tracking methods
-  clearProcessedOutlookEmails(): Promise<number>;
   
   // Packing slip checklist methods
   getPackingSlipItems(fileId: number): Promise<PackingSlipItem[]>;
@@ -445,12 +442,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(palletFileAssignments.id, id))
       .returning();
     return updated;
-  }
-
-  // Outlook email tracking methods
-  async clearProcessedOutlookEmails(): Promise<number> {
-    const result = await db.delete(processedOutlookEmails).returning();
-    return result.length;
   }
 
   // Packing slip checklist methods

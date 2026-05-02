@@ -131,16 +131,6 @@ app.use((req, res, next) => {
         setInterval(runBackgroundSync, SYNC_INTERVAL);
         log(`Background Asana sync scheduled (every 5 minutes)`, 'sync');
         
-        // Start Outlook sync after 2 minutes, then every 15 minutes
-        // Uses direct function call to bypass authentication
-        import('./outlookScheduler').then(({ startOutlookScheduler }) => {
-          setTimeout(() => {
-            startOutlookScheduler();
-          }, 60000);
-        }).catch(err => {
-          log(`Failed to load Outlook scheduler: ${err}`, 'outlook');
-        });
-
         if (process.env.AGENTMAIL_API_KEY) {
           import('./agentmailScheduler').then(({ startAgentMailScheduler }) => {
             startAgentMailScheduler();

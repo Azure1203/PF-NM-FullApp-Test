@@ -93,11 +93,6 @@ export default function Dashboard() {
     }
   });
 
-  const { data: outlookSyncStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; emailsProcessed: number; emailsMatched: number } | null }>({
-    queryKey: ['/api/outlook/sync-status'],
-    refetchInterval: 60000
-  });
-
   const { data: agentmailSyncStatus } = useQuery<{ status: { lastSyncAt: string | null; lastSuccessAt: string | null; lastError: string | null; emailsProcessed: number; emailsMatched: number } | null }>({
     queryKey: ['/api/agentmail/sync-status'],
     refetchInterval: 60000
@@ -146,62 +141,6 @@ export default function Dashboard() {
     enabled: diagnosticOpen
   });
 
-  const { mutate: resetProcessedEmails, isPending: isResettingEmails } = useMutation({
-    mutationFn: async () => {
-      const response = await fetch('/api/outlook/processed-emails', {
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Failed to reset processed emails');
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/outlook/sync-status'] });
-      toast({
-        title: "Processed emails reset",
-        description: data.message
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to reset processed emails",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const { mutate: fetchOutlookEmails, isPending: isFetchingEmails } = useMutation({
-    mutationFn: async () => {
-      const response = await fetch('/api/outlook/process-netley-emails', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || 'Failed to fetch emails');
-      }
-      return response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/outlook/sync-status'] });
-      toast({
-        title: "Outlook emails processed",
-        description: `Processed ${data.processed} emails, matched ${data.matched} packing slips to orders.`
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to fetch emails",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
 
   const { mutate: fetchAgentMailEmails, isPending: isFetchingAgentMail } = useMutation({
     mutationFn: async () => {
@@ -391,38 +330,6 @@ export default function Dashboard() {
                       </>
                     ) : (
                       <p>Auto-imports from Asana every 10 minutes</p>
-                    )}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="gap-2 rounded-xl" 
-                    onClick={() => fetchOutlookEmails()}
-                    disabled={isFetchingEmails}
-                    data-testid="button-fetch-outlook-emails"
-                  >
-                    {isFetchingEmails ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Mail className="w-4 h-4" />
-                    )}
-                    <span className="hidden sm:inline">Fetch Netley Emails</span>
-                    <span className="sm:hidden">Emails</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <div className="text-sm">
-                    {outlookSyncStatus?.status?.lastSuccessAt ? (
-                      <>
-                        <p>Last sync: {format(new Date(outlookSyncStatus.status.lastSuccessAt), 'MMM d, h:mm a')}</p>
-                        <p className="text-muted-foreground">Auto-syncs every 30 min</p>
-                      </>
-                    ) : (
-                      <p>Auto-syncs every 30 minutes</p>
                     )}
                   </div>
                 </TooltipContent>
@@ -967,7 +874,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Diagnostic Section - for debugging Outlook matching */}
+        {/* Diagnostic Section - for debugging order matching */}
         <div className="mt-10">
           <Collapsible open={diagnosticOpen} onOpenChange={setDiagnosticOpen}>
             <CollapsibleTrigger asChild>
@@ -1007,19 +914,7 @@ export default function Dashboard() {
                       >
                         {isDiagnosticLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => resetProcessedEmails()}
-                        disabled={isResettingEmails}
-                        data-testid="button-reset-processed-emails"
-                      >
-                        {isResettingEmails ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                        Reset Processed Emails
-                      </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2" data-testid="text-reset-description">
-                      If emails are being skipped as "already processed", click Reset to clear the history and reprocess them.
-                    </p>
                   </div>
 
                   {isDiagnosticLoading ? (

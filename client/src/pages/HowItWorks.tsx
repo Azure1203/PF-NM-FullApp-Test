@@ -122,14 +122,6 @@ export default function HowItWorks() {
                   <li><strong>Reset AgentMail</strong> <span className="inline-flex items-center gap-1">(<RotateCcw className="w-3 h-3 inline" /> circular arrow icon)</span> — clears all processed-email records so the system will reprocess every email on the next fetch. Use this if an attachment failed to download and you want to retry.</li>
                 </ul>
 
-                <div className="mt-4 p-3 bg-muted dark:bg-slate-800 border border-border dark:border-slate-700 rounded-lg" data-testid="section-step3-outlook-preserved">
-                  <p className="text-sm font-semibold text-foreground/80 dark:text-slate-300 mb-1 flex items-center gap-2">
-                    <Mail className="w-4 h-4" /> Outlook Integration (Preserved)
-                  </p>
-                  <p className="text-sm text-muted-foreground dark:text-muted-foreground/70">
-                    The original Microsoft Outlook connector (which monitored the "Perfect Fit Allmoxy Emails" folder) is preserved in the codebase but not currently active. It can be reconnected in the future by renewing the Outlook OAuth token. AgentMail was introduced as a more reliable replacement.
-                  </p>
-                </div>
               </CardContent>
             </Card>
 
@@ -517,7 +509,7 @@ export default function HowItWorks() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-muted-foreground dark:text-muted-foreground/70 space-y-3" data-testid="content-agentmail-processed">
-                  <p>To prevent downloading the same attachment twice, each processed attachment is recorded in the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">processed_outlook_emails</code> database table using a composite key:</p>
+                  <p>To prevent downloading the same attachment twice, each processed attachment is recorded in the <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">processed_emails</code> database table using a composite key:</p>
                   <code className="block bg-muted dark:bg-slate-800 px-3 py-2 rounded text-sm font-mono">agentmail:{"{message_id}"}:{"{attachment_id}"}</code>
                   <p>Each record stores the subject, processing status (<code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">processed</code>, <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">skipped</code>, or <code className="bg-muted dark:bg-slate-800 px-1 rounded text-sm">failed</code>), and the matched file ID if applicable.</p>
                   <p>Attachments with no matching order file are <em>not</em> marked as processed — they will be retried on every future poll until a matching order appears in the system.</p>
@@ -943,7 +935,7 @@ export default function HowItWorks() {
                         </tr>
                         <tr>
                           <td className="p-2">PDFs &amp; product images</td>
-                          <td className="p-2">These would need to be re-fetched from Outlook emails or re-uploaded</td>
+                          <td className="p-2">These would need to be re-fetched via AgentMail or re-uploaded manually</td>
                         </tr>
                       </tbody>
                     </table>

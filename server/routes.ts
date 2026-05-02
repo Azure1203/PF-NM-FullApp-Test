@@ -16,10 +16,10 @@ import fs from 'fs';
 import express from 'express';
 import crypto from 'crypto';
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { testOutlookConnection, searchNetleyEmails, downloadEmailAttachment, listMailFolders, type NetleyEmail, type MailFolder, type SearchResult } from "./outlook";
+
 import { getGoogleSheetsClient, getGoogleDriveClient } from "./googleSheets";
 import { getBackupSchedulerStatus } from "./backupScheduler";
-import { getSyncStatus, triggerManualFetch } from "./outlookScheduler";
+
 import { getAgentMailSyncStatus, triggerManualAgentMailFetch, clearAgentMailProcessedEmails } from "./agentmailScheduler";
 import { testAgentMailConnection } from "./agentmail";
 import { getAsanaImportStatus, triggerManualAsanaImport } from "./asanaImportScheduler";
@@ -5944,86 +5944,6 @@ export async function registerRoutes(
     }
   });
 
-  // Test Outlook connection
-  app.get('/api/outlook/test', isAuthenticated, async (req, res) => {
-    try {
-      const result = await testOutlookConnection();
-      res.json(result);
-    } catch (err: any) {
-      console.error('[Outlook] Connection test failed:', err.message);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // Get Outlook sync status
-  app.get('/api/outlook/sync-status', isAuthenticated, async (req, res) => {
-    try {
-      const status = await getSyncStatus();
-      res.json({ status });
-    } catch (err: any) {
-      console.error('[Outlook] Error getting sync status:', err.message);
-      res.status(500).json({ message: 'Failed to get sync status', error: err.message });
-    }
-  });
-
-  // List all mail folders
-  app.get('/api/outlook/folders', isAuthenticated, async (req, res) => {
-    try {
-      console.log('[Outlook] Listing mail folders...');
-      const folders = await listMailFolders();
-      console.log(`[Outlook] Found ${folders.length} folders`);
-      res.json({ folders });
-    } catch (err: any) {
-      console.error('[Outlook] Error listing folders:', err.message);
-      res.status(500).json({ message: 'Failed to list folders', error: err.message });
-    }
-  });
-
-  // List Netley packing slip emails from Outlook
-  app.get('/api/outlook/netley-emails', isAuthenticated, async (req, res) => {
-    try {
-      console.log('[Outlook] Fetching Netley packing slip emails...');
-      const result = await searchNetleyEmails();
-      
-      if (!result.folderFound) {
-        console.log(`[Outlook] Folder not found: ${result.folderName}`);
-        return res.status(404).json({
-          message: result.error,
-          folderFound: false,
-          folderName: result.folderName
-        });
-      }
-      
-      console.log(`[Outlook] Found ${result.emails.length} emails with PDF attachments in folder "${result.folderName}"`);
-      res.json({
-        emails: result.emails,
-        folderFound: true,
-        folderName: result.folderName
-      });
-    } catch (err: any) {
-      console.error('[Outlook] Error fetching emails:', err.message);
-      res.status(500).json({ message: 'Failed to fetch emails', error: err.message });
-    }
-  });
-
-  // Process Netley packing slip emails from Outlook and match to orders
-  // Uses shared processing function with deduplication
-  app.post('/api/outlook/process-netley-emails', isAuthenticated, async (req, res) => {
-    try {
-      console.log('[Outlook] Manual email processing triggered...');
-      const result = await triggerManualFetch();
-      
-      res.json({
-        message: `Processed ${result.processed} emails, matched ${result.matched} packing slips`,
-        processed: result.processed,
-        matched: result.matched
-      });
-    } catch (err: any) {
-      console.error('[Outlook] Error processing Netley emails:', err.message);
-      res.status(500).json({ message: 'Failed to process emails', error: err.message });
-    }
-  });
-
   app.get('/api/asana-import/status', isAuthenticated, async (req, res) => {
     try {
       const status = await getAsanaImportStatus();
@@ -6183,7 +6103,7 @@ export async function registerRoutes(
     }
   });
 
-  // Diagnostic endpoint for debugging Outlook matching
+  // Diagnostic endpoint for order file matching
   // Returns all order files with their Allmoxy Job # and packing slip status
   app.get('/api/diagnostic/order-files', isAuthenticated, async (req, res) => {
     try {
@@ -6244,22 +6164,6 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[Diagnostic] Error fetching order files:', err.message);
       res.status(500).json({ message: 'Failed to fetch diagnostic data', error: err.message });
-    }
-  });
-
-  // Reset processed Outlook emails - allows reprocessing of emails
-  app.delete('/api/outlook/processed-emails', isAuthenticated, async (req, res) => {
-    try {
-      console.log('[Outlook] Resetting processed email records...');
-      const result = await storage.clearProcessedOutlookEmails();
-      console.log(`[Outlook] Cleared ${result} processed email records`);
-      res.json({ 
-        message: `Cleared ${result} processed email records. Emails will be reprocessed on next fetch.`,
-        cleared: result
-      });
-    } catch (err: any) {
-      console.error('[Outlook] Error clearing processed emails:', err.message);
-      res.status(500).json({ message: 'Failed to clear processed emails', error: err.message });
     }
   });
 
@@ -6331,18 +6235,6 @@ export async function registerRoutes(
   });
   app.post('/api/agentmail/test', isAuthenticated, async (_req, res) => {
     try { res.json(await testAgentMailConnection()); } catch (e: any) { res.status(500).json({ message: e.message }); }
-  });
-  app.get('/api/outlook/status', isAuthenticated, async (_req, res) => {
-    try { res.json(await getSyncStatus()); } catch (e: any) { res.status(500).json({ message: e.message }); }
-  });
-  app.post('/api/outlook/fetch', isAuthenticated, async (_req, res) => {
-    try { res.json(await triggerManualFetch()); } catch (e: any) { res.status(500).json({ message: e.message }); }
-  });
-  app.post('/api/outlook/test', isAuthenticated, async (_req, res) => {
-    try { res.json(await testOutlookConnection()); } catch (e: any) { res.status(500).json({ message: e.message }); }
-  });
-  app.post('/api/outlook/list-folders', isAuthenticated, async (_req, res) => {
-    try { res.json({ folders: await listMailFolders() }); } catch (e: any) { res.status(500).json({ message: e.message }); }
   });
   // ─── End AgentMail routes ────────────────────────────────────────────────────
 
