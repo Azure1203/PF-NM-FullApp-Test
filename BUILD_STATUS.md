@@ -54,7 +54,6 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 | multer ^2.0.2 | File upload handling |
 | csv-parse ^6.1.0 | CSV parsing |
 | papaparse ^5.5.3 | Client-side CSV parsing |
-| @microsoft/microsoft-graph-client | Retained but unused (Outlook removed r25) |
 
 ---
 
@@ -540,7 +539,7 @@ Key-value store for app configuration.
 | description | text | |
 | updatedAt | timestamp | |
 
-> **Orphaned DB table** (exists in DB only, not in schema): `outlook_sync_status` — safe to `DROP TABLE` at any time.
+> **Orphaned DB table** (production database only — already removed from dev in r25-c and from `shared/schema.ts` in r25-b): `outlook_sync_status`. Will be dropped automatically by Replit's Publish flow on the next publish via its dev↔prod schema diff. See Known Issues §9.
 
 ---
 
@@ -1026,13 +1025,11 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 
 ## 9. Known Issues & Bugs
 
-1. **[LOW] `outlook_sync_status` orphaned table** — Exists in DB only, not in schema. Safe to `DROP TABLE outlook_sync_status;` directly in the production DB.
+1. **[LOW] `outlook_sync_status` orphaned in production DB only** — Dropped from the development database in r25-c, but still exists in the production database. `outlookSyncStatus` was removed from `shared/schema.ts` in r25-b, so Replit's Publish flow will detect the orphan during its dev↔prod schema diff on the next publish and offer to drop it. No manual action required — agents must NOT write migration scripts, deploy-build hooks, or startup-time DDL to drop it; the supported path is Publish.
 
-2. **[LOW] `@microsoft/microsoft-graph-client` still in package.json** — The Outlook integration was removed in r25 but the npm package remains installed. Not imported anywhere. Can be uninstalled with `npm uninstall @microsoft/microsoft-graph-client`.
+2. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
 
-3. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
-
-4. **[MEDIUM] Product image storage is base64 in DB** — Images stored as base64 text in `allmoxy_products.image_data` and `products.image_data`. For the current scale this works, but list queries must never include `image_data`. The `getAllmoxyProducts()` and `getProducts()` storage methods explicitly exclude it. All image reads go through `/api/product-images/by-id/:id/:table`. Do not add `imageData` to any list query.
+3. **[MEDIUM] Product image storage is base64 in DB** — Images stored as base64 text in `allmoxy_products.image_data` and `products.image_data`. For the current scale this works, but list queries must never include `image_data`. The `getAllmoxyProducts()` and `getProducts()` storage methods explicitly exclude it. All image reads go through `/api/product-images/by-id/:id/:table`. Do not add `imageData` to any list query.
 
 ---
 
@@ -1063,6 +1060,20 @@ Updated BUILD_STATUS.md to incorporate all information extracted directly from `
 - `client/src/pages/HowItWorks.tsx` — removed Outlook callout; updated references to mention AgentMail
 
 **Why:** Outlook was replaced by AgentMail. The Outlook scheduler was throwing a startup warning every boot and running a wasted 30-minute polling loop. The `processed_outlook_emails` table is retained because `agentmailScheduler.ts` uses it for deduplication (keys prefixed with `agentmail:`).
+
+---
+
+### r25-c — 2026-05-02 — Outlook teardown leftovers cleanup
+
+**Files affected:**
+- `package.json` / `package-lock.json` — removed `@microsoft/microsoft-graph-client` (unused since r25-b)
+- `BUILD_STATUS.md` — replaced two old "Known cleanup items" entries (section 9) with a single entry covering only the prod-DB orphan; reworded the orphaned-table note in section 4 to "production-only, pending next Publish"; deleted dependency-table row for the graph client (section 2)
+
+**Database changes:**
+- Dropped orphaned `outlook_sync_status` table from the development database (`DROP TABLE IF EXISTS outlook_sync_status`)
+- Production drop deferred to next Publish: the database skill's production query path is read-only and rejects DDL. Because `outlookSyncStatus` was already removed from `shared/schema.ts` in r25-b, Replit's Publish flow will detect the orphan during its dev↔prod schema diff on the next publish and drop it then. No code or migration script written for prod.
+
+**Why:** Closes out the Outlook integration removal — drops dead weight from the dependency tree and the dev DB. AgentMail email ingestion is unaffected; `processed_outlook_emails` is intentionally retained as it is reused by `agentmailScheduler.ts` for AgentMail dedup keys (`agentmail:` prefix).
 
 ---
 
