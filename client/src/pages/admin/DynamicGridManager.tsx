@@ -19,7 +19,7 @@ import {
   ChevronDown, ChevronUp, FileText, Loader2, AlertTriangle, X, CheckSquare, Square,
   Link2, Check, PlusCircle,
 } from "lucide-react";
-import type { AttributeGrid, AttributeGridRow, AllmoxyProductListItem } from "@shared/schema";
+import type { AttributeGrid, AttributeGridRow, AllmoxyProduct } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 type BindingWithProductInfo = {
@@ -91,7 +91,7 @@ export default function DynamicGridManager() {
       fetch(`/api/admin/attribute-grids/${selectedGridId}/bindings`).then(r => r.json()),
   });
 
-  const { data: allProducts = [] } = useQuery<AllmoxyProductListItem[]>({
+  const { data: allProducts = [] } = useQuery<AllmoxyProduct[]>({
     queryKey: ['/api/admin/allmoxy-products'],
   });
 

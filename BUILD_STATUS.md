@@ -21,7 +21,7 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 | Field | Value |
 |---|---|
 | **Last updated** | 2026-05-02 |
-| **Current release** | r26 |
+| **Current release** | r27 |
 | **Active branch** | main (Replit managed) |
 | **How to run (dev)** | `npm run dev` → starts Express + Vite on port 5000 |
 | **Entry point (backend)** | `server/index.ts` |
@@ -85,7 +85,9 @@ project root
 │   ├── static.ts                ← Production static file serving
 │   ├── vite.ts                  ← Vite dev-server middleware (dev only)
 │   ├── csvHelpers.ts            ← CSV parsing utilities
-│   ├── backfillMigration.ts     ← One-time startup migration for legacy order files
+│   ├── backfillMigration.ts     ← Startup migrations: order file backfill + product image migration to object storage
+│   ├── scripts/
+│   │   └── migrateProductImagesToObjectStorage.ts  ← Idempotent backfill: DB base64 → object storage
 │   ├── googleSheets.ts          ← Google Sheets / Drive OAuth client factory
 │   ├── backupScheduler.ts       ← Daily 3 AM Google Sheets backup scheduler
 │   ├── agentmail.ts             ← AgentMail API client (inbound email ingestion)
@@ -160,7 +162,7 @@ project root
 │           ├── OrdSettings.tsx
 │           └── OutputSettings.tsx
 │
-├── migrations/                  ← Drizzle migration SQL files (0000–0007)
+├── migrations/                  ← Drizzle migration SQL files (0000–0008)
 ├── docs/
 │   ├── MASTER_ARCHITECTURE_SPEC_v4.md
 │   └── BUILD_STATE.md           ← Superseded by this file
@@ -371,13 +373,8 @@ Internal hardware/component product catalog.
 | supplier | text | |
 | category | text | `'HARDWARE'` \| `'COMPONENT'` |
 | stockStatus | text | `'IN_STOCK'` \| `'BUYOUT'` |
-| length | numeric | |
-| width | numeric | |
-| height | numeric | |
 | weight | numeric | grams |
-| imagePath | text | Object storage path (legacy) |
-| imageData | text | Base64 image data (current primary) |
-| imageExt | text | `.jpg` \| `.png` \| `.webp` |
+| imagePath | text | Object storage path for product image |
 | notes | text | |
 | importRowNumber | integer | Row number in import CSV (for image auto-linking) |
 | createdAt | timestamp | |
@@ -405,11 +402,10 @@ Allmoxy product definitions: SKU prefix, pricing/export proxy IDs, export type, 
 | exportProxyId | integer FK→proxy_variables nullable | |
 | exportType | text | `'ORD'` \| `'ELIAS'` \| `'MJ'` \| `'GLASS'` \| `'HARDWARE'` \| `'CTS'` \| `'NONE'` |
 | supplyType | text | |
-| imagePath | text | Object storage path (legacy) |
-| imageData | text | Base64 image data (current primary) |
-| imageExt | text | |
-| createdAt | timestamp | |
-| updatedAt | timestamp | |
+| description | text | |
+| notes | text | |
+| imagePath | text | Object storage path for product image |
+| categoryId | integer FK→product_categories nullable | |
 
 ### 4.13 `attribute_grids`
 Named lookup tables (e.g. "TFL Shaker Doors", "Colors").
@@ -1002,8 +998,8 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 | Allmoxy product manager | ✅ Done | Full CRUD; SKU prefix; pricing/export proxy; grid bindings; per-product images |
 | Formula tester | ✅ Done | Live evaluation with scope inspector; auto-detect digit-prefix columns |
 | Pricing diagnostic | ✅ Done | Coverage stats; "Fix Missing Proxy Assignments"; "Auto-Create Missing Bindings" |
-| Bulk product image uploader | ✅ Done | Filename-exact matching; parallel upload; images stored as base64 in DB |
-| Per-product image upload | ✅ Done | Click thumbnail in editor to replace; DELETE to clear |
+| Bulk product image uploader | ✅ Done | Filename-exact matching; parallel upload to object storage; only `imagePath` persisted in DB |
+| Per-product image upload | ✅ Done | Click thumbnail in editor to replace; DELETE clears DB path + deletes object |
 | ORD header template | ✅ Done | `{{design_name}}` / `{{po_number}}` placeholders; stored in `app_settings` |
 | Output settings toggles | ✅ Done | Per-document image/pricing visibility flags |
 | Allowed users whitelist | ✅ Done | Admin role toggle; blocks non-whitelisted Replit users |
@@ -1017,7 +1013,7 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 | Asana | ✅ Done | OAuth via Replit Connectors; import + sync + notes |
 | AgentMail | ✅ Done | API key via `AGENTMAIL_API_KEY` env var |
 | Google Sheets / Drive | ✅ Done | OAuth via Replit Connectors |
-| Replit Object Storage | ✅ Done | Used for CTS part config images, uploaded PDFs |
+| Replit Object Storage | ✅ Done | Used for CTS part config images, uploaded PDFs, and all product images |
 | QZ Tray label printing | ✅ Done | Certificate + signing endpoints; client-side printer settings |
 | Outlook | ❌ Removed | r25; files deleted, scheduler gone, routes removed |
 
@@ -1029,11 +1025,27 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 
 2. **[LOW] Grid column digit-prefix UI warning missing** — When an attribute grid has a column whose name starts with a digit (e.g. `45_AND_90_PRICING_ID`), formulas must use a leading underscore (`doors._45_and_90_pricing_id`). The pricing engine sanitizes this automatically, but the Grid Manager UI does not warn admins when such columns exist.
 
-3. **[MEDIUM] Product image storage is base64 in DB** — Images stored as base64 text in `allmoxy_products.image_data` and `products.image_data`. For the current scale this works, but list queries must never include `image_data`. The `getAllmoxyProducts()` and `getProducts()` storage methods explicitly exclude it. All image reads go through `/api/product-images/by-id/:id/:table`. Do not add `imageData` to any list query.
+3. **[LOW] `image_data` columns not yet dropped from DB** — The `imageData` field has been removed from `shared/schema.ts` and all routes/storage code no longer read or write it. The backfill script runs on startup and migrates any remaining base64 bytes to object storage. Once confirmed zero rows remain (`SELECT count(*) FROM products WHERE image_data IS NOT NULL` and same for `allmoxy_products`), apply `migrations/0008_drop_image_data.sql` to drop the columns. This requires running `npx drizzle-kit migrate` or the equivalent for this project.
 
 ---
 
 ## 10. Changelog (reverse-chronological, recent releases)
+
+### r27 — 2026-05-02 — Migrate product images from DB to Object Storage (Task #30)
+
+**Problem:** Both `products` and `allmoxy_products` tables stored image bytes as base64 text in `image_data` columns. This bloated DB backups and forced `getProducts()` / `getAllmoxyProducts()` to maintain fragile hand-built column exclusion lists to avoid dragging megabytes of base64 through every list query.
+
+**Changes:**
+- **`server/scripts/migrateProductImagesToObjectStorage.ts`** — new idempotent startup backfill: reads any row with `image_data IS NOT NULL` from both tables via raw SQL, uploads to object storage at the row's existing `imagePath` (or synthesizes `product-images/migrated/{table}-{id}.{ext}`), updates `image_path` if null, skips rows whose object already exists. Runs via `backfillMigration.ts` on startup.
+- **`server/routes.ts`** — `POST /api/admin/allmoxy-products/:id/image`: now calls `objectStorageService.uploadBuffer()` instead of encoding to base64; only `imagePath` persisted. `DELETE /api/admin/allmoxy-products/:id/image`: reads existing `imagePath`, calls `objectStorageService.deleteObject()` (best-effort), nulls only `imagePath`. `POST /api/admin/products/bulk-upload-images`: uploads each file to object storage, persists only `imagePath`; removed base64 imageData writes. `GET /api/product-images/by-id/:id` and `GET /api/product-images/hardware/by-id/:id`: now look up `imagePath` and call `objectStorageService.downloadBuffer()` instead of decoding base64 from DB. Path-based route `GET /api/product-images/*` unchanged.
+- **`shared/schema.ts`** — removed `imageData: text("image_data")` from both `products` and `allmoxy_products`. Removed `ProductListItem = Omit<Product, 'imageData'>` and `AllmoxyProductListItem = Omit<AllmoxyProduct, 'imageData'>` type aliases; both are now plain `= Product` / `= AllmoxyProduct` respectively.
+- **`server/storage.ts`** — `getProducts()` and `getAllmoxyProducts()` now use plain `db.select().from(...)` — no hand-built column exclusion needed. Removed `AllmoxyProductListItem` import. Updated comment in `bulkInsertAllmoxyProducts`.
+- **`client/src/pages/admin/DynamicGridManager.tsx`** — updated import and query type from `AllmoxyProductListItem` to `AllmoxyProduct`.
+- **`migrations/0008_drop_image_data.sql`** — SQL to drop `image_data` from both tables; must be applied manually after confirming zero rows (see Known Issues §9 item 3).
+
+**Files affected:** `server/scripts/migrateProductImagesToObjectStorage.ts` (new), `server/backfillMigration.ts`, `server/routes.ts`, `shared/schema.ts`, `server/storage.ts`, `client/src/pages/admin/DynamicGridManager.tsx`, `migrations/0008_drop_image_data.sql` (new).
+
+---
 
 ### r26-a — 2026-05-02 — Clean stale Asana-403 test data
 

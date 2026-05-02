@@ -678,8 +678,8 @@ export async function registerRoutes(
       const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
       if (!allowedExts.includes(ext)) return res.status(400).json({ message: 'Invalid file type. Use jpg, png, or webp.' });
       const imagePath = `product-images/${req.file.originalname}`;
-      const imageData = req.file.buffer.toString('base64');
-      await db.update(allmoxyProducts).set({ imagePath, imageData }).where(eq(allmoxyProducts.id, productId));
+      await objectStorageService.uploadBuffer(req.file.buffer, imagePath, req.file.mimetype);
+      await db.update(allmoxyProducts).set({ imagePath }).where(eq(allmoxyProducts.id, productId));
       res.json({ imagePath });
     } catch (e: any) {
       console.error('[ProductImage] Upload error:', e);
@@ -690,7 +690,11 @@ export async function registerRoutes(
   app.delete('/api/admin/allmoxy-products/:id/image', isAuthenticated, async (req, res) => {
     try {
       const productId = Number(req.params.id);
-      await db.update(allmoxyProducts).set({ imagePath: null, imageData: null }).where(eq(allmoxyProducts.id, productId));
+      const [row] = await db.select({ imagePath: allmoxyProducts.imagePath }).from(allmoxyProducts).where(eq(allmoxyProducts.id, productId));
+      if (row?.imagePath) {
+        await objectStorageService.deleteObject(row.imagePath).catch(() => {});
+      }
+      await db.update(allmoxyProducts).set({ imagePath: null }).where(eq(allmoxyProducts.id, productId));
       res.status(204).send();
     } catch (e: any) {
       res.status(500).json({ message: 'Failed to clear image', error: e.message });
@@ -8106,9 +8110,6 @@ export async function registerRoutes(
     }
   });
 
-  // Storage strategy: images are stored as base64 in the DB image_data column.
-  // Object storage (GCS) is not used here — it is unavailable in this deployment environment.
-  // See migration 0007_image_data_columns.sql and shared/schema.ts imageData fields.
   app.post('/api/admin/products/bulk-upload-images', isAuthenticated, imageUpload.array('images', 100), async (req, res) => {
     try {
       const files = req.files as Express.Multer.File[] | undefined;
@@ -8167,7 +8168,7 @@ export async function registerRoutes(
         unmatchedFiles.push({ filename: file.originalname });
       }
 
-      // Store matched files in DB (base64 image_data) in parallel batches of 10
+      // Upload matched files to object storage, then persist imagePath in DB (parallel batches of 10)
       const saved: { filename: string; productName: string; storagePath: string }[] = [];
       const uploadErrors: { filename: string; error: string }[] = [];
       const BATCH_SIZE = 10;
@@ -8176,18 +8177,18 @@ export async function registerRoutes(
         const batch = matchedFiles.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (m) => {
           try {
-            const imageData = m.file.buffer.toString('base64');
+            await objectStorageService.uploadBuffer(m.file.buffer, m.storagePath, m.file.mimetype);
             if (m.table === 'allmoxy') {
               await db.update(allmoxyProducts)
-                .set({ imagePath: m.storagePath, imageData })
+                .set({ imagePath: m.storagePath })
                 .where(eq(allmoxyProducts.id, m.productId));
             } else {
-              await storage.updateProduct(m.productId, { imagePath: m.storagePath, imageData });
+              await storage.updateProduct(m.productId, { imagePath: m.storagePath });
             }
             saved.push({ filename: m.file.originalname, productName: m.productName, storagePath: m.storagePath });
           } catch (e: any) {
-            console.error(`[BulkImageUpload] DB write error for ${m.file.originalname}:`, e);
-            uploadErrors.push({ filename: m.file.originalname, error: e.message || 'DB write failed' });
+            console.error(`[BulkImageUpload] Upload error for ${m.file.originalname}:`, e);
+            uploadErrors.push({ filename: m.file.originalname, error: e.message || 'Upload failed' });
           }
         }));
       }
@@ -8246,17 +8247,18 @@ export async function registerRoutes(
       const productId = Number(req.params.id);
       if (!productId || isNaN(productId)) return res.status(400).json({ message: 'Invalid product id' });
 
-      const [product] = await db.select({
-        imageData: products.imageData,
-        imagePath: products.imagePath,
-      }).from(products).where(eq(products.id, productId));
+      const [product] = await db.select({ imagePath: products.imagePath }).from(products).where(eq(products.id, productId));
 
-      if (!product?.imageData) {
+      if (!product?.imagePath) {
         return res.status(404).json({ message: 'Image not found' });
       }
 
-      const buffer = Buffer.from(product.imageData, 'base64');
-      const ext = product.imagePath ? path.extname(product.imagePath).toLowerCase() : '';
+      const buffer = await objectStorageService.downloadBuffer(product.imagePath);
+      if (!buffer) {
+        return res.status(404).json({ message: 'Image not found in storage' });
+      }
+
+      const ext = path.extname(product.imagePath).toLowerCase();
       const contentTypeMap: Record<string, string> = {
         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
         '.png': 'image/png', '.webp': 'image/webp',
@@ -8280,17 +8282,18 @@ export async function registerRoutes(
       const productId = Number(req.params.id);
       if (!productId || isNaN(productId)) return res.status(400).json({ message: 'Invalid product id' });
 
-      const [product] = await db.select({
-        imageData: allmoxyProducts.imageData,
-        imagePath: allmoxyProducts.imagePath,
-      }).from(allmoxyProducts).where(eq(allmoxyProducts.id, productId));
+      const [product] = await db.select({ imagePath: allmoxyProducts.imagePath }).from(allmoxyProducts).where(eq(allmoxyProducts.id, productId));
 
-      if (!product?.imageData) {
+      if (!product?.imagePath) {
         return res.status(404).json({ message: 'Image not found' });
       }
 
-      const buffer = Buffer.from(product.imageData, 'base64');
-      const ext = product.imagePath ? path.extname(product.imagePath).toLowerCase() : '';
+      const buffer = await objectStorageService.downloadBuffer(product.imagePath);
+      if (!buffer) {
+        return res.status(404).json({ message: 'Image not found in storage' });
+      }
+
+      const ext = path.extname(product.imagePath).toLowerCase();
       const contentTypeMap: Record<string, string> = {
         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
         '.png': 'image/png', '.webp': 'image/webp',

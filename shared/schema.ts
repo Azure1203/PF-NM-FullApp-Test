@@ -308,8 +308,7 @@ export const products = pgTable("products", {
   category: text("category").notNull().default('HARDWARE'), // HARDWARE or COMPONENT
   stockStatus: text("stock_status").$type<StockStatus>().default('IN_STOCK'), // IN_STOCK or BUYOUT
   weight: real("weight"), // Weight in grams (optional)
-  imagePath: text("image_path"), // Object storage path to product image (filename reference)
-  imageData: text("image_data"), // Base64-encoded image bytes stored in DB
+  imagePath: text("image_path"), // Object storage path to product image
   notes: text("notes"), // Additional notes
   importRowNumber: integer("import_row_number"), // Row number from CSV import for image linking
   createdAt: timestamp("created_at").defaultNow(),
@@ -323,7 +322,7 @@ export const insertProductSchema = createInsertSchema(products).omit({
 });
 
 export type Product = typeof products.$inferSelect;
-export type ProductListItem = Omit<Product, 'imageData'>;
+export type ProductListItem = Product;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 
 // Hardware checklist items - items from hardware CSV attached to order files
@@ -450,13 +449,11 @@ export const allmoxyProducts = pgTable("allmoxy_products", {
   exportType: varchar("export_type", { length: 20 }).default('ORD'),
   supplyType: varchar("supply_type", { length: 20 }).default('STOCK'),
   imagePath: text("image_path"),
-  imageData: text("image_data"),
   categoryId: integer("category_id").references(() => productCategories.id, { onDelete: 'set null' }),
 });
 
 export const insertAllmoxyProductSchema = createInsertSchema(allmoxyProducts);
 export type AllmoxyProduct = typeof allmoxyProducts.$inferSelect;
-export type AllmoxyProductListItem = Omit<AllmoxyProduct, 'imageData'>;
 export type InsertAllmoxyProduct = z.infer<typeof insertAllmoxyProductSchema>;
 
 export const attributeGrids = pgTable("attribute_grids", {

@@ -38,7 +38,6 @@ import {
   productCategories,
   allmoxyProducts,
   type AllmoxyProduct,
-  type AllmoxyProductListItem,
   type InsertAllmoxyProduct,
   attributeGrids,
   type AttributeGrid,
@@ -150,7 +149,7 @@ export interface IStorage {
   updateProductCategory(id: number, name: string): Promise<import('@shared/schema').ProductCategory | undefined>;
   deleteProductCategory(id: number): Promise<boolean>;
 
-  getAllmoxyProducts(): Promise<AllmoxyProductListItem[]>;
+  getAllmoxyProducts(): Promise<AllmoxyProduct[]>;
   upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct>;
   updateAllmoxyProduct(id: number, updates: { pricingProxyId?: number | null; exportProxyId?: number | null; exportType?: string | null }): Promise<AllmoxyProduct>;
   deleteAllmoxyProduct(id: number): Promise<boolean>;
@@ -493,21 +492,6 @@ export class DatabaseStorage implements IStorage {
 
   // Product catalog methods
   async getProducts(search?: string, category?: string): Promise<ProductListItem[]> {
-    const productCols = {
-      id: products.id,
-      code: products.code,
-      name: products.name,
-      supplier: products.supplier,
-      category: products.category,
-      stockStatus: products.stockStatus,
-      weight: products.weight,
-      imagePath: products.imagePath,
-      notes: products.notes,
-      importRowNumber: products.importRowNumber,
-      createdAt: products.createdAt,
-      updatedAt: products.updatedAt,
-    };
-
     const conditions = [];
     if (search) {
       conditions.push(
@@ -522,9 +506,9 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (conditions.length > 0) {
-      return db.select(productCols).from(products).where(and(...conditions)).orderBy(products.code);
+      return db.select().from(products).where(and(...conditions)).orderBy(products.code);
     }
-    return db.select(productCols).from(products).orderBy(products.code);
+    return db.select().from(products).orderBy(products.code);
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
@@ -748,21 +732,8 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getAllmoxyProducts(): Promise<AllmoxyProductListItem[]> {
-    return db.select({
-      id: allmoxyProducts.id,
-      name: allmoxyProducts.name,
-      status: allmoxyProducts.status,
-      pricingProxyId: allmoxyProducts.pricingProxyId,
-      exportProxyId: allmoxyProducts.exportProxyId,
-      skuPrefix: allmoxyProducts.skuPrefix,
-      description: allmoxyProducts.description,
-      notes: allmoxyProducts.notes,
-      exportType: allmoxyProducts.exportType,
-      supplyType: allmoxyProducts.supplyType,
-      imagePath: allmoxyProducts.imagePath,
-      categoryId: allmoxyProducts.categoryId,
-    }).from(allmoxyProducts).orderBy(allmoxyProducts.name);
+  async getAllmoxyProducts(): Promise<AllmoxyProduct[]> {
+    return db.select().from(allmoxyProducts).orderBy(allmoxyProducts.name);
   }
 
   async upsertAllmoxyProduct(product: InsertAllmoxyProduct): Promise<AllmoxyProduct> {
@@ -836,7 +807,7 @@ export class DatabaseStorage implements IStorage {
           // Only overwrite proxy IDs if the import specifies them; otherwise preserve existing
           pricingProxyId: sql`COALESCE(EXCLUDED.pricing_proxy_id, allmoxy_products.pricing_proxy_id)`,
           exportProxyId: sql`COALESCE(EXCLUDED.export_proxy_id, allmoxy_products.export_proxy_id)`,
-          // Preserve admin-configured fields: skuPrefix, imagePath, imageData, notes
+          // Preserve admin-configured fields: skuPrefix, imagePath, notes
         },
       })
       .returning();

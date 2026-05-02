@@ -5,8 +5,14 @@ import { countPartsFromCSV } from "./csvHelpers";
 import { storage } from "./storage";
 import { log } from "./index";
 import { isNull, or, eq } from "drizzle-orm";
+import { migrateProductImagesToObjectStorage } from "./scripts/migrateProductImagesToObjectStorage";
 
 export async function runBackfillMigration() {
+  // Migrate product images from DB base64 columns into Object Storage (one-shot, idempotent)
+  await migrateProductImagesToObjectStorage().catch((e) =>
+    log(`Image migration error (non-fatal): ${e}`, "migration")
+  );
+
   try {
     const allFiles = await db.select().from(orderFiles).where(
       or(
