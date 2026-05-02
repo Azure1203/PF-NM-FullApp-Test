@@ -28,18 +28,42 @@ export function stripComments(formula: string): string {
 /**
  * Converts a grid row's rowData into a scope-friendly object:
  * - All keys lowercased
+ * - Keys that start with a digit are prefixed with `_` so mathjs dot-accessors
+ *   work (mathjs identifiers cannot start with a digit). Both the prefixed
+ *   and the non-prefixed key are written so older formulas that try the
+ *   bare name still resolve to the same value.
  * - Numeric strings coerced to numbers for mathjs
  */
 export function gridRowToScope(rowData: Record<string, any>): Record<string, any> {
-  return Object.fromEntries(
-    Object.entries(rowData).map(([k, v]) => {
-      const lower = k.toLowerCase();
-      if (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v))) {
-        return [lower, Number(v)];
-      }
-      return [lower, v];
-    })
-  );
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(rowData)) {
+    const lower = k.toLowerCase();
+    const coerced =
+      typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v))
+        ? Number(v)
+        : v;
+    out[lower] = coerced;
+    if (/^[0-9]/.test(lower)) {
+      out['_' + lower] = coerced;
+    }
+  }
+  return out;
+}
+
+/**
+ * mathjs cannot parse property accessors whose name starts with a digit
+ * (e.g. `doors.45_and_90_pricing_id`). It tokenizes `.45` as the decimal
+ * literal 0.45 and then `_and_90_pricing_id` as a separate identifier,
+ * yielding `doors * 0.45 * _and_90_pricing_id` — which throws
+ * `multiplyScalar (... actual: Object)` because `doors` is an object.
+ *
+ * This helper rewrites `<identifier>.<digit-starting-prop>` to
+ * `<identifier>._<digit-starting-prop>` so the prefixed scope key (added
+ * by gridRowToScope) can be reached. Plain decimal literals like 1.5 or
+ * 92900) are left alone because they aren't preceded by an identifier.
+ */
+export function sanitizeDigitAccessors(formula: string): string {
+  return formula.replace(/([A-Za-z_]\w*)\.(\d[A-Za-z0-9_]*)/g, '$1._$2');
 }
 
 export function evaluatePrice(
@@ -64,7 +88,7 @@ export function evaluatePrice(
   if (allProxyVars && allProxyVars.length > 0) {
     for (const pv of allProxyVars) {
       try {
-        const pvClean = stripComments(pv.formula);
+        const pvClean = sanitizeDigitAccessors(stripComments(pv.formula));
         const pvResult = math.evaluate(pvClean, { ...scope });
         scope[pv.name] = typeof pvResult === "number" ? pvResult : (Number(pvResult) || 0);
       } catch {
@@ -73,7 +97,7 @@ export function evaluatePrice(
     }
   }
 
-  const cleanFormula = stripComments(formula);
+  const cleanFormula = sanitizeDigitAccessors(stripComments(formula));
 
   try {
     const result = math.evaluate(cleanFormula, scope);
