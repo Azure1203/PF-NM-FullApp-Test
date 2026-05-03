@@ -4,7 +4,7 @@
 > For an outside developer or AI: read this file first. It is the single source of truth.
 > Extracted from: `shared/schema.ts`, `server/routes.ts` (8 377 lines), `server/storage.ts`, `server/services/pricingEngine.ts`.
 >
-> **Last Updated:** 2026-05-02 21:35
+> **Last Updated:** 2026-05-03
 >
 > **AI agents:** see `AGENTS.md` for the standing rule that this file MUST
 > be updated after every change before the task is considered complete.
@@ -25,8 +25,8 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-05-02 |
-| **Current release** | r28 |
+| **Last updated** | 2026-05-03 |
+| **Current release** | r31 |
 | **Active branch** | main (Replit managed) |
 | **How to run (dev)** | `npm run dev` → starts Express + Vite on port 5000 |
 | **Entry point (backend)** | `server/index.ts` |
@@ -1035,6 +1035,60 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 ---
 
 ## 10. Changelog (reverse-chronological, recent releases)
+
+### r31 — 2026-05-03 — Fix PDF page-break orphaning across 5 generators
+
+**What changed:** Updated the 5 ReportLab Python PDF scripts to prevent
+SKU labels and totals blocks from orphaning at page bottoms when a section's
+data table breaks across pages.
+
+- `server/scripts/generate_invoice.py`
+  - Rewrote `build_section_flowables` using a head/tail table split. The
+    SKU label is now wrapped in `KeepTogether([sku_line, head_table])`
+    where `head_table` carries the column header + first 3 data rows. The
+    remaining rows flow as a separate tail table (with column header
+    repeated via `repeatRows=1`). Removed the old `<= 6 items` branch.
+  - Wrapped the totals block in `KeepTogether(build_totals_flowable(...))`
+    so "Original / Discount / Final Order Total" never orphans.
+- `server/scripts/generate_customer_packing_slip.py`
+  - Same head/tail split pattern in `build_section_flowables`. Removed
+    `<= 6` branch from the section loop in `generate()`.
+- `server/scripts/generate_internal_packing_slip.py`
+  - Same head/tail split pattern. Preserves the existing `'0'` column
+    blank-label logic. Removed `<= 6` branch from `generate()`.
+- `server/scripts/generate_elias_pdf.py`
+  - In `generate()`, replaced the `<= 6 items` branch with
+    `KeepTogether(flowables[:2])` so the supplier row always stays with
+    the data table (previously the supplier label could orphan when an
+    Elias section had > 6 items). Tail flowables (footer, HRFlowable,
+    spacer) flow naturally. The data table already had `repeatRows=1`.
+- `server/scripts/generate_cut_to_size.py`
+  - Wrapped `build_item_totals(...)` in `KeepTogether(...)` so
+    "Total Length / Total Rods Needed" never separates from the item
+    detail table above it. Both `build_length_summary` and
+    `build_item_detail` already had `repeatRows=1`.
+
+**Why:** Sections with many items were rendering the SKU header at the
+bottom of one page and the data table on the next, breaking visual
+grouping. The new pattern guarantees the SKU label always has at least
+3 data rows immediately below it.
+
+**Not changed:** No layout, color, font, column-width, data-mapping,
+JSON-interface, or canvas/footer changes. `generate_mj_pdf.py` was left
+as-is — its existing `<= 6` KeepTogether is sufficient for MJ section
+sizes.
+
+**Files affected:**
+- `server/scripts/generate_invoice.py`
+- `server/scripts/generate_customer_packing_slip.py`
+- `server/scripts/generate_internal_packing_slip.py`
+- `server/scripts/generate_elias_pdf.py`
+- `server/scripts/generate_cut_to_size.py`
+- `BUILD_STATUS.md`
+
+**Verification:** All 5 scripts compile cleanly via `py_compile`.
+
+---
 
 ### r30 — 2026-05-02 21:35 — Add AGENTS.md with standing BUILD_STATUS update rule
 

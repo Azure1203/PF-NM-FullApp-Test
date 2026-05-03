@@ -256,7 +256,7 @@ def generate(data):
     story.extend(build_header(data, styles))
     story.extend(build_length_summary(data, styles))
     story.extend(build_item_detail(data, styles))
-    story.extend(build_item_totals(data, styles))
+    story.append(KeepTogether(build_item_totals(data, styles)))
 
     def make_canvas_factory(oid):
         def factory(*args, **kwargs):

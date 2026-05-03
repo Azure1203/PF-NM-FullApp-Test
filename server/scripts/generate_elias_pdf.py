@@ -210,8 +210,12 @@ def generate(data):
     story.extend(build_header(data, styles))
     for section in data.get('sections', []):
         flowables = build_section(section, styles)
-        if len(section.get('items', [])) <= 6:
-            story.append(KeepTogether(flowables))
+        # flowables = [supplier_row, data_table, footer_table, HRFlowable, Spacer]
+        # Always keep supplier_row with the data_table so supplier label
+        # never orphans at page bottom without any data rows below it.
+        if len(flowables) >= 2:
+            story.append(KeepTogether(flowables[:2]))
+            story.extend(flowables[2:])
         else:
             story.extend(flowables)
 

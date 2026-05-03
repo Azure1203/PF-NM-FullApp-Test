@@ -170,8 +170,6 @@ def build_section_flowables(section, styles):
     color               = section.get('color')
     product_description = section.get('productDescription', '')
 
-    flowables = []
-
     sku_line = Table(
         [[PB(f"{sku}:"), P(product_description)]],
         colWidths=[USABLE_W * 0.35, USABLE_W * 0.65],
@@ -181,30 +179,34 @@ def build_section_flowables(section, styles):
         ('TOPPADDING',    (0, 0), (-1, -1), 0),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
     ]))
-    flowables.append(sku_line)
 
-    col_w = col_widths_for(columns)
+    col_w   = col_widths_for(columns)
     hdr_row = [Paragraph(c, styles['col_hdr']) for c in columns]
-    table_data = [hdr_row]
-    for item in items:
-        row = [Paragraph(cell_value(col, item), styles['cell']) for col in columns]
-        table_data.append(row)
 
-    t = Table(table_data, colWidths=col_w, repeatRows=1)
-    t.setStyle(TableStyle([
-        ('BACKGROUND',   (0, 0), (-1, 0),  CHARCOAL),
-        ('TEXTCOLOR',    (0, 0), (-1, 0),  colors.white),
-        ('FONTNAME',     (0, 0), (-1, 0),  'Helvetica-Bold'),
-        ('FONTSIZE',     (0, 0), (-1, -1), 7.5),
-        ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, LIGHT_GRAY]),
-        ('ALIGN',        (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN',       (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING',   (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING',(0, 0), (-1, -1), 3),
-        ('GRID',         (0, 0), (-1, -1), 0.25, MID_GRAY),
-        ('LINEBELOW',    (0, 0), (-1, 0),  1, GOLD),
-    ]))
-    flowables.append(t)
+    def make_table(data_rows):
+        table_data = [hdr_row] + data_rows
+        t = Table(table_data, colWidths=col_w, repeatRows=1)
+        t.setStyle(TableStyle([
+            ('BACKGROUND',    (0, 0), (-1, 0),  CHARCOAL),
+            ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+            ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+            ('FONTSIZE',      (0, 0), (-1, -1), 7.5),
+            ('ROWBACKGROUNDS',(0, 1), (-1, -1), [colors.white, LIGHT_GRAY]),
+            ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING',    (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('GRID',          (0, 0), (-1, -1), 0.25, MID_GRAY),
+            ('LINEBELOW',     (0, 0), (-1, 0),  1, GOLD),
+        ]))
+        return t
+
+    all_rows = [[Paragraph(cell_value(col, item), styles['cell']) for col in columns]
+                for item in items]
+
+    KEEP = 3
+    head_rows = all_rows[:KEEP]
+    tail_rows = all_rows[KEEP:]
 
     footer_txt = f"{total_items} Total Items"
     if color:
@@ -217,9 +219,14 @@ def build_section_flowables(section, styles):
         ('TOPPADDING',    (0, 0), (-1, -1), 2),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
+
+    head_table = make_table(head_rows)
+    flowables = []
+    flowables.append(KeepTogether([sku_line, head_table]))
+    if tail_rows:
+        flowables.append(make_table(tail_rows))
     flowables.append(footer_line)
     flowables.append(Spacer(1, 6))
-
     return flowables
 
 
@@ -231,11 +238,7 @@ def generate(data):
     story = []
     story.extend(build_header(data, styles))
     for section in data.get('sections', []):
-        flowables = build_section_flowables(section, styles)
-        if len(section.get('items', [])) <= 6:
-            story.append(KeepTogether(flowables))
-        else:
-            story.extend(flowables)
+        story.extend(build_section_flowables(section, styles))
 
     def make_canvas_factory(oid):
         def factory(*args, **kwargs):
