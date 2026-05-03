@@ -3,6 +3,11 @@
 > **Living document.** Updated automatically with every meaningful change.
 > For an outside developer or AI: read this file first. It is the single source of truth.
 > Extracted from: `shared/schema.ts`, `server/routes.ts` (8 377 lines), `server/storage.ts`, `server/services/pricingEngine.ts`.
+>
+> **Last Updated:** 2026-05-02 21:35
+>
+> **AI agents:** see `AGENTS.md` for the standing rule that this file MUST
+> be updated after every change before the task is considered complete.
 
 ---
 
@@ -1030,6 +1035,35 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 ---
 
 ## 10. Changelog (reverse-chronological, recent releases)
+
+### r30 — 2026-05-02 21:35 — Add AGENTS.md with standing BUILD_STATUS update rule
+
+**What changed:** Created `AGENTS.md` at the project root. It establishes a
+mandatory rule: after every change, fix, or feature — no matter how small —
+`BUILD_STATUS.md` must be updated before the task is considered complete.
+The file specifies the required updates:
+- Prepend a new entry to Section 10 (Changelog) with date/time, what
+  changed, why, and files affected.
+- Update Section 8 (Feature Status) if any feature changed state.
+- Update Section 9 (Known Issues) for any bug fixed or newly introduced.
+- Bump the `**Last Updated:**` timestamp at the top.
+- Refresh the schema/routes/storage/pricing extraction line if line counts
+  shifted.
+Includes a process checklist to run through before calling
+`mark_task_complete`. Also added a `**Last Updated:**` field to the
+`BUILD_STATUS.md` header (it didn't previously exist) and a pointer from
+the header to `AGENTS.md`.
+
+**Why:** User request. Earlier work drifted because "small" changes
+(security patches, config tweaks, post-merge script updates) skipped the
+changelog. Months later it was unclear which dependency version was
+running, why options had been chosen, and whether known issues were still
+open. `BUILD_STATUS.md` is the project's memory between AI sessions; the
+new rule makes its maintenance non-optional.
+
+**Files affected:** `AGENTS.md` (new), `BUILD_STATUS.md`.
+
+---
 
 ### r29 — 2026-05-02 — Major-version dependency upgrades + outlook_sync_status orphan cleanup (Tasks #33–#36)
 
