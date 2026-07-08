@@ -2,9 +2,9 @@
 
 > **Living document.** Updated automatically with every meaningful change.
 > For an outside developer or AI: read this file first. It is the single source of truth.
-> Extracted from: `shared/schema.ts`, `server/routes.ts` (8 377 lines), `server/storage.ts`, `server/services/pricingEngine.ts`.
+> Extracted from: `shared/schema.ts` (538 lines), `server/routes.ts` (8 392 lines), `server/storage.ts` (1 058 lines), `server/services/pricingEngine.ts`.
 >
-> **Last Updated:** 2026-05-03
+> **Last Updated:** 2026-07-08
 >
 > **AI agents:** see `AGENTS.md` for the standing rule that this file MUST
 > be updated after every change before the task is considered complete.
@@ -25,8 +25,8 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 
 | Field | Value |
 |---|---|
-| **Last updated** | 2026-05-03 |
-| **Current release** | r31 |
+| **Last updated** | 2026-07-08 |
+| **Current release** | r33 |
 | **Active branch** | main (Replit managed) |
 | **How to run (dev)** | `npm run dev` → starts Express + Vite on port 5000 |
 | **Entry point (backend)** | `server/index.ts` |
@@ -51,6 +51,7 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 | tsx ^4.21.0 | Backend TypeScript runner |
 | tailwindcss ^3.4.17 | Utility CSS |
 | shadcn/ui (Radix UI) | Component library |
+| @anthropic-ai/claude-code ^2.1.132 | Claude Code CLI (dev tooling) |
 | asana ^3.1.5 | Asana API client |
 | googleapis ^171.4.0 | Google Sheets / Drive backup |
 | archiver ^7.0.1 | ZIP generation for multi-file ORD downloads |
@@ -67,6 +68,7 @@ Production-ready internal order management dashboard for **Netley Millwork / Per
 ```
 project root
 ├── BUILD_STATUS.md              ← This file (living build state)
+├── AGENTS.md                    ← Mandatory rule: BUILD_STATUS.md must be updated after every change
 ├── CHANGELOG.md                 ← Full reverse-chronological change log (r1–r26)
 ├── ORDER_PROCESS_GUIDE.md       ← End-to-end guide for shop staff
 ├── replit.md                    ← Replit-specific notes + architecture pointer
@@ -84,7 +86,7 @@ project root
 │
 ├── server/
 │   ├── index.ts                 ← Express app entry point; starts schedulers after server boot
-│   ├── routes.ts                ← All ~135 API route handlers (8 377 lines)
+│   ├── routes.ts                ← All ~135 API route handlers (8 392 lines)
 │   ├── storage.ts               ← IStorage interface + DatabaseStorage class (all DB CRUD)
 │   ├── db.ts                    ← Drizzle/pg connection pool
 │   ├── static.ts                ← Production static file serving
@@ -149,6 +151,8 @@ project root
 │       ├── HowItWorks.tsx       ← /how-it-works — system documentation page
 │       ├── Landing.tsx          ← Unauthenticated landing/login page
 │       ├── not-found.tsx        ← 404 page
+│       ├── daily/
+│       │   └── OrderProcessingDashboard.tsx  ← /daily — daily order processing dashboard
 │       ├── order-detail/
 │       │   ├── FileSidebar.tsx
 │       │   ├── DocumentsView.tsx
@@ -1026,7 +1030,7 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 
 ## 9. Known Issues & Bugs
 
-1. **[PARTIALLY RESOLVED] `outlook_sync_status` orphan table** — Verified in r29 that the table actually still existed in BOTH dev and prod (the r25-c BUILD_STATUS claim that dev was already cleaned was inaccurate). Dropped from dev via direct SQL (`DROP TABLE IF EXISTS outlook_sync_status`) in r29 so it now matches the schema (1 row of stale sync metrics discarded — column was removed from the codebase in r25-b, no reader/writer remained). Production still has the table; will be cleaned on next Publish, when Replit's dev↔prod schema diff offers the drop. No manual action required for prod — the supported path is Publish.
+1. **[RESOLVED] `outlook_sync_status` orphan table** — Dropped from dev in r29. App was published (deployed) after r30, which ran `db:push` against production and dropped the table there as well. Both dev and prod now match the schema with no `outlook_sync_status` table.
 
 2. **[RESOLVED] Grid column digit-prefix UI warning** — Resolved in r28. Grid Manager now displays an amber banner at the top of the selected grid when any column name starts with a digit, listing the offending columns and showing an example formula reference (`alias._{column}` form) so admins know to add the leading underscore.
 
@@ -1035,6 +1039,40 @@ All routes require `isAuthenticated` middleware (Replit session) unless noted.
 ---
 
 ## 10. Changelog (reverse-chronological, recent releases)
+
+### r33 — 2026-07-08 — BUILD_STATUS.md full refresh
+
+**What changed:** Full refresh of this file to reflect the current app state.
+
+- Updated `**Last Updated:**` to 2026-07-08.
+- Bumped `**Current release**` to r33.
+- Updated file-count annotations in the header extraction line
+  (`routes.ts` 8 392 lines, `storage.ts` 1 058 lines, `schema.ts` 538 lines).
+- Updated `routes.ts` line count in §3 file tree (8 377 → 8 392).
+- Added `AGENTS.md` to §3 project root file tree.
+- Added `client/src/pages/daily/OrderProcessingDashboard.tsx` to §3 file tree.
+- Added `@anthropic-ai/claude-code ^2.1.132` to §2 Key Dependencies table
+  (added in r32).
+- Marked Known Issue #1 (`outlook_sync_status` orphan table) as fully
+  **[RESOLVED]** — production table was dropped when the app was published
+  after r30.
+- Added `.claude-user` note in §3 `.gitignore` (see r32).
+
+**Files affected:** `BUILD_STATUS.md`
+
+---
+
+### r32 — 2026-07-08 — Add .claude-user to .gitignore; add @anthropic-ai/claude-code
+
+**What changed:**
+- Added `.claude-user` to `.gitignore` (ignores the file/directory and all
+  contents at any depth) so Claude Code session state is not committed.
+- `@anthropic-ai/claude-code ^2.1.132` added to `package.json` dependencies
+  by the Replit platform when Claude Code was connected.
+
+**Files affected:** `.gitignore`, `package.json`
+
+---
 
 ### r31 — 2026-05-03 — Fix PDF page-break orphaning across 5 generators
 
